@@ -114,21 +114,21 @@ const Contact = () => {
         </div>
 
         {/* Quick action buttons */}
-        <div className='mt-5 flex flex-wrap gap-3'>
+        <div className='mt-5 flex flex-wrap gap-2 sm:gap-3'>
           <a href='tel:+918877663311'
-            className='inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold
-                       bg-blue-600 text-white hover:bg-blue-700 hover:scale-105 transition-all shadow-md'>
+            className='inline-flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold
+                       bg-blue-600 text-white hover:bg-blue-700 active:scale-95 transition-all shadow-md'>
             📞 Call Now
           </a>
           <a href='https://wa.me/918877663311?text=Hi%20Siddharth!%20I%20found%20your%20portfolio%20and%20would%20love%20to%20connect.'
             target='_blank' rel='noreferrer'
-            className='inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold
-                       bg-green-600 text-white hover:bg-green-700 hover:scale-105 transition-all shadow-md'>
+            className='inline-flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold
+                       bg-green-600 text-white hover:bg-green-700 active:scale-95 transition-all shadow-md'>
             💬 WhatsApp
           </a>
           <a href='mailto:siddharthfulia7@gmail.com'
-            className='inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold
-                       border-2 border-slate-300 text-slate-600 hover:bg-slate-50 hover:scale-105 transition-all'>
+            className='inline-flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold
+                       border-2 border-slate-300 text-slate-600 hover:bg-slate-50 active:scale-95 transition-all'>
             📧 Email
           </a>
         </div>

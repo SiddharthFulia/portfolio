@@ -63,16 +63,16 @@ const Projects = () => {
             {/* Gradient accent bar */}
             <div className={`h-1.5 bg-gradient-to-r ${proj.gradient}`} />
 
-            <div className='p-6 md:p-8 flex flex-col md:flex-row gap-6 items-start'>
+            <div className='p-4 sm:p-6 md:p-8 flex flex-col md:flex-row gap-4 sm:gap-6 items-start'>
               {/* Icon */}
-              <div className={`w-16 h-16 rounded-xl bg-gradient-to-br ${proj.gradient} flex items-center justify-center text-3xl shadow-lg shrink-0`}>
+              <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-xl bg-gradient-to-br ${proj.gradient} flex items-center justify-center text-2xl sm:text-3xl shadow-lg shrink-0`}>
                 {proj.icon}
               </div>
 
               {/* Content */}
               <div className='flex-1 min-w-0'>
-                <div className='flex items-center gap-3 flex-wrap mb-2'>
-                  <h3 className='font-poppins font-bold text-2xl text-black'>{proj.title}</h3>
+                <div className='flex items-center gap-2 sm:gap-3 flex-wrap mb-2'>
+                  <h3 className='font-poppins font-bold text-xl sm:text-2xl text-black'>{proj.title}</h3>
                   <span className='text-xs font-semibold px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200'>
                     {proj.tag}
                   </span>
@@ -89,37 +89,37 @@ const Projects = () => {
                 </div>
 
                 {/* Action buttons */}
-                <div className='flex flex-wrap gap-3 items-center'>
+                <div className='flex flex-wrap gap-2 sm:gap-3 items-center'>
                   <Link to={proj.route}
-                    className='inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-white text-sm
+                    className='inline-flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-bold text-white text-xs sm:text-sm
                                bg-gradient-to-r from-amber-500 to-orange-600 shadow-md shadow-orange-200
                                hover:scale-105 hover:shadow-lg transition-all duration-200'>
                     ▶ Visualize Live
                   </Link>
                   <a href={proj.github} target='_blank' rel='noreferrer'
-                    className='inline-flex items-center gap-2 px-5 py-3 rounded-xl font-semibold text-sm
+                    className='inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl font-semibold text-xs sm:text-sm
                                border-2 border-slate-300 text-slate-600 hover:border-slate-400 hover:bg-slate-50
                                hover:scale-105 transition-all duration-200'>
                     GitHub ↗
                   </a>
                   {/* Private repo info icon */}
                   <div className='relative group'>
-                    <div className='w-8 h-8 rounded-full bg-amber-50 border-2 border-amber-200 flex items-center justify-center
+                    <div className='w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-amber-50 border-2 border-amber-200 flex items-center justify-center
                                     cursor-default hover:bg-amber-100 hover:border-amber-300 transition-all duration-200'>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2.5" strokeLinecap="round">
                         <circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" />
                       </svg>
                     </div>
-                    <div className='absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-56 px-4 py-3 bg-gray-900 text-white text-xs
+                    <div className='absolute bottom-full right-0 sm:left-1/2 sm:-translate-x-1/2 mb-3 w-52 sm:w-56 px-3 sm:px-4 py-3 bg-gray-900 text-white text-xs
                                     rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all
                                     duration-200 scale-95 group-hover:scale-100 z-20 leading-relaxed'>
                       <div className='flex items-center gap-1.5 mb-1.5'>
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
                         <span className='font-bold text-amber-400'>Private Repository</span>
                       </div>
-                      <p className='text-gray-400'>Proprietary search algorithms, evaluation logic & move generation.</p>
-                      <p className='text-gray-500 mt-1.5'>Request access via GitHub to review the source code.</p>
-                      <div className='absolute top-full left-1/2 -translate-x-1/2 border-[6px] border-transparent border-t-gray-900' />
+                      <p className='text-gray-400'>Proprietary algorithms, evaluation & move generation.</p>
+                      <p className='text-gray-500 mt-1'>Request access via GitHub.</p>
+                      <div className='absolute top-full right-3 sm:left-1/2 sm:-translate-x-1/2 sm:right-auto border-[6px] border-transparent border-t-gray-900' />
                     </div>
                   </div>
                 </div>

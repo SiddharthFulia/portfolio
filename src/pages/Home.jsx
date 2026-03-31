@@ -142,16 +142,16 @@ const Home = () => {
 
       {/* Drag hint — shows on first load */}
       {showHint && (
-        <div className='absolute bottom-24 left-0 right-0 z-10 flex justify-center pointer-events-none'>
-          <div className='flex items-center gap-3 bg-white/90 backdrop-blur-sm px-5 py-3 rounded-full shadow-lg
-                          animate-bounce' style={{ animationDuration: '2s' }}>
-            <span className='text-2xl'>👆</span>
-            <div className='text-sm text-gray-700'>
-              <span className='font-semibold'>Drag left or right</span> to explore the island
+        <div className='absolute bottom-20 sm:bottom-24 left-0 right-0 z-10 flex justify-center pointer-events-none px-4'>
+          <div className='flex items-center gap-2 sm:gap-3 bg-white/90 backdrop-blur-sm px-4 sm:px-5 py-2.5 sm:py-3 rounded-full shadow-lg
+                          animate-bounce max-w-[90vw]' style={{ animationDuration: '2s' }}>
+            <span className='text-xl sm:text-2xl shrink-0'>👆</span>
+            <div className='text-xs sm:text-sm text-gray-700'>
+              <span className='font-semibold'>Drag left or right</span> to explore
               <br />
-              <span className='text-gray-400 text-xs'>Stop at each station to learn more</span>
+              <span className='text-gray-400 text-[10px] sm:text-xs'>Stop at each station to learn more</span>
             </div>
-            <span className='text-lg'>↔</span>
+            <span className='text-base sm:text-lg shrink-0'>↔</span>
           </div>
         </div>
       )}

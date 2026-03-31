@@ -1233,9 +1233,9 @@ export default function ChessEngine() {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center',
-      gap: '16px', padding: '20px 10px', color: '#e2e8f0',
+      gap: '12px', padding: '12px 4px', color: '#e2e8f0',
       fontFamily: "'Inter', system-ui, sans-serif",
-      maxWidth: '960px', margin: '0 auto',
+      maxWidth: '960px', margin: '0 auto', width: '100%', boxSizing: 'border-box',
     }}>
       {/* Title */}
       <div style={{ textAlign: 'center', marginBottom: 4 }}>
@@ -1253,12 +1253,12 @@ export default function ChessEngine() {
 
       {/* Main layout */}
       <div style={{
-        display: 'flex', gap: '16px', width: '100%',
+        display: 'flex', gap: '12px', width: '100%',
         justifyContent: 'center', flexWrap: 'wrap',
-        alignItems: 'flex-start',
+        alignItems: 'flex-start', boxSizing: 'border-box',
       }}>
         {/* Eval bar + Board */}
-        <div style={{ display: 'flex', gap: '6px' }}>
+        <div style={{ display: 'flex', gap: '4px', maxWidth: '100%' }}>
           {/* Eval bar */}
           <div style={{
             width: '20px', borderRadius: '4px', overflow: 'hidden',
@@ -1325,8 +1325,8 @@ export default function ChessEngine() {
                 display: 'grid',
                 gridTemplateColumns: 'repeat(8, 1fr)',
                 gridTemplateRows: 'repeat(8, 1fr)',
-                width: 'min(calc(100vw - 100px), 580px)',
-                height: 'min(calc(100vw - 100px), 580px)',
+                width: 'min(calc(100vw - 24px), 580px)',
+                height: 'min(calc(100vw - 24px), 580px)',
                 borderRadius: '4px',
                 overflow: 'hidden',
                 boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
@@ -1512,7 +1512,8 @@ export default function ChessEngine() {
         {/* Side panel */}
         <div style={{
           display: 'flex', flexDirection: 'column', gap: '10px',
-          minWidth: '200px', maxWidth: '240px', flex: '1 1 200px',
+          minWidth: '0', maxWidth: '100%', width: '100%',
+          flex: '1 1 200px',
         }}>
           {/* Controls */}
           <div style={{

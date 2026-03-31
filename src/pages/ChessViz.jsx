@@ -19,7 +19,7 @@ export default function ChessViz() {
       <div className='fixed inset-0 pointer-events-none opacity-[0.03]'
         style={{ backgroundImage: 'radial-gradient(circle, #22d3ee 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
 
-      <div className='relative max-w-6xl mx-auto px-6 pt-28 pb-24'>
+      <div className='relative max-w-6xl mx-auto px-3 sm:px-6 pt-24 sm:pt-28 pb-16 sm:pb-24'>
         {/* Breadcrumb */}
         <div className='flex items-center gap-2 text-sm text-gray-500 mb-6'>
           <Link to='/projects' className='hover:text-gray-300 transition-colors'>Projects</Link>
@@ -28,18 +28,18 @@ export default function ChessViz() {
         </div>
 
         {/* Hero */}
-        <div className='mb-10'>
-          <div className='flex items-center gap-4 mb-3'>
-            <span className='text-4xl'>♟</span>
+        <div className='mb-8 sm:mb-10'>
+          <div className='flex items-center gap-3 sm:gap-4 mb-3'>
+            <span className='text-3xl sm:text-4xl'>♟</span>
             <div>
-              <h1 className='font-poppins font-black text-4xl md:text-5xl bg-gradient-to-r from-amber-400 via-orange-400 to-red-500 bg-clip-text text-transparent'>
+              <h1 className='font-poppins font-black text-2xl sm:text-4xl md:text-5xl bg-gradient-to-r from-amber-400 via-orange-400 to-red-500 bg-clip-text text-transparent'>
                 Chess Engine
               </h1>
-              <p className='text-gray-500 text-sm mt-1'>Live visualization of the engine running in your browser</p>
+              <p className='text-gray-500 text-xs sm:text-sm mt-1'>Live visualization of the engine running in your browser</p>
             </div>
           </div>
 
-          <div className='flex flex-wrap gap-6 mt-4'>
+          <div className='flex flex-wrap gap-4 sm:gap-6 mt-4'>
             {[
               ['Language', 'C / JS', 'text-cyan-400'],
               ['Search', 'Alpha-Beta Pruning', 'text-green-400'],
@@ -126,13 +126,13 @@ export default function ChessViz() {
 
         {/* Chess Engine */}
         <div className='bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden'>
-          <div className='flex items-center gap-2 px-5 py-3 bg-gray-800/60 border-b border-gray-700/60'>
-            <span className='text-white font-semibold text-sm'>Live Chess Engine</span>
-            <span className='px-2 py-0.5 bg-gray-800 text-amber-400 text-xs rounded font-mono'>Alpha-Beta</span>
-            <span className='px-2 py-0.5 bg-gray-800 text-cyan-400 text-xs rounded font-mono'>Iterative Deepening</span>
-            <span className='px-2 py-0.5 bg-gray-800 text-green-400 text-xs rounded font-mono'>Quiescence Search</span>
-            <span className='px-2 py-0.5 bg-gray-800 text-purple-400 text-xs rounded font-mono'>MVV-LVA</span>
-            <span className='px-2 py-0.5 bg-gray-800 text-pink-400 text-xs rounded font-mono'>Delta Pruning</span>
+          <div className='flex flex-wrap items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 sm:py-3 bg-gray-800/60 border-b border-gray-700/60'>
+            <span className='text-white font-semibold text-xs sm:text-sm mr-1'>Live Chess Engine</span>
+            <span className='px-1.5 sm:px-2 py-0.5 bg-gray-800 text-amber-400 text-[10px] sm:text-xs rounded font-mono'>Alpha-Beta</span>
+            <span className='px-1.5 sm:px-2 py-0.5 bg-gray-800 text-cyan-400 text-[10px] sm:text-xs rounded font-mono'>Iterative Deepening</span>
+            <span className='px-1.5 sm:px-2 py-0.5 bg-gray-800 text-green-400 text-[10px] sm:text-xs rounded font-mono'>Quiescence Search</span>
+            <span className='hidden sm:inline px-2 py-0.5 bg-gray-800 text-purple-400 text-xs rounded font-mono'>MVV-LVA</span>
+            <span className='hidden sm:inline px-2 py-0.5 bg-gray-800 text-pink-400 text-xs rounded font-mono'>Delta Pruning</span>
           </div>
           <div className='p-4'>
             <Suspense fallback={<Loader />}>
