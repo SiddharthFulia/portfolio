@@ -2,6 +2,7 @@ import { VerticalTimeline, VerticalTimelineElement } from "react-vertical-timeli
 import { motion } from "framer-motion";
 import "react-vertical-timeline-component/style.min.css";
 
+import { useState } from "react";
 import { CTA } from "../components";
 import { experiences, skills, publications, achievements, competitiveProgramming } from "../constants";
 
@@ -14,6 +15,152 @@ const stagger = {
   hidden: {},
   show: { transition: { staggerChildren: 0.1 } },
 };
+
+const EXPERTISE = [
+  {
+    id: 'backend',
+    icon: '⚙️',
+    title: 'Backend Architecture',
+    color: 'from-blue-600 to-cyan-500',
+    tags: ['Node.js', 'Express.js', 'REST APIs', 'RabbitMQ', 'Redis', 'PM2'],
+    summary: 'Built 100+ production REST APIs powering analytics, reporting, and AI-driven insights at scale.',
+    details: [
+      'Designed scalable microservice architecture with Express.js handling 10K+ requests/day',
+      'Engineered RabbitMQ job queues with retry logic, dead-letter exchanges, and fail-safe execution for 10K+ daily jobs',
+      'Implemented Redis caching layer — reduced API latency by 40% across critical endpoints',
+      'Built automated email reporting pipeline via Mailgun delivering scheduled digests to 30+ stakeholders',
+      'Set up PM2 process management with zero-downtime deployments and health monitoring',
+    ],
+  },
+  {
+    id: 'frontend',
+    icon: '🎨',
+    title: 'Frontend & UI',
+    color: 'from-purple-600 to-pink-500',
+    tags: ['React', 'Next.js 15', 'TailwindCSS', 'Ant Design', 'MUI', 'Framer Motion', 'Three.js'],
+    summary: 'Pixel-perfect responsive interfaces with 3D effects, complex data dashboards, and rich text editors.',
+    details: [
+      'Built production Next.js 15 app with App Router, Server Components, and ISR for a multi-tenant analytics platform',
+      'Implemented complex data visualization dashboards with Chart.js and Tremor for real-time analytics',
+      'Integrated TipTap rich text editor for content management with custom extensions',
+      'Created interactive 3D experiences with Three.js — solar systems, particle fields, gravity simulations',
+      'Designed responsive layouts with TailwindCSS + Ant Design component library across 50+ pages',
+    ],
+  },
+  {
+    id: 'ai',
+    icon: '🤖',
+    title: 'AI & ML Systems',
+    color: 'from-green-600 to-emerald-500',
+    tags: ['LangChain', 'OpenAI API', 'Anthropic SDK', 'Google Vertex AI', 'PyTorch', 'GNNs'],
+    summary: 'From LLM-powered product features to graph neural networks for blockchain security research.',
+    details: [
+      'Integrated LangChain + LangGraph for AI-driven content analysis and automated insights generation',
+      'Built production AI features using OpenAI API, Anthropic SDK, and Google Vertex AI',
+      'Developed Graph Neural Network models (PyTorch) for blockchain phishing detection at IIT Patna — 96.7% F1',
+      'Implemented quantum-resistant cryptographic protocols for post-quantum blockchain security',
+      'Designed AI-powered analytics pipelines processing data from Google Search Console + GA4',
+    ],
+  },
+  {
+    id: 'database',
+    icon: '🗄️',
+    title: 'Databases & Data',
+    color: 'from-orange-600 to-yellow-500',
+    tags: ['MongoDB', 'PostgreSQL', 'MySQL', 'Redis', 'Google BigQuery', 'Knex.js'],
+    summary: 'Multi-database architecture with optimized queries, indexing strategies, and cloud data warehousing.',
+    details: [
+      'Designed MongoDB schemas with compound indexes, aggregation pipelines, and change streams',
+      'Built PostgreSQL + Knex.js query builder layer for structured analytics data',
+      'Integrated Google Cloud BigQuery for large-scale data warehousing and analytical queries',
+      'Implemented Redis for session management, rate limiting, and API response caching',
+      'Optimized database performance via strategic indexing, pagination, and query profiling — 40% latency reduction',
+    ],
+  },
+  {
+    id: 'devops',
+    icon: '🐳',
+    title: 'DevOps & Cloud',
+    color: 'from-cyan-600 to-blue-500',
+    tags: ['Docker', 'Google Cloud', 'Puppeteer', 'Node-cron', 'CI/CD'],
+    summary: 'Containerized deployments, automated scraping pipelines, and scheduled cloud workflows.',
+    details: [
+      'Containerized services with Docker for consistent dev/staging/production environments',
+      'Built automated web scraping pipelines with Puppeteer for competitive intelligence data',
+      'Engineered Node-cron scheduled jobs for automated report generation and data sync',
+      'Set up Google Cloud infrastructure — BigQuery, Vertex AI, and Cloud Storage',
+      'Implemented CI/CD pipelines with automated testing and zero-downtime deployment strategies',
+    ],
+  },
+  {
+    id: 'sysdesign',
+    icon: '🏗️',
+    title: 'System Design',
+    color: 'from-red-600 to-rose-500',
+    tags: ['Microservices', 'Message Queues', 'Caching', 'Rate Limiting', 'API Design'],
+    summary: 'Designed distributed systems handling 10K+ daily jobs with fault tolerance and horizontal scalability.',
+    details: [
+      'Architected event-driven microservices with RabbitMQ message queues for async job processing',
+      'Designed multi-layer caching strategy: Redis L1 cache + CDN L2 + browser cache headers',
+      'Implemented rate limiting, request throttling, and circuit breaker patterns for API resilience',
+      'Built automated retry mechanisms with exponential backoff and dead-letter queue handling',
+      'Designed RESTful API contracts with versioning, pagination, filtering, and comprehensive error handling',
+    ],
+  },
+];
+
+function ExpertiseCard({ item }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <motion.div variants={fadeUp}>
+      <div
+        className={`bg-white rounded-2xl border border-slate-100 shadow-md overflow-hidden
+                     transition-all duration-300 ${open ? 'shadow-xl ring-2 ring-blue-100' : 'hover:-translate-y-1 hover:shadow-lg'}`}
+      >
+        {/* Header — always visible, clickable */}
+        <button
+          onClick={() => setOpen(o => !o)}
+          className="w-full text-left"
+        >
+          <div className={`bg-gradient-to-r ${item.color} p-5 flex items-center justify-between`}>
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">{item.icon}</span>
+              <div>
+                <h4 className="text-white font-poppins font-bold text-lg">{item.title}</h4>
+                <p className="text-white/80 text-xs mt-0.5 max-w-md">{item.summary}</p>
+              </div>
+            </div>
+            <span className={`text-white text-xl transition-transform duration-300 ${open ? 'rotate-45' : ''}`}>+</span>
+          </div>
+        </button>
+
+        {/* Tags — always visible */}
+        <div className="px-5 py-3 flex flex-wrap gap-1.5 border-b border-slate-100">
+          {item.tags.map(t => (
+            <span key={t} className="px-2.5 py-1 bg-slate-100 text-slate-600 text-xs font-semibold rounded-full">
+              {t}
+            </span>
+          ))}
+        </div>
+
+        {/* Expandable details */}
+        <div
+          className="overflow-hidden transition-all duration-500 ease-in-out"
+          style={{ maxHeight: open ? '600px' : '0px', opacity: open ? 1 : 0 }}
+        >
+          <ul className="p-5 space-y-3">
+            {item.details.map((d, i) => (
+              <li key={i} className="flex gap-2 text-sm text-slate-600 leading-relaxed">
+                <span className="text-blue-500 mt-0.5 shrink-0">▸</span>
+                <span>{d}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
 
 const About = () => {
   return (
@@ -94,6 +241,22 @@ const About = () => {
             ))}
           </VerticalTimeline>
         </div>
+      </div>
+
+      {/* ── Tech Expertise ── */}
+      <div className='py-16'>
+        <motion.h3 className='subhead-text' initial="hidden" whileInView="show"
+          variants={fadeUp} viewport={{ once: true }}>What I Build.</motion.h3>
+        <motion.p className='mt-5 text-slate-500' initial="hidden" whileInView="show"
+          variants={fadeUp} viewport={{ once: true }}>
+          Real-world systems I've designed and shipped — click each to see details.
+        </motion.p>
+        <motion.div className='mt-12 grid grid-cols-1 md:grid-cols-2 gap-6'
+          initial="hidden" whileInView="show" variants={stagger} viewport={{ once: true }}>
+          {EXPERTISE.map(item => (
+            <ExpertiseCard key={item.id} item={item} />
+          ))}
+        </motion.div>
       </div>
 
       {/* ── Research & Publications ── */}
