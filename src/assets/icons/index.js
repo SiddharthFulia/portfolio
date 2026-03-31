@@ -30,6 +30,12 @@ import python from './python.svg'
 import cplusplus from './cplusplus.svg'
 import postgresql from './postgresql.svg'
 import pytorch from './pytorch.svg'
+import redis from './redis.svg'
+import docker from './docker.svg'
+import mysql from './mysql.svg'
+import langchain from './langchain.svg'
+import openai from './openai.svg'
+import rabbitmq from './rabbitmq.svg'
 
 export {
     css, express, git, github, html, javascript, mongodb, motion, mui,
@@ -37,4 +43,5 @@ export {
     linkedin, twitter, car, estate, pricewise, snapgram, summiz,
     threads, arrow, contact, soundon, soundoff,
     python, cplusplus, postgresql, pytorch,
+    redis, docker, mysql, langchain, openai, rabbitmq,
 }

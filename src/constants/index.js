@@ -17,6 +17,13 @@ import {
     cplusplus,
     postgresql,
     pytorch,
+    redis,
+    docker,
+    mysql,
+    langchain,
+    openai,
+    rabbitmq,
+    mui,
     summiz,
     pricewise,
     snapgram,
@@ -101,6 +108,41 @@ export const skills = [
         imageUrl: css,
         name: "CSS",
         type: "Frontend",
+    },
+    {
+        imageUrl: redis,
+        name: "Redis",
+        type: "Database",
+    },
+    {
+        imageUrl: docker,
+        name: "Docker",
+        type: "DevOps",
+    },
+    {
+        imageUrl: mysql,
+        name: "MySQL",
+        type: "Database",
+    },
+    {
+        imageUrl: rabbitmq,
+        name: "RabbitMQ",
+        type: "Backend",
+    },
+    {
+        imageUrl: mui,
+        name: "Material UI",
+        type: "Frontend",
+    },
+    {
+        imageUrl: langchain,
+        name: "LangChain",
+        type: "AI / ML",
+    },
+    {
+        imageUrl: openai,
+        name: "OpenAI API",
+        type: "AI / ML",
     },
 ];
 

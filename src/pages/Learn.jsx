@@ -1,10 +1,38 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import BSTVisualizer from '../components/lab/BSTVisualizer'
 import RedBlackTree from '../components/lab/RedBlackTree'
 import HeapVisualizer from '../components/lab/HeapVisualizer'
 import DPVisualizer from '../components/lab/DPVisualizer'
 import SortingVisualizer from '../components/lab/SortingVisualizer'
 import GraphTraversal from '../components/lab/GraphTraversal'
+
+function FadeIn({ children, delay = 0, className = '' }) {
+  const ref = useRef()
+  const [visible, setVisible] = useState(false)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const obs = new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) { setVisible(true); obs.disconnect() } },
+      { threshold: 0.08 }
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
+  return (
+    <div
+      ref={ref}
+      className={className}
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateY(0)' : 'translateY(36px)',
+        transition: `opacity 0.6s ease ${delay}s, transform 0.6s ease ${delay}s`,
+      }}
+    >
+      {children}
+    </div>
+  )
+}
 
 const CATEGORIES = ['All', 'DSA', 'Algorithms', 'CP', 'System Design', 'Web Dev']
 
@@ -1743,65 +1771,80 @@ export default function Learn() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <div className="max-w-6xl mx-auto px-6 pt-28 pb-8">
+      {/* Subtle grid bg */}
+      <div className="fixed inset-0 pointer-events-none opacity-[0.03]"
+        style={{ backgroundImage: 'radial-gradient(circle, #a855f7 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
+
+      <div className="relative max-w-6xl mx-auto px-6 pt-28 pb-8">
         {/* Hero */}
-        <h1 className="font-poppins font-black text-5xl md:text-6xl bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent leading-tight">
-          Learn CS
-        </h1>
-        <p className="text-gray-400 mt-3 text-base max-w-xl">
-          Interactive tutorials on DSA, system design &amp; competitive programming — with live visualizers you can play with.
-        </p>
+        <FadeIn>
+          <h1 className="font-poppins font-black text-5xl md:text-6xl bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent leading-tight">
+            Learn CS
+          </h1>
+          <p className="text-gray-400 mt-3 text-base max-w-xl">
+            Interactive tutorials on DSA, system design &amp; competitive programming — with live visualizers you can play with.
+          </p>
+        </FadeIn>
 
         {/* Stats row */}
-        <div className="flex flex-wrap gap-6 mt-6">
-          {[
-            [String(TUTORIALS.length), 'Tutorials'],
-            [String(TUTORIALS.reduce((a, t) => a + t.steps.length, 0)), 'Total Steps'],
-            [String(completed.size), 'Completed'],
-            ['6', 'Live Demos'],
-          ].map(([n, l]) => (
-            <div key={l}>
-              <div className="text-2xl font-black text-purple-400">{n}</div>
-              <div className="text-xs text-gray-500">{l}</div>
-            </div>
-          ))}
-        </div>
+        <FadeIn delay={0.1}>
+          <div className="flex flex-wrap gap-8 mt-6">
+            {[
+              [String(TUTORIALS.length), 'Tutorials', 'text-purple-400'],
+              [String(TUTORIALS.reduce((a, t) => a + t.steps.length, 0)), 'Total Steps', 'text-cyan-400'],
+              [String(completed.size), 'Completed', 'text-green-400'],
+              ['6', 'Live Demos', 'text-pink-400'],
+            ].map(([n, l, color]) => (
+              <div key={l} className="text-center">
+                <div className={`text-3xl font-black ${color}`}>{n}</div>
+                <div className="text-xs text-gray-500 mt-0.5">{l}</div>
+              </div>
+            ))}
+          </div>
+        </FadeIn>
 
         {/* Category filter */}
-        <div className="flex flex-wrap gap-2 mt-8 mb-8">
-          {CATEGORIES.map(cat => (
-            <button
-              key={cat}
-              onClick={() => { setActiveCategory(cat); setOpenId(null) }}
-              className={`px-4 py-2 rounded-full text-sm font-semibold transition-all ${
-                activeCategory === cat
-                  ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/30'
-                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
-              }`}
-            >
-              {cat}
-              {cat !== 'All' && (
-                <span className="ml-1.5 text-xs opacity-60">
-                  {TUTORIALS.filter(t => t.category === cat).length}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+        <FadeIn delay={0.2}>
+          <div className="flex flex-wrap gap-2 mt-8 mb-8">
+            {CATEGORIES.map(cat => (
+              <button
+                key={cat}
+                onClick={() => { setActiveCategory(cat); setOpenId(null) }}
+                className={`px-4 py-2 rounded-full text-sm font-semibold transition-all ${
+                  activeCategory === cat
+                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/30'
+                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                }`}
+              >
+                {cat}
+                {cat !== 'All' && (
+                  <span className="ml-1.5 text-xs opacity-60">
+                    {TUTORIALS.filter(t => t.category === cat).length}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </FadeIn>
       </div>
 
       {/* Tutorial grid */}
       <div className="max-w-6xl mx-auto px-6 pb-24">
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map(tutorial => (
-            <TutorialCard
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          {filtered.map((tutorial, idx) => (
+            <FadeIn
               key={tutorial.id}
-              tutorial={tutorial}
-              isOpen={openId === tutorial.id}
-              onToggle={() => setOpenId(prev => prev === tutorial.id ? null : tutorial.id)}
-              onComplete={handleComplete}
-              completed={completed.has(tutorial.id)}
-            />
+              delay={Math.min(idx * 0.08, 0.4)}
+              className={openId === tutorial.id ? 'col-span-full' : ''}
+            >
+              <TutorialCard
+                tutorial={tutorial}
+                isOpen={openId === tutorial.id}
+                onToggle={() => setOpenId(prev => prev === tutorial.id ? null : tutorial.id)}
+                onComplete={handleComplete}
+                completed={completed.has(tutorial.id)}
+              />
+            </FadeIn>
           ))}
         </div>
 
