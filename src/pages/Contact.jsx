@@ -96,6 +96,41 @@ const Contact = () => {
               github.com/SiddharthFulia
             </span>
           </a>
+          <a href='tel:+918877663311'
+            className='flex items-center gap-3 group w-fit'>
+            <span className='text-2xl'>📱</span>
+            <span className='text-slate-600 font-medium group-hover:text-blue-500 transition-colors'>
+              +91 88776 63311
+            </span>
+          </a>
+          <a href='https://wa.me/918877663311?text=Hi%20Siddharth!%20I%20found%20your%20portfolio%20and%20would%20love%20to%20connect.'
+            target='_blank' rel='noreferrer'
+            className='flex items-center gap-3 group w-fit'>
+            <span className='text-2xl'>💬</span>
+            <span className='text-slate-600 font-medium group-hover:text-green-500 transition-colors'>
+              WhatsApp — Message directly
+            </span>
+          </a>
+        </div>
+
+        {/* Quick action buttons */}
+        <div className='mt-5 flex flex-wrap gap-3'>
+          <a href='tel:+918877663311'
+            className='inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold
+                       bg-blue-600 text-white hover:bg-blue-700 hover:scale-105 transition-all shadow-md'>
+            📞 Call Now
+          </a>
+          <a href='https://wa.me/918877663311?text=Hi%20Siddharth!%20I%20found%20your%20portfolio%20and%20would%20love%20to%20connect.'
+            target='_blank' rel='noreferrer'
+            className='inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold
+                       bg-green-600 text-white hover:bg-green-700 hover:scale-105 transition-all shadow-md'>
+            💬 WhatsApp
+          </a>
+          <a href='mailto:siddharthfulia7@gmail.com'
+            className='inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold
+                       border-2 border-slate-300 text-slate-600 hover:bg-slate-50 hover:scale-105 transition-all'>
+            📧 Email
+          </a>
         </div>
 
         <div className='mt-8 mb-2 flex items-center gap-3'>
