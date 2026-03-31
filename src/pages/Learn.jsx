@@ -52,7 +52,7 @@ function CodeBlock({ code }) {
 
 function StepContent({ step }) {
   const renderContent = (text) => {
-    const parts = text.split(/(~~~[\s\S]*?~~~|\*\*[^*]+\*\*|~[^~+]])/g)
+    const parts = text.split(/(~~~[\s\S]*?~~~|\*\*[^*]+\*\*|~[^~]+~)/g)
     return parts.map((part, i) => {
       if (part.startsWith('~~~') && part.endsWith('~~~')) {
         const code = part.slice(3, -3).replace(/^\w+\n/, '')
