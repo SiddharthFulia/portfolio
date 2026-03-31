@@ -182,12 +182,16 @@ function isSquareAttacked(state, sq, bySide) {
   const { board, colors } = state
 
   // Pawn attacks
+  // White pawn at P attacks P-11 and P-9 (diagonally up)
+  // So sq is attacked by WHITE pawn if there's one at sq+11 or sq+9
   if (bySide === WHITE) {
-    if (isOnBoard(sq - 11) && board[sq - 11] === PAWN && colors[sq - 11] === WHITE) return true
-    if (isOnBoard(sq - 9)  && board[sq - 9]  === PAWN && colors[sq - 9]  === WHITE) return true
+    if (isOnBoard(sq + 11) && board[sq + 11] === PAWN && colors[sq + 11] === WHITE) return true
+    if (isOnBoard(sq + 9)  && board[sq + 9]  === PAWN && colors[sq + 9]  === WHITE) return true
   } else {
-    if (isOnBoard(sq + 11) && board[sq + 11] === PAWN && colors[sq + 11] === BLACK) return true
-    if (isOnBoard(sq + 9)  && board[sq + 9]  === PAWN && colors[sq + 9]  === BLACK) return true
+    // Black pawn at P attacks P+9 and P+11 (diagonally down)
+    // So sq is attacked by BLACK pawn if there's one at sq-9 or sq-11
+    if (isOnBoard(sq - 9)  && board[sq - 9]  === PAWN && colors[sq - 9]  === BLACK) return true
+    if (isOnBoard(sq - 11) && board[sq - 11] === PAWN && colors[sq - 11] === BLACK) return true
   }
 
   // Knight attacks

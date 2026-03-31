@@ -246,7 +246,7 @@ export const projects = [
         iconUrl: car,
         theme: 'btn-back-orange',
         name: 'Chess Engine',
-        description: 'Chess engine written in C with 10x12 board representation, alpha-beta pruning, and iterative deepening search. Features move generation, positional evaluation with piece-square tables, and full chess rules (castling, en passant, promotion).',
+        description: 'Chess engine in C with alpha-beta pruning, iterative deepening, quiescence search, MVV-LVA move ordering, delta pruning, and piece-square tables. 10×12 mailbox board with full move generation (castling, en passant, promotion).',
         link: 'https://github.com/SiddharthFulia/Chess-engine',
         linkLabel: 'GitHub',
         tag: 'Systems · C',

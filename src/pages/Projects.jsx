@@ -22,7 +22,7 @@ const LIVE_PROJECTS = [
     tag: 'Systems · C',
     gradient: 'from-amber-500 via-orange-500 to-red-600',
     desc: 'Full chess engine with alpha-beta pruning, iterative deepening, piece-square tables, and 10×12 board representation. Play against the AI live in your browser.',
-    techs: ['C', 'Alpha-Beta', 'Minimax', 'Iterative Deepening'],
+    techs: ['C', 'Alpha-Beta', 'Iterative Deepening', 'Quiescence Search', 'MVV-LVA', 'Delta Pruning', 'Piece-Square Tables'],
     route: '/chess',
     github: 'https://github.com/SiddharthFulia/Chess-engine',
   },
@@ -104,16 +104,22 @@ const Projects = () => {
                   </a>
                   {/* Private repo info icon */}
                   <div className='relative group'>
-                    <div className='w-7 h-7 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center
-                                    text-slate-400 text-sm cursor-default hover:bg-slate-200 transition-colors'>
-                      i
+                    <div className='w-8 h-8 rounded-full bg-amber-50 border-2 border-amber-200 flex items-center justify-center
+                                    cursor-default hover:bg-amber-100 hover:border-amber-300 transition-all duration-200'>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2.5" strokeLinecap="round">
+                        <circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" />
+                      </svg>
                     </div>
-                    <div className='absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs
-                                    rounded-lg shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity
-                                    duration-200 whitespace-nowrap z-10'>
-                      Private repo — proprietary algorithms & logic.
-                      <br />Request access via GitHub.
-                      <div className='absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900' />
+                    <div className='absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-56 px-4 py-3 bg-gray-900 text-white text-xs
+                                    rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all
+                                    duration-200 scale-95 group-hover:scale-100 z-20 leading-relaxed'>
+                      <div className='flex items-center gap-1.5 mb-1.5'>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                        <span className='font-bold text-amber-400'>Private Repository</span>
+                      </div>
+                      <p className='text-gray-400'>Proprietary search algorithms, evaluation logic & move generation.</p>
+                      <p className='text-gray-500 mt-1.5'>Request access via GitHub to review the source code.</p>
+                      <div className='absolute top-full left-1/2 -translate-x-1/2 border-[6px] border-transparent border-t-gray-900' />
                     </div>
                   </div>
                 </div>
@@ -163,16 +169,21 @@ const Projects = () => {
                       ▶ Visualize Live
                     </Link>
                     <div className='relative group inline-flex'>
-                      <div className='w-5 h-5 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center
-                                      text-slate-400 text-[10px] cursor-default hover:bg-slate-200 transition-colors font-serif italic'>
-                        i
+                      <div className='w-6 h-6 rounded-full bg-amber-50 border-2 border-amber-200 flex items-center justify-center
+                                      cursor-default hover:bg-amber-100 transition-all'>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2.5" strokeLinecap="round">
+                          <circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" />
+                        </svg>
                       </div>
-                      <div className='absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs
-                                      rounded-lg shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity
-                                      duration-200 whitespace-nowrap z-10'>
-                        Private repo — proprietary algorithms.
-                        <br />Request access via GitHub.
-                        <div className='absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900' />
+                      <div className='absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 px-3 py-2.5 bg-gray-900 text-white text-xs
+                                      rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all
+                                      duration-200 z-20 leading-relaxed'>
+                        <span className='font-bold text-amber-400 flex items-center gap-1 mb-1'>
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                          Private Repo
+                        </span>
+                        <p className='text-gray-400'>Request access via GitHub.</p>
+                        <div className='absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-gray-900' />
                       </div>
                     </div>
                   </>
