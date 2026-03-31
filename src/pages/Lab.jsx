@@ -7,6 +7,9 @@ import SortingVisualizer from '../components/lab/SortingVisualizer'
 import PathfindingVisualizer from '../components/lab/PathfindingVisualizer'
 import BSTVisualizer from '../components/lab/BSTVisualizer'
 import GraphTraversal from '../components/lab/GraphTraversal'
+import RedBlackTree from '../components/lab/RedBlackTree'
+import HeapVisualizer from '../components/lab/HeapVisualizer'
+import DPVisualizer from '../components/lab/DPVisualizer'
 import TicTacToe from '../components/lab/TicTacToe'
 import GameOfLife from '../components/lab/GameOfLife'
 import FractalExplorer from '../components/lab/FractalExplorer'
@@ -67,12 +70,12 @@ const Lab = () => {
           Interactive Lab
         </h1>
         <p className='text-gray-400 mt-3 text-base max-w-xl'>
-          14 live demos — 3D simulations, classic algorithms, AI game theory, fractal math, SQL queries & a JS playground. All running 100% in the browser.
+          17 live demos — 3D simulations, classic algorithms, AI game theory, fractal math, SQL queries & a JS playground. All running 100% in the browser.
         </p>
 
         {/* Stats row */}
         <div className='flex flex-wrap gap-6 mt-6'>
-          {[['14', 'Interactive Demos'],['3', '3D Simulations'],['5', 'Algorithm Visualizers'],['2', 'Code Environments']].map(([n, l]) => (
+          {[['17', 'Interactive Demos'],['3', '3D Simulations'],['8', 'Algorithm Visualizers'],['2', 'Code Environments']].map(([n, l]) => (
             <div key={l}>
               <div className='text-2xl font-black text-cyan-400'>{n}</div>
               <div className='text-xs text-gray-500'>{l}</div>
@@ -131,6 +134,15 @@ const Lab = () => {
                 <GraphTraversal />
               </Card>
             </div>
+            <Card title='Red-Black Tree' tags={['Self-Balancing', 'Rotations', 'O(log n)']}>
+              <RedBlackTree />
+            </Card>
+            <Card title='Heap & Priority Queue' tags={['Min Heap', 'Max Heap', 'Sift-up/down']}>
+              <HeapVisualizer />
+            </Card>
+            <Card title='Dynamic Programming' tags={['Memoization', 'Tabulation', 'LCS', 'Knapsack']}>
+              <DPVisualizer />
+            </Card>
           </div>
         </div>
 

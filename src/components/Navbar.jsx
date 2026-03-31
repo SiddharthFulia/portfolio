@@ -3,7 +3,7 @@ import { logo } from "../assets/images";
 
 const Navbar = () => {
   const { pathname } = useLocation();
-  const isDark = pathname.startsWith('/lab');
+  const isDark = pathname.startsWith('/lab') || pathname.startsWith('/learn');
 
   return (
     <header className={`header transition-colors ${isDark ? 'bg-gray-950/80 backdrop-blur-md' : ''}`}>
@@ -25,6 +25,13 @@ const Navbar = () => {
             : "text-sm px-4 py-2 rounded-lg text-white font-semibold bg-gray-900 hover:bg-gray-800 transition-colors"
         }>
           ⚗ Lab
+        </NavLink>
+        <NavLink to='/learn' className={({ isActive }) =>
+          isActive
+            ? "text-sm px-4 py-2 rounded-lg text-black font-semibold bg-purple-400 shadow-md"
+            : `text-sm px-4 py-2 rounded-lg font-semibold transition-colors ${isDark ? 'text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700' : 'text-white bg-purple-700 hover:bg-purple-600'}`
+        }>
+          📚 Learn
         </NavLink>
         <a
           href="/resume.pdf"
