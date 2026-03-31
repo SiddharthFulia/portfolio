@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
 
 const TEXT = 'Creative Developer'
+const SUBTITLE = '& Designer'
+const TOTAL = TEXT.length + SUBTITLE.length
 
 const BRICK_CSS = `
   repeating-linear-gradient(
@@ -31,9 +33,9 @@ const NeonText = () => {
   const [flickerIdx, setFlickerIdx] = useState(-1)
   const containerRef = useRef()
 
-  // Letter-by-letter turn on
+  // Letter-by-letter turn on (main text + subtitle)
   useEffect(() => {
-    if (visibleCount >= TEXT.length) return
+    if (visibleCount >= TOTAL) return
     const t = setTimeout(() => setVisibleCount(c => c + 1), 80 + Math.random() * 60)
     return () => clearTimeout(t)
   }, [visibleCount])
@@ -147,17 +149,14 @@ const NeonText = () => {
         justifyContent: 'center',
         padding: '0 1rem',
       }}>
-        {'& Designer'.split('').map((ch, i) => {
-          const delay = TEXT.length + i
-          const on = delay < visibleCount + TEXT.length // turns on after main text
-          const flicker = false
-          const actuallyOn = visibleCount >= TEXT.length ? i < (visibleCount - TEXT.length + 5) : false
+        {SUBTITLE.split('').map((ch, i) => {
+          const on = visibleCount > TEXT.length + i
           return (
             <span
               key={i}
               style={{
-                color: actuallyOn ? (flicker ? 'rgba(255,50,150,0.15)' : '#ff32a0') : 'transparent',
-                textShadow: pinkShadow(actuallyOn, flicker),
+                color: on ? '#ff32a0' : 'transparent',
+                textShadow: pinkShadow(on, false),
                 transition: 'color 0.3s, text-shadow 0.4s',
                 whiteSpace: ch === ' ' ? 'pre' : 'normal',
               }}

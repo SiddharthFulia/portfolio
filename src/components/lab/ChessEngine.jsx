@@ -1247,7 +1247,7 @@ export default function ChessEngine() {
                 { label: 'Depth', value: aiInfo.depth || '-' },
                 { label: 'Nodes', value: aiInfo.nodes ? aiInfo.nodes.toLocaleString() : '-' },
                 { label: 'Time', value: aiInfo.time ? `${(aiInfo.time / 1000).toFixed(2)}s` : '-' },
-                { label: 'Eval', value: aiInfo.nodes ? `${(-evalScore / 100 >= 0 ? '+' : ''}${(-evalScore / 100).toFixed(2)}` : '-' },
+                { label: 'Eval', value: aiInfo.nodes ? `${(-evalScore / 100) >= 0 ? '+' : ''}${(-evalScore / 100).toFixed(2)}` : '-' },
               ].map(({ label, value }) => (
                 <div key={label} style={{
                   background: 'rgba(0,0,0,0.2)', borderRadius: '6px',

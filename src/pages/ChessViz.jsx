@@ -53,7 +53,7 @@ export default function ChessViz() {
             ))}
           </div>
 
-          <div className='flex flex-wrap gap-2 mt-5'>
+          <div className='flex flex-wrap gap-3 items-center mt-5'>
             <a href='https://github.com/SiddharthFulia/Chess-engine'
               target='_blank' rel='noreferrer'
               className='px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg font-semibold transition-colors'>
@@ -63,6 +63,20 @@ export default function ChessViz() {
               className='px-4 py-2 bg-gray-800/50 hover:bg-gray-800 text-gray-400 text-sm rounded-lg font-semibold transition-colors'>
               ← Back to Projects
             </Link>
+            {/* Private repo tooltip */}
+            <div className='relative group'>
+              <div className='w-7 h-7 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center
+                              text-gray-500 text-sm cursor-default hover:bg-gray-700 hover:text-gray-300 transition-colors font-serif italic'>
+                i
+              </div>
+              <div className='absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-white text-gray-900 text-xs
+                              rounded-lg shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity
+                              duration-200 whitespace-nowrap z-10 font-sans'>
+                Private repo — proprietary algorithms & logic.
+                <br />Request access via GitHub.
+                <div className='absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-white' />
+              </div>
+            </div>
           </div>
 
           <div className='mt-6 h-px bg-gradient-to-r from-amber-900/60 to-transparent' />

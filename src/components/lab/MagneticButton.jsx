@@ -169,19 +169,13 @@ const MagneticButton = () => {
               textTransform: 'uppercase',
             }}
           >
-            {/* Button text with gradient */}
+            {/* Button text */}
             <span style={{
               position: 'relative',
               zIndex: 2,
-              background: hover
-                ? 'linear-gradient(90deg, #0ff, #ff32a0, #a855f7)'
-                : 'linear-gradient(90deg, rgba(255,255,255,0.9), rgba(255,255,255,0.7))',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-              transition: 'background 0.3s',
-              backgroundSize: '200% 100%',
-              animation: hover ? 'magneticTextShimmer 2s linear infinite' : 'none',
+              color: hover ? '#0ff' : '#fff',
+              transition: 'color 0.3s',
+              textShadow: hover ? '0 0 20px rgba(0,255,255,0.5)' : 'none',
             }}>
               Get in Touch
             </span>
