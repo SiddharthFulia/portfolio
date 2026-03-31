@@ -525,18 +525,27 @@ function orderMoves(moves) {
   })
 }
 
-function quiescence(state, alpha, beta, searchInfo) {
+function quiescence(state, alpha, beta, searchInfo, qDepth) {
+  if (qDepth === undefined) qDepth = 0
   searchInfo.nodes++
+
   const standPat = evaluate(state)
   if (standPat >= beta) return beta
   if (standPat > alpha) alpha = standPat
 
+  // Depth limit on quiescence to prevent explosion
+  if (qDepth >= 8) return standPat
+
   const moves = generateLegalMoves(state)
-  const captures = orderMoves(moves.filter(m => m.captured !== EMPTY))
+  const captures = orderMoves(moves.filter(m => m.captured !== EMPTY || m.promoted))
 
   for (const move of captures) {
+    // Delta pruning: skip captures that can't possibly raise alpha
+    // even if we win the captured piece
+    if (standPat + PIECE_VAL[move.captured || 0] + 200 < alpha && !move.promoted) continue
+
     const undo = makeMove(state, move)
-    const score = -quiescence(state, -beta, -alpha, searchInfo)
+    const score = -quiescence(state, -beta, -alpha, searchInfo, qDepth + 1)
     undoMove(state, undo)
 
     if (score >= beta) return beta
@@ -547,7 +556,7 @@ function quiescence(state, alpha, beta, searchInfo) {
 }
 
 function alphaBeta(state, depth, alpha, beta, searchInfo) {
-  if (depth <= 0) return quiescence(state, alpha, beta, searchInfo)
+  if (depth <= 0) return quiescence(state, alpha, beta, searchInfo, 0)
 
   searchInfo.nodes++
   const moves = orderMoves(generateLegalMoves(state))
@@ -696,7 +705,9 @@ export default function ChessEngine() {
   const [highlights, setHighlights] = useState([]) // [{row,col}]
   const [drawStart, setDrawStart] = useState(null) // {row,col} for right-click drag start
   const [drawCurrent, setDrawCurrent] = useState(null) // {row,col} while dragging
-  const [dragPiece, setDragPiece] = useState(null) // {sq120, char, color, x, y} for drag-and-drop
+  const [dragSq, setDragSq] = useState(null) // sq120 of piece being dragged (for ghost opacity)
+  const dragRef = useRef(null) // ref to floating drag element — position updated via DOM, no re-renders
+  const dragDataRef = useRef(null) // {sq120, legalMoves} during drag
   const boardRef = useRef(null)
   const stateRef = useRef(gameState)
 
@@ -761,14 +772,16 @@ export default function ChessEngine() {
     return newState
   }, [])
 
-  // Compute best moves for recommendation panel
+  // Compute best moves for recommendation panel using shallow search (not just static eval)
   const computeBestMoves = useCallback((state) => {
     if (state.side !== WHITE) return
-    const moves = generateLegalMoves(state)
+    const moves = orderMoves(generateLegalMoves(state))
     const scored = []
+    const searchInfo = { nodes: 0, bestMove: null, maxDepth: 2 }
     for (const move of moves) {
       const undo = makeMove(state, move)
-      const score = -evaluate(state) // quick static eval
+      // Search 2-ply deep + quiescence so it sees recaptures
+      const score = -alphaBeta(state, 2, -100000, 100000, searchInfo)
       undoMove(state, undo)
       scored.push({ move, score, alg: moveToAlg(move, state) })
     }
@@ -951,17 +964,42 @@ export default function ChessEngine() {
     e.preventDefault()
   }, [])
 
+  const startDrag = useCallback((sq120, e) => {
+    const state = stateRef.current
+    const piece = state.board[sq120]
+    const pieceChar = PIECE_CHARS_W[piece]
+    const el = dragRef.current
+    if (!el || !boardRef.current) return
+
+    const rect = boardRef.current.getBoundingClientRect()
+    el.textContent = pieceChar
+    el.style.display = 'block'
+    el.style.left = (e.clientX - rect.left) + 'px'
+    el.style.top = (e.clientY - rect.top) + 'px'
+
+    const allLegal = generateLegalMoves(state)
+    dragDataRef.current = { sq120, moves: allLegal.filter(m => m.from === sq120) }
+    setDragSq(sq120)
+    setSelected(sq120)
+    setLegalMoves(allLegal.filter(m => m.from === sq120))
+  }, [])
+
+  const endDrag = useCallback(() => {
+    const el = dragRef.current
+    if (el) el.style.display = 'none'
+    dragDataRef.current = null
+    setDragSq(null)
+  }, [])
+
   const handleBoardMouseDown = useCallback((e) => {
-    if (e.button === 2) { // right click
+    if (e.button === 2) {
       e.preventDefault()
       const coords = getBoardCoords(e)
       if (coords) setDrawStart(coords)
     } else if (e.button === 0) {
-      // Left click clears arrows and highlights
       setArrows([])
       setHighlights([])
 
-      // Start drag if clicking own piece
       if (!aiThinking && !gameOver && !promoSquare) {
         const state = stateRef.current
         if (state.side !== WHITE) return
@@ -969,59 +1007,44 @@ export default function ChessEngine() {
         if (!coords) return
         const sq120 = SQ120[coords.row * 8 + coords.col]
         if (state.board[sq120] !== EMPTY && state.colors[sq120] === WHITE) {
-          const piece = state.board[sq120]
-          const pieceChar = PIECE_CHARS_W[piece]
-          const rect = boardRef.current.getBoundingClientRect()
-          setDragPiece({
-            sq120,
-            char: pieceChar,
-            color: WHITE,
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top,
-          })
-          // Also select the piece for legal move display
-          setSelected(sq120)
-          const allLegal = generateLegalMoves(state)
-          setLegalMoves(allLegal.filter(m => m.from === sq120))
+          startDrag(sq120, e)
         }
       }
     }
-  }, [getBoardCoords, aiThinking, gameOver, promoSquare])
+  }, [getBoardCoords, aiThinking, gameOver, promoSquare, startDrag])
 
   const handleBoardMouseMove = useCallback((e) => {
     if (drawStart && e.buttons === 2) {
       const coords = getBoardCoords(e)
       if (coords) setDrawCurrent(coords)
     }
-    // Update drag piece position
-    if (dragPiece && e.buttons === 1) {
+    // Update floating drag piece via DOM (no state, no re-render)
+    if (dragDataRef.current && e.buttons === 1) {
+      const el = dragRef.current
       const rect = boardRef.current?.getBoundingClientRect()
-      if (rect) {
-        setDragPiece(prev => prev ? {
-          ...prev,
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top,
-        } : null)
+      if (el && rect) {
+        el.style.left = (e.clientX - rect.left) + 'px'
+        el.style.top = (e.clientY - rect.top) + 'px'
       }
     }
-  }, [drawStart, dragPiece, getBoardCoords])
+  }, [drawStart, getBoardCoords])
 
   const handleBoardMouseUp = useCallback((e) => {
     // Handle drag-and-drop on left click release
-    if (e.button === 0 && dragPiece) {
+    if (e.button === 0 && dragDataRef.current) {
+      const { sq120: fromSq, moves } = dragDataRef.current
       const coords = getBoardCoords(e)
+      endDrag()
+
       if (coords) {
         const targetSq120 = SQ120[coords.row * 8 + coords.col]
-        if (targetSq120 !== dragPiece.sq120) {
-          // Try to make the move
+        if (targetSq120 !== fromSq) {
           const state = stateRef.current
-          const allLegal = generateLegalMoves(state)
-          const fromMoves = allLegal.filter(m => m.from === dragPiece.sq120)
-          const promoMoves = fromMoves.filter(m => m.to === targetSq120 && m.promoted)
-          const move = fromMoves.find(m => m.to === targetSq120 && !m.promoted)
+          const promoMoves = moves.filter(m => m.to === targetSq120 && m.promoted)
+          const move = moves.find(m => m.to === targetSq120 && !m.promoted)
 
           if (promoMoves.length > 0) {
-            setPromoSquare({ from: dragPiece.sq120, to: targetSq120, moves: promoMoves })
+            setPromoSquare({ from: fromSq, to: targetSq120, moves: promoMoves })
           } else if (move) {
             const newState = executeMove(state, move)
             if (!checkGameEnd(newState)) {
@@ -1030,7 +1053,6 @@ export default function ChessEngine() {
           }
         }
       }
-      setDragPiece(null)
       return
     }
 
@@ -1166,7 +1188,7 @@ export default function ChessEngine() {
                   ? '0 0 2px rgba(0,0,0,0.8), 0 1px 3px rgba(0,0,0,0.5), 1px 0 0 rgba(0,0,0,0.4), -1px 0 0 rgba(0,0,0,0.4), 0 -1px 0 rgba(0,0,0,0.4), 0 1px 0 rgba(0,0,0,0.4)'
                   : '0 0 2px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.3)',
                 transition: 'transform 0.1s',
-                opacity: dragPiece && dragPiece.sq120 === sq120 ? 0.3 : 1,
+                opacity: dragSq === sq120 ? 0.3 : 1,
               }}>
                 {pieceChar}
               </span>
@@ -1294,7 +1316,7 @@ export default function ChessEngine() {
               onMouseDown={handleBoardMouseDown}
               onMouseMove={handleBoardMouseMove}
               onMouseUp={handleBoardMouseUp}
-              onMouseLeave={() => { setDragPiece(null); setDrawStart(null); setDrawCurrent(null) }}
+              onMouseLeave={() => { endDrag(); setDrawStart(null); setDrawCurrent(null) }}
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(8, 1fr)',
@@ -1356,14 +1378,13 @@ export default function ChessEngine() {
                 </svg>
               )}
 
-              {/* Floating drag piece */}
-              {dragPiece && (
-                <span style={{
+              {/* Floating drag piece — positioned via ref, not state */}
+              <span
+                ref={dragRef}
+                style={{
                   position: 'absolute',
-                  left: dragPiece.x,
-                  top: dragPiece.y,
                   transform: 'translate(-50%, -50%)',
-                  fontSize: 'min(7vw, 58px)',
+                  fontSize: 'min(7vw, 62px)',
                   lineHeight: 1,
                   pointerEvents: 'none',
                   zIndex: 20,
@@ -1371,10 +1392,10 @@ export default function ChessEngine() {
                   textShadow: '0 0 4px rgba(0,0,0,0.9), 0 2px 8px rgba(0,0,0,0.6), 2px 0 0 rgba(0,0,0,0.5), -2px 0 0 rgba(0,0,0,0.5)',
                   filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.5))',
                   cursor: 'grabbing',
-                }}>
-                  {dragPiece.char}
-                </span>
-              )}
+                  display: 'none',
+                  willChange: 'left, top',
+                }}
+              />
             </div>
 
             {/* Captured by white (bottom) */}
