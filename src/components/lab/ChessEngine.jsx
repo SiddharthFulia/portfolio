@@ -615,11 +615,49 @@ function sq120ToAlg(sq) {
   return String.fromCharCode(97 + file) + (rank + 1)
 }
 
-function moveToAlg(move) {
-  const from = sq120ToAlg(move.from)
+function moveToAlg(move, state) {
   const to = sq120ToAlg(move.to)
-  const promo = move.promoted ? PIECE_NAMES[move.promoted].toLowerCase() : ''
-  return from + to + promo
+  const piece = move.promoted ? PAWN : (state ? state.board[move.from] : 0)
+  const pieceName = piece ? PIECE_NAMES[piece] : ''
+  const isCapture = move.captured !== EMPTY
+  const promo = move.promoted ? '=' + PIECE_NAMES[move.promoted] : ''
+
+  // Castling
+  if (move.flag === 2) {
+    const toFile = SQ64[move.to] % 8
+    return toFile > 4 ? 'O-O' : 'O-O-O'
+  }
+
+  // Pawn moves
+  if (piece === PAWN || !pieceName) {
+    const fromFile = String.fromCharCode(97 + (SQ64[move.from] % 8))
+    if (isCapture) return fromFile + 'x' + to + promo
+    return to + promo
+  }
+
+  // Piece moves (N, B, R, Q, K)
+  const capture = isCapture ? 'x' : ''
+  // Disambiguation: check if another piece of same type can go to same square
+  let disambig = ''
+  if (state && (piece === KNIGHT || piece === ROOK || piece === QUEEN || piece === BISHOP)) {
+    const side = state.colors[move.from]
+    for (let i = 0; i < 64; i++) {
+      const sq = SQ120[i]
+      if (sq === move.from) continue
+      if (state.board[sq] === piece && state.colors[sq] === side) {
+        // Check if this other piece can also reach move.to (pseudo check is fine for notation)
+        const fromFile = SQ64[move.from] % 8
+        const otherFile = i % 8
+        const fromRank = Math.floor(SQ64[move.from] / 8)
+        const otherRank = Math.floor(i / 8)
+        if (fromFile !== otherFile) disambig = String.fromCharCode(97 + fromFile)
+        else if (fromRank !== otherRank) disambig = String(8 - fromRank)
+        else disambig = String.fromCharCode(97 + fromFile) + (8 - fromRank)
+        break
+      }
+    }
+  }
+  return pieceName + disambig + capture + to
 }
 
 function cloneState(state) {
@@ -652,6 +690,14 @@ export default function ChessEngine() {
   const [gameOver, setGameOver] = useState(null) // null | 'checkmate' | 'stalemate' | 'draw'
   const [winner, setWinner] = useState(null) // WHITE | BLACK | null
   const [promoSquare, setPromoSquare] = useState(null) // { from, to } if promotion choice needed
+  const [showBestMoves, setShowBestMoves] = useState(false)
+  const [bestMoves, setBestMoves] = useState([]) // top moves with eval
+  const [arrows, setArrows] = useState([]) // [{from: {row,col}, to: {row,col}}]
+  const [highlights, setHighlights] = useState([]) // [{row,col}]
+  const [drawStart, setDrawStart] = useState(null) // {row,col} for right-click drag start
+  const [drawCurrent, setDrawCurrent] = useState(null) // {row,col} while dragging
+  const [dragPiece, setDragPiece] = useState(null) // {sq120, char, color, x, y} for drag-and-drop
+  const boardRef = useRef(null)
   const stateRef = useRef(gameState)
 
   useEffect(() => { stateRef.current = gameState }, [gameState])
@@ -671,22 +717,43 @@ export default function ChessEngine() {
       setGameOver('draw')
       return true
     }
+    // Insufficient material check (K vs K, K+B vs K, K+N vs K)
+    const pieces = { [WHITE]: [], [BLACK]: [] }
+    for (let i = 0; i < 64; i++) {
+      const sq = SQ120[i]
+      if (state.board[sq] !== EMPTY) {
+        pieces[state.colors[sq]].push(state.board[sq])
+      }
+    }
+    const wp = pieces[WHITE].filter(p => p !== KING)
+    const bp = pieces[BLACK].filter(p => p !== KING)
+    if (wp.length === 0 && bp.length === 0) {
+      setGameOver('draw')
+      return true
+    }
+    if (wp.length === 0 && bp.length === 1 && (bp[0] === BISHOP || bp[0] === KNIGHT)) {
+      setGameOver('draw')
+      return true
+    }
+    if (bp.length === 0 && wp.length === 1 && (wp[0] === BISHOP || wp[0] === KNIGHT)) {
+      setGameOver('draw')
+      return true
+    }
     return false
   }, [])
 
   const executeMove = useCallback((state, move) => {
     const newState = cloneState(state)
+    const movingSide = newState.side
 
-    // Track captures for display
-    if (move.captured !== EMPTY && move.flag !== 1) {
-      newState.captured[newState.side === WHITE ? BLACK : WHITE].push(move.captured)
-    } else if (move.flag === 1) {
-      // en passant capture
-      newState.captured[newState.side === WHITE ? BLACK : WHITE].push(PAWN)
+    // Track captures for display (captured piece belongs to enemy)
+    if (move.captured !== EMPTY) {
+      newState.captured[1 - movingSide].push(move.captured)
     }
 
+    const alg = moveToAlg(move, newState)
     makeMove(newState, move)
-    newState.moveList.push(moveToAlg(move))
+    newState.moveList.push(alg)
     setLastMove({ from: move.from, to: move.to })
     setSelected(null)
     setLegalMoves([])
@@ -694,9 +761,28 @@ export default function ChessEngine() {
     return newState
   }, [])
 
+  // Compute best moves for recommendation panel
+  const computeBestMoves = useCallback((state) => {
+    if (state.side !== WHITE) return
+    const moves = generateLegalMoves(state)
+    const scored = []
+    for (const move of moves) {
+      const undo = makeMove(state, move)
+      const score = -evaluate(state) // quick static eval
+      undoMove(state, undo)
+      scored.push({ move, score, alg: moveToAlg(move, state) })
+    }
+    scored.sort((a, b) => b.score - a.score)
+    setBestMoves(scored.slice(0, 5))
+  }, [])
+
   const runAI = useCallback((state) => {
     if (state.side !== BLACK) return
     setAiThinking(true)
+
+    // Quick pondering eval before full search
+    const quickEval = evaluate(state)
+    setAiInfo(prev => ({ ...prev, score: -quickEval }))
 
     // Use setTimeout to let React render the thinking state
     setTimeout(() => {
@@ -706,25 +792,27 @@ export default function ChessEngine() {
 
       if (result.move) {
         const newState = cloneState(state)
-        if (result.move.captured !== EMPTY && result.move.flag !== 1) {
+        if (result.move.captured !== EMPTY) {
           newState.captured[WHITE].push(result.move.captured)
-        } else if (result.move.flag === 1) {
-          newState.captured[WHITE].push(PAWN)
         }
+        const aiAlg = moveToAlg(result.move, newState)
         makeMove(newState, result.move)
-        newState.moveList.push(moveToAlg(result.move))
+        newState.moveList.push(aiAlg)
         setLastMove({ from: result.move.from, to: result.move.to })
         setGameState(newState)
         setAiInfo({ depth: result.depth || aiDepth, nodes: result.nodes, time: result.time, score: result.score })
         setAiThinking(false)
 
         // Check game end after AI move
-        checkGameEnd(newState)
+        if (!checkGameEnd(newState)) {
+          // Compute best moves for player's next turn
+          computeBestMoves(newState)
+        }
       } else {
         setAiThinking(false)
       }
     }, 50)
-  }, [aiDepth, checkGameEnd])
+  }, [aiDepth, checkGameEnd, computeBestMoves])
 
   const handleSquareClick = useCallback((sq120) => {
     if (aiThinking || gameOver) return
@@ -735,15 +823,21 @@ export default function ChessEngine() {
     if (promoSquare) return
 
     if (selected !== null) {
-      // Try to move
-      const move = legalMoves.find(m => m.to === sq120 && !m.promoted)
-      const promoMoves = legalMoves.filter(m => m.to === sq120 && m.promoted)
+      // Deselect if clicking same square
+      if (sq120 === selected) {
+        setSelected(null)
+        setLegalMoves([])
+        return
+      }
 
+      // Try to find a legal move to this square
+      const promoMoves = legalMoves.filter(m => m.to === sq120 && m.promoted)
       if (promoMoves.length > 0) {
         setPromoSquare({ from: selected, to: sq120, moves: promoMoves })
         return
       }
 
+      const move = legalMoves.find(m => m.to === sq120)
       if (move) {
         const newState = executeMove(state, move)
         if (!checkGameEnd(newState)) {
@@ -752,22 +846,25 @@ export default function ChessEngine() {
         return
       }
 
-      // Deselect if clicking same square
-      if (sq120 === selected) {
-        setSelected(null)
-        setLegalMoves([])
+      // No legal move to this square — if it's our own piece, re-select it
+      if (state.board[sq120] !== EMPTY && state.colors[sq120] === WHITE) {
+        setSelected(sq120)
+        const allLegal = generateLegalMoves(state)
+        setLegalMoves(allLegal.filter(m => m.from === sq120))
         return
       }
+
+      // Clicked empty square or enemy with no legal move — just deselect
+      setSelected(null)
+      setLegalMoves([])
+      return
     }
 
-    // Select piece
+    // No piece selected — select if it's our piece
     if (state.board[sq120] !== EMPTY && state.colors[sq120] === WHITE) {
       setSelected(sq120)
       const allLegal = generateLegalMoves(state)
       setLegalMoves(allLegal.filter(m => m.from === sq120))
-    } else {
-      setSelected(null)
-      setLegalMoves([])
     }
   }, [selected, legalMoves, aiThinking, gameOver, promoSquare, executeMove, checkGameEnd, runAI])
 
@@ -836,6 +933,148 @@ export default function ChessEngine() {
     }
   }, [aiThinking])
 
+  // Arrow drawing helpers
+  const getBoardCoords = useCallback((e) => {
+    const board = boardRef.current
+    if (!board) return null
+    const rect = board.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    const sqSize = rect.width / 8
+    const col = Math.floor(x / sqSize)
+    const row = Math.floor(y / sqSize)
+    if (row < 0 || row > 7 || col < 0 || col > 7) return null
+    return { row, col }
+  }, [])
+
+  const handleBoardContextMenu = useCallback((e) => {
+    e.preventDefault()
+  }, [])
+
+  const handleBoardMouseDown = useCallback((e) => {
+    if (e.button === 2) { // right click
+      e.preventDefault()
+      const coords = getBoardCoords(e)
+      if (coords) setDrawStart(coords)
+    } else if (e.button === 0) {
+      // Left click clears arrows and highlights
+      setArrows([])
+      setHighlights([])
+
+      // Start drag if clicking own piece
+      if (!aiThinking && !gameOver && !promoSquare) {
+        const state = stateRef.current
+        if (state.side !== WHITE) return
+        const coords = getBoardCoords(e)
+        if (!coords) return
+        const sq120 = SQ120[coords.row * 8 + coords.col]
+        if (state.board[sq120] !== EMPTY && state.colors[sq120] === WHITE) {
+          const piece = state.board[sq120]
+          const pieceChar = PIECE_CHARS_W[piece]
+          const rect = boardRef.current.getBoundingClientRect()
+          setDragPiece({
+            sq120,
+            char: pieceChar,
+            color: WHITE,
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+          })
+          // Also select the piece for legal move display
+          setSelected(sq120)
+          const allLegal = generateLegalMoves(state)
+          setLegalMoves(allLegal.filter(m => m.from === sq120))
+        }
+      }
+    }
+  }, [getBoardCoords, aiThinking, gameOver, promoSquare])
+
+  const handleBoardMouseMove = useCallback((e) => {
+    if (drawStart && e.buttons === 2) {
+      const coords = getBoardCoords(e)
+      if (coords) setDrawCurrent(coords)
+    }
+    // Update drag piece position
+    if (dragPiece && e.buttons === 1) {
+      const rect = boardRef.current?.getBoundingClientRect()
+      if (rect) {
+        setDragPiece(prev => prev ? {
+          ...prev,
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top,
+        } : null)
+      }
+    }
+  }, [drawStart, dragPiece, getBoardCoords])
+
+  const handleBoardMouseUp = useCallback((e) => {
+    // Handle drag-and-drop on left click release
+    if (e.button === 0 && dragPiece) {
+      const coords = getBoardCoords(e)
+      if (coords) {
+        const targetSq120 = SQ120[coords.row * 8 + coords.col]
+        if (targetSq120 !== dragPiece.sq120) {
+          // Try to make the move
+          const state = stateRef.current
+          const allLegal = generateLegalMoves(state)
+          const fromMoves = allLegal.filter(m => m.from === dragPiece.sq120)
+          const promoMoves = fromMoves.filter(m => m.to === targetSq120 && m.promoted)
+          const move = fromMoves.find(m => m.to === targetSq120 && !m.promoted)
+
+          if (promoMoves.length > 0) {
+            setPromoSquare({ from: dragPiece.sq120, to: targetSq120, moves: promoMoves })
+          } else if (move) {
+            const newState = executeMove(state, move)
+            if (!checkGameEnd(newState)) {
+              runAI(newState)
+            }
+          }
+        }
+      }
+      setDragPiece(null)
+      return
+    }
+
+    if (e.button === 2 && drawStart) {
+      const end = getBoardCoords(e)
+      if (end) {
+        if (drawStart.row === end.row && drawStart.col === end.col) {
+          // Same square — toggle highlight
+          setHighlights(prev => {
+            const exists = prev.findIndex(h => h.row === end.row && h.col === end.col)
+            if (exists >= 0) return prev.filter((_, i) => i !== exists)
+            return [...prev, end]
+          })
+        } else {
+          // Different square — toggle arrow
+          setArrows(prev => {
+            const exists = prev.findIndex(a =>
+              a.from.row === drawStart.row && a.from.col === drawStart.col &&
+              a.to.row === end.row && a.to.col === end.col
+            )
+            if (exists >= 0) return prev.filter((_, i) => i !== exists)
+            return [...prev, { from: drawStart, to: end }]
+          })
+        }
+      }
+      setDrawStart(null)
+      setDrawCurrent(null)
+    }
+  }, [drawStart, getBoardCoords])
+
+  // Replace piece letters with Unicode symbols for display
+  const fancyMove = (alg, isWhite) => {
+    if (!alg) return ''
+    const map = isWhite
+      ? { K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘' }
+      : { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞' }
+    if (alg === 'O-O' || alg === 'O-O-O') return alg
+    // Check if first char is a piece letter
+    if ('KQRBN'.includes(alg[0])) {
+      return map[alg[0]] + alg.slice(1)
+    }
+    return alg
+  }
+
   // Render board
   const renderBoard = () => {
     const squares = []
@@ -854,8 +1093,11 @@ export default function ChessEngine() {
         const isLastFrom = lastMove && sq120 === lastMove.from
         const isLastTo = lastMove && sq120 === lastMove.to
 
+        const isHighlighted = highlights.some(h => h.row === row && h.col === col)
+
         let bgColor = isLight ? '#ebecd0' : '#779952'
-        if (isSelected) bgColor = isLight ? '#f7f769' : '#bbcc44'
+        if (isHighlighted) bgColor = isLight ? '#eb6a5a' : '#d44a3a'
+        else if (isSelected) bgColor = isLight ? '#f7f769' : '#bbcc44'
         else if (isLastFrom || isLastTo) bgColor = isLight ? '#f5f682' : '#b9ca43'
 
         const pieceChar = piece !== EMPTY
@@ -919,11 +1161,12 @@ export default function ChessEngine() {
               <span style={{
                 fontSize: 'min(5.5vw, 46px)',
                 lineHeight: 1,
+                color: color === WHITE ? '#fff' : '#1a1a1a',
                 textShadow: color === WHITE
-                  ? '0 1px 3px rgba(0,0,0,0.3)'
-                  : '0 1px 2px rgba(0,0,0,0.4)',
+                  ? '0 0 2px rgba(0,0,0,0.8), 0 1px 3px rgba(0,0,0,0.5), 1px 0 0 rgba(0,0,0,0.4), -1px 0 0 rgba(0,0,0,0.4), 0 -1px 0 rgba(0,0,0,0.4), 0 1px 0 rgba(0,0,0,0.4)'
+                  : '0 0 2px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.3)',
                 transition: 'transform 0.1s',
-                filter: color === BLACK ? 'drop-shadow(0 1px 1px rgba(255,255,255,0.1))' : 'none',
+                opacity: dragPiece && dragPiece.sq120 === sq120 ? 0.3 : 1,
               }}>
                 {pieceChar}
               </span>
@@ -966,7 +1209,7 @@ export default function ChessEngine() {
       display: 'flex', flexDirection: 'column', alignItems: 'center',
       gap: '16px', padding: '20px 10px', color: '#e2e8f0',
       fontFamily: "'Inter', system-ui, sans-serif",
-      maxWidth: '800px', margin: '0 auto',
+      maxWidth: '960px', margin: '0 auto',
     }}>
       {/* Title */}
       <div style={{ textAlign: 'center', marginBottom: 4 }}>
@@ -1045,18 +1288,93 @@ export default function ChessEngine() {
             </div>
 
             {/* Board */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(8, 1fr)',
-              gridTemplateRows: 'repeat(8, 1fr)',
-              width: 'min(calc(100vw - 100px), 480px)',
-              height: 'min(calc(100vw - 100px), 480px)',
-              borderRadius: '4px',
-              overflow: 'hidden',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-              border: '2px solid rgba(255,255,255,0.08)',
-            }}>
+            <div
+              ref={boardRef}
+              onContextMenu={handleBoardContextMenu}
+              onMouseDown={handleBoardMouseDown}
+              onMouseMove={handleBoardMouseMove}
+              onMouseUp={handleBoardMouseUp}
+              onMouseLeave={() => { setDragPiece(null); setDrawStart(null); setDrawCurrent(null) }}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(8, 1fr)',
+                gridTemplateRows: 'repeat(8, 1fr)',
+                width: 'min(calc(100vw - 100px), 580px)',
+                height: 'min(calc(100vw - 100px), 580px)',
+                borderRadius: '4px',
+                overflow: 'hidden',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                border: '2px solid rgba(255,255,255,0.08)',
+                position: 'relative',
+              }}
+            >
               {renderBoard()}
+
+              {/* Arrow SVG overlay */}
+              {(arrows.length > 0 || (drawStart && drawCurrent && (drawStart.row !== drawCurrent.row || drawStart.col !== drawCurrent.col))) && (
+                <svg
+                  style={{
+                    position: 'absolute', inset: 0,
+                    width: '100%', height: '100%',
+                    pointerEvents: 'none', zIndex: 4,
+                  }}
+                  viewBox="0 0 800 800"
+                >
+                  <defs>
+                    <marker id="arrowhead" markerWidth="4" markerHeight="4" refX="3" refY="2" orient="auto">
+                      <polygon points="0 0, 4 2, 0 4" fill="rgba(255,170,0,0.85)" />
+                    </marker>
+                    <marker id="arrowhead-draft" markerWidth="4" markerHeight="4" refX="3" refY="2" orient="auto">
+                      <polygon points="0 0, 4 2, 0 4" fill="rgba(255,170,0,0.5)" />
+                    </marker>
+                  </defs>
+                  {/* Saved arrows */}
+                  {arrows.map((a, i) => {
+                    const x1 = a.from.col * 100 + 50
+                    const y1 = a.from.row * 100 + 50
+                    const x2 = a.to.col * 100 + 50
+                    const y2 = a.to.row * 100 + 50
+                    return (
+                      <line key={i}
+                        x1={x1} y1={y1} x2={x2} y2={y2}
+                        stroke="rgba(255,170,0,0.85)" strokeWidth="7"
+                        strokeLinecap="round" markerEnd="url(#arrowhead)"
+                        opacity="0.8"
+                      />
+                    )
+                  })}
+                  {/* Draft arrow while dragging */}
+                  {drawStart && drawCurrent && (drawStart.row !== drawCurrent.row || drawStart.col !== drawCurrent.col) && (
+                    <line
+                      x1={drawStart.col * 100 + 50} y1={drawStart.row * 100 + 50}
+                      x2={drawCurrent.col * 100 + 50} y2={drawCurrent.row * 100 + 50}
+                      stroke="rgba(255,170,0,0.5)" strokeWidth="7"
+                      strokeLinecap="round" markerEnd="url(#arrowhead-draft)"
+                      opacity="0.5"
+                    />
+                  )}
+                </svg>
+              )}
+
+              {/* Floating drag piece */}
+              {dragPiece && (
+                <span style={{
+                  position: 'absolute',
+                  left: dragPiece.x,
+                  top: dragPiece.y,
+                  transform: 'translate(-50%, -50%)',
+                  fontSize: 'min(7vw, 58px)',
+                  lineHeight: 1,
+                  pointerEvents: 'none',
+                  zIndex: 20,
+                  color: '#fff',
+                  textShadow: '0 0 4px rgba(0,0,0,0.9), 0 2px 8px rgba(0,0,0,0.6), 2px 0 0 rgba(0,0,0,0.5), -2px 0 0 rgba(0,0,0,0.5)',
+                  filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.5))',
+                  cursor: 'grabbing',
+                }}>
+                  {dragPiece.char}
+                </span>
+              )}
             </div>
 
             {/* Captured by white (bottom) */}
@@ -1132,7 +1450,7 @@ export default function ChessEngine() {
                   {gameOver === 'draw' && 'Draw'}
                 </div>
                 <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
-                  {gameOver === 'checkmate' ? 'Checkmate' : gameOver === 'stalemate' ? 'No legal moves' : '50 move rule'}
+                  {gameOver === 'checkmate' ? 'Checkmate' : gameOver === 'stalemate' ? 'No legal moves' : 'Insufficient material / 50 move rule'}
                 </div>
                 <button
                   onClick={newGame}
@@ -1267,6 +1585,67 @@ export default function ChessEngine() {
             )}
           </div>
 
+          {/* Best Moves */}
+          <div style={{
+            background: 'rgba(255,255,255,0.04)', borderRadius: '10px',
+            padding: '12px', border: '1px solid rgba(255,255,255,0.06)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: showBestMoves ? 8 : 0 }}>
+              <h3 style={{
+                fontSize: '0.7rem', fontWeight: 700, color: '#64748b',
+                textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0,
+              }}>
+                Recommended Moves
+              </h3>
+              <button
+                onClick={() => {
+                  setShowBestMoves(p => !p)
+                  if (!showBestMoves) computeBestMoves(stateRef.current)
+                }}
+                style={{
+                  background: showBestMoves ? '#1e40af' : '#1e293b',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '4px', padding: '2px 8px',
+                  color: showBestMoves ? '#fff' : '#94a3b8',
+                  fontSize: '0.65rem', fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                {showBestMoves ? 'Hide' : 'Show'}
+              </button>
+            </div>
+            {showBestMoves && bestMoves.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {bestMoves.map((bm, i) => (
+                  <div key={i} style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    background: i === 0 ? 'rgba(59,130,246,0.15)' : 'rgba(0,0,0,0.15)',
+                    borderRadius: 4, padding: '4px 8px',
+                    border: i === 0 ? '1px solid rgba(59,130,246,0.3)' : '1px solid transparent',
+                  }}>
+                    <span style={{ fontSize: '0.65rem', color: '#64748b', width: 14 }}>#{i + 1}</span>
+                    <span style={{
+                      fontSize: '0.78rem', fontWeight: 700, fontFamily: 'monospace',
+                      color: i === 0 ? '#60a5fa' : '#cbd5e1',
+                    }}>
+                      {fancyMove(bm.alg, true)}
+                    </span>
+                    <span style={{
+                      fontSize: '0.65rem', fontFamily: 'monospace', marginLeft: 'auto',
+                      color: bm.score >= 0 ? '#4ade80' : '#f87171',
+                    }}>
+                      {bm.score >= 0 ? '+' : ''}{(bm.score / 100).toFixed(1)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {showBestMoves && bestMoves.length === 0 && (
+              <div style={{ fontSize: '0.7rem', color: '#475569', fontStyle: 'italic' }}>
+                {gameState.side === WHITE ? 'Click Show to analyze' : 'Wait for your turn'}
+              </div>
+            )}
+          </div>
+
           {/* Status */}
           <div style={{
             background: 'rgba(255,255,255,0.04)', borderRadius: '10px',
@@ -1318,13 +1697,13 @@ export default function ChessEngine() {
                     color: i * 2 === gameState.moveList.length - 1 ? '#60a5fa' : '#cbd5e1',
                     fontWeight: i * 2 === gameState.moveList.length - 1 ? 700 : 400,
                   }}>
-                    {gameState.moveList[i * 2]}
+                    {fancyMove(gameState.moveList[i * 2], true)}
                   </span>
                   <span style={{
                     color: i * 2 + 1 === gameState.moveList.length - 1 ? '#60a5fa' : '#94a3b8',
                     fontWeight: i * 2 + 1 === gameState.moveList.length - 1 ? 700 : 400,
                   }}>
-                    {gameState.moveList[i * 2 + 1] || ''}
+                    {fancyMove(gameState.moveList[i * 2 + 1], false)}
                   </span>
                 </React.Fragment>
               ))}
