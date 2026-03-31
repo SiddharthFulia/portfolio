@@ -3,7 +3,7 @@ import { logo } from "../assets/images";
 
 const Navbar = () => {
   const { pathname } = useLocation();
-  const isDark = pathname.startsWith('/lab') || pathname.startsWith('/learn');
+  const isDark = pathname.startsWith('/lab') || pathname.startsWith('/learn') || pathname.startsWith('/creative') || pathname.startsWith('/chess');
 
   return (
     <header className={`header transition-colors ${isDark ? 'bg-gray-950/80 backdrop-blur-md' : ''}`}>
@@ -32,6 +32,13 @@ const Navbar = () => {
             : `text-sm px-4 py-2 rounded-lg font-semibold transition-colors ${isDark ? 'text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700' : 'text-white bg-purple-700 hover:bg-purple-600'}`
         }>
           📚 Learn
+        </NavLink>
+        <NavLink to='/creative' className={({ isActive }) =>
+          isActive
+            ? "text-sm px-4 py-2 rounded-lg text-white font-semibold bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-500 shadow-md shadow-pink-500/20"
+            : `text-sm px-4 py-2 rounded-lg font-semibold transition-colors ${isDark ? 'text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700' : 'text-white bg-pink-600 hover:bg-pink-500'}`
+        }>
+          ✨ Creative
         </NavLink>
         <a
           href="/resume.pdf"

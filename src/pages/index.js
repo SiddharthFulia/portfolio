@@ -4,3 +4,5 @@ export { default as Projects } from './Projects';
 export { default as Contact } from './Contact';
 export { default as Lab } from './Lab';
 export { default as Learn } from './Learn';
+export { default as Creative } from './Creative';
+export { default as ChessViz } from './ChessViz';

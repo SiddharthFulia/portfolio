@@ -244,6 +244,15 @@ export const projects = [
     },
     {
         iconUrl: car,
+        theme: 'btn-back-orange',
+        name: 'Chess Engine',
+        description: 'Chess engine written in C with 10x12 board representation, alpha-beta pruning, and iterative deepening search. Features move generation, positional evaluation with piece-square tables, and full chess rules (castling, en passant, promotion).',
+        link: 'https://github.com/SiddharthFulia/Chess-engine',
+        linkLabel: 'GitHub',
+        tag: 'Systems · C',
+    },
+    {
+        iconUrl: car,
         theme: 'btn-back-yellow',
         name: 'LTTS Knowledge Graph',
         description: 'Automated Knowledge Graph extraction from unstructured documents. Top 3 out of 30,000+ participants from 480+ universities at LTTS TECHgium 2022.',

@@ -18,13 +18,6 @@ const FractalExplorer = lazy(() => import('../components/lab/FractalExplorer'))
 const MatrixRain = lazy(() => import('../components/lab/MatrixRain'))
 const SQLPlayground = lazy(() => import('../components/lab/SQLPlayground'))
 const CodeRunner = lazy(() => import('../components/lab/CodeRunner'))
-const NeonText = lazy(() => import('../components/lab/NeonText'))
-const MagneticButton = lazy(() => import('../components/lab/MagneticButton'))
-const HolographicCard = lazy(() => import('../components/lab/HolographicCard'))
-const AuroraEffect = lazy(() => import('../components/lab/AuroraEffect'))
-const MorphingBlob = lazy(() => import('../components/lab/MorphingBlob'))
-const Cube3D = lazy(() => import('../components/lab/Cube3D'))
-const InfiniteMarquee = lazy(() => import('../components/lab/InfiniteMarquee'))
 
 /* ── Section definitions ── */
 const SECTIONS = [
@@ -34,7 +27,6 @@ const SECTIONS = [
   { id: 'math',       label: 'Mathematics',     icon: '🎨', count: 4, color: 'from-pink-500 to-rose-500',   desc: 'Fractals, automata & physics' },
   { id: 'data',       label: 'Data & SQL',      icon: '🗄',  count: 1, color: 'from-indigo-500 to-blue-500', desc: 'In-browser SQL playground' },
   { id: 'code',       label: 'Code',            icon: '💻', count: 1, color: 'from-gray-500 to-gray-600',   desc: 'JavaScript REPL' },
-  { id: 'creative',   label: 'Creative UI',     icon: '✨', count: 7, color: 'from-purple-500 to-pink-500', desc: 'Stunning visual experiments' },
 ]
 
 /* ── Fade-in animation ── */
@@ -216,52 +208,6 @@ function CodeSection() {
   )
 }
 
-function CreativeSection() {
-  return (
-    <div className='flex flex-col gap-6'>
-      <FadeIn>
-        <Card title='Holographic Developer Card' tags={['3D Tilt', 'Rainbow Overlay', 'Mouse Tracking']}>
-          <HolographicCard />
-        </Card>
-      </FadeIn>
-      <FadeIn delay={0.08}>
-        <Card title='Aurora Borealis' tags={['CSS Animation', 'Starfield', 'Blend Modes', 'Pure CSS']}>
-          <AuroraEffect />
-        </Card>
-      </FadeIn>
-      <FadeIn delay={0.12}>
-        <Card title='Infinite Tech Marquee' tags={['Glassmorphism', 'Shimmer Borders', 'Hover Pause']}>
-          <InfiniteMarquee />
-        </Card>
-      </FadeIn>
-      <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
-        <FadeIn delay={0.16}>
-          <Card title='Morphing Gradient Blob' tags={['Border-Radius', 'Frosted Glass', 'Mouse Reactive']}>
-            <MorphingBlob />
-          </Card>
-        </FadeIn>
-        <FadeIn delay={0.2}>
-          <Card title='3D Tech Cube' tags={['CSS 3D', 'Drag Rotate', 'preserve-3d', 'Touch']}>
-            <Cube3D />
-          </Card>
-        </FadeIn>
-      </div>
-      <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
-        <FadeIn delay={0.24}>
-          <Card title='Neon Sign Text' tags={['CSS Glow', 'Flicker', 'Letter Animation']}>
-            <NeonText />
-          </Card>
-        </FadeIn>
-        <FadeIn delay={0.28}>
-          <Card title='Magnetic Button' tags={['Cursor Tracking', 'Ripple', 'Gradient Border']}>
-            <MagneticButton />
-          </Card>
-        </FadeIn>
-      </div>
-    </div>
-  )
-}
-
 const SECTION_CONTENT = {
   worlds: WorldsSection,
   algorithms: AlgorithmsSection,
@@ -269,7 +215,6 @@ const SECTION_CONTENT = {
   math: MathSection,
   data: DataSection,
   code: CodeSection,
-  creative: CreativeSection,
 }
 
 /* ── Main Lab page ── */
@@ -300,12 +245,12 @@ const Lab = () => {
           Interactive Lab
         </h1>
         <p className='text-gray-400 mt-3 text-base max-w-xl'>
-          24 live demos — pick a category below to load it. 3D worlds, algorithms, AI, fractals, SQL, and creative UI experiments. All 100% in the browser.
+          17 live demos — pick a category below to load it. 3D worlds, algorithms, AI, fractals, SQL, and code tools. All 100% in the browser.
         </p>
 
         {/* Stats */}
         <div className='flex flex-wrap gap-8 mt-6'>
-          {[['24', 'Demos', 'text-cyan-400'], ['7', 'Categories', 'text-blue-400'], ['7', 'Creative UI', 'text-purple-400'], ['3', '3D Worlds', 'text-pink-400']].map(([n, l, c]) => (
+          {[['17', 'Demos', 'text-cyan-400'], ['6', 'Categories', 'text-blue-400'], ['3', '3D Worlds', 'text-pink-400']].map(([n, l, c]) => (
             <div key={l} className='text-center'>
               <div className={`text-3xl font-black ${c}`}>{n}</div>
               <div className='text-xs text-gray-500 mt-0.5'>{l}</div>

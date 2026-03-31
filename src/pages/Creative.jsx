@@ -1,0 +1,214 @@
+import { useState, useRef, useEffect, lazy, Suspense } from 'react'
+
+/* ── Lazy imports — nothing loads until selected ── */
+const HolographicCard = lazy(() => import('../components/lab/HolographicCard'))
+const AuroraEffect = lazy(() => import('../components/lab/AuroraEffect'))
+const MorphingBlob = lazy(() => import('../components/lab/MorphingBlob'))
+const Cube3D = lazy(() => import('../components/lab/Cube3D'))
+const InfiniteMarquee = lazy(() => import('../components/lab/InfiniteMarquee'))
+const NeonText = lazy(() => import('../components/lab/NeonText'))
+const MagneticButton = lazy(() => import('../components/lab/MagneticButton'))
+
+/* ── Demo definitions ── */
+const DEMOS = [
+  { id: 'holographic',  label: 'Holographic Card',     icon: '💳', tags: ['3D Tilt', 'Rainbow Overlay', 'Mouse Tracking'],         color: 'from-blue-500 to-cyan-400' },
+  { id: 'aurora',       label: 'Aurora Borealis',       icon: '🌌', tags: ['CSS Animation', 'Starfield', 'Blend Modes', 'Pure CSS'], color: 'from-green-500 to-teal-400' },
+  { id: 'morphing',     label: 'Morphing Blob',         icon: '🫧', tags: ['Border-Radius', 'Frosted Glass', 'Mouse Reactive'],     color: 'from-purple-500 to-pink-500' },
+  { id: 'cube',         label: '3D Tech Cube',          icon: '🧊', tags: ['CSS 3D', 'Drag Rotate', 'preserve-3d', 'Touch'],        color: 'from-orange-500 to-red-500' },
+  { id: 'marquee',      label: 'Infinite Marquee',      icon: '📜', tags: ['Glassmorphism', 'Shimmer Borders', 'Hover Pause'],      color: 'from-yellow-500 to-orange-400' },
+  { id: 'neon',         label: 'Neon Sign Text',        icon: '💡', tags: ['CSS Glow', 'Flicker', 'Letter Animation'],              color: 'from-pink-500 to-rose-500' },
+  { id: 'magnetic',     label: 'Magnetic Button',       icon: '🧲', tags: ['Cursor Tracking', 'Ripple', 'Gradient Border'],         color: 'from-indigo-500 to-violet-500' },
+]
+
+const DEMO_COMPONENTS = {
+  holographic: HolographicCard,
+  aurora: AuroraEffect,
+  morphing: MorphingBlob,
+  cube: Cube3D,
+  marquee: InfiniteMarquee,
+  neon: NeonText,
+  magnetic: MagneticButton,
+}
+
+/* ── Fade-in animation ── */
+function FadeIn({ children, delay = 0, className = '' }) {
+  const [visible, setVisible] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setVisible(true), delay * 1000)
+    return () => clearTimeout(t)
+  }, [delay])
+  return (
+    <div
+      className={className}
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateY(0)' : 'translateY(30px)',
+        transition: 'opacity 0.5s ease, transform 0.5s ease',
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
+/* ── Loader ── */
+const Loader = () => (
+  <div className='flex items-center justify-center py-24'>
+    <div className='flex flex-col items-center gap-3'>
+      <div className='w-10 h-10 border-2 border-pink-500 border-t-transparent rounded-full animate-spin' />
+      <span className='text-gray-500 text-sm'>Loading demo...</span>
+    </div>
+  </div>
+)
+
+const Tag = ({ children }) => (
+  <span className='px-2 py-0.5 bg-gray-800 text-pink-400 text-xs rounded font-mono'>{children}</span>
+)
+
+const Card = ({ title, tags = [], children }) => (
+  <div className='bg-gray-900 rounded-2xl overflow-hidden border border-gray-800 hover:border-gray-700 transition-colors'>
+    <div className='flex flex-wrap items-center gap-2 px-5 py-3 bg-gray-800/60 border-b border-gray-700/60'>
+      <span className='text-white font-semibold text-sm'>{title}</span>
+      <div className='flex gap-1.5 flex-wrap ml-1'>
+        {tags.map(t => <Tag key={t}>{t}</Tag>)}
+      </div>
+    </div>
+    <div className='p-4'>
+      <Suspense fallback={<Loader />}>{children}</Suspense>
+    </div>
+  </div>
+)
+
+/* ── Main Creative page ── */
+const Creative = () => {
+  const [active, setActive] = useState(null)
+  const contentRef = useRef()
+
+  const handleClick = (id) => {
+    setActive(prev => prev === id ? null : id)
+    setTimeout(() => {
+      contentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 50)
+  }
+
+  const activeDemo = DEMOS.find(d => d.id === active)
+  const ActiveComponent = active ? DEMO_COMPONENTS[active] : null
+
+  return (
+    <div className='min-h-screen bg-gray-950 text-white'>
+      {/* Subtle dot grid bg */}
+      <div className='fixed inset-0 pointer-events-none opacity-[0.03]'
+        style={{ backgroundImage: 'radial-gradient(circle, #ec4899 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
+
+      {/* ── Hero ── */}
+      <div className='relative max-w-6xl mx-auto px-6 pt-32 pb-6'>
+        <FadeIn>
+          <h1 className='font-poppins font-black text-5xl md:text-6xl bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent leading-tight'>
+            Creative UI Showcase
+          </h1>
+        </FadeIn>
+        <FadeIn delay={0.1}>
+          <p className='text-gray-400 mt-3 text-base max-w-2xl'>
+            Experimental UI components built with pure CSS & React — holographic effects, aurora skies, morphing blobs, neon signs & more
+          </p>
+        </FadeIn>
+
+        {/* Stats */}
+        <FadeIn delay={0.2}>
+          <div className='flex flex-wrap gap-8 mt-6'>
+            {[['7', 'UI Experiments', 'text-purple-400'], ['Pure', 'CSS', 'text-pink-400'], ['Zero', 'Libraries', 'text-cyan-400'], ['100%', 'Interactive', 'text-yellow-400']].map(([n, l, c]) => (
+              <div key={l} className='text-center'>
+                <div className={`text-3xl font-black ${c}`}>{n}</div>
+                <div className='text-xs text-gray-500 mt-0.5'>{l}</div>
+              </div>
+            ))}
+          </div>
+        </FadeIn>
+      </div>
+
+      {/* ── Demo selector grid ── */}
+      <div className='relative max-w-6xl mx-auto px-6 pb-6'>
+        <div className='grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3'>
+          {DEMOS.map((d, i) => {
+            const isActive = active === d.id
+            return (
+              <FadeIn key={d.id} delay={0.25 + i * 0.05}>
+                <button
+                  onClick={() => handleClick(d.id)}
+                  className={`relative group text-left rounded-xl border p-4 transition-all duration-300 overflow-hidden w-full ${
+                    isActive
+                      ? 'border-pink-500/60 bg-gray-900 shadow-lg shadow-pink-900/20 scale-[1.02]'
+                      : 'border-gray-800 bg-gray-900/60 hover:border-gray-700 hover:bg-gray-900 hover:scale-[1.01]'
+                  }`}
+                >
+                  {/* Active indicator bar */}
+                  {isActive && (
+                    <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${d.color}`} />
+                  )}
+
+                  <div className='flex items-center gap-2.5 mb-2'>
+                    <span className='text-2xl'>{d.icon}</span>
+                    <span className='text-white font-bold text-sm'>{d.label}</span>
+                  </div>
+                  <div className='flex flex-wrap gap-1 mb-3'>
+                    {d.tags.slice(0, 2).map(t => (
+                      <span key={t} className='text-[10px] text-gray-500 bg-gray-800/80 px-1.5 py-0.5 rounded'>{t}</span>
+                    ))}
+                  </div>
+                  <div className='flex items-center justify-end'>
+                    <span className={`text-xs font-semibold transition-colors ${
+                      isActive ? 'text-pink-400' : 'text-gray-600 group-hover:text-gray-400'
+                    }`}>
+                      {isActive ? '▼ Close' : '→ Open'}
+                    </span>
+                  </div>
+                </button>
+              </FadeIn>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* ── Active demo content ── */}
+      {active && ActiveComponent && (
+        <div ref={contentRef} className='relative max-w-6xl mx-auto px-6 pb-24'>
+          {/* Section header */}
+          <div className='pt-8 pb-6'>
+            <div className='flex items-center gap-3 mb-1'>
+              <span className='text-3xl'>{activeDemo.icon}</span>
+              <h2 className='font-poppins font-black text-3xl bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent'>
+                {activeDemo.label}
+              </h2>
+              <button
+                onClick={() => setActive(null)}
+                className='ml-auto px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white rounded-lg text-sm font-semibold transition-colors'
+              >
+                ✕ Close
+              </button>
+            </div>
+            <div className='mt-4 h-px bg-gradient-to-r from-pink-900/60 to-transparent' />
+          </div>
+
+          {/* Render the active demo */}
+          <FadeIn>
+            <Card title={activeDemo.label} tags={activeDemo.tags}>
+              <ActiveComponent />
+            </Card>
+          </FadeIn>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!active && (
+        <div className='max-w-6xl mx-auto px-6 pb-24'>
+          <div className='text-center py-20'>
+            <p className='text-gray-600 text-lg'>Pick a component above to preview it</p>
+            <p className='text-gray-700 text-sm mt-2'>Nothing is loaded until you click — zero wasted bandwidth</p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default Creative

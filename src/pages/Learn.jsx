@@ -42,39 +42,60 @@ const DIFF_COLORS = {
   Advanced: 'bg-red-900/60 text-red-400 border-red-700/50',
 }
 
-function CodeBlock({ code }) {
+function CodeBlock({ code, isAscii }) {
   return (
-    <pre className="bg-gray-950 border border-gray-700/60 rounded-lg p-4 overflow-x-auto text-sm font-mono text-green-300 leading-relaxed whitespace-pre-wrap">
-      <code>{code}</code>
-    </pre>
+    <div className="my-3 rounded-lg border border-gray-700/60 overflow-hidden">
+      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800/80 border-b border-gray-700/40">
+        <span className="w-2.5 h-2.5 rounded-full bg-red-500/70" />
+        <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/70" />
+        <span className="w-2.5 h-2.5 rounded-full bg-green-500/70" />
+        <span className="ml-2 text-[10px] text-gray-500 font-mono">{isAscii ? 'diagram' : 'code'}</span>
+      </div>
+      <pre className={`bg-gray-950 p-4 overflow-x-auto font-mono leading-relaxed whitespace-pre ${
+        isAscii ? 'text-cyan-300/90 text-[11px] md:text-xs' : 'text-green-300 text-xs md:text-sm'
+      }`}>
+        <code>{code}</code>
+      </pre>
+    </div>
   )
 }
 
 function StepContent({ step }) {
   const renderContent = (text) => {
-    const parts = text.split(/(~~~[\s\S]*?~~~|\*\*[^*]+\*\*|~[^~]+~)/g)
-    return parts.map((part, i) => {
-      if (part.startsWith('~~~') && part.endsWith('~~~')) {
-        const code = part.slice(3, -3).replace(/^\w+\n/, '')
-        return <CodeBlock key={i} code={code} />
+    // Split on triple-backtick code blocks first (``` ... ```)
+    const blocks = text.split(/(```[\s\S]*?```)/g)
+    return blocks.map((block, i) => {
+      // Code block
+      if (block.startsWith('```') && block.endsWith('```')) {
+        const inner = block.slice(3, -3).replace(/^\w*\n/, '') // strip optional language tag
+        const isAscii = /[┌┐└┘│─▼▲►◄╔╗╚╝║═├┤┬┴┼]/.test(inner)
+        return <CodeBlock key={i} code={inner.trim()} isAscii={isAscii} />
       }
-      if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={i} className="text-white font-semibold">{part.slice(2, -2)}</strong>
-      }
-      if (part.startsWith('~') && part.endsWith('~')) {
-        return <code key={i} className="bg-gray-800 text-cyan-300 px-1.5 py-0.5 rounded text-sm font-mono">{part.slice(1, -1)}</code>
-      }
-      return part.split('\n').map((line, j) => {
-        if (line.startsWith('- ')) return <li key={j} className="ml-4 text-gray-300 list-disc">{line.slice(2)}</li>
-        if (line.match(/^\d+\./)) return <li key={j} className="ml-4 text-gray-300 list-decimal">{line.replace(/^\d+\.\s*/, '')}</li>
-        if (line.trim() === '') return <br key={j} />
-        return <span key={j}>{line}</span>
+
+      // Inline formatting within text blocks
+      const inlineParts = block.split(/(\*\*[^*]+\*\*|~[^~]+~)/g)
+      return inlineParts.map((part, j) => {
+        const key = `${i}-${j}`
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return <strong key={key} className="text-white font-semibold">{part.slice(2, -2)}</strong>
+        }
+        if (part.startsWith('~') && part.endsWith('~') && part.length > 2) {
+          return <code key={key} className="bg-gray-800 text-cyan-300 px-1.5 py-0.5 rounded text-[13px] font-mono">{part.slice(1, -1)}</code>
+        }
+        // Plain text — handle line-level formatting
+        return part.split('\n').map((line, k) => {
+          const lk = `${key}-${k}`
+          if (line.startsWith('- ')) return <li key={lk} className="ml-4 text-gray-300 list-disc">{line.slice(2)}</li>
+          if (line.match(/^\d+\.\s/)) return <li key={lk} className="ml-4 text-gray-300 list-decimal">{line.replace(/^\d+\.\s*/, '')}</li>
+          if (line.trim() === '') return <br key={lk} />
+          return <span key={lk}>{line}</span>
+        })
       })
     })
   }
 
   return (
-    <div className="prose prose-invert max-w-none space-y-3 text-gray-300 leading-relaxed text-sm">
+    <div className="prose prose-invert max-w-none space-y-2 text-gray-300 leading-relaxed text-sm">
       {renderContent(step.content)}
       {step.code && <CodeBlock code={step.code} />}
     </div>
