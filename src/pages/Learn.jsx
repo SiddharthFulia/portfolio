@@ -1657,7 +1657,7 @@ function TutorialCard({ tutorial, isOpen, onToggle, onComplete, completed }) {
             </div>
           </div>
           <button
-            onClick={isOpen ? onToggle : onToggle}
+            onClick={(e) => { e.stopPropagation(); onToggle() }}
             className={`shrink-0 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
               isOpen
                 ? 'bg-gray-800 text-gray-300 hover:bg-gray-700'
