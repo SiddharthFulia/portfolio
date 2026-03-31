@@ -14,6 +14,13 @@ const Navbar = () => {
         <NavLink to='/projects' className={({ isActive }) => isActive ? "text-blue-600" : "text-black"}>
           Projects
         </NavLink>
+        <NavLink to='/lab' className={({ isActive }) =>
+          isActive
+            ? "text-sm px-4 py-2 rounded-lg text-black font-semibold bg-cyan-400 shadow-md"
+            : "text-sm px-4 py-2 rounded-lg text-white font-semibold bg-gray-900 hover:bg-gray-800 transition-colors"
+        }>
+          ⚗ Lab
+        </NavLink>
         <a
           href="/resume.pdf"
           target="_blank"
