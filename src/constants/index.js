@@ -1,0 +1,333 @@
+import { passionfruit, iitpatna } from "../assets/images";
+import {
+    contact,
+    css,
+    express,
+    git,
+    github,
+    javascript,
+    linkedin,
+    mongodb,
+    nextjs,
+    nodejs,
+    react,
+    tailwindcss,
+    typescript,
+    python,
+    cplusplus,
+    postgresql,
+    pytorch,
+    summiz,
+    pricewise,
+    snapgram,
+    estate,
+    threads,
+    car,
+    arrow,
+} from "../assets/icons";
+
+export const skills = [
+    {
+        imageUrl: javascript,
+        name: "JavaScript",
+        type: "Frontend",
+    },
+    {
+        imageUrl: python,
+        name: "Python",
+        type: "AI / ML",
+    },
+    {
+        imageUrl: cplusplus,
+        name: "C++",
+        type: "Backend",
+    },
+    {
+        imageUrl: react,
+        name: "React.js",
+        type: "Frontend",
+    },
+    {
+        imageUrl: nextjs,
+        name: "Next.js",
+        type: "Frontend",
+    },
+    {
+        imageUrl: nodejs,
+        name: "Node.js",
+        type: "Backend",
+    },
+    {
+        imageUrl: express,
+        name: "Express.js",
+        type: "Backend",
+    },
+    {
+        imageUrl: typescript,
+        name: "TypeScript",
+        type: "Frontend",
+    },
+    {
+        imageUrl: pytorch,
+        name: "PyTorch",
+        type: "AI / ML",
+    },
+    {
+        imageUrl: mongodb,
+        name: "MongoDB",
+        type: "Database",
+    },
+    {
+        imageUrl: postgresql,
+        name: "PostgreSQL",
+        type: "Database",
+    },
+    {
+        imageUrl: tailwindcss,
+        name: "Tailwind CSS",
+        type: "Frontend",
+    },
+    {
+        imageUrl: git,
+        name: "Git",
+        type: "Version Control",
+    },
+    {
+        imageUrl: github,
+        name: "GitHub",
+        type: "Version Control",
+    },
+    {
+        imageUrl: css,
+        name: "CSS",
+        type: "Frontend",
+    },
+];
+
+export const experiences = [
+    {
+        title: "Founding Engineer & Full Stack Dev (AI/ML + Data Platforms)",
+        company_name: "Passionfruit",
+        company_link: "https://www.linkedin.com/company/getpassionfruit/posts/?feedView=all",
+        icon: passionfruit,
+        iconBg: "#ffd6d6",
+        date: "July 2024 – Present",
+        points: [
+            "Built scalable backend architecture and 100+ REST APIs from scratch, powering analytics, reporting, and AI-driven insights.",
+            "Integrated Google Search Console + GA4 pipelines end-to-end, enabling automated tracking across 200+ sites.",
+            "Engineered cron + RabbitMQ workflows to process 10K+ jobs/day with retries and fail-safe execution.",
+            "Shipped automated email reporting via Mailgun, delivering scheduled digests to 30+ stakeholders.",
+            "Optimized DB performance via indexing, pagination, caching — reducing API latency by 40%.",
+        ],
+    },
+    {
+        title: "ML Research Intern",
+        company_name: "IIT Patna",
+        company_link: "https://www.iitp.ac.in",
+        icon: iitpatna,
+        iconBg: "#d6e4ff",
+        date: "Dec 2023 – Aug 2024",
+        points: [
+            "Pioneered GrabPhisher — Ethereum phishing detection using EvolveGCN + Node2vec.",
+            "Achieved 93% accuracy and 92% F1-score, outperforming all state-of-the-art methods.",
+            "Constructed TNG & TTNG to capture dynamic temporal features and evolving graph topology.",
+            "Research accepted and published at an international conference.",
+        ],
+    },
+];
+
+export const socialLinks = [
+    {
+        name: 'Contact',
+        iconUrl: contact,
+        link: '/contact',
+    },
+    {
+        name: 'GitHub',
+        iconUrl: github,
+        link: 'https://github.com/SiddharthFulia',
+    },
+    {
+        name: 'LinkedIn',
+        iconUrl: linkedin,
+        link: 'https://www.linkedin.com/in/siddharth-fulia/',
+    },
+];
+
+export const projects = [
+    {
+        iconUrl: summiz,
+        theme: 'btn-back-blue',
+        name: 'CrickSpeakAI',
+        description: 'AI-powered cricket analytics platform with real-time commentary. ShotSense CNN (16 conv layers) for shot classification, CatchVision LSTM for 92% catch prediction, and LLM-powered live commentary.',
+        link: null,
+        linkLabel: null,
+        tag: 'Research · Accepted',
+    },
+    {
+        iconUrl: pricewise,
+        theme: 'btn-back-red',
+        name: 'GrabPhisher',
+        description: 'Ethereum blockchain phishing detection using EvolveGCN + Node2vec. 93% accuracy, 92% F1-score — outperforms all SOTA methods. Built at IIT Patna.',
+        link: 'https://github.com/SiddharthFulia',
+        linkLabel: 'GitHub',
+        tag: 'Research · Published',
+    },
+    {
+        iconUrl: snapgram,
+        theme: 'btn-back-pink',
+        name: 'Quantum-Resistant Cryptography',
+        description: 'Proprietary encryption algorithm that withstands quantum brute-force attacks, handles files up to 100MB+, and beats AES in space and time efficiency.',
+        link: null,
+        linkLabel: null,
+        tag: 'Research · Accepted',
+    },
+    {
+        iconUrl: estate,
+        theme: 'btn-back-green',
+        name: 'IoT Soil Testing & Crop Recommender',
+        description: 'Arduino + ML system for real-time soil testing and AI crop recommendations. 50% efficiency boost, 30% productivity increase. Published on IEEE Xplore.',
+        link: 'https://ieeexplore.ieee.org/document/10307726',
+        linkLabel: 'Read Paper',
+        tag: 'IEEE Published',
+    },
+    {
+        iconUrl: threads,
+        theme: 'btn-back-black',
+        name: 'Passionfruit Platform',
+        description: 'Full-stack SaaS at Passionfruit NY — 100+ APIs, GA4 across 200+ sites, RabbitMQ processing 10K+ jobs/day, Mailgun digests for 30+ stakeholders.',
+        link: 'https://www.linkedin.com/company/getpassionfruit/posts/?feedView=all',
+        linkLabel: 'View Company',
+        tag: 'Production · Live',
+    },
+    {
+        iconUrl: car,
+        theme: 'btn-back-yellow',
+        name: 'LTTS Knowledge Graph',
+        description: 'Automated Knowledge Graph extraction from unstructured documents. Top 3 out of 30,000+ participants from 480+ universities at LTTS TECHgium 2022.',
+        link: 'https://drive.google.com/file/d/1C-4jtHmv-bGxPHo-0KYpnc8rdv1_Bc2C/view?usp=sharing',
+        linkLabel: 'View Certificate',
+        tag: 'Top 3 · TECHgium',
+    },
+];
+
+export const publications = [
+    {
+        emoji: '🔐',
+        title: 'Quantum-Resistant Cryptography: Proprietary Algorithm Outperforming AES',
+        status: 'Accepted',
+        statusBg: 'bg-purple-100 text-purple-700',
+        conference: 'International Journal · 2024',
+        link: null,
+        linkLabel: null,
+        highlights: [
+            'Defies quantum threats with incomplete randomness techniques',
+            'Handles images & documents up to 100MB+ with support for larger files',
+            'Reduces space & time vs AES, unbreakable against brute-force attacks',
+        ],
+        theme: 'btn-back-pink',
+    },
+    {
+        emoji: '🌱',
+        title: 'Innovative Model For Soil Testing With Intelligent Crop Recommendation System',
+        status: 'Published',
+        statusBg: 'bg-green-100 text-green-700',
+        conference: 'IEEE Xplore · 2023',
+        link: 'https://ieeexplore.ieee.org/document/10307726',
+        linkLabel: 'Read Paper',
+        highlights: [
+            'IoT + AI for infinite cycles of instant, accurate soil analysis',
+            'Boosted operational efficiency by 50%, agricultural productivity by 30%',
+            'Stack: Arduino IDE, NodeJS, React Native',
+        ],
+        theme: 'btn-back-green',
+    },
+    {
+        emoji: '🏏',
+        title: 'CrickSpeakAI: Revolutionizing Cricket Analytics and Commentary',
+        status: 'Accepted',
+        statusBg: 'bg-blue-100 text-blue-700',
+        conference: 'International Conference · 2024',
+        link: null,
+        linkLabel: null,
+        highlights: [
+            'ShotSense CNN: 16 conv + 11 dense layers with VGG weights for shot classification',
+            'CatchVision LSTM: 92% accuracy spatial-temporal catch prediction',
+            'End-to-end YOLO v8 + LLM + GTTS real-time commentary pipeline',
+        ],
+        theme: 'btn-back-blue',
+    },
+];
+
+export const achievements = [
+    {
+        emoji: '🏆',
+        title: 'Meta Hacker Cup 2025',
+        rank: 'Global Rank 186',
+        sub: 'Round 3 · Two-time commemorative shirt recipient',
+        certLink: 'https://www.facebook.com/codingcompetitions/hacker-cup/2025/certificate/5471687682871051?source=facebook',
+        linkedinLink: 'https://www.linkedin.com/posts/siddharth-fulia_metahackercup2025-top200-round3-activity-7432281275920728066-5b8P?utm_source=share&utm_medium=member_desktop&rcm=ACoAADbS-ywBYuwbaIFL7brrtMs_7hHq9KiB_bw',
+        theme: 'btn-back-yellow',
+    },
+    {
+        emoji: '🥇',
+        title: 'Meta Hacker Cup 2023',
+        rank: 'Global Rank 1361',
+        sub: 'Meta\'s global competitive programming competition',
+        certLink: 'https://www.facebook.com/codingcompetitions/hacker-cup/2023/certificate/5471687682871051',
+        linkedinLink: 'https://www.linkedin.com/posts/siddharth-fulia_metahackercup2023-finalranking-solocontender-activity-7135667127939739648-E3yJ?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAADbS-ywBYuwbaIFL7brrtMs_7hHq9KiB_bw',
+        theme: 'btn-back-orange',
+    },
+    {
+        emoji: '🎯',
+        title: 'LTTS TECHgium 2022',
+        rank: 'Top 3',
+        sub: '"Knowledge Graph from Documents" · 30,000+ participants · 480+ universities worldwide',
+        certLink: 'https://drive.google.com/file/d/1C-4jtHmv-bGxPHo-0KYpnc8rdv1_Bc2C/view?usp=sharing',
+        linkedinLink: 'https://www.linkedin.com/posts/siddharth-fulia_ltts-techgium2023-finalists-activity-7098932401522786304-Tk6m?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAADbS-ywBYuwbaIFL7brrtMs_7hHq9KiB_bw',
+        theme: 'btn-back-red',
+    },
+];
+
+export const competitiveProgramming = [
+    {
+        platform: 'CodeChef',
+        emoji: '👨‍💻',
+        rating: '2114',
+        stars: '5★',
+        highlight: 'Global Rank 23',
+        highlightSub: 'in CodeChef Starters',
+        stats: [
+            { label: 'Rating', value: '2114' },
+            { label: 'Stars', value: '5★' },
+            { label: 'Global Rank', value: '#23' },
+            { label: 'Problems', value: '41+' },
+        ],
+        description: '5-star rated competitive programmer with a peak rating of 2114. Achieved Global Rank 23 in CodeChef Starters. Strong expertise in DP, greedy algorithms, binary search, and graph theory.',
+        profileLink: 'https://www.codechef.com/users/fulia',
+        linkedinLink: 'https://www.linkedin.com/posts/siddharth-fulia_back-in-the-arena-my-competitive-coding-activity-7339460576152039425-t4eR?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAADbS-ywBYuwbaIFL7brrtMs_7hHq9KiB_bw',
+        color: 'from-yellow-400 to-orange-500',
+        border: 'border-yellow-200',
+        badge: 'bg-yellow-100 text-yellow-800',
+    },
+    {
+        platform: 'Codeforces',
+        emoji: '⚡',
+        rating: 'Active',
+        stars: '',
+        highlight: 'Regular Competitor',
+        highlightSub: 'Codeforces rated contests',
+        stats: [
+            { label: 'Platform', value: 'CF' },
+            { label: 'Focus', value: 'DSA' },
+            { label: 'Style', value: 'Speed' },
+            { label: 'Contests', value: 'Rated' },
+        ],
+        description: 'Active Codeforces participant competing in rated rounds. Consistent practice in competitive problem solving with focus on algorithm optimization and mathematical reasoning.',
+        profileLink: 'https://codeforces.com/profile/Fulia6464',
+        linkedinLink: null,
+        color: 'from-blue-400 to-indigo-500',
+        border: 'border-blue-200',
+        badge: 'bg-blue-100 text-blue-800',
+    },
+];
