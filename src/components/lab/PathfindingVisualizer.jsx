@@ -163,7 +163,9 @@ const PathfindingVisualizer = () => {
       <div className='rounded-lg overflow-hidden border border-gray-800 cursor-crosshair'
         onMouseDown={() => (mouseDown.current = true)}
         onMouseUp={() => (mouseDown.current = false)}
-        onMouseLeave={() => (mouseDown.current = false)}>
+        onMouseLeave={() => (mouseDown.current = false)}
+        onTouchStart={() => (mouseDown.current = true)}
+        onTouchEnd={() => (mouseDown.current = false)}>
         {grid.map((row, r) => (
           <div key={r} className='flex'>
             {row.map((cell, c) => (
@@ -171,7 +173,8 @@ const PathfindingVisualizer = () => {
                 className='relative flex-1 transition-colors duration-75'
                 style={{ paddingBottom: `${100 / COLS}%`, backgroundColor: cellBg(cell) }}
                 onMouseDown={() => toggleWall(r, c)}
-                onMouseEnter={() => { if (mouseDown.current) toggleWall(r, c) }}>
+                onMouseEnter={() => { if (mouseDown.current) toggleWall(r, c) }}
+                onTouchStart={e => { e.preventDefault(); toggleWall(r, c) }}>
                 {isStart(r, c) && (
                   <span className='absolute inset-0 flex items-center justify-center text-[7px] font-black text-black'>S</span>
                 )}

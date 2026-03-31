@@ -1,95 +1,188 @@
-import { useState } from 'react'
+import { useRef } from 'react'
+import SolarSystem3D from '../components/lab/SolarSystem3D'
+import GravitySimulator from '../components/lab/GravitySimulator'
+import WarpSpeed from '../components/lab/WarpSpeed'
 import ParticleCanvas from '../components/lab/ParticleCanvas'
 import SortingVisualizer from '../components/lab/SortingVisualizer'
 import PathfindingVisualizer from '../components/lab/PathfindingVisualizer'
+import BSTVisualizer from '../components/lab/BSTVisualizer'
+import GraphTraversal from '../components/lab/GraphTraversal'
 import TicTacToe from '../components/lab/TicTacToe'
 import GameOfLife from '../components/lab/GameOfLife'
+import FractalExplorer from '../components/lab/FractalExplorer'
+import MatrixRain from '../components/lab/MatrixRain'
+import SQLPlayground from '../components/lab/SQLPlayground'
+import CodeRunner from '../components/lab/CodeRunner'
 
-const TABS = [
-  {
-    id: 'particles',
-    label: '🌌 Neural Particles',
-    tag: 'WebGL · Canvas',
-    desc: 'Interactive particle field — 140 nodes auto-connect when nearby, repel from your cursor',
-    Component: ParticleCanvas,
-  },
-  {
-    id: 'sort',
-    label: '📊 Sorting Algorithms',
-    tag: 'Algorithms · O(n²) vs O(n log n)',
-    desc: 'Live visualization of Bubble, Selection, Insertion, Quick & Merge sort with real-time comparison/swap counters',
-    Component: SortingVisualizer,
-  },
-  {
-    id: 'path',
-    label: '🗺 Pathfinding',
-    tag: 'A* · BFS · DFS · Graph Search',
-    desc: 'Draw walls on the grid and watch A*, BFS & DFS find (or fail to find) the shortest path',
-    Component: PathfindingVisualizer,
-  },
-  {
-    id: 'ttt',
-    label: '🤖 Minimax AI',
-    tag: 'Game Theory · Alpha-Beta Pruning',
-    desc: 'Unbeatable Tic-Tac-Toe AI using Minimax + α-β pruning — try to win (you can\'t)',
-    Component: TicTacToe,
-  },
-  {
-    id: 'life',
-    label: '🔬 Game of Life',
-    tag: 'Cellular Automaton · Conway 1970',
-    desc: 'Conway\'s Game of Life — click cells, add preset patterns (Glider, Pulsar, R-Pentomino) and watch emergence',
-    Component: GameOfLife,
-  },
+const SECTIONS = [
+  { id: 'worlds',     label: '🪐 3D Worlds' },
+  { id: 'algorithms', label: '⚡ Algorithms' },
+  { id: 'ai',         label: '🤖 AI & Games' },
+  { id: 'math',       label: '🎨 Mathematics' },
+  { id: 'data',       label: '🗄 Data & SQL' },
+  { id: 'code',       label: '💻 Code' },
 ]
 
+const Tag = ({ children }) => (
+  <span className='px-2 py-0.5 bg-gray-800 text-cyan-400 text-xs rounded font-mono'>{children}</span>
+)
+
+const Card = ({ title, tags = [], children }) => (
+  <div className='bg-gray-900 rounded-2xl overflow-hidden border border-gray-800'>
+    <div className='flex flex-wrap items-center gap-2 px-5 py-3 bg-gray-800/60 border-b border-gray-700/60'>
+      <span className='text-white font-semibold text-sm'>{title}</span>
+      <div className='flex gap-1.5 flex-wrap ml-1'>
+        {tags.map(t => <Tag key={t}>{t}</Tag>)}
+      </div>
+    </div>
+    <div className='p-4'>{children}</div>
+  </div>
+)
+
+const SectionHeader = ({ id, icon, title, subtitle }) => (
+  <div id={id} className='pt-20 pb-6'>
+    <div className='flex items-center gap-3 mb-1'>
+      <span className='text-3xl'>{icon}</span>
+      <h2 className='font-poppins font-black text-3xl bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent'>
+        {title}
+      </h2>
+    </div>
+    <p className='text-gray-500 text-sm ml-12'>{subtitle}</p>
+    <div className='mt-4 h-px bg-gradient-to-r from-cyan-900/60 to-transparent' />
+  </div>
+)
+
 const Lab = () => {
-  const [active, setActive] = useState('particles')
-  const current = TABS.find(t => t.id === active)
-  const { Component } = current
+  const refs = Object.fromEntries(SECTIONS.map(s => [s.id, useRef()]))
+
+  const scrollTo = id => {
+    refs[id].current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   return (
-    <div className='min-h-screen bg-gray-950 text-white px-6 pb-16'>
-      {/* Header */}
-      <div className='max-w-6xl mx-auto pt-28 pb-8'>
-        <div className='flex items-end gap-4'>
-          <div>
-            <h1 className='font-poppins font-black text-4xl md:text-5xl bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent'>
-              Interactive Lab
-            </h1>
-            <p className='text-gray-400 mt-2 text-sm'>
-              Algorithms, AI & visual experiments — click around and break things
-            </p>
-          </div>
-          <div className='ml-auto hidden md:flex flex-col items-end gap-1 text-xs text-gray-600'>
-            <span>React · Canvas · Zero dependencies</span>
-            <span>All demos run 100% in the browser</span>
-          </div>
-        </div>
+    <div className='min-h-screen bg-gray-950 text-white'>
+      {/* ── Hero ── */}
+      <div className='max-w-6xl mx-auto px-6 pt-32 pb-4'>
+        <h1 className='font-poppins font-black text-5xl md:text-6xl bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-500 bg-clip-text text-transparent leading-tight'>
+          Interactive Lab
+        </h1>
+        <p className='text-gray-400 mt-3 text-base max-w-xl'>
+          14 live demos — 3D simulations, classic algorithms, AI game theory, fractal math, SQL queries & a JS playground. All running 100% in the browser.
+        </p>
 
-        {/* Tab pills */}
-        <div className='mt-8 flex flex-wrap gap-2'>
-          {TABS.map(t => (
-            <button key={t.id} onClick={() => setActive(t.id)}
-              className={`px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200
-                ${active === t.id
-                  ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/30 scale-105'
-                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white'}`}>
-              {t.label}
-            </button>
+        {/* Stats row */}
+        <div className='flex flex-wrap gap-6 mt-6'>
+          {[['14', 'Interactive Demos'],['3', '3D Simulations'],['5', 'Algorithm Visualizers'],['2', 'Code Environments']].map(([n, l]) => (
+            <div key={l}>
+              <div className='text-2xl font-black text-cyan-400'>{n}</div>
+              <div className='text-xs text-gray-500'>{l}</div>
+            </div>
           ))}
         </div>
 
-        {/* Active tab info */}
-        <div className='mt-5 flex items-center gap-3'>
-          <span className='px-2 py-0.5 bg-gray-800 text-cyan-400 text-xs rounded-md font-mono'>{current.tag}</span>
-          <p className='text-gray-400 text-sm'>{current.desc}</p>
+        {/* Section nav */}
+        <div className='flex flex-wrap gap-2 mt-8'>
+          {SECTIONS.map(s => (
+            <button key={s.id} onClick={() => scrollTo(s.id)}
+              className='px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-full text-sm font-semibold transition-all'>
+              {s.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Demo */}
-      <div className='max-w-6xl mx-auto'>
-        <Component />
+      <div className='max-w-6xl mx-auto px-6 pb-24'>
+
+        {/* ── 3D Worlds ── */}
+        <div ref={refs.worlds}>
+          <SectionHeader id='worlds' icon='🪐' title='3D Worlds'
+            subtitle='Three.js & Canvas simulations — drag, interact, explore' />
+          <div className='flex flex-col gap-6'>
+            <Card title='Solar System' tags={['Three.js', '3D', 'Orbital Mechanics']}>
+              <SolarSystem3D />
+            </Card>
+            <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
+              <Card title='Warp Drive' tags={['Canvas', 'Starfield', 'Blue-shift']}>
+                <WarpSpeed />
+              </Card>
+              <Card title='Neural Particles' tags={['Canvas', 'Mouse Repulsion']}>
+                <ParticleCanvas />
+              </Card>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Algorithms ── */}
+        <div ref={refs.algorithms}>
+          <SectionHeader id='algorithms' icon='⚡' title='Algorithms'
+            subtitle='Watch algorithms execute step-by-step in real time' />
+          <div className='flex flex-col gap-6'>
+            <Card title='Sorting Algorithms' tags={['Bubble', 'Quick', 'Merge', 'O(n²) vs O(n log n)']}>
+              <SortingVisualizer />
+            </Card>
+            <Card title='Pathfinding Visualizer' tags={['A*', 'BFS', 'DFS', 'Draw walls']}>
+              <PathfindingVisualizer />
+            </Card>
+            <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
+              <Card title='Binary Search Tree' tags={['Insert', 'Search', 'Traversal', 'SVG']}>
+                <BSTVisualizer />
+              </Card>
+              <Card title='Graph Traversal' tags={['BFS', 'DFS', 'Queue', 'Stack']}>
+                <GraphTraversal />
+              </Card>
+            </div>
+          </div>
+        </div>
+
+        {/* ── AI & Games ── */}
+        <div ref={refs.ai}>
+          <SectionHeader id='ai' icon='🤖' title='AI & Game Theory'
+            subtitle='Minimax, alpha-beta pruning, and unbeatable game AI' />
+          <Card title='Minimax Tic-Tac-Toe' tags={['Minimax', 'Alpha-Beta Pruning', 'Game Theory', 'Unbeatable AI']}>
+            <TicTacToe />
+          </Card>
+        </div>
+
+        {/* ── Mathematics ── */}
+        <div ref={refs.math}>
+          <SectionHeader id='math' icon='🎨' title='Mathematical Beauty'
+            subtitle='Cellular automata, fractals, N-body physics, and emergent complexity' />
+          <div className='flex flex-col gap-6'>
+            <Card title="Conway's Game of Life" tags={['Cellular Automaton', 'Emergence', 'Canvas']}>
+              <GameOfLife />
+            </Card>
+            <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
+              <Card title='Mandelbrot Fractal' tags={['Infinite Zoom', 'Complex Plane', 'Canvas']}>
+                <FractalExplorer />
+              </Card>
+              <Card title='N-Body Gravity Simulator' tags={['F=Gm₁m₂/r²', 'Physics', 'Field Lines']}>
+                <GravitySimulator />
+              </Card>
+            </div>
+            <Card title='Matrix Rain' tags={['Katakana', 'Canvas', 'The Matrix']}>
+              <MatrixRain />
+            </Card>
+          </div>
+        </div>
+
+        {/* ── Data & SQL ── */}
+        <div ref={refs.data}>
+          <SectionHeader id='data' icon='🗄' title='Data & Queries'
+            subtitle='Run real SQL queries against an in-browser database — no server needed' />
+          <Card title='SQL Playground' tags={['SELECT', 'JOIN', 'GROUP BY', 'In-browser Engine']}>
+            <SQLPlayground />
+          </Card>
+        </div>
+
+        {/* ── Code Playground ── */}
+        <div ref={refs.code}>
+          <SectionHeader id='code' icon='💻' title='Code Playground'
+            subtitle='Write and run JavaScript directly in the browser with live output' />
+          <Card title='JavaScript REPL' tags={['Run Code', 'console.log', 'Sandboxed', 'Examples']}>
+            <CodeRunner />
+          </Card>
+        </div>
+
       </div>
     </div>
   )

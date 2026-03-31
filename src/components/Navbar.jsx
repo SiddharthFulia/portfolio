@@ -1,17 +1,22 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { logo } from "../assets/images";
 
 const Navbar = () => {
+  const { pathname } = useLocation();
+  const isDark = pathname.startsWith('/lab');
+
   return (
-    <header className='header'>
+    <header className={`header transition-colors ${isDark ? 'bg-gray-950/80 backdrop-blur-md' : ''}`}>
       <NavLink to='/'>
         <img src={logo} alt='logo' className='w-16 h-16 object-contain' />
       </NavLink>
       <nav className='flex items-center text-lg gap-7 font-medium'>
-        <NavLink to='/about' className={({ isActive }) => isActive ? "text-blue-600" : "text-black"}>
+        <NavLink to='/about' className={({ isActive }) =>
+          isActive ? "text-blue-400" : isDark ? "text-gray-300 hover:text-white" : "text-black"}>
           About
         </NavLink>
-        <NavLink to='/projects' className={({ isActive }) => isActive ? "text-blue-600" : "text-black"}>
+        <NavLink to='/projects' className={({ isActive }) =>
+          isActive ? "text-blue-400" : isDark ? "text-gray-300 hover:text-white" : "text-black"}>
           Projects
         </NavLink>
         <NavLink to='/lab' className={({ isActive }) =>

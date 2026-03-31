@@ -170,6 +170,9 @@ const GameOfLife = () => {
         onMouseDown={() => (mouseDown.current = true)}
         onMouseUp={() => (mouseDown.current = false)}
         onMouseLeave={() => (mouseDown.current = false)}
+        onTouchStart={e => { e.preventDefault(); mouseDown.current = true; handleCanvasClick(e.touches[0]) }}
+        onTouchMove={e => { e.preventDefault(); handleCanvasClick(e.touches[0]) }}
+        onTouchEnd={() => (mouseDown.current = false)}
       />
 
       <div className='flex flex-wrap gap-x-6 mt-3 text-sm text-gray-400 items-center'>
