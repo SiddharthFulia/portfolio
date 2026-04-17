@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { fetchNASA, nasaUrl, getRateLimitRemaining } from '../components/science/utils'
+import { fetchNASA, nasaUrl, getRateLimitRemaining, corsProxy } from '../components/science/utils'
 
 /* ── Categories for filter ── */
 const CATEGORIES = [
@@ -117,10 +117,10 @@ const ISSWidget = () => {
 
   useEffect(() => {
     const fetchISS = () => {
-      fetch('http://api.open-notify.org/iss-now.json')
+      fetch(corsProxy('http://api.open-notify.org/iss-now.json'))
         .then(r => r.json()).then(d => setPos(d.iss_position)).catch(() => {})
     }
-    fetch('http://api.open-notify.org/astros.json')
+    fetch(corsProxy('http://api.open-notify.org/astros.json'))
       .then(r => r.json()).then(d => setPeople(d.number)).catch(() => {})
     fetchISS()
     const iv = setInterval(fetchISS, 10000)

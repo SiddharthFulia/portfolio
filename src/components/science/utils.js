@@ -120,6 +120,14 @@ export function debounce(fn, ms) {
   };
 }
 
+/**
+ * Wrap a URL through a CORS proxy for APIs that block browser requests.
+ * Used for: TechTransfer (redirect CORS), Fireball (no CORS), open-notify (HTTP).
+ */
+export function corsProxy(url) {
+  return `https://corsproxy.io/?${encodeURIComponent(url)}`;
+}
+
 /** Card classes (no backdrop-blur for performance) */
 export const glassCard = 'bg-gray-900 border border-gray-700/50 rounded-2xl';
 export const glassCardHover = 'hover:border-cyan-500/30 transition-colors duration-200';

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { fetchNASA, glassCard, debounce, ErrorWithRetry } from './utils';
+import { fetchNASA, glassCard, debounce, ErrorWithRetry, corsProxy } from './utils';
 
 /* ── Skeleton ── */
 const Skeleton = () => (
@@ -161,7 +161,7 @@ const SatelliteViewer = () => {
   // Fetch ISS position (polls)
   const fetchISS = useCallback(async () => {
     try {
-      const res = await fetch('http://api.open-notify.org/iss-now.json');
+      const res = await fetch(corsProxy('http://api.open-notify.org/iss-now.json'));
       const data = await res.json();
       if (data?.iss_position) {
         setIssPos(data.iss_position);
@@ -174,7 +174,7 @@ const SatelliteViewer = () => {
   // Fetch people in space
   const fetchPeople = useCallback(async () => {
     try {
-      const res = await fetch('http://api.open-notify.org/astros.json');
+      const res = await fetch(corsProxy('http://api.open-notify.org/astros.json'));
       const data = await res.json();
       if (data?.people) setPeople(data.people);
     } catch {
