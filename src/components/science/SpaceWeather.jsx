@@ -122,19 +122,25 @@ const SpaceWeather = () => {
     const endDate = todayStr();
     const opts = { signal: controller.signal };
 
-    const [flrRes, gstRes, cmeRes] = await Promise.all([
-      fetchNASA(nasaUrl('https://api.nasa.gov/DONKI/FLR', { startDate, endDate }), opts),
-      fetchNASA(nasaUrl('https://api.nasa.gov/DONKI/GST', { startDate, endDate }), opts),
-      fetchNASA(nasaUrl('https://api.nasa.gov/DONKI/CME', { startDate, endDate }), opts),
-    ]);
+    // Fire all 3 independently — show data as each arrives
+    fetchNASA(nasaUrl('https://api.nasa.gov/DONKI/FLR', { startDate, endDate }), opts)
+      .then(({ data, error: e }) => {
+        if (e) setError(prev => prev || e);
+        else if (Array.isArray(data)) setFlares(data);
+      });
 
-    const err = flrRes.error || gstRes.error || cmeRes.error;
-    if (err) { setError(err); setLoading(false); return; }
+    fetchNASA(nasaUrl('https://api.nasa.gov/DONKI/GST', { startDate, endDate }), opts)
+      .then(({ data, error: e }) => {
+        if (e) setError(prev => prev || e);
+        else if (Array.isArray(data)) setStorms(data);
+      });
 
-    setFlares(Array.isArray(flrRes.data) ? flrRes.data : []);
-    setStorms(Array.isArray(gstRes.data) ? gstRes.data : []);
-    setCmes(Array.isArray(cmeRes.data) ? cmeRes.data : []);
-    setLoading(false);
+    fetchNASA(nasaUrl('https://api.nasa.gov/DONKI/CME', { startDate, endDate }), opts)
+      .then(({ data, error: e }) => {
+        if (e) setError(prev => prev || e);
+        else if (Array.isArray(data)) setCmes(data);
+        setLoading(false); // last one turns off loading
+      });
   }, []);
 
   useEffect(() => {

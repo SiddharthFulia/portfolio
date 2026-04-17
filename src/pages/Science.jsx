@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { fetchNASA, nasaUrl, getRateLimitRemaining, corsProxy } from '../components/science/utils'
+import { fetchNASA, nasaUrl, corsProxy } from '../components/science/utils'
 
 /* ── Categories for filter ── */
 const CATEGORIES = [
@@ -35,40 +35,6 @@ const ICONS = {
   tech: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" /></svg>,
   fireballs: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 00.495-7.467 5.99 5.99 0 00-1.925 3.546 5.974 5.974 0 01-2.133-1A3.75 3.75 0 0012 18z" /></svg>,
   satellites: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M8.288 15.038a5.25 5.25 0 01-1.326-3.538c0-1.326.493-2.538 1.326-3.538m7.424 7.076a5.25 5.25 0 001.326-3.538c0-1.326-.493-2.538-1.326-3.538M12 8.25v7.5m-6 3.75h12a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H6A1.5 1.5 0 004.5 6v12A1.5 1.5 0 006 19.5z" /></svg>,
-}
-
-/* ── Info tooltip ── */
-const InfoTooltip = () => {
-  const [open, setOpen] = useState(false)
-  return (
-    <div className="relative inline-block">
-      <button onClick={() => setOpen(o => !o)} onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}
-        className="w-7 h-7 rounded-full border border-gray-700 bg-gray-800 text-gray-500 hover:text-cyan-400 hover:border-cyan-700 flex items-center justify-center transition-colors text-xs font-bold">
-        i
-      </button>
-      {open && (() => {
-        const remaining = getRateLimitRemaining()
-        return (
-          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-3 bg-gray-900 border border-gray-700 rounded-xl shadow-xl shadow-black/40 z-50 text-left">
-            <div className="text-xs text-gray-300 font-semibold mb-2">API Rate Limits</div>
-            {remaining !== null && (
-              <div className="flex items-center gap-2 mb-2 p-2 bg-gray-800 rounded-lg">
-                <div className={`w-2 h-2 rounded-full ${remaining > 10 ? 'bg-green-500' : remaining > 0 ? 'bg-yellow-500' : 'bg-red-500'}`} />
-                <span className="text-xs text-gray-300 font-mono">{remaining}</span>
-                <span className="text-[11px] text-gray-500">requests remaining</span>
-              </div>
-            )}
-            <ul className="text-[11px] text-gray-400 space-y-1">
-              <li className="flex items-start gap-1.5"><span className="text-yellow-500 mt-0.5">&#9679;</span><span>Demo key: <span className="text-gray-300">30/hr</span>, <span className="text-gray-300">50/day</span></span></li>
-              <li className="flex items-start gap-1.5"><span className="text-green-500 mt-0.5">&#9679;</span><span>Free key: <span className="text-gray-300">1,000/hr</span></span></li>
-              <li className="flex items-start gap-1.5"><span className="text-cyan-500 mt-0.5">&#9679;</span><span>Get one at <a href="https://api.nasa.gov/" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">api.nasa.gov</a></span></li>
-            </ul>
-            <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-gray-700" />
-          </div>
-        )
-      })()}
-    </div>
-  )
 }
 
 /* ── Featured APOD banner (auto-fetches today's image) ── */
@@ -271,7 +237,6 @@ const Science = () => {
                 <div className="text-[10px] text-gray-500 mt-0.5">{l}</div>
               </div>
             ))}
-            <InfoTooltip />
           </div>
         </FadeIn>
       </div>
