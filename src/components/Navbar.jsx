@@ -5,7 +5,7 @@ import sakura from "../assets/sakura.mp3";
 
 const Navbar = () => {
   const { pathname } = useLocation();
-  const isDark = pathname.startsWith('/lab') || pathname.startsWith('/learn') || pathname.startsWith('/creative') || pathname.startsWith('/chess');
+  const isDark = pathname.startsWith('/lab') || pathname.startsWith('/learn') || pathname.startsWith('/creative') || pathname.startsWith('/chess') || pathname.startsWith('/science');
 
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
@@ -43,6 +43,9 @@ const Navbar = () => {
       inactiveDark: 'text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700' },
     { to: '/creative', label: 'Creative', activeClass: 'text-white bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-500 shadow-md shadow-pink-500/20',
       inactiveClass: 'text-white bg-pink-600 hover:bg-pink-500',
+      inactiveDark: 'text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700' },
+    { to: '/science', label: 'Science', activeClass: 'text-white bg-gradient-to-r from-cyan-500 to-blue-600 shadow-md shadow-cyan-500/20',
+      inactiveClass: 'text-white bg-blue-700 hover:bg-blue-600',
       inactiveDark: 'text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700' },
   ];
 

@@ -146,7 +146,7 @@ const Cube3D = () => {
                 ...styles.face,
                 background: face.gradient,
                 transform: FACE_TRANSFORMS[i],
-                boxShadow: `inset 0 0 40px rgba(0,0,0,0.3), 0 0 20px ${face.glow}44`,
+                boxShadow: `inset 0 0 20px rgba(0,0,0,0.25)`,
               }}
             >
               <span style={styles.label}>{face.label}</span>
@@ -202,7 +202,6 @@ const styles = {
     backfaceVisibility: 'hidden',
     borderRadius: 16,
     border: '1px solid rgba(255,255,255,0.12)',
-    backdropFilter: 'blur(2px)',
   },
   label: {
     color: '#fff',
