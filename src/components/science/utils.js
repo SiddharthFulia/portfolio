@@ -61,13 +61,28 @@ export async function fetchNASA(url, { signal, skipCache = false } = {}) {
       if (res.status === 429) {
         _rateLimitHit = Date.now();
         _rateLimitRemaining = 0;
-        return { data: null, error: 'Rate limit reached — waiting 60s before allowing new requests.' };
+        return { data: null, error: 'Rate limit reached — waiting 10s before retrying.' };
+      }
+      if (res.status === 404) {
+        return { data: null, error: 'This API endpoint is currently unavailable (404). It may be temporarily down.' };
       }
       throw new Error(`API Error ${res.status}: ${res.statusText}`);
     }
-    const data = await res.json();
-    setCache(url, data);
-    return { data, error: null };
+
+    // Guard against HTML responses (some APIs return HTML on errors/redirects)
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('text/html')) {
+      return { data: null, error: 'API returned an HTML page instead of data. The service may be temporarily down.' };
+    }
+
+    const text = await res.text();
+    try {
+      const data = JSON.parse(text);
+      setCache(url, data);
+      return { data, error: null };
+    } catch {
+      return { data: null, error: 'Invalid response from API. The service may be temporarily down.' };
+    }
   } catch (err) {
     if (err.name === 'AbortError') return { data: null, error: null };
     return { data: null, error: err.message };
