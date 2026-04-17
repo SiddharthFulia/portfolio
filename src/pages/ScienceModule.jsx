@@ -13,6 +13,7 @@ const COMPONENTS = {
   tech:       lazy(() => import('../components/science/TechPortal')),
   fireballs:  lazy(() => import('../components/science/FireballTracker')),
   satellites: lazy(() => import('../components/science/SatelliteViewer')),
+  imagery:    lazy(() => import('../components/science/EarthImagery')),
 }
 
 const META = {
@@ -28,10 +29,12 @@ const META = {
     info: 'Daily photos of Earth from the DSCOVR satellite at the L1 point, 1.5 million km away. Browse through thumbnails, navigate dates, and use the play button to see Earth rotate.' },
   media:      { label: 'Media Library',        api: 'Images',       color: 'from-indigo-500 to-blue-500',  skeleton: 'grid',
     info: 'Search through millions of space images and videos. Try terms like "nebula", "mars", "hubble", "galaxy", or "astronaut". Click any image to see it full-size with metadata.' },
-  mars:       { label: 'Mars Rovers',          api: 'Mars',         color: 'from-red-500 to-orange-500',   skeleton: 'grid',
-    info: 'Browse photos from Mars rovers — Curiosity, Perseverance, Opportunity, and Spirit. Switch rovers using tabs, filter by camera type, and pick a specific Sol (Martian day).' },
+  mars:       { label: 'Mars Rovers',          api: 'Mars',         color: 'from-red-500 to-orange-500',   skeleton: 'list',
+    info: 'The Mars Rover Photos API has been officially retired. This page shows rover mission info and links to browse Mars images through the Media Library.' },
   tech:       { label: 'Tech Portal',          api: 'TechTransfer', color: 'from-cyan-500 to-teal-500',    skeleton: 'list',
     info: 'Search patents and technologies developed by space agencies. Click any result to expand details and find links to the original patent documentation.' },
+  imagery:    { label: 'Earth Imagery',         api: 'Landsat',      color: 'from-emerald-500 to-cyan-500', skeleton: 'image',
+    info: 'View satellite imagery of any location on Earth from Landsat 8. Enter coordinates or pick a preset city, set a date, and adjust zoom level. Not all dates have coverage for every location.' },
   fireballs:  { label: 'Fireball Tracker',     api: 'CNEOS',        color: 'from-amber-500 to-red-600',    skeleton: 'map',
     info: 'Bright meteor events (fireballs) detected in Earth\'s atmosphere. Markers on the map show impact locations sized by energy. Use the date range filter and sort by energy, velocity, or date.' },
   satellites: { label: 'Satellite Tracker',    api: 'TLE/ISS',      color: 'from-violet-500 to-purple-500',skeleton: 'dashboard',

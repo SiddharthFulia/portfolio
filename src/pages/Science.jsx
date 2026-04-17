@@ -18,7 +18,8 @@ const SECTIONS = [
   { id: 'earth',      label: 'Earth Events',         color: 'from-green-500 to-emerald-500', desc: 'Wildfires, volcanoes, storms from orbit',    api: 'EONET',        cat: 'tracking', hasDate: false },
   { id: 'epic',       label: 'EPIC Earth Camera',    color: 'from-blue-500 to-cyan-500',     desc: 'Daily Earth photos from DSCOVR',             api: 'EPIC',         cat: 'imagery',  hasDate: true },
   { id: 'media',      label: 'Media Library',        color: 'from-indigo-500 to-blue-500',   desc: 'Search millions of space images & videos',   api: 'Images',       cat: 'data',     hasDate: false },
-  { id: 'mars',       label: 'Mars Rovers',          color: 'from-red-500 to-orange-500',    desc: 'Curiosity, Perseverance & more',             api: 'Mars',         cat: 'imagery',  hasDate: true },
+  { id: 'imagery',    label: 'Earth Imagery',         color: 'from-emerald-500 to-cyan-500',  desc: 'Satellite photos of any location on Earth',  api: 'Landsat',      cat: 'imagery',  hasDate: true },
+  { id: 'mars',       label: 'Mars Rovers',          color: 'from-red-500 to-orange-500',    desc: 'Rover mission info (API retired)',            api: 'Mars',         cat: 'imagery',  hasDate: false, retired: true },
   { id: 'tech',       label: 'Tech Portal',          color: 'from-cyan-500 to-teal-500',     desc: 'Space agency patents & tech transfer',       api: 'TechTransfer', cat: 'data',     hasDate: false },
   { id: 'fireballs',  label: 'Fireball Tracker',     color: 'from-amber-500 to-red-600',     desc: 'Atmospheric fireball events worldwide',      api: 'CNEOS',        cat: 'tracking', hasDate: true },
   { id: 'satellites', label: 'Satellite Tracker',    color: 'from-violet-500 to-purple-500', desc: 'Live ISS position & satellite orbits',       api: 'TLE/ISS',      cat: 'tracking', hasDate: false },
@@ -35,6 +36,7 @@ const ICONS = {
   tech: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" /></svg>,
   fireballs: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 00.495-7.467 5.99 5.99 0 00-1.925 3.546 5.974 5.974 0 01-2.133-1A3.75 3.75 0 0012 18z" /></svg>,
   satellites: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M8.288 15.038a5.25 5.25 0 01-1.326-3.538c0-1.326.493-2.538 1.326-3.538m7.424 7.076a5.25 5.25 0 001.326-3.538c0-1.326-.493-2.538-1.326-3.538M12 8.25v7.5m-6 3.75h12a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H6A1.5 1.5 0 004.5 6v12A1.5 1.5 0 006 19.5z" /></svg>,
+  imagery: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5a17.92 17.92 0 01-8.716-2.247m0 0A9.015 9.015 0 003 12c0-1.605.42-3.113 1.157-4.418" /></svg>,
 }
 
 /* ── Featured APOD banner (auto-fetches today's image) ── */
@@ -227,7 +229,7 @@ const Science = () => {
         <FadeIn delay={0.1}>
           <div className="flex flex-wrap items-center gap-8 mt-6">
             {[
-              ['10', 'Data Feeds', 'text-cyan-400'],
+              ['11', 'Data Feeds', 'text-cyan-400'],
               ['7+', 'Live APIs', 'text-blue-400'],
               ['Live', 'ISS Tracking', 'text-green-400'],
               ['30yr+', 'Image Archive', 'text-purple-400'],
@@ -295,6 +297,7 @@ const Science = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-white font-bold text-sm">{s.label}</span>
+                        {s.retired && <span className="text-[9px] text-yellow-500 bg-yellow-900/30 px-1.5 py-0.5 rounded font-semibold">Retired</span>}
                       </div>
                       <p className="text-gray-500 text-xs leading-relaxed">{s.desc}</p>
                     </div>
