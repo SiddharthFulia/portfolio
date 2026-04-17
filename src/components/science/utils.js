@@ -125,7 +125,7 @@ export function debounce(fn, ms) {
  * Used for: TechTransfer (redirect CORS), Fireball (no CORS), open-notify (HTTP).
  */
 export function corsProxy(url) {
-  return `https://corsproxy.io/?${encodeURIComponent(url)}`;
+  return `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}`;
 }
 
 /** Card classes (no backdrop-blur for performance) */
