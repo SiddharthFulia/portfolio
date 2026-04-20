@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { analyzeFace, checkFaceHealth } from '../api/face'
+import { createWorker } from 'tesseract.js'
 
 const MOOD_EMOJI = { happy: '😄', sad: '😢', angry: '😠', surprised: '😲', sleepy: '😴', neutral: '😐' }
 const MOOD_COLORS = {
@@ -59,8 +60,18 @@ const FaceDetection = () => {
   const [showBox, setShowBox] = useState(true)
   const [videoDims, setVideoDims] = useState({ w: 0, h: 0 })
 
+  // OCR state
+  const [ocrText, setOcrText] = useState('')
+  const [ocrLoading, setOcrLoading] = useState(false)
+  const [ocrProgress, setOcrProgress] = useState(0)
+  const [ocrLang, setOcrLang] = useState('eng')
+  const ocrWorkerRef = useRef(null)
+  const ocrFileRef = useRef(null)
+  const [ocrImage, setOcrImage] = useState(null)
+  const [ocrCopied, setOcrCopied] = useState(false)
+
   // Object detection state
-  const [mode, setMode] = useState('face') // 'face' | 'object'
+  const [mode, setMode] = useState('face') // 'face' | 'object' | 'ocr'
   const [objModelStatus, setObjModelStatus] = useState('idle')
   const objModelRef = useRef(null)
   const objAnimRef = useRef(null)
@@ -282,6 +293,48 @@ const FaceDetection = () => {
     return () => { if (objAnimRef.current) cancelAnimationFrame(objAnimRef.current) }
   }, [mode, objModelStatus, isPaused, getColor])
 
+  // ═══ OCR ═══
+  const runOCR = useCallback(async (imgSrc) => {
+    setOcrLoading(true); setOcrProgress(0); setOcrText('')
+    try {
+      if (!ocrWorkerRef.current) {
+        const worker = await createWorker(ocrLang, 1, {
+          logger: (m) => { if (m.status === 'recognizing text') setOcrProgress(Math.round(m.progress * 100)) }
+        })
+        ocrWorkerRef.current = worker
+      }
+      const { data } = await ocrWorkerRef.current.recognize(imgSrc)
+      setOcrText(data.text || 'No text detected')
+    } catch (err) {
+      setOcrText('OCR failed: ' + err.message)
+    }
+    setOcrLoading(false)
+  }, [ocrLang])
+
+  const handleOcrUpload = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => { setOcrImage(reader.result); runOCR(reader.result) }
+    reader.readAsDataURL(file)
+  }
+
+  const captureOcrFromCamera = () => {
+    const video = videoRef.current, canvas = canvasRef.current
+    if (!video || !canvas || video.readyState < 2) return
+    canvas.width = video.videoWidth; canvas.height = video.videoHeight
+    canvas.getContext('2d').drawImage(video, 0, 0)
+    const img = canvas.toDataURL('image/png')
+    setOcrImage(img); runOCR(img)
+  }
+
+  const copyOcrText = () => {
+    navigator.clipboard.writeText(ocrText).then(() => { setOcrCopied(true); setTimeout(() => setOcrCopied(false), 2000) })
+  }
+
+  // Cleanup OCR worker on unmount
+  useEffect(() => () => { ocrWorkerRef.current?.terminate() }, [])
+
   // Clear overlay when switching modes
   useEffect(() => {
     const overlay = overlayRef.current
@@ -324,6 +377,10 @@ const FaceDetection = () => {
             className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors ${mode === 'object' ? 'bg-gradient-to-r from-pink-600 to-orange-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
             Object Detection
           </button>
+          <button onClick={() => setMode('ocr')}
+            className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors ${mode === 'ocr' ? 'bg-gradient-to-r from-amber-600 to-yellow-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
+            OCR / Text
+          </button>
         </div>
 
         {/* Status */}
@@ -347,6 +404,12 @@ const FaceDetection = () => {
               {objModelStatus === 'ready' && <span className="text-xs text-gray-600"><span className="text-pink-400 font-mono">{objFps}</span> FPS</span>}
               {objPredictions.length > 0 && <span className="text-xs text-gray-600"><span className="text-orange-400 font-mono">{objPredictions.length}</span> objects</span>}
             </>
+          )}
+          {mode === 'ocr' && (
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${ocrLoading ? 'bg-yellow-500 animate-pulse' : 'bg-green-500'}`} />
+              <span className="text-xs text-gray-500">{ocrLoading ? `Processing... ${ocrProgress}%` : 'Tesseract.js ready'}</span>
+            </div>
           )}
         </div>
 
@@ -384,6 +447,29 @@ const FaceDetection = () => {
                     <input type="range" min="0.1" max="0.9" step="0.05" value={objThreshold} onChange={e => setObjThreshold(parseFloat(e.target.value))}
                       className="w-20 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-pink-500" />
                     <span className="text-xs text-pink-400 font-mono w-8">{Math.round(objThreshold * 100)}%</span>
+                  </div>
+                )}
+                {mode === 'ocr' && (
+                  <div className="flex items-center gap-2 ml-auto">
+                    <button onClick={captureOcrFromCamera} disabled={ocrLoading}
+                      className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold rounded-lg disabled:opacity-50 transition-colors">
+                      Capture & Scan
+                    </button>
+                    <button onClick={() => ocrFileRef.current?.click()} disabled={ocrLoading}
+                      className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs font-semibold rounded-lg disabled:opacity-50 transition-colors">
+                      Upload Image
+                    </button>
+                    <input ref={ocrFileRef} type="file" accept="image/*" onChange={handleOcrUpload} className="hidden" />
+                    <select value={ocrLang} onChange={e => { setOcrLang(e.target.value); ocrWorkerRef.current?.terminate(); ocrWorkerRef.current = null }}
+                      className="px-2 py-1.5 bg-gray-800 border border-gray-700 text-gray-300 text-xs rounded-lg focus:outline-none">
+                      <option value="eng">English</option>
+                      <option value="hin">Hindi</option>
+                      <option value="jpn">Japanese</option>
+                      <option value="chi_sim">Chinese</option>
+                      <option value="spa">Spanish</option>
+                      <option value="fra">French</option>
+                      <option value="deu">German</option>
+                    </select>
                   </div>
                 )}
               </div>
@@ -484,7 +570,57 @@ const FaceDetection = () => {
                 )}
                 <div className="p-4 rounded-2xl border border-gray-800 bg-gray-900">
                   <h3 className="text-gray-400 text-xs font-semibold mb-2">About</h3>
-                  <p className="text-gray-500 text-xs leading-relaxed">Object detection uses TensorFlow.js + COCO-SSD model running entirely in your browser. Detects 80 object classes in real-time. No data sent to any server.</p>
+                  <p className="text-gray-500 text-xs leading-relaxed">TensorFlow.js + COCO-SSD, 80 object classes, runs in your browser.</p>
+                </div>
+              </>
+            )}
+
+            {mode === 'ocr' && (
+              <>
+                {/* OCR Preview */}
+                {ocrImage && (
+                  <div className="rounded-2xl border border-gray-800 bg-gray-900 overflow-hidden">
+                    <img src={ocrImage} alt="OCR input" className="w-full max-h-48 object-contain bg-black" />
+                  </div>
+                )}
+
+                {/* Progress */}
+                {ocrLoading && (
+                  <div className="p-4 rounded-2xl border border-gray-800 bg-gray-900">
+                    <div className="flex justify-between text-xs mb-2">
+                      <span className="text-gray-400">Processing...</span>
+                      <span className="text-amber-400 font-mono">{ocrProgress}%</span>
+                    </div>
+                    <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-amber-500 to-yellow-500 rounded-full transition-all duration-300" style={{ width: `${ocrProgress}%` }} />
+                    </div>
+                  </div>
+                )}
+
+                {/* Result */}
+                {ocrText && !ocrLoading && (
+                  <div className="p-4 rounded-2xl border border-gray-800 bg-gray-900">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-white font-bold text-sm">Extracted Text</h3>
+                      <button onClick={copyOcrText}
+                        className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors ${ocrCopied ? 'bg-green-600 text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'}`}>
+                        {ocrCopied ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
+                    <pre className="text-gray-300 text-xs leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto font-mono bg-gray-950 p-3 rounded-lg">{ocrText}</pre>
+                  </div>
+                )}
+
+                {!ocrImage && !ocrLoading && (
+                  <div className="p-5 rounded-2xl border border-gray-800 bg-gray-900 text-center">
+                    <div className="text-4xl mb-2">📝</div>
+                    <p className="text-gray-500 text-sm">Capture from camera or upload an image to extract text</p>
+                  </div>
+                )}
+
+                <div className="p-4 rounded-2xl border border-gray-800 bg-gray-900">
+                  <h3 className="text-gray-400 text-xs font-semibold mb-2">About</h3>
+                  <p className="text-gray-500 text-xs leading-relaxed">Tesseract.js OCR engine, supports 100+ languages, runs in your browser.</p>
                 </div>
               </>
             )}
