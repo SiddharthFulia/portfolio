@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { fetchNASA, glassCard, formatNumber, ErrorWithRetry, corsProxy } from './utils';
+import { fetchFireballs, formatNumber } from '../../api/nasa';
+import { glassCard } from './utils';
+import ErrorWithRetry from './ErrorWithRetry';
 
 /* ── Skeleton ── */
 const Skeleton = () => (
@@ -143,11 +145,11 @@ const FireballTracker = () => {
     setLoading(true);
     setError(null);
 
-    let rawUrl = 'https://ssd-api.jpl.nasa.gov/fireball.api?req-loc=true';
-    if (start) rawUrl += `&date-min=${start}`;
-    if (end) rawUrl += `&date-max=${end}`;
+    const params = { 'req-loc': true };
+    if (start) params['date-min'] = start;
+    if (end) params['date-max'] = end;
 
-    const { data, error: err } = await fetchNASA(corsProxy(rawUrl), { signal: controller.signal });
+    const { data, error: err } = await fetchFireballs(params, { signal: controller.signal });
     if (err) { setError(err); setLoading(false); return; }
 
     if (data?.data && data?.fields) {

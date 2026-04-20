@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { fetchNASA, nasaUrl, formatNumber, formatDistance, glassCard, todayStr, daysAgo, ErrorWithRetry } from './utils';
+import { fetchAsteroids, formatNumber, formatDistance, todayStr, daysAgo } from '../../api/nasa';
+import { glassCard } from './utils';
+import ErrorWithRetry from './ErrorWithRetry';
 
 /* ── Danger badge ── */
 const DangerBadge = ({ hazardous }) => (
@@ -140,12 +142,10 @@ const AsteroidTracker = () => {
     setLoading(true);
     setError(null);
 
-    const url = nasaUrl('https://api.nasa.gov/neo/rest/v1/feed', {
+    const { data: d, error: e } = await fetchAsteroids({
       start_date: daysAgo(6),
       end_date: todayStr(),
-    });
-
-    const { data: d, error: e } = await fetchNASA(url, { signal: controller.signal });
+    }, { signal: controller.signal });
     if (e) { setError(e); setLoading(false); return; }
     if (d) setData(d);
     setLoading(false);

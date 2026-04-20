@@ -284,7 +284,7 @@ export default function BSTVisualizer() {
       )}
 
       <div className="bg-gray-950 rounded-xl overflow-x-auto mb-4">
-        <svg width="100%" viewBox={`0 0 ${svgW} ${svgH}`} style={{ minWidth: 400 }}>
+        <svg width="100%" viewBox={`0 0 ${svgW} ${svgH}`} style={{ minWidth: 'min(100%, 400px)' }}>
           <defs>
             <filter id="glow">
               <feGaussianBlur stdDeviation="2" result="coloredBlur" />

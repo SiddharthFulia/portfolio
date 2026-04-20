@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Route, BrowserRouter as Router, Routes, useLocation } from "react-router-dom";
+import { ConfigProvider, theme } from "antd";
 import { Footer, Navbar } from "./components";
 
 /* ── Lazy page imports ── */
@@ -13,6 +14,10 @@ const Creative = lazy(() => import("./pages/Creative"));
 const ChessViz = lazy(() => import("./pages/ChessViz"));
 const Science = lazy(() => import("./pages/Science"));
 const ScienceModule = lazy(() => import("./pages/ScienceModule"));
+const FaceDetection = lazy(() => import("./pages/FaceDetection"));
+const Explore = lazy(() => import("./pages/Explore"));
+const ExploreModule = lazy(() => import("./pages/ExploreModule"));
+const AIChat = lazy(() => import("./pages/AIChat"));
 
 /* ── Skeleton building blocks ── */
 const B = "animate-pulse bg-slate-200 rounded";
@@ -105,6 +110,10 @@ const ConditionalFooter = () => {
 
 const App = () => {
   return (
+    <ConfigProvider theme={{
+      algorithm: theme.darkAlgorithm,
+      token: { colorPrimary: '#22d3ee', borderRadius: 10, colorBgContainer: '#111827', colorBgElevated: '#1f2937', colorBorder: '#374151' },
+    }}>
     <main className='bg-slate-300/20'>
       <Router>
         <Navbar />
@@ -119,10 +128,15 @@ const App = () => {
           <Route path='/chess' element={<Suspense fallback={<DarkPageSkeleton />}><ChessViz /></Suspense>} />
           <Route path='/science' element={<Suspense fallback={<ScienceSkeleton />}><Science /></Suspense>} />
           <Route path='/science/:module' element={<Suspense fallback={<ScienceModuleSkeleton />}><ScienceModule /></Suspense>} />
+          <Route path='/face' element={<Suspense fallback={<DarkPageSkeleton />}><FaceDetection /></Suspense>} />
+          <Route path='/explore' element={<Suspense fallback={<DarkPageSkeleton />}><Explore /></Suspense>} />
+          <Route path='/explore/:module' element={<Suspense fallback={<DarkPageSkeleton />}><ExploreModule /></Suspense>} />
+          <Route path='/ai' element={<Suspense fallback={<DarkPageSkeleton />}><AIChat /></Suspense>} />
         </Routes>
         <ConditionalFooter />
       </Router>
     </main>
+    </ConfigProvider>
   );
 };
 

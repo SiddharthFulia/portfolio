@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { fetchNASA, nasaUrl, corsProxy } from '../components/science/utils'
+import { fetchAPOD, fetchISS as fetchISSPosition, fetchAstros, fetchAsteroids, todayStr, daysAgo } from '../api/nasa'
 
 /* ── Categories for filter ── */
 const CATEGORIES = [
@@ -45,7 +45,7 @@ const FeaturedAPOD = () => {
 
   useEffect(() => {
     const controller = new AbortController()
-    fetchNASA(nasaUrl('https://api.nasa.gov/planetary/apod'), { signal: controller.signal })
+    fetchAPOD({}, { signal: controller.signal })
       .then(({ data }) => { if (data) setApod(data) })
     return () => controller.abort()
   }, [])
@@ -85,11 +85,9 @@ const ISSWidget = () => {
 
   useEffect(() => {
     const fetchISS = () => {
-      fetch(corsProxy('http://api.open-notify.org/iss-now.json'))
-        .then(r => r.json()).then(d => setPos(d.iss_position)).catch(() => {})
+      fetchISSPosition().then(({ data }) => { if (data?.iss_position) setPos(data.iss_position) }).catch(() => {})
     }
-    fetch(corsProxy('http://api.open-notify.org/astros.json'))
-      .then(r => r.json()).then(d => setPeople(d.number)).catch(() => {})
+    fetchAstros().then(({ data }) => { if (data?.number) setPeople(data.number) }).catch(() => {})
     fetchISS()
     const iv = setInterval(fetchISS, 10000)
     return () => clearInterval(iv)
@@ -138,9 +136,7 @@ const AsteroidWidget = () => {
 
   useEffect(() => {
     const controller = new AbortController()
-    const today = new Date().toISOString().slice(0, 10)
-    const weekAgo = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10)
-    fetchNASA(nasaUrl('https://api.nasa.gov/neo/rest/v1/feed', { start_date: weekAgo, end_date: today }), { signal: controller.signal })
+    fetchAsteroids({ start_date: daysAgo(6), end_date: todayStr() }, { signal: controller.signal })
       .then(({ data }) => {
         if (!data) return
         setCount(data.element_count)

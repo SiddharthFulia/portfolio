@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { fetchNASA, glassCard, debounce, ErrorWithRetry, corsProxy } from './utils';
+import { fetchISS as fetchISSPosition, fetchAstros, fetchTLE, debounce } from '../../api/nasa';
+import { glassCard } from './utils';
+import ErrorWithRetry from './ErrorWithRetry';
 
 /* ── Skeleton ── */
 const Skeleton = () => (
@@ -161,8 +163,7 @@ const SatelliteViewer = () => {
   // Fetch ISS position (polls)
   const fetchISS = useCallback(async () => {
     try {
-      const res = await fetch(corsProxy('http://api.open-notify.org/iss-now.json'));
-      const data = await res.json();
+      const { data } = await fetchISSPosition();
       if (data?.iss_position) {
         setIssPos(data.iss_position);
       }
@@ -174,8 +175,7 @@ const SatelliteViewer = () => {
   // Fetch people in space
   const fetchPeople = useCallback(async () => {
     try {
-      const res = await fetch(corsProxy('http://api.open-notify.org/astros.json'));
-      const data = await res.json();
+      const { data } = await fetchAstros();
       if (data?.people) setPeople(data.people);
     } catch {
       // Silently fail
@@ -190,8 +190,8 @@ const SatelliteViewer = () => {
     abortRef.current = controller;
     setSatLoading(true);
 
-    const { data, error: err } = await fetchNASA(
-      `https://tle.ivanstanojevic.me/api/tle/?search=${encodeURIComponent(query)}&page_size=20`,
+    const { data, error: err } = await fetchTLE(
+      { search: query, page_size: 20 },
       { signal: controller.signal }
     );
 

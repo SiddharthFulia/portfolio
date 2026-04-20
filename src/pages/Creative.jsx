@@ -259,15 +259,7 @@ const Creative = () => {
         </div>
       )}
 
-      {/* Empty state */}
-      {!active && (
-        <div className='max-w-6xl mx-auto px-6 pb-24'>
-          <div className='text-center py-20'>
-            <p className='text-gray-600 text-lg'>Pick a component above to preview it</p>
-            <p className='text-gray-700 text-sm mt-2'>Nothing is loaded until you click — zero wasted bandwidth</p>
-          </div>
-        </div>
-      )}
+      {!active && <div className="pb-24" />}
     </div>
   )
 }

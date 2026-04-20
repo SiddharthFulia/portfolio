@@ -393,11 +393,183 @@ const EXAMPLES = [
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
+// ─── Execution Plan Generator ─────────────────────────────────────────────
+
+function generatePlan(sql) {
+  const ast = parseSQL(sql.trim())
+  const steps = []
+  const tableRows = DB[ast.table]?.length || 0
+
+  // Step 1: Table scan
+  steps.push({
+    op: 'TABLE SCAN',
+    detail: ast.table,
+    rows: tableRows,
+    cost: tableRows,
+    color: 'from-blue-500 to-cyan-500',
+    icon: '📋',
+  })
+
+  // Step 2: JOIN
+  if (ast.joinTable) {
+    const joinRows = DB[ast.joinTable]?.length || 0
+    steps.push({
+      op: 'NESTED LOOP JOIN',
+      detail: `${ast.table} ⋈ ${ast.joinTable}`,
+      rows: tableRows * joinRows,
+      cost: tableRows * joinRows,
+      color: 'from-purple-500 to-pink-500',
+      icon: '🔗',
+    })
+  }
+
+  // Step 3: WHERE filter
+  if (ast.whereClause) {
+    const condStr = formatCond(ast.whereClause)
+    const estRows = Math.max(1, Math.floor((ast.joinTable ? tableRows * (DB[ast.joinTable]?.length || 1) : tableRows) * 0.4))
+    steps.push({
+      op: 'FILTER',
+      detail: condStr,
+      rows: estRows,
+      cost: estRows,
+      color: 'from-yellow-500 to-orange-500',
+      icon: '🔍',
+    })
+  }
+
+  // Step 4: GROUP BY + aggregation
+  if (ast.groupBy || ast.columns.some(c => c.type === 'aggregate')) {
+    const groups = ast.groupBy ? new Set(DB[ast.table]?.map(r => r[ast.groupBy])).size : 1
+    steps.push({
+      op: ast.groupBy ? 'GROUP BY + AGGREGATE' : 'AGGREGATE',
+      detail: ast.groupBy ? `group on "${ast.groupBy}"` : ast.columns.filter(c => c.type === 'aggregate').map(c => `${c.fn}(${c.arg})`).join(', '),
+      rows: groups,
+      cost: groups * 2,
+      color: 'from-green-500 to-emerald-500',
+      icon: '📊',
+    })
+  }
+
+  // Step 5: SELECT projection
+  const colNames = ast.columns[0]?.type === 'star' ? '*' : ast.columns.map(c => c.alias || c.col).join(', ')
+  steps.push({
+    op: 'PROJECT',
+    detail: colNames,
+    rows: steps[steps.length - 1]?.rows || tableRows,
+    cost: 1,
+    color: 'from-cyan-500 to-blue-500',
+    icon: '📌',
+  })
+
+  // Step 6: DISTINCT
+  if (ast.distinct) {
+    steps.push({
+      op: 'DISTINCT',
+      detail: 'remove duplicates (hash)',
+      rows: steps[steps.length - 1]?.rows || 0,
+      cost: steps[steps.length - 1]?.rows || 0,
+      color: 'from-indigo-500 to-purple-500',
+      icon: '🎯',
+    })
+  }
+
+  // Step 7: ORDER BY
+  if (ast.orderBy) {
+    const n = steps[steps.length - 1]?.rows || 0
+    steps.push({
+      op: 'SORT',
+      detail: `${ast.orderBy.col} ${ast.orderBy.dir}`,
+      rows: n,
+      cost: n > 0 ? Math.ceil(n * Math.log2(Math.max(2, n))) : 0,
+      color: 'from-amber-500 to-yellow-500',
+      icon: '↕️',
+    })
+  }
+
+  // Step 8: LIMIT
+  if (ast.limit != null) {
+    steps.push({
+      op: 'LIMIT',
+      detail: `top ${ast.limit}`,
+      rows: Math.min(ast.limit, steps[steps.length - 1]?.rows || 0),
+      cost: 1,
+      color: 'from-red-500 to-orange-500',
+      icon: '✂️',
+    })
+  }
+
+  // Step 9: RESULT
+  steps.push({
+    op: 'RESULT',
+    detail: `${steps[steps.length - 1]?.rows || 0} rows returned`,
+    rows: steps[steps.length - 1]?.rows || 0,
+    cost: 0,
+    color: 'from-green-400 to-emerald-400',
+    icon: '✅',
+  })
+
+  return steps
+}
+
+function formatCond(c) {
+  if (!c) return ''
+  if (c.type === 'logic') return `${formatCond(c.left)} ${c.op} ${formatCond(c.right)}`
+  if (c.type === 'not') return `NOT ${formatCond(c.cond)}`
+  if (c.type === 'cmp') return `${c.col} ${c.op} ${typeof c.val === 'string' ? `'${c.val}'` : c.val}`
+  return ''
+}
+
+/* ── Plan Visualization ── */
+function PlanView({ steps }) {
+  const totalCost = steps.reduce((s, step) => s + step.cost, 0)
+  return (
+    <div className="mt-4 space-y-1">
+      <div className="text-xs text-gray-500 mb-3 flex items-center gap-3">
+        <span>Execution Plan</span>
+        <span className="text-cyan-400 font-mono">{steps.length} steps</span>
+        <span className="text-purple-400 font-mono">cost: {totalCost}</span>
+      </div>
+      {steps.map((step, i) => (
+        <div key={i} className="flex items-stretch gap-0">
+          {/* Connector */}
+          <div className="w-8 flex flex-col items-center shrink-0">
+            <div className={`w-3 h-3 rounded-full bg-gradient-to-br ${step.color} shrink-0 ring-2 ring-gray-900`} />
+            {i < steps.length - 1 && <div className="w-px flex-1 bg-gray-700" />}
+          </div>
+          {/* Node */}
+          <div className="flex-1 pb-3">
+            <div className="bg-gray-800/60 border border-gray-700/50 rounded-lg p-3 hover:border-gray-600 transition-colors">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-sm">{step.icon}</span>
+                <span className={`text-xs font-bold bg-gradient-to-r ${step.color} bg-clip-text text-transparent`}>{step.op}</span>
+                {step.cost > 0 && (
+                  <div className="ml-auto flex items-center gap-2">
+                    <span className="text-[10px] text-gray-500 font-mono">{step.rows} rows</span>
+                    <div className="w-16 h-1.5 bg-gray-900 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full bg-gradient-to-r ${step.color}`}
+                        style={{ width: `${Math.min(100, (step.cost / Math.max(1, totalCost)) * 100)}%` }} />
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="text-[11px] text-gray-400 font-mono truncate">{step.detail}</div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
+
 export default function SQLPlayground() {
   const [sql, setSql] = useState(EXAMPLES[0].sql)
   const [results, setResults] = useState(null)
   const [error, setError] = useState(null)
   const [time, setTime] = useState(null)
+  const [plan, setPlan] = useState(null)
+  const [showPlan, setShowPlan] = useState(false)
   const [schemaOpen, setSchemaOpen] = useState(true)
   const textareaRef = useRef(null)
 
@@ -409,10 +581,26 @@ export default function SQLPlayground() {
       setResults(rows)
       setError(null)
       setTime((performance.now() - t0).toFixed(2))
+      // Auto-generate plan on run
+      try { setPlan(generatePlan(sql)) } catch { setPlan(null) }
     } catch (e) {
       setError(e.message)
       setResults(null)
       setTime(null)
+      setPlan(null)
+    }
+  }, [sql])
+
+  const explain = useCallback(() => {
+    if (!sql.trim()) return
+    try {
+      const steps = generatePlan(sql)
+      setPlan(steps)
+      setShowPlan(true)
+      setError(null)
+    } catch (e) {
+      setError(e.message)
+      setPlan(null)
     }
   }, [sql])
 
@@ -462,8 +650,12 @@ export default function SQLPlayground() {
               <option value="" disabled>Examples…</option>
               {EXAMPLES.map(ex => <option key={ex.label} value={ex.label}>{ex.label}</option>)}
             </select>
+            <button onClick={explain}
+              className="px-3 py-1.5 bg-purple-600/30 hover:bg-purple-600/50 text-purple-400 text-xs rounded-lg font-semibold transition-colors ml-auto border border-purple-600/30">
+              Explain
+            </button>
             <button onClick={execute}
-              className="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-sm rounded-lg font-semibold transition-colors ml-auto">
+              className="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-sm rounded-lg font-semibold transition-colors">
               Run
             </button>
             <span className="text-gray-600 text-xs font-mono">Ctrl+Enter</span>
@@ -517,6 +709,20 @@ export default function SQLPlayground() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+
+          {/* Execution Plan */}
+          {plan && (
+            <div>
+              <button onClick={() => setShowPlan(p => !p)}
+                className="flex items-center gap-1.5 text-xs text-purple-400 hover:text-purple-300 mt-3 mb-1 transition-colors">
+                <svg className={`w-3 h-3 transition-transform ${showPlan ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                </svg>
+                Execution Plan
+              </button>
+              {showPlan && <PlanView steps={plan} />}
             </div>
           )}
         </div>

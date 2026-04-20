@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { fetchNASA, NASA_API_KEY, glassCard, debounce, ErrorWithRetry, corsProxy } from './utils';
+import { fetchTechTransfer, debounce } from '../../api/nasa';
+import { glassCard } from './utils';
+import ErrorWithRetry from './ErrorWithRetry';
 
 /* ── Skeleton ── */
 const Skeleton = () => (
@@ -82,8 +84,7 @@ const TechPortal = () => {
     setError(null);
 
     const searchTerm = q.trim() || 'engine';
-    const rawUrl = `https://api.nasa.gov/techtransfer/patent/?${encodeURIComponent(searchTerm)}&api_key=${NASA_API_KEY}`;
-    const { data, error: err } = await fetchNASA(corsProxy(rawUrl), { signal: controller.signal });
+    const { data, error: err } = await fetchTechTransfer({ q: searchTerm }, { signal: controller.signal });
 
     if (err) { setError(err); setLoading(false); return; }
     if (data?.results) {

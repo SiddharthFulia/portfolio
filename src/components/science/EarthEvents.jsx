@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { fetchNASA, glassCard, ErrorWithRetry } from './utils';
+import { fetchEarthEvents } from '../../api/nasa';
+import { glassCard } from './utils';
+import ErrorWithRetry from './ErrorWithRetry';
 
 /* ── Category config ── */
 const CATEGORIES = {
@@ -175,8 +177,7 @@ const EarthEvents = () => {
     setLoading(true);
     setError(null);
 
-    const url = 'https://eonet.gsfc.nasa.gov/api/v3/events?limit=50&status=open';
-    const { data, error: err } = await fetchNASA(url, { signal: controller.signal });
+    const { data, error: err } = await fetchEarthEvents({ limit: 50, status: 'open' }, { signal: controller.signal });
     if (err) { setError(err); setLoading(false); return; }
     if (data?.events) setEvents(data.events);
     setLoading(false);

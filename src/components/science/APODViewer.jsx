@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { fetchNASA, nasaUrl, glassCard, glassCardHover, todayStr, ErrorWithRetry } from './utils';
+import { fetchAPOD, todayStr } from '../../api/nasa';
+import { glassCard, glassCardHover } from './utils';
+import ErrorWithRetry from './ErrorWithRetry';
 
 /* ── Loading Skeleton ── */
 const Skeleton = () => (
@@ -98,7 +100,7 @@ const APODViewer = () => {
   const [expanded, setExpanded] = useState(false);
   const abortRef = useRef(null);
 
-  const fetchAPOD = useCallback(async (selectedDate) => {
+  const loadAPOD = useCallback(async (selectedDate) => {
     if (abortRef.current) abortRef.current.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -106,8 +108,7 @@ const APODViewer = () => {
     setLoading(true);
     setError(null);
 
-    const url = nasaUrl('https://api.nasa.gov/planetary/apod', { date: selectedDate });
-    const { data, error: err } = await fetchNASA(url, { signal: controller.signal });
+    const { data, error: err } = await fetchAPOD({ date: selectedDate }, { signal: controller.signal });
 
     if (err) {
       setError(err);
@@ -122,9 +123,9 @@ const APODViewer = () => {
   }, []);
 
   useEffect(() => {
-    fetchAPOD(date);
+    loadAPOD(date);
     return () => { if (abortRef.current) abortRef.current.abort(); };
-  }, [date, fetchAPOD]);
+  }, [date, loadAPOD]);
 
   const goRandom = () => {
     const start = new Date(1995, 5, 16).getTime();
@@ -164,7 +165,7 @@ const APODViewer = () => {
       </div>
 
       {/* Error */}
-      <ErrorWithRetry error={error} onRetry={() => fetchAPOD(date)} />
+      <ErrorWithRetry error={error} onRetry={() => loadAPOD(date)} />
 
       {/* Loading */}
       {loading && <Skeleton />}

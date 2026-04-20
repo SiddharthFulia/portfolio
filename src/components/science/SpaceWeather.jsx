@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { fetchNASA, nasaUrl, glassCard, daysAgo, todayStr, ErrorWithRetry } from './utils';
+import { fetchFlares, fetchStorms, fetchCMEs, daysAgo, todayStr } from '../../api/nasa';
+import { glassCard } from './utils';
+import ErrorWithRetry from './ErrorWithRetry';
 
 /* ── Severity color mapping ── */
 const severityColor = (level) => {
@@ -123,19 +125,19 @@ const SpaceWeather = () => {
     const opts = { signal: controller.signal };
 
     // Fire all 3 independently — show data as each arrives
-    fetchNASA(nasaUrl('https://api.nasa.gov/DONKI/FLR', { startDate, endDate }), opts)
+    fetchFlares({ startDate, endDate }, opts)
       .then(({ data, error: e }) => {
         if (e) setError(prev => prev || e);
         else if (Array.isArray(data)) setFlares(data);
       });
 
-    fetchNASA(nasaUrl('https://api.nasa.gov/DONKI/GST', { startDate, endDate }), opts)
+    fetchStorms({ startDate, endDate }, opts)
       .then(({ data, error: e }) => {
         if (e) setError(prev => prev || e);
         else if (Array.isArray(data)) setStorms(data);
       });
 
-    fetchNASA(nasaUrl('https://api.nasa.gov/DONKI/CME', { startDate, endDate }), opts)
+    fetchCMEs({ startDate, endDate }, opts)
       .then(({ data, error: e }) => {
         if (e) setError(prev => prev || e);
         else if (Array.isArray(data)) setCmes(data);

@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { fetchNASA, glassCard, debounce, ErrorWithRetry } from './utils';
+import { fetchMediaSearch, debounce } from '../../api/nasa';
+import { glassCard } from './utils';
+import ErrorWithRetry from './ErrorWithRetry';
 
 const SUGGESTIONS = ['mars', 'hubble', 'earth', 'nebula', 'galaxy', 'astronaut', 'apollo', 'saturn', 'jupiter', 'space station'];
 
@@ -92,8 +94,10 @@ const NASAMediaSearch = () => {
     if (!append) setLoading(true);
     setError(null);
 
-    const url = `https://images-api.nasa.gov/search?q=${encodeURIComponent(q)}&media_type=${type}&page=${pg}&page_size=24`;
-    const { data, error: err } = await fetchNASA(url, { signal: controller.signal });
+    const { data, error: err } = await fetchMediaSearch(
+      { q, media_type: type, page: pg, page_size: 24 },
+      { signal: controller.signal }
+    );
 
     if (err) { setError(err); setLoading(false); return; }
     if (data?.collection) {

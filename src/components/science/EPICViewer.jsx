@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { fetchNASA, nasaUrl, glassCard, ErrorWithRetry } from './utils';
+import { fetchEPIC, fetchEPICByDate, fetchEPICDates } from '../../api/nasa';
+import { glassCard } from './utils';
+import ErrorWithRetry from './ErrorWithRetry';
 
 /* ── Skeleton ── */
 const Skeleton = () => (
@@ -133,11 +135,9 @@ const EPICViewer = () => {
     setLoading(true);
     setError(null);
 
-    const url = dateStr
-      ? nasaUrl(`https://api.nasa.gov/EPIC/api/natural/date/${dateStr}`)
-      : nasaUrl('https://api.nasa.gov/EPIC/api/natural');
-
-    const { data, error: err } = await fetchNASA(url, { signal: controller.signal });
+    const { data, error: err } = dateStr
+      ? await fetchEPICByDate(dateStr, { signal: controller.signal })
+      : await fetchEPIC({ signal: controller.signal });
     if (err) { setError(err); setLoading(false); return; }
     if (data && Array.isArray(data)) {
       setImages(data);
@@ -152,7 +152,7 @@ const EPICViewer = () => {
     const opts = { signal: controller.signal };
 
     // Fire both in parallel
-    fetchNASA(nasaUrl('https://api.nasa.gov/EPIC/api/natural/all'), opts)
+    fetchEPICDates(opts)
       .then(({ data }) => {
         if (data && Array.isArray(data)) {
           setAvailableDates(data.slice(0, 30).map(d => d.date));

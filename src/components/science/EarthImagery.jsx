@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { nasaUrl, NASA_API_KEY } from './utils';
+import { getEarthImageryURL } from '../../api/nasa';
 
 const PRESETS = [
   { label: 'New York', lat: 40.7128, lon: -74.006 },
@@ -32,7 +32,7 @@ const EarthImagery = () => {
     setError(null);
 
     // Earth imagery endpoint returns an image directly (not JSON)
-    const url = `https://api.nasa.gov/planetary/earth/imagery?lon=${lon}&lat=${lat}&date=${date}&dim=${dim}&api_key=${NASA_API_KEY}`;
+    const url = getEarthImageryURL({ lat, lon, date, dim });
     setImageUrl(url);
   }, [lat, lon, date, dim]);
 

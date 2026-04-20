@@ -157,8 +157,8 @@ export default function GraphTraversal() {
       </div>
 
       <div className="flex flex-col lg:flex-row gap-4">
-        <div className="bg-gray-950 rounded-xl overflow-hidden flex-1">
-          <svg width="100%" viewBox={`0 0 ${svgW} ${svgH}`} style={{ minWidth: 320 }}>
+        <div className="bg-gray-950 rounded-xl overflow-x-auto flex-1">
+          <svg width="100%" viewBox={`0 0 ${svgW} ${svgH}`} style={{ minWidth: 'min(100%, 320px)' }}>
             <defs>
               <filter id="glow2">
                 <feGaussianBlur stdDeviation="3" result="coloredBlur" />

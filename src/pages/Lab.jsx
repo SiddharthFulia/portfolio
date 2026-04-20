@@ -118,18 +118,16 @@ function AlgorithmsSection() {
           <PathfindingVisualizer />
         </Card>
       </FadeIn>
-      <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
-        <FadeIn delay={0.12}>
-          <Card title='Binary Search Tree' tags={['Insert', 'Search', 'Traversal', 'SVG']}>
-            <BSTVisualizer />
-          </Card>
-        </FadeIn>
-        <FadeIn delay={0.16}>
-          <Card title='Graph Traversal' tags={['BFS', 'DFS', 'Queue', 'Stack']}>
-            <GraphTraversal />
-          </Card>
-        </FadeIn>
-      </div>
+      <FadeIn delay={0.12}>
+        <Card title='Binary Search Tree' tags={['Insert', 'Search', 'Traversal', 'SVG']}>
+          <BSTVisualizer />
+        </Card>
+      </FadeIn>
+      <FadeIn delay={0.16}>
+        <Card title='Graph Traversal' tags={['BFS', 'DFS', 'Queue', 'Stack']}>
+          <GraphTraversal />
+        </Card>
+      </FadeIn>
       <FadeIn delay={0.2}>
         <Card title='Red-Black Tree' tags={['Self-Balancing', 'Rotations', 'O(log n)']}>
           <RedBlackTree />
@@ -325,15 +323,7 @@ const Lab = () => {
         </div>
       )}
 
-      {/* Empty state */}
-      {!active && (
-        <div className='max-w-6xl mx-auto px-6 pb-24'>
-          <div className='text-center py-20'>
-            <p className='text-gray-600 text-lg'>Pick a category above to load demos</p>
-            <p className='text-gray-700 text-sm mt-2'>Nothing is loaded until you click — zero wasted bandwidth</p>
-          </div>
-        </div>
-      )}
+      {!active && <div className="pb-24" />}
     </div>
   )
 }
