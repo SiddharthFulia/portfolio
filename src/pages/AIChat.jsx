@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { checkHealth, sendAI } from '../api/ai'
+import { checkHealth, sendChat } from '../api/ai'
 
 const MODELS = [
   { id: 'phi3:mini', label: 'Phi-3 Mini', desc: 'Microsoft, general purpose' },
@@ -45,12 +45,10 @@ const AIChat = () => {
     const history = messages.map(m => ({ role: m.role, content: m.content }))
     const t0 = Date.now()
 
-    const { data, error } = await sendAI(text, {
+    const { data, error } = await sendChat(text, {
       history,
       model,
-      system: system || undefined,
-      maxTokens,
-      temperature,
+      context: 'general',
     })
 
     setLastMs(Date.now() - t0)
