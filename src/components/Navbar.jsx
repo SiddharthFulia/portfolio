@@ -5,7 +5,7 @@ import sakura from "../assets/sakura.mp3";
 
 const Navbar = () => {
   const { pathname } = useLocation();
-  const isDark = pathname.startsWith('/lab') || pathname.startsWith('/learn') || pathname.startsWith('/creative') || pathname.startsWith('/chess') || pathname.startsWith('/science') || pathname.startsWith('/face') || pathname.startsWith('/explore') || pathname.startsWith('/ai');
+  const isDark = ['/lab', '/learn', '/creative', '/chess', '/science', '/face', '/vision', '/explore', '/ai'].some(r => pathname.startsWith(r));
 
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
@@ -38,22 +38,19 @@ const Navbar = () => {
     { to: '/lab', label: 'Lab', activeClass: 'text-black bg-cyan-400 shadow-md',
       inactiveClass: 'text-white bg-gray-900 hover:bg-gray-800',
       inactiveDark: 'text-white bg-gray-900 hover:bg-gray-800' },
-    { to: '/learn', label: 'Learn', activeClass: 'text-black bg-purple-400 shadow-md',
-      inactiveClass: 'text-white bg-purple-700 hover:bg-purple-600',
-      inactiveDark: 'text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700' },
     { to: '/creative', label: 'Creative', activeClass: 'text-white bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-500 shadow-md shadow-pink-500/20',
       inactiveClass: 'text-white bg-pink-600 hover:bg-pink-500',
       inactiveDark: 'text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700' },
     { to: '/science', label: 'Science', activeClass: 'text-white bg-gradient-to-r from-cyan-500 to-blue-600 shadow-md shadow-cyan-500/20',
       inactiveClass: 'text-white bg-blue-700 hover:bg-blue-600',
       inactiveDark: 'text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700' },
-    { to: '/face', label: 'Face AI', activeClass: 'text-white bg-gradient-to-r from-purple-500 to-pink-600 shadow-md shadow-purple-500/20',
-      inactiveClass: 'text-white bg-purple-700 hover:bg-purple-600',
-      inactiveDark: 'text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700' },
     { to: '/explore', label: 'Explore', activeClass: 'text-white bg-gradient-to-r from-red-500 to-amber-500 shadow-md shadow-red-500/20',
       inactiveClass: 'text-white bg-amber-700 hover:bg-amber-600',
       inactiveDark: 'text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700' },
-    { to: '/ai', label: 'AI Chat', activeClass: 'text-white bg-gradient-to-r from-blue-500 to-cyan-500 shadow-md shadow-blue-500/20',
+    { to: '/vision', label: 'Vision', activeClass: 'text-white bg-gradient-to-r from-purple-500 to-pink-600 shadow-md shadow-purple-500/20',
+      inactiveClass: 'text-white bg-purple-700 hover:bg-purple-600',
+      inactiveDark: 'text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700' },
+    { to: '/ai', label: 'AI', activeClass: 'text-white bg-gradient-to-r from-blue-500 to-cyan-500 shadow-md shadow-blue-500/20',
       inactiveClass: 'text-white bg-blue-700 hover:bg-blue-600',
       inactiveDark: 'text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700' },
   ];

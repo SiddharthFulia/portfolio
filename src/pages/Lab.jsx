@@ -18,6 +18,7 @@ const FractalExplorer = lazy(() => import('../components/lab/FractalExplorer'))
 const MatrixRain = lazy(() => import('../components/lab/MatrixRain'))
 const SQLPlayground = lazy(() => import('../components/lab/SQLPlayground'))
 const CodeRunner = lazy(() => import('../components/lab/CodeRunner'))
+import { Link } from 'react-router-dom'
 
 /* ── Section definitions ── */
 const SECTIONS = [
@@ -27,6 +28,7 @@ const SECTIONS = [
   { id: 'math',       label: 'Mathematics',     icon: '🎨', count: 4, color: 'from-pink-500 to-rose-500',   desc: 'Fractals, automata & physics' },
   { id: 'data',       label: 'Data & SQL',      icon: '🗄',  count: 1, color: 'from-indigo-500 to-blue-500', desc: 'In-browser SQL playground' },
   { id: 'code',       label: 'Code',            icon: '💻', count: 1, color: 'from-gray-500 to-gray-600',   desc: 'JavaScript REPL' },
+  { id: 'learn',      label: 'Learn',           icon: '📚', count: 1, color: 'from-purple-500 to-indigo-500', desc: 'DSA tutorials & explanations' },
 ]
 
 /* ── Fade-in animation ── */
@@ -206,6 +208,17 @@ function CodeSection() {
   )
 }
 
+function LearnSection() {
+  return (
+    <div className="text-center py-8">
+      <p className="text-gray-400 mb-4">DSA tutorials with step-by-step explanations, code examples, and interactive demos.</p>
+      <Link to="/learn" className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl transition-colors">
+        Open Tutorials →
+      </Link>
+    </div>
+  )
+}
+
 const SECTION_CONTENT = {
   worlds: WorldsSection,
   algorithms: AlgorithmsSection,
@@ -213,6 +226,7 @@ const SECTION_CONTENT = {
   math: MathSection,
   data: DataSection,
   code: CodeSection,
+  learn: LearnSection,
 }
 
 /* ── Main Lab page ── */
@@ -243,7 +257,7 @@ const Lab = () => {
           Interactive Lab
         </h1>
         <p className='text-gray-400 mt-3 text-base max-w-xl'>
-          17 live demos — pick a category below to load it. 3D worlds, algorithms, AI, fractals, SQL, and code tools. All 100% in the browser.
+          Interactive demos & tutorials — 3D worlds, algorithms, AI, fractals, SQL, code tools, and DSA learning.
         </p>
 
         {/* Stats */}

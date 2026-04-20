@@ -1,7 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { socialLinks } from "../constants";
 
-const DARK_ROUTES = ['/lab', '/learn', '/creative', '/chess', '/science', '/face', '/explore', '/ai'];
+const DARK_ROUTES = ['/lab', '/learn', '/creative', '/chess', '/science', '/face', '/vision', '/explore', '/ai'];
 
 const Footer = () => {
   const { pathname } = useLocation();

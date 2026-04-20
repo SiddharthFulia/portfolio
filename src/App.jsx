@@ -128,6 +128,7 @@ const App = () => {
           <Route path='/chess' element={<Suspense fallback={<DarkPageSkeleton />}><ChessViz /></Suspense>} />
           <Route path='/science' element={<Suspense fallback={<ScienceSkeleton />}><Science /></Suspense>} />
           <Route path='/science/:module' element={<Suspense fallback={<ScienceModuleSkeleton />}><ScienceModule /></Suspense>} />
+          <Route path='/vision' element={<Suspense fallback={<DarkPageSkeleton />}><FaceDetection /></Suspense>} />
           <Route path='/face' element={<Suspense fallback={<DarkPageSkeleton />}><FaceDetection /></Suspense>} />
           <Route path='/explore' element={<Suspense fallback={<DarkPageSkeleton />}><Explore /></Suspense>} />
           <Route path='/explore/:module' element={<Suspense fallback={<DarkPageSkeleton />}><ExploreModule /></Suspense>} />
