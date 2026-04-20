@@ -125,7 +125,9 @@ const AIChat = () => {
                 <div>
                   <div className="flex justify-between text-xs mb-1">
                     <span className="text-gray-400">Temperature</span>
-                    <span className="text-cyan-400 font-mono">{temperature}</span>
+                    <input type="number" min="0" max="2" step="0.1" value={temperature}
+                      onChange={e => setTemperature(parseFloat(e.target.value) || 0)}
+                      className="w-12 bg-gray-800 text-cyan-400 text-xs font-mono text-right px-1 py-0.5 rounded border border-gray-700 focus:outline-none focus:border-cyan-500" />
                   </div>
                   <input type="range" min="0" max="2" step="0.1" value={temperature}
                     onChange={e => setTemperature(parseFloat(e.target.value))}
@@ -134,7 +136,9 @@ const AIChat = () => {
                 <div>
                   <div className="flex justify-between text-xs mb-1">
                     <span className="text-gray-400">Max Tokens</span>
-                    <span className="text-cyan-400 font-mono">{maxTokens}</span>
+                    <input type="number" min="10" max="4000" step="10" value={maxTokens}
+                      onChange={e => setMaxTokens(parseInt(e.target.value) || 100)}
+                      className="w-16 bg-gray-800 text-cyan-400 text-xs font-mono text-right px-1 py-0.5 rounded border border-gray-700 focus:outline-none focus:border-cyan-500" />
                   </div>
                   <input type="range" min="50" max="2000" step="50" value={maxTokens}
                     onChange={e => setMaxTokens(parseInt(e.target.value))}

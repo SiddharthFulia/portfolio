@@ -75,7 +75,7 @@ const FaceDetection = () => {
     if (v) setVideoDims({ w: v.videoWidth, h: v.videoHeight })
   }, [])
 
-  // Continuous detection loop (every 500ms)
+  // Continuous detection loop (every 150ms = ~6-7 FPS max)
   useEffect(() => {
     if (isPaused || !serviceOnline) return
 
@@ -89,10 +89,12 @@ const FaceDetection = () => {
       const vh = video.videoHeight
       if (!vw || !vh) return
 
-      canvas.width = vw
-      canvas.height = vh
-      canvas.getContext('2d').drawImage(video, 0, 0, vw, vh)
-      const base64 = canvas.toDataURL('image/jpeg', 0.7)
+      // Downscale for faster processing
+      const scale = Math.min(1, 320 / Math.max(vw, vh))
+      canvas.width = Math.round(vw * scale)
+      canvas.height = Math.round(vh * scale)
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height)
+      const base64 = canvas.toDataURL('image/jpeg', 0.5)
 
       pendingRef.current = true
       const t0 = performance.now()
@@ -119,10 +121,23 @@ const FaceDetection = () => {
         })
         .catch(() => setNoFace(true))
         .finally(() => { pendingRef.current = false })
-    }, 500)
+    }, 150)
 
     return () => clearInterval(intervalRef.current)
   }, [isPaused, serviceOnline])
+
+  // Landmark group indices for connected lines (like Amrita)
+  const LANDMARK_LINES = {
+    jaw: Array.from({ length: 17 }, (_, i) => i),
+    leftEyebrow: [17, 18, 19, 20, 21],
+    rightEyebrow: [22, 23, 24, 25, 26],
+    noseBridge: [27, 28, 29, 30],
+    noseBottom: [31, 32, 33, 34, 35],
+    leftEye: [36, 37, 38, 39, 40, 41, 36],
+    rightEye: [42, 43, 44, 45, 46, 47, 42],
+    outerLips: [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 48],
+    innerLips: [60, 61, 62, 63, 64, 65, 66, 67, 60],
+  }
 
   // Draw overlay
   useEffect(() => {
@@ -134,21 +149,45 @@ const FaceDetection = () => {
     ctx.clearRect(0, 0, w, h)
 
     if (!faceData?.faces?.length) return
-    const vw = videoRef.current?.videoWidth || 480
-    const vh = videoRef.current?.videoHeight || 360
-    const scaleX = w / vw
-    const scaleY = h / vh
+    // Use the actual image size returned by the backend (downscaled coords)
+    const imgW = faceData.imageSize?.width || 320
+    const imgH = faceData.imageSize?.height || 240
+    const scaleX = w / imgW
+    const scaleY = h / imgH
     const mirrorX = (x) => w - x * scaleX
     const mapY = (y) => y * scaleY
 
     faceData.faces.forEach(face => {
       const bb = face.boundingBox
+
+      // Bounding box with corner brackets
       if (showBox && bb) {
+        const bx = mirrorX(bb.x + bb.width)
+        const by = mapY(bb.y)
+        const bw = bb.width * scaleX
+        const bh = bb.height * scaleY
+        const corner = 14
+
         ctx.strokeStyle = '#22d3ee'
         ctx.lineWidth = 2
         ctx.setLineDash([6, 4])
-        ctx.strokeRect(mirrorX(bb.x + bb.width), mapY(bb.y), bb.width * scaleX, bb.height * scaleY)
+        ctx.strokeRect(bx, by, bw, bh)
         ctx.setLineDash([])
+
+        // Corner accents
+        ctx.lineWidth = 3
+        ctx.beginPath(); ctx.moveTo(bx, by + corner); ctx.lineTo(bx, by); ctx.lineTo(bx + corner, by); ctx.stroke()
+        ctx.beginPath(); ctx.moveTo(bx + bw - corner, by); ctx.lineTo(bx + bw, by); ctx.lineTo(bx + bw, by + corner); ctx.stroke()
+        ctx.beginPath(); ctx.moveTo(bx, by + bh - corner); ctx.lineTo(bx, by + bh); ctx.lineTo(bx + corner, by + bh); ctx.stroke()
+        ctx.beginPath(); ctx.moveTo(bx + bw - corner, by + bh); ctx.lineTo(bx + bw, by + bh); ctx.lineTo(bx + bw, by + bh - corner); ctx.stroke()
+
+        // Confidence label
+        if (face.confidence) {
+          ctx.font = 'bold 11px monospace'
+          ctx.fillStyle = '#22d3ee'
+          ctx.textAlign = 'left'
+          ctx.fillText(`${Math.round(face.confidence * 100)}%`, bx + 4, by + bh + 14)
+        }
       }
 
       const pts = face.landmarks?.points
@@ -158,22 +197,56 @@ const FaceDetection = () => {
           const py = Array.isArray(p) ? p[1] : p.y
           return [mirrorX(px), mapY(py)]
         })
+
+        // Connected lines per group
+        Object.entries(LANDMARK_LINES).forEach(([group, indices]) => {
+          ctx.beginPath()
+          ctx.strokeStyle = getLandmarkColor(indices[0]) + 'aa'
+          ctx.lineWidth = 1.5
+          indices.forEach((idx, i) => {
+            const [px, py] = mapped[idx]
+            if (i === 0) ctx.moveTo(px, py)
+            else ctx.lineTo(px, py)
+          })
+          ctx.stroke()
+        })
+
+        // Dots
         mapped.forEach(([px, py], idx) => {
           ctx.beginPath()
-          ctx.arc(px, py, 2.5, 0, Math.PI * 2)
+          ctx.arc(px, py, 2, 0, Math.PI * 2)
           ctx.fillStyle = getLandmarkColor(idx)
           ctx.fill()
         })
       }
 
-      // Mood emoji above face
+      // Mood emoji + label floating above face
       const mood = face.mood
       if (mood && bb) {
         bounceRef.current = (bounceRef.current + 1) % 60
-        const bounceY = Math.sin((bounceRef.current / 60) * Math.PI * 2) * 4
-        ctx.font = '36px serif'
+        const bounceY = Math.sin((bounceRef.current / 60) * Math.PI * 2) * 5
+        const cx = mirrorX(bb.x + bb.width / 2)
+        const cy = mapY(bb.y) - 20 + bounceY
+
+        // Emoji
+        ctx.font = '32px serif'
         ctx.textAlign = 'center'
-        ctx.fillText(MOOD_EMOJI[mood] || '😐', mirrorX(bb.x + bb.width / 2), mapY(bb.y) - 16 + bounceY)
+        ctx.fillText(MOOD_EMOJI[mood] || '😐', cx, cy)
+
+        // Mood text below emoji
+        ctx.font = 'bold 12px system-ui'
+        ctx.fillStyle = MOOD_COLORS[mood]?.hex || '#9ca3af'
+        ctx.fillText(mood.toUpperCase(), cx, cy + 18)
+      }
+
+      // Smile indicator on the face itself
+      if (face.features?.smiling && bb) {
+        const cx = mirrorX(bb.x + bb.width / 2)
+        const cy = mapY(bb.y + bb.height) + 8
+        ctx.font = '10px system-ui'
+        ctx.fillStyle = '#4ade80'
+        ctx.textAlign = 'center'
+        ctx.fillText('SMILING', cx, cy)
       }
     })
   }, [faceData, showLandmarks, showBox])
