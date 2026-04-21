@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Input, Tag, Progress, Modal, Segmented, Empty } from 'antd'
+import { Input, Tag, Progress, Modal, Segmented, Empty, Pagination } from 'antd'
 import { SearchOutlined } from '@ant-design/icons'
 import { fetchPokemonList, fetchPokemonDetail } from '../../api/nasa'
 
@@ -29,6 +29,8 @@ const Pokedex = () => {
   const [detailLoading, setDetailLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [gen, setGen] = useState('Gen 1')
+  const [page, setPage] = useState(1)
+  const pageSize = 36
 
   const GEN_MAP = { 'Gen 1': [1, 151], 'Gen 2': [152, 251], 'Gen 3': [252, 386], 'All': [1, 386] }
 
@@ -62,13 +64,13 @@ const Pokedex = () => {
           allowClear
           size="large"
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={e => { setSearch(e.target.value); setPage(1) }}
           className="flex-1"
         />
         <Segmented
           options={['Gen 1', 'Gen 2', 'Gen 3', 'All']}
           value={gen}
-          onChange={setGen}
+          onChange={v => { setGen(v); setPage(1) }}
           size="large"
         />
       </div>
@@ -78,7 +80,7 @@ const Pokedex = () => {
           <Empty description="No Pokemon found" />
         ) : (
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
-            {filtered.map(p => (
+            {filtered.slice((page - 1) * pageSize, page * pageSize).map(p => (
               <div key={p.id} onClick={() => loadDetail(p.id)}
                 className={`cursor-pointer rounded-xl border p-2 text-center transition-all hover:scale-105 ${
                   selected === p.id ? 'border-red-500 bg-gray-800' : 'border-gray-800 bg-gray-900 hover:border-gray-600'
@@ -90,6 +92,12 @@ const Pokedex = () => {
             ))}
           </div>
         )
+      )}
+
+      {filtered.length > pageSize && (
+        <div className="flex justify-center">
+          <Pagination current={page} total={filtered.length} pageSize={pageSize} onChange={p => setPage(p)} showSizeChanger={false} showTotal={t => `${t} Pokemon`} />
+        </div>
       )}
 
       {/* Detail modal */}

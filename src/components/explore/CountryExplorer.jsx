@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Input, Select, Tag, Modal, Descriptions, Statistic, Empty } from 'antd'
+import { Input, Select, Tag, Modal, Descriptions, Statistic, Empty, Pagination } from 'antd'
 import { SearchOutlined, GlobalOutlined } from '@ant-design/icons'
 import { fetchCountries } from '../../api/nasa'
 
@@ -32,6 +32,8 @@ const CountryExplorer = () => {
   const [region, setRegion] = useState('All')
   const [sortBy, setSortBy] = useState('name')
   const [selected, setSelected] = useState(null)
+  const [page, setPage] = useState(1)
+  const pageSize = 30
 
   useEffect(() => {
     fetchCountries().then(({ data }) => {
@@ -56,10 +58,10 @@ const CountryExplorer = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row gap-3">
         <Input placeholder="Search countries..." prefix={<SearchOutlined />} allowClear size="large"
-          value={search} onChange={e => setSearch(e.target.value)} className="flex-1" />
-        <Select value={region} onChange={setRegion} size="large" style={{ width: 140 }}
+          value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} className="flex-1" />
+        <Select value={region} onChange={v => { setRegion(v); setPage(1) }} size="large" style={{ width: 140 }}
           options={REGIONS.map(r => ({ value: r, label: r }))} />
-        <Select value={sortBy} onChange={setSortBy} size="large" style={{ width: 160 }}
+        <Select value={sortBy} onChange={v => { setSortBy(v); setPage(1) }} size="large" style={{ width: 160 }}
           options={[{ value: 'name', label: 'Sort: Name' }, { value: 'population', label: 'Sort: Population' }, { value: 'area', label: 'Sort: Area' }]} />
       </div>
 
@@ -68,7 +70,7 @@ const CountryExplorer = () => {
       {loading ? <SkeletonGrid /> : (
         filtered.length === 0 ? <Empty /> : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            {filtered.slice(0, 60).map(c => (
+            {filtered.slice((page - 1) * pageSize, page * pageSize).map(c => (
               <div key={c.name?.common} onClick={() => setSelected(c)}
                 className="cursor-pointer rounded-xl border border-gray-800 bg-gray-900 p-3 hover:border-gray-600 transition-colors">
                 {c.flags?.png && <img src={c.flags.png} alt="" className="w-10 h-7 object-cover rounded mb-2" loading="lazy" />}
@@ -79,6 +81,12 @@ const CountryExplorer = () => {
             ))}
           </div>
         )
+      )}
+
+      {filtered.length > pageSize && (
+        <div className="flex justify-center">
+          <Pagination current={page} total={filtered.length} pageSize={pageSize} onChange={p => setPage(p)} showSizeChanger={false} showTotal={t => `${t} countries`} />
+        </div>
       )}
 
       <Modal open={!!selected} onCancel={() => setSelected(null)} footer={null} width={500} centered destroyOnClose>

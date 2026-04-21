@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Button, Skeleton } from 'antd'
 import { fetchQuotes } from '../../api/nasa'
 
 const COLORS = [
@@ -30,15 +31,18 @@ const QuoteWall = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <span className="text-gray-500 text-xs">{quotes.length} quotes</span>
-        <button onClick={loadQuotes} disabled={loading}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50">
+        <Button type="primary" onClick={loadQuotes} loading={loading}>
           Load More
-        </button>
+        </Button>
       </div>
 
       {loading && quotes.length === 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {[...Array(6)].map((_, i) => <div key={i} className="animate-pulse bg-gray-800 rounded-xl h-32" />)}
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="rounded-xl border border-gray-800 p-5">
+              <Skeleton active paragraph={{ rows: 2 }} title={false} />
+            </div>
+          ))}
         </div>
       ) : (
         <div className="columns-1 sm:columns-2 gap-4 space-y-4">

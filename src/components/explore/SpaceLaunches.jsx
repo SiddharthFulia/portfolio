@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Tag, Empty, Modal, Descriptions, Button } from 'antd'
+import { Tag, Empty, Modal, Descriptions, Button, Pagination } from 'antd'
 import { RocketOutlined } from '@ant-design/icons'
 import { fetchLaunches } from '../../api/nasa'
 
@@ -25,9 +25,11 @@ const SpaceLaunches = () => {
   const [launches, setLaunches] = useState([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState(null)
+  const [page, setPage] = useState(1)
+  const pageSize = 15
 
   useEffect(() => {
-    fetchLaunches({ limit: 15 }).then(({ data }) => {
+    fetchLaunches({ limit: 50 }).then(({ data }) => {
       if (data?.results) setLaunches(data.results)
       setLoading(false)
     })
@@ -60,7 +62,7 @@ const SpaceLaunches = () => {
       {loading ? <SkeletonList /> : (
         launches.length === 0 ? <Empty description="No upcoming launches" /> : (
           <div className="space-y-3">
-            {launches.map(l => {
+            {launches.slice((page - 1) * pageSize, page * pageSize).map(l => {
               const countdown = getCountdown(l.net)
               const img = l.image?.image_url || l.image
               return (
@@ -88,6 +90,12 @@ const SpaceLaunches = () => {
             })}
           </div>
         )
+      )}
+
+      {launches.length > pageSize && (
+        <div className="flex justify-center">
+          <Pagination current={page} total={launches.length} pageSize={pageSize} onChange={p => setPage(p)} showSizeChanger={false} showTotal={t => `${t} launches`} />
+        </div>
       )}
 
       <Modal open={!!selected} onCancel={() => setSelected(null)} footer={null} width={600} centered destroyOnClose>

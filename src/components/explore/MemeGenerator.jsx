@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Input, Modal, Button } from 'antd'
+import { Input, Modal, Button, Pagination } from 'antd'
 import { SearchOutlined, DownloadOutlined } from '@ant-design/icons'
 import { fetchMemes } from '../../api/nasa'
 
@@ -19,6 +19,8 @@ const MemeGenerator = () => {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
+  const [page, setPage] = useState(1)
+  const pageSize = 20
 
   useEffect(() => {
     fetchMemes().then(({ data }) => {
@@ -45,14 +47,14 @@ const MemeGenerator = () => {
         placeholder="Search meme templates..."
         prefix={<SearchOutlined className="text-gray-500" />}
         allowClear size="large"
-        value={search} onChange={e => setSearch(e.target.value)}
+        value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
       />
 
       <div className="text-xs text-gray-500">{filtered.length} templates</div>
 
       {loading ? <SkeletonGrid /> : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-          {filtered.slice(0, 40).map(m => (
+          {filtered.slice((page - 1) * pageSize, page * pageSize).map(m => (
             <div key={m.id} onClick={() => setSelected(m)}
               className="cursor-pointer rounded-xl overflow-hidden border border-gray-800 bg-gray-900 hover:border-gray-600 transition-all group hover:scale-[1.02]">
               <img src={m.url} alt={m.name} loading="lazy"
@@ -63,6 +65,12 @@ const MemeGenerator = () => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {filtered.length > pageSize && (
+        <div className="flex justify-center">
+          <Pagination current={page} total={filtered.length} pageSize={pageSize} onChange={p => setPage(p)} showSizeChanger={false} showTotal={t => `${t} templates`} />
         </div>
       )}
 
