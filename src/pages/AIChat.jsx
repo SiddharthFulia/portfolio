@@ -12,9 +12,8 @@ const LOCAL_MODELS = [
 
 const GROQ_MODELS = [
   { id: 'llama-3.1-8b', label: 'Llama 3.1 8B', desc: 'Fastest' },
-  { id: 'llama-3.1-70b', label: 'Llama 3.1 70B', desc: 'Best quality' },
-  { id: 'mixtral-8x7b', label: 'Mixtral 8x7B', desc: 'Long context' },
-  { id: 'gemma-7b', label: 'Gemma 7B', desc: 'Lightweight' },
+  { id: 'llama-3.3-70b', label: 'Llama 3.3 70B', desc: 'Best quality' },
+  { id: 'gpt-oss-120b', label: 'GPT-OSS 120B', desc: 'Most powerful' },
 ]
 
 const CodeBlock = ({ children, className }) => {
