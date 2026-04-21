@@ -169,14 +169,36 @@ const FaceAI = () => {
         ctx.setLineDash([])
       }
       const pts = face.landmarks?.points
-      if (showLandmarks && pts?.length === 68) {
+      const groups = face.landmarks?.groups
+      if (showLandmarks && pts?.length >= 68) {
         const mapped = pts.map(p => [mirrorX(p.x ?? p[0]), mapY(p.y ?? p[1])])
+
+        // Draw 68-point connected lines
         Object.values(LANDMARK_GROUPS).forEach(group => {
           ctx.beginPath(); ctx.strokeStyle = group.color + 'bb'; ctx.lineWidth = 1.5
           group.indices.forEach((idx, i) => { const [px, py] = mapped[idx]; i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py) })
           ctx.stroke()
         })
-        mapped.forEach(([px, py], idx) => { ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI * 2); ctx.fillStyle = getLandmarkColor(idx); ctx.fill() })
+
+        // Draw detailed contour groups if available (lips, eyes)
+        const drawContour = (groupPts, color, fill) => {
+          if (!groupPts?.length) return
+          const mp = groupPts.map(p => [mirrorX(p.x), mapY(p.y)])
+          ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2
+          mp.forEach(([px, py], i) => { i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py) })
+          ctx.closePath(); ctx.stroke()
+          if (fill) { ctx.fillStyle = fill; ctx.fill() }
+        }
+
+        if (groups) {
+          drawContour(groups.outerLip, '#e91e8ccc', face.features?.smiling ? '#e91e8c22' : null)
+          drawContour(groups.innerLip, '#e91e8c99', '#e91e8c11')
+          drawContour(groups.leftEye, '#4caf50cc', '#4caf5015')
+          drawContour(groups.rightEye, '#4caf50cc', '#4caf5015')
+        }
+
+        // Dots
+        mapped.forEach(([px, py], idx) => { ctx.beginPath(); ctx.arc(px, py, 2, 0, Math.PI * 2); ctx.fillStyle = getLandmarkColor(idx); ctx.fill() })
       }
       const mood = typeof face.mood === 'string' ? face.mood : face.mood?.label
       if (mood && bb) {
