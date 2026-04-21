@@ -29,6 +29,8 @@ const ObjectDetect = () => {
   const fpsRef = useRef({ frames: 0, lastTime: Date.now() })
   const colorMapRef = useRef({})
   const colorIdxRef = useRef(0)
+  const smoothedRef = useRef([])  // smoothed bounding boxes
+  const animRef = useRef(null)
 
   const [serviceOnline, setServiceOnline] = useState(null)
   const [predictions, setPredictions] = useState([])
@@ -72,7 +74,7 @@ const ObjectDetect = () => {
       if (!vw || !vh) return
 
       // Downscale for speed
-      const scale = Math.min(1, 480 / Math.max(vw, vh))
+      const scale = Math.min(1, 320 / Math.max(vw, vh))
       canvas.width = Math.round(vw * scale)
       canvas.height = Math.round(vh * scale)
       canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height)
@@ -89,14 +91,27 @@ const ObjectDetect = () => {
 
         if (data?.objects) {
           setPredictions(data.objects)
-          drawBoxes(data.objects, data.imageSize?.width || canvas.width, data.imageSize?.height || canvas.height)
+          // Smooth: lerp towards new positions instead of snapping
+          const newSmoothed = data.objects.map(obj => {
+            const prev = smoothedRef.current.find(s => s.class === obj.class)
+            if (prev) {
+              const lerp = 0.4 // smoothing factor (0=frozen, 1=instant)
+              return {
+                ...obj,
+                bbox: obj.bbox.map((v, i) => Math.round(prev.bbox[i] + (v - prev.bbox[i]) * lerp)),
+              }
+            }
+            return { ...obj }
+          })
+          smoothedRef.current = newSmoothed
+          drawBoxes(newSmoothed, data.imageSize?.width || canvas.width, data.imageSize?.height || canvas.height)
         }
       }).catch(() => {}).finally(() => { pendingRef.current = false })
-    }, 300)
+    }, 400)
     return () => clearInterval(intervalRef.current)
   }, [paused, serviceOnline, threshold])
 
-  // Draw bounding boxes
+  // Draw bounding boxes (mirrored to match selfie video)
   const drawBoxes = (objects, imgW, imgH) => {
     const overlay = overlayRef.current
     if (!overlay) return
@@ -107,7 +122,8 @@ const ObjectDetect = () => {
 
     objects.forEach(obj => {
       const [bx, by, bw, bh] = obj.bbox
-      const x = bx * scaleX, y = by * scaleY, ow = bw * scaleX, oh = bh * scaleY
+      // Mirror X to match the scaleX(-1) on the video
+      const x = w - (bx + bw) * scaleX, y = by * scaleY, ow = bw * scaleX, oh = bh * scaleY
       const color = getColor(obj.class)
       const corner = Math.min(14, ow * 0.15, oh * 0.15)
 
@@ -150,7 +166,7 @@ const ObjectDetect = () => {
             <>
               <video ref={videoRef} autoPlay playsInline muted onLoadedMetadata={() => { const v = videoRef.current; if (v) setVideoDims({ w: v.videoWidth, h: v.videoHeight }) }}
                 className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
-              <canvas ref={overlayRef} className="absolute inset-0 w-full h-full pointer-events-none" style={{ transform: 'scaleX(-1)' }} />
+              <canvas ref={overlayRef} className="absolute inset-0 w-full h-full pointer-events-none" />
               <canvas ref={canvasRef} style={{ display: 'none' }} />
             </>
           )}
