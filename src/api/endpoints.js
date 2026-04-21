@@ -7,8 +7,9 @@ export const ENDPOINTS = {
   CHAT: '/api/chat',
   AI: '/api/ai',
 
-  // Face Detection
+  // Vision
   FACE_ANALYZE: '/api/face-analyze',
+  DETECT_OBJECTS: '/api/detect-objects',
   FACE_HEALTH: '/api/face-health',
 
   // NASA — direct proxied endpoints (api.nasa.gov/*)

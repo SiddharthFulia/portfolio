@@ -10,6 +10,15 @@ export async function analyzeFace(imageData, options = {}) {
   }
 }
 
+export async function detectObjects(imageData, threshold = 0.5, options = {}) {
+  try {
+    const res = await post(ENDPOINTS.DETECT_OBJECTS, { image: imageData, threshold }, { timeout: 15000, ...options });
+    return { data: res.data || res, error: null };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+}
+
 export async function checkFaceHealth() {
   try {
     const res = await get(ENDPOINTS.FACE_HEALTH, {}, { timeout: 3000 });
