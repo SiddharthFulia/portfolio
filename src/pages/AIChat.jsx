@@ -11,10 +11,10 @@ const LOCAL_MODELS = [
 ]
 
 const GROQ_MODELS = [
-  { id: 'llama-3.1-8b', label: 'Llama 3.1 8B', desc: 'Fastest responses' },
+  { id: 'llama-3.1-8b', label: 'Llama 3.1 8B', desc: 'Fastest' },
   { id: 'llama-3.1-70b', label: 'Llama 3.1 70B', desc: 'Best quality' },
-  { id: 'llama-3.3-70b', label: 'Llama 3.3 70B', desc: 'Latest, versatile' },
-  { id: 'mixtral-8x7b', label: 'Mixtral 8x7B', desc: 'Long context (32K)' },
+  { id: 'mixtral-8x7b', label: 'Mixtral 8x7B', desc: 'Long context' },
+  { id: 'gemma-7b', label: 'Gemma 7B', desc: 'Lightweight' },
 ]
 
 const CodeBlock = ({ children, className }) => {
