@@ -11,10 +11,10 @@ const LOCAL_MODELS = [
 ]
 
 const GROQ_MODELS = [
-  { id: 'llama-3.3-70b', label: 'Llama 3.3 70B', desc: 'Fast, powerful' },
-  { id: 'llama-3.1-8b', label: 'Llama 3.1 8B', desc: 'Ultra fast' },
-  { id: 'mixtral-8x7b', label: 'Mixtral 8x7B', desc: 'Balanced' },
-  { id: 'gemma2-9b', label: 'Gemma 2 9B', desc: 'Google, efficient' },
+  { id: 'llama-3.1-8b', label: 'Llama 3.1 8B', desc: 'Fastest responses' },
+  { id: 'llama-3.1-70b', label: 'Llama 3.1 70B', desc: 'Best quality' },
+  { id: 'llama-3.3-70b', label: 'Llama 3.3 70B', desc: 'Latest, versatile' },
+  { id: 'mixtral-8x7b', label: 'Mixtral 8x7B', desc: 'Long context (32K)' },
 ]
 
 const CodeBlock = ({ children, className }) => {
@@ -77,7 +77,7 @@ const AIChat = () => {
   const [sending, setSending] = useState(false)
   const [status, setStatus] = useState('checking')
   const [provider, setProvider] = useState('groq') // 'local' | 'groq'
-  const [model, setModel] = useState('llama-3.3-70b')
+  const [model, setModel] = useState('llama-3.1-8b')
   const [system, setSystem] = useState('')
   const [temperature, setTemperature] = useState(0.7)
   const [maxTokens, setMaxTokens] = useState(200)

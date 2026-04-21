@@ -85,12 +85,13 @@ const Navbar = () => {
         ))}
 
         {/* More dropdown */}
-        <div className="relative" onMouseLeave={() => setMoreOpen(false)}>
+        <div className="relative">
           <button
-            onMouseEnter={() => setMoreOpen(true)}
             onClick={() => setMoreOpen(o => !o)}
             className={`text-[11px] px-2.5 py-1.5 rounded-lg font-semibold transition-colors flex items-center gap-1 ${
-              isDark ? 'text-gray-400 hover:text-white bg-gray-800/80 hover:bg-gray-700' : 'text-gray-600 hover:text-black bg-gray-100 hover:bg-gray-200'
+              moreOpen
+                ? 'text-cyan-400 bg-gray-800'
+                : isDark ? 'text-gray-400 hover:text-white bg-gray-800/80 hover:bg-gray-700' : 'text-gray-600 hover:text-black bg-gray-100 hover:bg-gray-200'
             }`}>
             More
             <svg className={`w-3 h-3 transition-transform ${moreOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
@@ -98,21 +99,24 @@ const Navbar = () => {
             </svg>
           </button>
           {moreOpen && (
-            <div className={`absolute top-full right-0 mt-1 py-1 rounded-xl shadow-xl border min-w-[160px] z-50 ${
-              isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'
-            }`}>
-              {moreLinks.map(l => (
-                <NavLink key={l.to} to={l.to} onClick={() => setMoreOpen(false)}
-                  className={({ isActive }) =>
-                    `block px-4 py-2 text-sm transition-colors ${
-                      isActive
-                        ? 'text-cyan-400'
-                        : isDark ? 'text-gray-300 hover:text-white hover:bg-gray-800' : 'text-gray-700 hover:text-black hover:bg-gray-50'
-                    }`}>
-                  {l.label}
-                </NavLink>
-              ))}
-            </div>
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setMoreOpen(false)} />
+              <div className={`absolute top-full right-0 mt-1 py-1 rounded-xl shadow-xl border min-w-[160px] z-50 ${
+                isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'
+              }`}>
+                {moreLinks.map(l => (
+                  <NavLink key={l.to} to={l.to} onClick={() => setMoreOpen(false)}
+                    className={({ isActive }) =>
+                      `block px-4 py-2.5 text-sm transition-colors ${
+                        isActive
+                          ? 'text-cyan-400'
+                          : isDark ? 'text-gray-300 hover:text-white hover:bg-gray-800' : 'text-gray-700 hover:text-black hover:bg-gray-50'
+                      }`}>
+                    {l.label}
+                  </NavLink>
+                ))}
+              </div>
+            </>
           )}
         </div>
 
