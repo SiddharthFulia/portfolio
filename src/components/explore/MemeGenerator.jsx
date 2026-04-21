@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Input, Modal, Button, Pagination } from 'antd'
 import { SearchOutlined, DownloadOutlined } from '@ant-design/icons'
 import { fetchMemes } from '../../api/nasa'
+import AnimatedCard from './AnimatedCard'
 
 const SkeletonGrid = () => (
   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
@@ -55,15 +56,15 @@ const MemeGenerator = () => {
       {loading ? <SkeletonGrid /> : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
           {filtered.slice((page - 1) * pageSize, page * pageSize).map(m => (
-            <div key={m.id} onClick={() => setSelected(m)}
-              className="cursor-pointer rounded-xl overflow-hidden border border-gray-800 bg-gray-900 hover:border-gray-600 transition-all group hover:scale-[1.02]">
+            <AnimatedCard key={m.id} tiltAmount={10} onClick={() => setSelected(m)}
+              className="cursor-pointer rounded-xl overflow-hidden border border-gray-800 bg-gray-900 hover:border-gray-600 transition-all">
               <img src={m.url} alt={m.name} loading="lazy"
-                className="w-full aspect-square object-cover group-hover:scale-105 transition-transform duration-300" />
+                className="w-full aspect-square object-cover" />
               <div className="p-2">
                 <p className="text-white text-[11px] font-semibold line-clamp-1">{m.name}</p>
                 <p className="text-gray-600 text-[9px]">{m.box_count} text boxes</p>
               </div>
-            </div>
+            </AnimatedCard>
           ))}
         </div>
       )}

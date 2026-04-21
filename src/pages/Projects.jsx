@@ -1,9 +1,37 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 
 import { CTA } from "../components";
 import { projects } from "../constants";
 import { arrow } from "../assets/icons";
+import AnimatedCard from '../components/explore/AnimatedCard';
+
+const ShareButtons = ({ title, url }) => {
+  const [copied, setCopied] = useState(false)
+  const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`
+  const linkedinUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(url)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="flex gap-2 mt-2">
+      <a href={twitterUrl} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-cyan-400 transition-colors" title="Share on X">
+        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+      </a>
+      <a href={linkedinUrl} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-blue-400 transition-colors" title="Share on LinkedIn">
+        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+      </a>
+      <button onClick={copyLink} className={`transition-colors ${copied ? 'text-green-400' : 'text-gray-500 hover:text-white'}`} title="Copy link">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-2.939a4.5 4.5 0 00-1.242-7.244l-4.5-4.5a4.5 4.5 0 00-6.364 6.364L4.757 8.25" /></svg>
+      </button>
+    </div>
+  )
+}
 
 const fadeUp = {
   hidden: { opacity: 0, y: 40 },
@@ -58,7 +86,8 @@ const Projects = () => {
         </div>
 
         {LIVE_PROJECTS.map(proj => (
-          <div key={proj.title}
+          <AnimatedCard key={proj.title} effect='fire'>
+          <div
             className='relative rounded-2xl overflow-hidden border border-slate-200 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1'>
             {/* Gradient accent bar */}
             <div className={`h-1.5 bg-gradient-to-r ${proj.gradient}`} />
@@ -123,17 +152,23 @@ const Projects = () => {
                     </div>
                   </div>
                 </div>
+                <ShareButtons title={proj.title} url={proj.github || window.location.href} />
               </div>
             </div>
           </div>
+          </AnimatedCard>
         ))}
       </motion.div>
 
       {/* ── All Projects ── */}
       <motion.div className='flex flex-wrap my-20 gap-16'
         initial="hidden" whileInView="show" variants={stagger} viewport={{ once: true }}>
-        {projects.map((project) => (
+        {projects.map((project, idx) => {
+          const effects = ['water', 'electric', 'psychic', 'fire', 'grass', 'dragon', 'ice', 'dark', 'ghost', 'poison']
+          return (
           <motion.div key={project.name} variants={fadeUp} className='lg:w-[400px] w-full'>
+            <AnimatedCard effect={effects[idx % effects.length]}>
+            <div className="p-5">
             <div className='block-container w-12 h-12'>
               <div className={`btn-back rounded-xl ${project.theme}`} />
               <div className='btn-front rounded-xl flex justify-center items-center'>
@@ -143,19 +178,19 @@ const Projects = () => {
 
             <div className='mt-5 flex flex-col'>
               <div className="flex items-center gap-3 flex-wrap">
-                <h4 className='text-2xl font-poppins font-semibold'>{project.name}</h4>
+                <h4 className='text-2xl font-poppins font-semibold text-white'>{project.name}</h4>
                 {project.tag && (
-                  <span className="text-xs font-semibold px-2 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-100">
+                  <span className="text-xs font-semibold px-2 py-1 rounded-full bg-blue-900/30 text-blue-400 border border-blue-800/30">
                     {project.tag}
                   </span>
                 )}
               </div>
-              <p className='mt-2 text-slate-500'>{project.description}</p>
+              <p className='mt-2 text-gray-400'>{project.description}</p>
               <div className='mt-5 flex items-center gap-4 flex-wrap'>
                 {project.link && (
                   <div className='flex items-center gap-2 font-poppins'>
                     <Link to={project.link} target='_blank' rel='noopener noreferrer'
-                      className='font-semibold text-blue-600 hover:underline'>
+                      className='font-semibold text-blue-400 hover:underline'>
                       {project.linkLabel}
                     </Link>
                     <img src={arrow} alt='arrow' className='w-4 h-4 object-contain' />
@@ -165,12 +200,12 @@ const Projects = () => {
                 {project.name === 'Chess Engine' && (
                   <>
                     <Link to='/chess'
-                      className='font-semibold text-amber-600 hover:text-amber-700 hover:underline font-poppins text-sm'>
+                      className='font-semibold text-amber-400 hover:text-amber-300 hover:underline font-poppins text-sm'>
                       ▶ Visualize Live
                     </Link>
                     <div className='relative group inline-flex'>
-                      <div className='w-6 h-6 rounded-full bg-amber-50 border-2 border-amber-200 flex items-center justify-center
-                                      cursor-default hover:bg-amber-100 transition-all'>
+                      <div className='w-6 h-6 rounded-full bg-amber-900/30 border-2 border-amber-700/40 flex items-center justify-center
+                                      cursor-default hover:bg-amber-900/50 transition-all'>
                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2.5" strokeLinecap="round">
                           <circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" />
                         </svg>
@@ -189,9 +224,13 @@ const Projects = () => {
                   </>
                 )}
               </div>
+              <ShareButtons title={project.name} url={project.link || window.location.href} />
             </div>
+            </div>
+            </AnimatedCard>
           </motion.div>
-        ))}
+          )
+        })}
       </motion.div>
 
       <hr className='border-slate-200' />

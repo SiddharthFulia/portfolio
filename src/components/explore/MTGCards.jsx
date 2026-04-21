@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Input, Modal, Tag, Button, Empty } from 'antd'
 import { SearchOutlined, ReloadOutlined, DownloadOutlined } from '@ant-design/icons'
 import { fetchMTG } from '../../api/nasa'
+import AnimatedCard from './AnimatedCard'
 
 const RARITY_COLORS = { common: 'default', uncommon: 'silver', rare: 'gold', mythic: 'orange' }
 
@@ -78,11 +79,13 @@ const MTGCards = () => {
         cards.length === 0 ? <Empty description="No cards found" /> : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {cards.map(c => (
-              <div key={c.id} onClick={() => setSelected(c)}
-                className="cursor-pointer rounded-xl overflow-hidden border border-gray-800 hover:border-gray-600 transition-all group hover:scale-[1.03] hover:shadow-lg hover:shadow-purple-900/20">
+              <AnimatedCard key={c.id} tiltAmount={15}
+                effect={c.rarity === 'mythic' ? 'fire' : c.rarity === 'rare' ? 'electric' : c.rarity === 'uncommon' ? 'grass' : 'default'}
+                onClick={() => setSelected(c)}
+                className="cursor-pointer rounded-xl overflow-hidden border border-gray-800 hover:border-gray-600 transition-all hover:shadow-lg hover:shadow-purple-900/20">
                 <img src={c.image_uris?.normal || c.image_uris?.small} alt={c.name} loading="lazy"
                   className="w-full rounded-xl" />
-              </div>
+              </AnimatedCard>
             ))}
           </div>
         )

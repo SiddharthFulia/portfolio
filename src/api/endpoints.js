@@ -3,9 +3,10 @@ export const ENDPOINTS = {
   HEALTH: '/api/health',
   STATS: '/api/stats',
 
-  // AI (Ollama)
+  // AI
   CHAT: '/api/chat',
   AI: '/api/ai',
+  GROQ: '/api/groq',
 
   // Vision
   FACE_ANALYZE: '/api/face-analyze',

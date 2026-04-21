@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, lazy, Suspense } from 'react'
+import AnimatedCard from '../components/explore/AnimatedCard'
 
 /* ── Lazy imports — nothing loads until selected ── */
 const HolographicCard = lazy(() => import('../components/lab/HolographicCard'))
@@ -184,16 +185,17 @@ const Creative = () => {
         <div className='grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3'>
           {filteredDemos.map((d, i) => {
             const isActive = active === d.id
+            const effectMap = { holographic:'ice', aurora:'grass', morphing:'psychic', cube:'fire', marquee:'electric', neon:'fire', magnetic:'dragon', gradient:'psychic', wave:'water', glitch:'dark', particles:'electric', textanim:'psychic', shadow:'ghost' }
             return (
               <FadeIn key={d.id} delay={0.25 + i * 0.04}>
-                <button
-                  onClick={() => handleClick(d.id)}
-                  className={`relative group text-left rounded-xl border p-4 transition-all duration-300 overflow-hidden w-full ${
-                    isActive
-                      ? 'border-pink-500/60 bg-gray-900 shadow-lg shadow-pink-900/20 scale-[1.02]'
-                      : 'border-gray-800 bg-gray-900/60 hover:border-gray-700 hover:bg-gray-900 hover:scale-[1.01]'
-                  }`}
-                >
+                <AnimatedCard effect={effectMap[d.id] || 'default'} onClick={() => handleClick(d.id)} className="h-full w-full">
+                  <div
+                    className={`relative group text-left p-4 transition-all duration-300 w-full ${
+                      isActive
+                        ? 'shadow-lg shadow-pink-900/20'
+                        : ''
+                    }`}
+                  >
                   {/* Active indicator bar */}
                   {isActive && (
                     <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${d.color}`} />
@@ -218,7 +220,8 @@ const Creative = () => {
                       {isActive ? '▼ Close' : '→ Open'}
                     </span>
                   </div>
-                </button>
+                  </div>
+                </AnimatedCard>
               </FadeIn>
             )
           })}

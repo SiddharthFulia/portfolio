@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Input, Card, Tag, Badge, Pagination, Modal, Descriptions, Empty, Select } from 'antd'
+import { Input, Tag, Badge, Pagination, Modal, Descriptions, Empty, Select } from 'antd'
 import { SearchOutlined } from '@ant-design/icons'
 import { fetchRickMorty } from '../../api/nasa'
+import AnimatedCard from './AnimatedCard'
 
 const STATUS_COLORS = { Alive: 'green', Dead: 'red', unknown: 'default' }
 const STATUS_DOTS = { Alive: 'bg-green-500', Dead: 'bg-red-500', unknown: 'bg-gray-500' }
@@ -86,33 +87,28 @@ const RickMorty = () => {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {characters.map(c => (
-              <Card
+              <AnimatedCard
                 key={c.id}
-                hoverable
+                effect={c.status === 'Alive' ? 'grass' : c.status === 'Dead' ? 'fire' : 'ghost'}
                 onClick={() => setSelected(c)}
-                className="bg-gray-900 border-gray-800 overflow-hidden"
-                styles={{ body: { padding: 12 } }}
-                cover={
-                  <div className="relative">
-                    <img src={c.image} alt={c.name} className="w-full aspect-square object-cover" loading="lazy" />
-                    <Badge
-                      count={c.status}
-                      color={STATUS_COLORS[c.status]}
-                      className="absolute top-2 right-2"
-                    />
-                  </div>
-                }
+                className="cursor-pointer rounded-xl overflow-hidden border border-gray-800 bg-gray-900 hover:border-gray-600 transition-all"
               >
-                <Card.Meta
-                  title={<span className="text-white text-sm">{c.name}</span>}
-                  description={
-                    <div className="flex items-center gap-2 mt-1">
-                      <Tag color="blue" className="text-[10px] m-0">{c.species}</Tag>
-                      {c.type && <Tag className="text-[10px] m-0">{c.type}</Tag>}
-                    </div>
-                  }
-                />
-              </Card>
+                <div className="relative">
+                  <img src={c.image} alt={c.name} className="w-full aspect-square object-cover" loading="lazy" />
+                  <Badge
+                    count={c.status}
+                    color={STATUS_COLORS[c.status]}
+                    className="absolute top-2 right-2"
+                  />
+                </div>
+                <div className="p-3">
+                  <span className="text-white text-sm font-semibold">{c.name}</span>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Tag color="blue" className="text-[10px] m-0">{c.species}</Tag>
+                    {c.type && <Tag className="text-[10px] m-0">{c.type}</Tag>}
+                  </div>
+                </div>
+              </AnimatedCard>
             ))}
           </div>
         )

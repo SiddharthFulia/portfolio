@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import AnimatedCard from '../components/explore/AnimatedCard'
 
 const MODULES = [
   { id: 'pokedex',   label: 'Pokedex',           color: 'from-red-500 to-orange-500',    desc: 'Browse 386 Pokemon with stats, types, abilities' },
@@ -48,10 +49,13 @@ const Explore = () => (
 
     <div className="max-w-6xl mx-auto px-6 pb-24">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {MODULES.map((m, i) => (
+        {MODULES.map((m, i) => {
+          const effectMap = { pokedex:'fire', rickmorty:'grass', launches:'fire', mtg:'dragon', memes:'electric', food:'fire', dogs:'electric', countries:'grass', quotes:'psychic' }
+          return (
           <FadeIn key={m.id} delay={0.2 + i * 0.03}>
             <Link to={`/explore/${m.id}`}
-              className="group relative block rounded-2xl border border-gray-800 bg-gray-900/80 overflow-hidden hover:border-gray-600 transition-colors">
+              className="group relative block">
+              <AnimatedCard effect={effectMap[m.id] || 'default'} className="h-full">
               <div className={`h-1 bg-gradient-to-r ${m.color} opacity-40 group-hover:opacity-100 transition-opacity`} />
               <div className="p-5">
                 <div className="flex items-start gap-3">
@@ -65,9 +69,11 @@ const Explore = () => (
                   </svg>
                 </div>
               </div>
+              </AnimatedCard>
             </Link>
           </FadeIn>
-        ))}
+          )
+        })}
       </div>
     </div>
   </div>

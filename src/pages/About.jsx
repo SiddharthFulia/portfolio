@@ -5,6 +5,9 @@ import "react-vertical-timeline-component/style.min.css";
 import { useState } from "react";
 import { CTA } from "../components";
 import { experiences, skills, publications, achievements, competitiveProgramming } from "../constants";
+import AnimatedCard from '../components/explore/AnimatedCard';
+import GitHubHeatmap from '../components/GitHubHeatmap';
+import TypingTerminal from '../components/TypingTerminal';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 40 },
@@ -109,10 +112,13 @@ const EXPERTISE = [
   },
 ];
 
+const EXPERTISE_EFFECTS = { backend:'ice', frontend:'psychic', ai:'dragon', database:'fire', devops:'water', sysdesign:'electric' };
+
 function ExpertiseCard({ item }) {
   const [open, setOpen] = useState(false);
   return (
     <motion.div variants={fadeUp}>
+      <AnimatedCard effect={EXPERTISE_EFFECTS[item.id] || 'default'}>
       <div
         className={`bg-white rounded-2xl border border-slate-100 shadow-md overflow-hidden
                      transition-all duration-300 ${open ? 'shadow-xl ring-2 ring-blue-100' : 'hover:-translate-y-1 hover:shadow-lg'}`}
@@ -158,6 +164,7 @@ function ExpertiseCard({ item }) {
           </ul>
         </div>
       </div>
+      </AnimatedCard>
     </motion.div>
   );
 }
@@ -203,6 +210,16 @@ const About = () => {
                        hover:scale-105 transition-transform duration-200">
             💼 LinkedIn Profile
           </a>
+        </div>
+
+        {/* Terminal */}
+        <div className="mt-8">
+          <TypingTerminal />
+        </div>
+
+        {/* GitHub Activity */}
+        <div className="mt-8 p-5 bg-gray-900 rounded-2xl border border-gray-800">
+          <GitHubHeatmap username="Sid-passion" />
         </div>
       </motion.div>
 

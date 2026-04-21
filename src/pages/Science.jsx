@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchAPOD, fetchISS as fetchISSPosition, fetchAstros, fetchAsteroids, todayStr, daysAgo } from '../api/nasa'
+import AnimatedCard from '../components/explore/AnimatedCard'
 
 /* ── Categories for filter ── */
 const CATEGORIES = [
@@ -276,12 +277,15 @@ const Science = () => {
         </FadeIn>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((s, i) => (
+          {filtered.map((s, i) => {
+            const effectMap = { apod:'psychic', asteroids:'fire', weather:'electric', earth:'grass', epic:'water', media:'default', mars:'fire', tech:'ice', fireballs:'fire', satellites:'dragon', imagery:'grass' }
+            return (
             <FadeIn key={s.id} delay={0.25 + i * 0.03}>
               <Link
                 to={`/science/${s.id}`}
-                className="group relative block rounded-2xl border border-gray-800 bg-gray-900/80 overflow-hidden hover:border-gray-600 transition-colors"
+                className="group relative block"
               >
+                <AnimatedCard effect={effectMap[s.id] || 'default'} className="h-full">
                 {/* Top gradient bar */}
                 <div className={`h-1 bg-gradient-to-r ${s.color} opacity-40 group-hover:opacity-100 transition-opacity`} />
 
@@ -317,9 +321,11 @@ const Science = () => {
                     </svg>
                   </div>
                 </div>
+                </AnimatedCard>
               </Link>
             </FadeIn>
-          ))}
+            )
+          })}
         </div>
       </div>
     </div>

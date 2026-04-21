@@ -24,6 +24,22 @@ export async function sendChat(message, options = {}) {
   }
 }
 
+export async function sendGroq(message, options = {}) {
+  try {
+    const data = await post(ENDPOINTS.GROQ, {
+      message,
+      history: options.history || [],
+      model: options.model || 'llama-3.3-70b',
+      system: options.system,
+      maxTokens: options.maxTokens || 500,
+      temperature: options.temperature || 0.7,
+    });
+    return { data: data?.data || data, error: null };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+}
+
 export async function sendAI(message, options = {}) {
   try {
     const messages = [{ role: 'user', content: message }];

@@ -2,6 +2,9 @@ import { lazy, Suspense } from "react";
 import { Route, BrowserRouter as Router, Routes, useLocation } from "react-router-dom";
 import { ConfigProvider, theme } from "antd";
 import { Footer, Navbar } from "./components";
+import BackToTop from './components/BackToTop';
+import PageTransition from './components/PageTransition';
+import EasterEgg from './components/EasterEgg';
 
 /* ── Lazy page imports ── */
 const Home = lazy(() => import("./pages/Home"));
@@ -119,23 +122,25 @@ const App = () => {
         <Navbar />
         <Routes>
           <Route path='/' element={<Suspense fallback={<HomeSkeleton />}><Home /></Suspense>} />
-          <Route path='/about' element={<Suspense fallback={<LightPageSkeleton />}><About /></Suspense>} />
-          <Route path='/projects' element={<Suspense fallback={<LightPageSkeleton />}><Projects /></Suspense>} />
-          <Route path='/contact' element={<Suspense fallback={<ContactSkeleton />}><Contact /></Suspense>} />
-          <Route path='/lab' element={<Suspense fallback={<DarkPageSkeleton />}><Lab /></Suspense>} />
-          <Route path='/learn' element={<Suspense fallback={<DarkPageSkeleton />}><Learn /></Suspense>} />
-          <Route path='/creative' element={<Suspense fallback={<DarkPageSkeleton />}><Creative /></Suspense>} />
-          <Route path='/chess' element={<Suspense fallback={<DarkPageSkeleton />}><ChessViz /></Suspense>} />
-          <Route path='/science' element={<Suspense fallback={<ScienceSkeleton />}><Science /></Suspense>} />
-          <Route path='/science/:module' element={<Suspense fallback={<ScienceModuleSkeleton />}><ScienceModule /></Suspense>} />
-          <Route path='/vision' element={<Suspense fallback={<DarkPageSkeleton />}><FaceDetection /></Suspense>} />
-          <Route path='/face' element={<Suspense fallback={<DarkPageSkeleton />}><FaceDetection /></Suspense>} />
-          <Route path='/explore' element={<Suspense fallback={<DarkPageSkeleton />}><Explore /></Suspense>} />
-          <Route path='/explore/:module' element={<Suspense fallback={<DarkPageSkeleton />}><ExploreModule /></Suspense>} />
-          <Route path='/ai' element={<Suspense fallback={<DarkPageSkeleton />}><AIChat /></Suspense>} />
+          <Route path='/about' element={<Suspense fallback={<LightPageSkeleton />}><PageTransition><About /></PageTransition></Suspense>} />
+          <Route path='/projects' element={<Suspense fallback={<LightPageSkeleton />}><PageTransition><Projects /></PageTransition></Suspense>} />
+          <Route path='/contact' element={<Suspense fallback={<ContactSkeleton />}><PageTransition><Contact /></PageTransition></Suspense>} />
+          <Route path='/lab' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><Lab /></PageTransition></Suspense>} />
+          <Route path='/learn' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><Learn /></PageTransition></Suspense>} />
+          <Route path='/creative' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><Creative /></PageTransition></Suspense>} />
+          <Route path='/chess' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><ChessViz /></PageTransition></Suspense>} />
+          <Route path='/science' element={<Suspense fallback={<ScienceSkeleton />}><PageTransition><Science /></PageTransition></Suspense>} />
+          <Route path='/science/:module' element={<Suspense fallback={<ScienceModuleSkeleton />}><PageTransition><ScienceModule /></PageTransition></Suspense>} />
+          <Route path='/vision' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><FaceDetection /></PageTransition></Suspense>} />
+          <Route path='/face' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><FaceDetection /></PageTransition></Suspense>} />
+          <Route path='/explore' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><Explore /></PageTransition></Suspense>} />
+          <Route path='/explore/:module' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><ExploreModule /></PageTransition></Suspense>} />
+          <Route path='/ai' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><AIChat /></PageTransition></Suspense>} />
         </Routes>
         <ConditionalFooter />
       </Router>
+      <BackToTop />
+      <EasterEgg />
     </main>
     </ConfigProvider>
   );

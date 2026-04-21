@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Tag, Empty, Modal, Descriptions, Button, Pagination } from 'antd'
 import { RocketOutlined } from '@ant-design/icons'
 import { fetchLaunches } from '../../api/nasa'
+import AnimatedCard from './AnimatedCard'
 
 const STATUS_COLORS = { 1: 'green', 2: 'orange', 3: 'blue', 4: 'red', 5: 'purple', 6: 'cyan' }
 
@@ -66,10 +67,10 @@ const SpaceLaunches = () => {
               const countdown = getCountdown(l.net)
               const img = l.image?.image_url || l.image
               return (
-                <div key={l.id} onClick={() => setSelected(l)}
-                  className="cursor-pointer rounded-xl border border-gray-800 bg-gray-900 overflow-hidden hover:border-gray-600 transition-all flex group">
+                <AnimatedCard key={l.id} tiltAmount={6} effect="fire" onClick={() => setSelected(l)}
+                  className="cursor-pointer rounded-xl border border-gray-800 bg-gray-900 overflow-hidden hover:border-gray-600 transition-all flex">
                   {typeof img === 'string' && img.startsWith('http') && (
-                    <img src={img} alt="" className="w-28 sm:w-36 h-28 sm:h-36 object-cover shrink-0 group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                    <img src={img} alt="" className="w-28 sm:w-36 h-28 sm:h-36 object-cover shrink-0" loading="lazy" />
                   )}
                   <div className="p-4 flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-1">
@@ -85,7 +86,7 @@ const SpaceLaunches = () => {
                     </div>
                     <div className="text-gray-600 text-[10px] mt-2">{formatDate(l.net)}</div>
                   </div>
-                </div>
+                </AnimatedCard>
               )
             })}
           </div>

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Input, Tag, Progress, Modal, Segmented, Empty, Pagination } from 'antd'
 import { SearchOutlined } from '@ant-design/icons'
 import { fetchPokemonList, fetchPokemonDetail } from '../../api/nasa'
+import AnimatedCard from './AnimatedCard'
 
 const TYPE_COLORS = {
   normal: '#a8a878', fire: '#f08030', water: '#6890f0', grass: '#78c850',
@@ -81,14 +82,13 @@ const Pokedex = () => {
         ) : (
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
             {filtered.slice((page - 1) * pageSize, page * pageSize).map(p => (
-              <div key={p.id} onClick={() => loadDetail(p.id)}
-                className={`cursor-pointer rounded-xl border p-2 text-center transition-all hover:scale-105 ${
-                  selected === p.id ? 'border-red-500 bg-gray-800' : 'border-gray-800 bg-gray-900 hover:border-gray-600'
-                }`}>
-                <img src={spriteUrl(p.id)} alt={p.name} className="w-16 h-16 mx-auto object-contain" loading="lazy" />
-                <div className="text-[9px] text-gray-600 font-mono">#{String(p.id).padStart(3, '0')}</div>
-                <div className="text-white text-[11px] font-semibold capitalize truncate">{p.name}</div>
-              </div>
+              <AnimatedCard key={p.id} onClick={() => loadDetail(p.id)} tiltAmount={12}>
+                <div className="p-2 text-center">
+                  <img src={spriteUrl(p.id)} alt={p.name} className="w-16 h-16 mx-auto object-contain drop-shadow-lg" loading="lazy" />
+                  <div className="text-[9px] text-gray-600 font-mono">#{String(p.id).padStart(3, '0')}</div>
+                  <div className="text-white text-[11px] font-semibold capitalize truncate">{p.name}</div>
+                </div>
+              </AnimatedCard>
             ))}
           </div>
         )

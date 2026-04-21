@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Button, Modal, Segmented } from 'antd'
 import { ReloadOutlined, DownloadOutlined } from '@ant-design/icons'
 import { fetchFoodish } from '../../api/nasa'
+import AnimatedCard from './AnimatedCard'
 
 const CATEGORIES = ['random', 'pizza', 'burger', 'pasta', 'biryani', 'rice', 'dessert', 'dosa', 'idly', 'samosa']
 
@@ -66,11 +67,11 @@ const FoodGallery = () => {
       {loading ? <SkeletonGrid /> : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {images.map((url, i) => (
-            <div key={i} onClick={() => setSelected(url)}
-              className="cursor-pointer rounded-xl overflow-hidden border border-gray-800 hover:border-gray-600 transition-all group hover:scale-[1.02]">
+            <AnimatedCard key={i} tiltAmount={10} onClick={() => setSelected(url)}
+              className="cursor-pointer rounded-xl overflow-hidden border border-gray-800 hover:border-gray-600 transition-all">
               <img src={url} alt="Food" loading="lazy"
-                className="w-full aspect-square object-cover group-hover:scale-105 transition-transform duration-300" />
-            </div>
+                className="w-full aspect-square object-cover" />
+            </AnimatedCard>
           ))}
         </div>
       )}

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, lazy, Suspense } from 'react'
+import AnimatedCard from '../components/explore/AnimatedCard'
 
 /* ── Lazy imports — nothing loads until the section is clicked ── */
 const SolarSystem3D = lazy(() => import('../components/lab/SolarSystem3D'))
@@ -276,17 +277,17 @@ const Lab = () => {
         <div className='grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3'>
           {SECTIONS.map((s, i) => {
             const isActive = active === s.id
+            const effectMap = { worlds:'water', algorithms:'electric', ai:'psychic', math:'psychic', data:'ice', code:'default', learn:'dragon' }
             return (
-              <button
-                key={s.id}
-                onClick={() => handleClick(s.id)}
-                className={`relative group text-left rounded-xl border p-4 transition-all duration-300 overflow-hidden ${
-                  isActive
-                    ? 'border-cyan-500/60 bg-gray-900 shadow-lg shadow-cyan-900/20 scale-[1.02]'
-                    : 'border-gray-800 bg-gray-900/60 hover:border-gray-700 hover:bg-gray-900 hover:scale-[1.01]'
-                }`}
-                style={{ animationDelay: `${i * 60}ms` }}
-              >
+              <AnimatedCard key={s.id} effect={effectMap[s.id] || 'default'} onClick={() => handleClick(s.id)} className="h-full">
+                <div
+                  className={`relative group text-left p-4 transition-all duration-300 ${
+                    isActive
+                      ? 'shadow-lg shadow-cyan-900/20'
+                      : ''
+                  }`}
+                  style={{ animationDelay: `${i * 60}ms` }}
+                >
                 {/* Active indicator bar */}
                 {isActive && (
                   <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${s.color}`} />
@@ -305,7 +306,8 @@ const Lab = () => {
                     {isActive ? '▼ Close' : '→ Open'}
                   </span>
                 </div>
-              </button>
+                </div>
+              </AnimatedCard>
             )
           })}
         </div>
