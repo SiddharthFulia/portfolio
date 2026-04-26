@@ -40,6 +40,58 @@ export async function sendGroq(message, options = {}) {
   }
 }
 
+export async function sendGemini(message, options = {}) {
+  try {
+    const data = await post(ENDPOINTS.GEMINI, {
+      message,
+      history: options.history || [],
+      model: options.model || 'gemini-flash',
+      system: options.system,
+      maxTokens: options.maxTokens || 500,
+      temperature: options.temperature || 0.7,
+    });
+    return { data: data?.data || data, error: null };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+}
+
+export async function geminiVision(image, prompt, options = {}) {
+  try {
+    const data = await post(ENDPOINTS.GEMINI_VISION, { image, prompt, model: options.model || 'gemini-flash' });
+    return { data: data?.data || data, error: null };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+}
+
+export async function generateImage(prompt, options = {}) {
+  try {
+    const data = await post(ENDPOINTS.GENERATE_IMAGE, { prompt, model: options.model }, { timeout: 60000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+}
+
+export async function textToSpeech(text, options = {}) {
+  try {
+    const data = await post(ENDPOINTS.TTS, { text, voice: options.voice, lang: options.lang }, { timeout: 30000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+}
+
+export async function summarizeText(text, options = {}) {
+  try {
+    const data = await post(ENDPOINTS.SUMMARIZE, { text, model: options.model });
+    return { data: data?.data || data, error: null };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+}
+
 export async function sendAI(message, options = {}) {
   try {
     const messages = [{ role: 'user', content: message }];

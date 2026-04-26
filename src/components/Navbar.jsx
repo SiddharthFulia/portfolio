@@ -5,7 +5,7 @@ import sakura from "../assets/sakura.mp3";
 
 const Navbar = () => {
   const { pathname } = useLocation();
-  const isDark = ['/lab', '/learn', '/creative', '/chess', '/science', '/face', '/vision', '/explore', '/ai'].some(r => pathname.startsWith(r));
+  const isDark = ['/lab', '/learn', '/creative', '/chess', '/science', '/face', '/vision', '/explore', '/ai', '/studio'].some(r => pathname.startsWith(r));
 
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
@@ -40,6 +40,7 @@ const Navbar = () => {
   // Featured pills — AI stuff first for peak interest
   const featuredPills = [
     { to: '/ai', label: 'AI Chat', color: 'from-blue-500 to-cyan-500' },
+    { to: '/studio', label: 'AI Studio', color: 'from-purple-500 to-amber-500' },
     { to: '/vision', label: 'Vision AI', color: 'from-purple-500 to-pink-600' },
     { to: '/science', label: 'Science', color: 'from-cyan-500 to-blue-600' },
     { to: '/explore', label: 'Explore', color: 'from-red-500 to-amber-500' },

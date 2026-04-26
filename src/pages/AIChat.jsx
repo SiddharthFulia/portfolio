@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Input, Button, Select, Slider, Collapse, Tag, Tooltip } from 'antd'
 import { SendOutlined, RobotOutlined, UserOutlined, CopyOutlined, CheckOutlined, SettingOutlined } from '@ant-design/icons'
 import ReactMarkdown from 'react-markdown'
-import { checkHealth, sendChat, sendGroq } from '../api/ai'
+import { checkHealth, sendChat, sendGroq, sendGemini } from '../api/ai'
 
 const LOCAL_MODELS = [
   { id: 'phi3:mini', label: 'Phi-3 Mini', desc: 'Local, general purpose' },
@@ -14,6 +14,12 @@ const GROQ_MODELS = [
   { id: 'llama-3.1-8b', label: 'Llama 3.1 8B', desc: 'Fastest' },
   { id: 'llama-3.3-70b', label: 'Llama 3.3 70B', desc: 'Best quality' },
   { id: 'gpt-oss-120b', label: 'GPT-OSS 120B', desc: 'Most powerful' },
+]
+
+const GEMINI_MODELS = [
+  { id: 'gemini-flash', label: 'Gemini 2.0 Flash', desc: 'Fast, free' },
+  { id: 'gemini-flash-lite', label: 'Flash Lite', desc: 'Ultra light' },
+  { id: 'gemini-pro', label: 'Gemini 1.5 Pro', desc: 'Best quality' },
 ]
 
 const CodeBlock = ({ children, className }) => {
@@ -108,7 +114,7 @@ const AIChat = () => {
     const history = messages.map(m => ({ role: m.role, content: m.content }))
     const t0 = Date.now()
 
-    const sendFn = provider === 'groq' ? sendGroq : sendChat
+    const sendFn = provider === 'groq' ? sendGroq : provider === 'gemini' ? sendGemini : sendChat
     const { data, error } = await sendFn(text, { history, model, context: 'general', system, maxTokens, temperature })
 
     setLastMs(Date.now() - t0)
@@ -143,8 +149,8 @@ const AIChat = () => {
               <span className={`w-2 h-2 rounded-full ${status === 'online' ? 'bg-green-500' : status === 'offline' ? 'bg-red-500' : 'bg-gray-600 animate-pulse'}`} />
               <span className="text-xs text-gray-500">{status === 'online' ? 'Ollama connected' : status === 'offline' ? 'Server offline' : 'Connecting...'}</span>
             </div>
-            <Tag color={provider === 'groq' ? 'purple' : 'blue'}>
-              {provider === 'groq' ? 'Cloud' : 'Local'}: {(provider === 'groq' ? GROQ_MODELS : LOCAL_MODELS).find(m => m.id === model)?.label}
+            <Tag color={provider === 'groq' ? 'purple' : provider === 'gemini' ? 'blue' : 'cyan'}>
+              {provider === 'groq' ? 'Groq' : provider === 'gemini' ? 'Gemini' : 'Local'}: {(provider === 'groq' ? GROQ_MODELS : provider === 'gemini' ? GEMINI_MODELS : LOCAL_MODELS).find(m => m.id === model)?.label}
             </Tag>
             {lastMs && <span className="text-xs text-gray-600 font-mono">{lastMs}ms</span>}
             {lastTokens && <span className="text-xs text-gray-600 font-mono">{lastTokens} tok</span>}
@@ -165,20 +171,25 @@ const AIChat = () => {
                   <label className="text-xs text-gray-400 mb-1 block">Provider</label>
                   <div className="flex gap-2 mb-2">
                     <Button size="small" type={provider === 'groq' ? 'primary' : 'default'}
-                      onClick={() => { setProvider('groq'); setModel('llama-3.3-70b') }}
+                      onClick={() => { setProvider('groq'); setModel('llama-3.1-8b') }}
                       style={provider === 'groq' ? { background: '#7c3aed' } : {}}>
-                      Cloud AI
+                      Groq
+                    </Button>
+                    <Button size="small" type={provider === 'gemini' ? 'primary' : 'default'}
+                      onClick={() => { setProvider('gemini'); setModel('gemini-flash') }}
+                      style={provider === 'gemini' ? { background: '#4285f4' } : {}}>
+                      Gemini
                     </Button>
                     <Button size="small" type={provider === 'local' ? 'primary' : 'default'}
                       onClick={() => { setProvider('local'); setModel('phi3:mini') }}>
-                      Local (Ollama)
+                      Ollama
                     </Button>
                   </div>
                 </div>
                 <div>
                   <label className="text-xs text-gray-400 mb-1 block">Model</label>
                   <Select value={model} onChange={setModel} size="small" style={{ width: '100%' }}
-                    options={(provider === 'groq' ? GROQ_MODELS : LOCAL_MODELS).map(m => ({ value: m.id, label: `${m.label} — ${m.desc}` }))} />
+                    options={(provider === 'groq' ? GROQ_MODELS : provider === 'gemini' ? GEMINI_MODELS : LOCAL_MODELS).map(m => ({ value: m.id, label: `${m.label} — ${m.desc}` }))} />
                 </div>
                 <div>
                   <label className="text-xs text-gray-400 mb-1 block">System Prompt</label>

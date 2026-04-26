@@ -21,6 +21,7 @@ const FaceDetection = lazy(() => import("./pages/FaceDetection"));
 const Explore = lazy(() => import("./pages/Explore"));
 const ExploreModule = lazy(() => import("./pages/ExploreModule"));
 const AIChat = lazy(() => import("./pages/AIChat"));
+const AIStudio = lazy(() => import("./pages/AIStudio"));
 
 /* ── Skeleton building blocks ── */
 const B = "animate-pulse bg-slate-200 rounded";
@@ -136,6 +137,7 @@ const App = () => {
           <Route path='/explore' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><Explore /></PageTransition></Suspense>} />
           <Route path='/explore/:module' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><ExploreModule /></PageTransition></Suspense>} />
           <Route path='/ai' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><AIChat /></PageTransition></Suspense>} />
+          <Route path='/studio' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><AIStudio /></PageTransition></Suspense>} />
         </Routes>
         <ConditionalFooter />
       </Router>

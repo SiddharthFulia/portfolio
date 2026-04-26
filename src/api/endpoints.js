@@ -7,6 +7,11 @@ export const ENDPOINTS = {
   CHAT: '/api/chat',
   AI: '/api/ai',
   GROQ: '/api/groq',
+  GEMINI: '/api/gemini',
+  GEMINI_VISION: '/api/gemini/vision',
+  GENERATE_IMAGE: '/api/generate-image',
+  TTS: '/api/tts',
+  SUMMARIZE: '/api/summarize',
 
   // Vision
   FACE_ANALYZE: '/api/face-analyze',
