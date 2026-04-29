@@ -1,6 +1,7 @@
 import { useState, lazy, Suspense } from 'react'
 
 const FaceAI = lazy(() => import('../components/vision/FaceAI'))
+const ImageEdit = lazy(() => import('../components/vision/ImageEdit'))
 const ObjectDetect = lazy(() => import('../components/vision/ObjectDetect'))
 const OCRTool = lazy(() => import('../components/vision/OCRTool'))
 const FaceLab = lazy(() => import('../components/vision/FaceLab'))
@@ -30,9 +31,10 @@ const FaceDetection = () => {
         </p>
 
         {/* Mode tabs */}
-        <div className="flex gap-2 mb-8">
+        <div className="flex gap-2 mb-8 flex-wrap">
           {[
             { id: 'face', label: 'Face AI', gradient: 'from-[#e91e8c] to-[#b388ff]' },
+            { id: 'edit', label: 'Image Edit', gradient: 'from-purple-600 to-cyan-500' },
             { id: 'object', label: 'Object Detection', gradient: 'from-pink-600 to-orange-600' },
             { id: 'ocr', label: 'OCR / Text', gradient: 'from-amber-600 to-yellow-600' },
             { id: 'lab', label: 'Face Lab', gradient: 'from-violet-600 to-fuchsia-600' },
@@ -48,6 +50,7 @@ const FaceDetection = () => {
 
         <Suspense fallback={<Skeleton />}>
           {mode === 'face' && <FaceAI />}
+          {mode === 'edit' && <ImageEdit />}
           {mode === 'object' && <ObjectDetect />}
           {mode === 'ocr' && <OCRTool />}
           {mode === 'lab' && <FaceLab />}

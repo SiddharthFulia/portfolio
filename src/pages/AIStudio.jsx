@@ -7,16 +7,22 @@ import ReactMarkdown from 'react-markdown'
 const P = 'animate-pulse bg-gray-800 rounded-xl'
 
 // ─── Image Generation ───
+const PROVIDERS = [
+  { id: 'cloudflare', label: 'Cloudflare', desc: 'FLUX.1-schnell • 10k/day free' },
+  { id: 'huggingface', label: 'Hugging Face', desc: 'FLUX.1-schnell • monthly credits' },
+]
+
 const ImageGen = () => {
   const [prompt, setPrompt] = useState('')
   const [image, setImage] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [provider, setProvider] = useState('cloudflare')
 
   const generate = async () => {
     if (!prompt.trim()) return
     setLoading(true); setError(null); setImage(null)
-    const { data, error: err } = await generateImage(prompt.trim())
+    const { data, error: err } = await generateImage(prompt.trim(), { provider })
     if (err) setError(err)
     else if (data?.image) setImage(data.image)
     setLoading(false)
@@ -30,6 +36,24 @@ const ImageGen = () => {
 
   return (
     <div className="space-y-5">
+      {/* Provider picker */}
+      <div>
+        <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-wider mb-2">Provider</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          {PROVIDERS.map(p => (
+            <button key={p.id} onClick={() => setProvider(p.id)}
+              className={`p-3 rounded-lg border text-left transition-colors ${
+                provider === p.id
+                  ? 'border-purple-500 bg-purple-600/15'
+                  : 'border-gray-700 bg-gray-800/40 hover:bg-gray-800'
+              }`}>
+              <div className={`text-sm font-semibold ${provider === p.id ? 'text-purple-300' : 'text-gray-300'}`}>{p.label}</div>
+              <div className="text-[10px] text-gray-500 mt-0.5">{p.desc}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="flex gap-2">
         <Input.TextArea value={prompt} onChange={e => setPrompt(e.target.value)}
           placeholder="A futuristic city at sunset, cyberpunk style, neon lights..."

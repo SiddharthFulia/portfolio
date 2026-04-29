@@ -67,7 +67,24 @@ export async function geminiVision(image, prompt, options = {}) {
 
 export async function generateImage(prompt, options = {}) {
   try {
-    const data = await post(ENDPOINTS.GENERATE_IMAGE, { prompt, model: options.model }, { timeout: 60000 });
+    const data = await post(
+      ENDPOINTS.GENERATE_IMAGE,
+      { prompt, model: options.model, provider: options.provider || 'cloudflare' },
+      { timeout: 60000 }
+    );
+    return { data: data?.data || data, error: null };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+}
+
+export async function editImage(image, prompt, options = {}) {
+  try {
+    const data = await post(
+      ENDPOINTS.IMAGE_EDIT,
+      { image, prompt, strength: options.strength, steps: options.steps },
+      { timeout: 60000 }
+    );
     return { data: data?.data || data, error: null };
   } catch (err) {
     return { data: null, error: err.message };

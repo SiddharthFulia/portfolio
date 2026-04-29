@@ -145,6 +145,12 @@ const Navbar = () => {
         </button>
       </div>
 
+      {/* Mobile menu backdrop — closes menu on outside tap */}
+      {menuOpen && (
+        <div className="fixed inset-0 top-16 z-40 bg-black/40 lg:hidden"
+          onClick={() => setMenuOpen(false)} />
+      )}
+
       {/* Mobile menu */}
       {menuOpen && (
         <div className={`absolute top-full left-0 right-0 z-50 py-4 px-6 flex flex-col gap-1 shadow-xl border-t

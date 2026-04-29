@@ -1,8 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
-import { Button, Select, Tabs } from 'antd'
-import { CameraOutlined, UploadOutlined, DownloadOutlined } from '@ant-design/icons'
+import { Button, Input, Tabs } from 'antd'
+import { CameraOutlined, UploadOutlined, DownloadOutlined, ReloadOutlined } from '@ant-design/icons'
 import { generateImage, geminiVision } from '../../api/ai'
 import { analyzeFace } from '../../api/face'
+
+const IMAGE_PROVIDERS = [
+  { id: 'cloudflare', label: 'Cloudflare', desc: '10k/day free' },
+  { id: 'huggingface', label: 'Hugging Face', desc: 'monthly credits' },
+]
 
 const STYLES = [
   { id: 'anime', label: 'Anime / Cartoon', prompt: 'Convert this person into anime style art, keep the same face features, hair, and expression. Studio Ghibli style, detailed, vibrant colors.' },
@@ -39,6 +44,8 @@ const FaceLab = () => {
   const [selectedFilter, setSelectedFilter] = useState('none')
   const [faceData, setFaceData] = useState(null)
   const [description, setDescription] = useState(null)
+  const [describing, setDescribing] = useState(false)
+  const [imageProvider, setImageProvider] = useState('cloudflare')
   const fileRef = useRef(null)
   const videoRef = useRef(null)
   const captureCanvasRef = useRef(null)
@@ -102,22 +109,21 @@ const FaceLab = () => {
     reader.readAsDataURL(file)
   }
 
-  // Describe face with Gemini
+  // Describe face with Gemini (auto on image change)
   const describeFace = async () => {
     if (!image) return
-    setLoading(true); setError(null); setDescription(null)
+    setDescribing(true); setError(null)
     const { data, error: err } = await geminiVision(image, 'You are describing a person for an AI portrait generator. Write a single paragraph with ONLY physical attributes. Format: "[ethnicity] [gender], [age]yo, [skin tone] skin, [hair description], [face shape], [eye details], [nose], [lips], [expression], wearing [clothing]". Example: "South Asian male, 24yo, medium brown skin, short black straight hair, oval face, dark brown eyes, medium nose, full lips, slight smile, wearing dark blue t-shirt". Be extremely specific about skin color. NO generic descriptions. NO bullet points. Just one detailed sentence.')
     if (err) setError(err)
     else setDescription(data?.reply || '')
-    setLoading(false)
+    setDescribing(false)
   }
 
-  // Generate styled portrait
+  // Generate styled portrait — uses (possibly user-edited) description
   const generateStyled = async () => {
-    if (!description && !image) return
+    if (!image) return
     setLoading(true); setError(null); setResult(null)
 
-    // First get description if we don't have one
     let desc = description
     if (!desc) {
       const { data } = await geminiVision(image, 'Describe this person in one sentence for an AI art generator: ethnicity, skin tone, gender, age, hair, face shape, expression, clothing. Be specific about skin color. Example: "South Asian male, 24yo, brown skin, short black hair, oval face, slight smile, blue shirt"')
@@ -126,9 +132,9 @@ const FaceLab = () => {
     }
 
     const style = STYLES.find(s => s.id === selectedStyle)
-    const prompt = `Portrait of a person who looks exactly like this: ${desc.slice(0, 400)}. Style: ${style.prompt}. IMPORTANT: match the skin tone, ethnicity, and facial features exactly as described.`
+    const prompt = `Portrait of a person who looks exactly like this: ${desc.slice(0, 600)}. Style: ${style.prompt}. IMPORTANT: match the skin tone, ethnicity, and facial features exactly as described.`
 
-    const { data, error: err } = await generateImage(prompt)
+    const { data, error: err } = await generateImage(prompt, { provider: imageProvider })
     if (err) setError(err)
     else if (data?.image) setResult(data.image)
     setLoading(false)
@@ -223,8 +229,13 @@ const FaceLab = () => {
     img.src = image
   }, [image, selectedFilter, faceData])
 
-  // Auto-detect face when image changes
-  useEffect(() => { if (image) detectForFilters() }, [image])
+  // Auto-detect face + auto-describe when image changes
+  useEffect(() => {
+    if (image) {
+      detectForFilters()
+      describeFace()
+    }
+  }, [image])
 
   const download = (src, name) => {
     const a = document.createElement('a')
@@ -302,24 +313,60 @@ const FaceLab = () => {
             key: 'style', label: 'AI Style Transfer',
             children: (
               <div className="space-y-4">
-                <div className="flex flex-wrap gap-2">
-                  {STYLES.map(s => (
-                    <button key={s.id} onClick={() => setSelectedStyle(s.id)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                        selectedStyle === s.id ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                      }`}>{s.label}</button>
-                  ))}
+                {/* Editable AI description */}
+                <div className="p-3 bg-gray-800/50 border border-gray-700 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-gray-500 text-[10px] font-semibold uppercase">AI Description (editable)</p>
+                    <Button size="small" icon={<ReloadOutlined />} loading={describing} onClick={describeFace}>
+                      Re-describe
+                    </Button>
+                  </div>
+                  <Input.TextArea
+                    value={description || ''}
+                    onChange={e => setDescription(e.target.value)}
+                    placeholder={describing ? 'Analyzing face...' : 'Description will appear here. Edit it to tweak skin tone, clothing, expression, etc.'}
+                    autoSize={{ minRows: 3, maxRows: 8 }}
+                    disabled={describing}
+                  />
+                  <p className="text-gray-600 text-[10px] mt-1.5">Tip: edit this text to control the output — change clothing color, hair style, expression, background, anything.</p>
                 </div>
-                <Button type="primary" onClick={generateStyled} loading={loading} disabled={!image}
+
+                {/* Style picker */}
+                <div>
+                  <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-wider mb-2">Style</p>
+                  <div className="flex flex-wrap gap-2">
+                    {STYLES.map(s => (
+                      <button key={s.id} onClick={() => setSelectedStyle(s.id)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                          selectedStyle === s.id ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                        }`}>{s.label}</button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Provider picker */}
+                <div>
+                  <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-wider mb-2">Provider</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {IMAGE_PROVIDERS.map(p => (
+                      <button key={p.id} onClick={() => setImageProvider(p.id)}
+                        className={`p-2.5 rounded-lg border text-left transition-colors ${
+                          imageProvider === p.id
+                            ? 'border-purple-500 bg-purple-600/15'
+                            : 'border-gray-700 bg-gray-800/40 hover:bg-gray-800'
+                        }`}>
+                        <div className={`text-xs font-semibold ${imageProvider === p.id ? 'text-purple-300' : 'text-gray-300'}`}>{p.label}</div>
+                        <div className="text-[10px] text-gray-500 mt-0.5">{p.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <Button type="primary" onClick={generateStyled} loading={loading} disabled={!image || describing}
                   style={{ background: '#7c3aed' }}>
                   {loading ? 'Generating...' : `Generate ${STYLES.find(s => s.id === selectedStyle)?.label}`}
                 </Button>
-                {description && (
-                  <div className="p-3 bg-gray-800/50 border border-gray-700 rounded-lg">
-                    <p className="text-gray-500 text-[10px] font-semibold uppercase mb-1">AI Description</p>
-                    <p className="text-gray-300 text-xs leading-relaxed">{description}</p>
-                  </div>
-                )}
+
                 <p className="text-gray-600 text-[10px]">Note: AI generates a new portrait inspired by the description. It won't be an exact copy of your face — think of it as "what would someone matching my description look like in this style".</p>
               </div>
             )

@@ -10,6 +10,7 @@ export const ENDPOINTS = {
   GEMINI: '/api/gemini',
   GEMINI_VISION: '/api/gemini/vision',
   GENERATE_IMAGE: '/api/generate-image',
+  IMAGE_EDIT: '/api/image-edit',
   TTS: '/api/tts',
   SUMMARIZE: '/api/summarize',
 
