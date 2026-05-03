@@ -22,6 +22,7 @@ const Explore = lazy(() => import("./pages/Explore"));
 const ExploreModule = lazy(() => import("./pages/ExploreModule"));
 const AIChat = lazy(() => import("./pages/AIChat"));
 const AIStudio = lazy(() => import("./pages/AIStudio"));
+const AIVideo = lazy(() => import("./pages/AIVideo"));
 
 /* ── Skeleton building blocks ── */
 const B = "animate-pulse bg-slate-200 rounded";
@@ -91,6 +92,31 @@ const ScienceModuleSkeleton = () => (
   </div>
 );
 
+const AIVideoSkeleton = () => (
+  <div className="min-h-screen bg-gray-950 pt-28 px-5 sm:px-6">
+    <div className="max-w-6xl mx-auto space-y-5">
+      <div className={`${BD} h-6 w-44`} style={{borderRadius:20}} />
+      <div className={`${BD} h-12 w-72`} />
+      <div className={`${BD} h-4 w-96 max-w-full`} />
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-4">
+        <div className="lg:col-span-3 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            {[1,2].map(i => <div key={i} className={`${BD} h-20`} style={{borderRadius:12}} />)}
+          </div>
+          <div className={`${BD} h-24`} style={{borderRadius:12}} />
+          <div className="grid grid-cols-4 gap-3">
+            {[1,2,3,4].map(i => <div key={i} className={`${BD} h-14`} style={{borderRadius:8}} />)}
+          </div>
+          <div className={`${BD} h-12`} style={{borderRadius:8}} />
+        </div>
+        <div className="lg:col-span-2">
+          <div className={`${BD}`} style={{aspectRatio:'9/16',borderRadius:16}} />
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
 const ContactSkeleton = () => (
   <div className="max-w-5xl mx-auto px-8 sm:px-16 pt-28 pb-16">
     <div className={`${B} h-10 w-48 mb-6`} />
@@ -138,6 +164,8 @@ const App = () => {
           <Route path='/explore/:module' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><ExploreModule /></PageTransition></Suspense>} />
           <Route path='/ai' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><AIChat /></PageTransition></Suspense>} />
           <Route path='/studio' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><AIStudio /></PageTransition></Suspense>} />
+          <Route path='/ai-video' element={<Suspense fallback={<AIVideoSkeleton />}><PageTransition><AIVideo /></PageTransition></Suspense>} />
+          <Route path='/video' element={<Suspense fallback={<AIVideoSkeleton />}><PageTransition><AIVideo /></PageTransition></Suspense>} />
         </Routes>
         <ConditionalFooter />
       </Router>

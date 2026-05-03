@@ -14,6 +14,12 @@ export const ENDPOINTS = {
   TTS: '/api/tts',
   SUMMARIZE: '/api/summarize',
 
+  // AI Video (free + open-source)
+  AI_VIDEO_GENERATE: '/api/ai-video/generate',
+  AI_VIDEO_TODAY: '/api/ai-video/today',
+  AI_VIDEO_LIST: '/api/ai-video/list',
+  AI_VIDEO_PROVIDERS: '/api/ai-video/providers',
+
   // Vision
   FACE_ANALYZE: '/api/face-analyze',
   DETECT_OBJECTS: '/api/detect-objects',

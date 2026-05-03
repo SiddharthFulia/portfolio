@@ -368,14 +368,25 @@ const Summarizer = () => {
 const AIStudio = () => {
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <div className="max-w-5xl mx-auto px-6 pt-32 pb-24">
-        <h1 className="font-poppins font-black text-5xl md:text-6xl bg-gradient-to-r from-purple-400 via-pink-400 to-amber-400 bg-clip-text text-transparent leading-tight mb-2">
-          AI Studio
-        </h1>
-        <p className="text-gray-400 text-sm max-w-xl mb-8">
-          Generate images, analyze photos, convert text to speech, and summarize content — powered by Stable Diffusion, Gemini, and Hugging Face.
-        </p>
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-pink-900/10 to-amber-900/20 pointer-events-none" />
+        <div className="absolute -top-32 -right-32 w-96 h-96 bg-purple-600/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-20 -left-20 w-96 h-96 bg-amber-600/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative max-w-5xl mx-auto px-5 sm:px-6 pt-28 sm:pt-32 pb-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gray-800/60 border border-gray-700 backdrop-blur-sm mb-3">
+            <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
+            <span className="text-[11px] uppercase tracking-wider text-gray-300 font-semibold">4 tools • multi-provider</span>
+          </div>
+          <h1 className="font-poppins font-black text-4xl sm:text-5xl md:text-6xl bg-gradient-to-r from-purple-300 via-pink-300 to-amber-300 bg-clip-text text-transparent leading-tight mb-2">
+            AI Studio
+          </h1>
+          <p className="text-gray-400 text-sm sm:text-base max-w-xl">
+            Generate images, analyze photos, convert text to speech, and summarize content — Stable Diffusion, Gemini, FLUX & more.
+          </p>
+        </div>
+      </div>
 
+      <div className="max-w-5xl mx-auto px-5 sm:px-6 pb-24">
         <Tabs
           defaultActiveKey="imagegen"
           size="large"
