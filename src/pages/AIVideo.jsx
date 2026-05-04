@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Input, Button, Select, Switch } from 'antd'
 import { VideoCameraOutlined, ThunderboltOutlined, CopyOutlined, CheckOutlined, DownloadOutlined, ReloadOutlined, LinkOutlined, InfoCircleOutlined } from '@ant-design/icons'
-import { generateVideo, getTodayVideo } from '../api/ai'
+import { generateVideo, getJobStatus, getTodayVideo, getVideoProviders } from '../api/ai'
 
 const BE_URL = import.meta.env.VITE_BE_URL || 'http://localhost:4001'
 
@@ -9,7 +9,7 @@ const PROVIDERS = [
   {
     id: 'auto',
     label: 'Auto',
-    desc: 'Tries ZSky → HF → ComfyUI',
+    desc: 'Tries ZSky → ComfyUI',
     badge: 'Smart',
     accent: 'from-fuchsia-500 via-cyan-500 to-amber-400',
     border: 'border-fuchsia-500/60',
@@ -18,20 +18,11 @@ const PROVIDERS = [
   {
     id: 'zsky',
     label: 'ZSky AI',
-    desc: 'Hosted • free tier',
-    badge: 'Hosted',
+    desc: 'Hosted • free tier • always live',
+    badge: 'Fast',
     accent: 'from-sky-500 to-blue-400',
     border: 'border-sky-500/60',
     glow: 'shadow-sky-500/20',
-  },
-  {
-    id: 'hf',
-    label: 'Hugging Face',
-    desc: 'No video on free tier',
-    badge: 'Broken',
-    accent: 'from-amber-500 to-yellow-400',
-    border: 'border-amber-500/60',
-    glow: 'shadow-amber-500/20',
   },
   {
     id: 'comfyui',
@@ -51,12 +42,6 @@ const MODELS_BY_PROVIDER = {
     { value: 'realistic', label: 'Realistic' },
     { value: 'anime', label: 'Anime' },
     { value: 'cartoon', label: 'Cartoon' },
-  ],
-  hf: [
-    { value: 'ltx-video', label: 'LTX-Video' },
-    { value: 'wan-2.1', label: 'Wan 2.1' },
-    { value: 'zeroscope', label: 'Zeroscope' },
-    { value: 'cogvideox-2b', label: 'CogVideoX' },
   ],
   comfyui: [
     { value: 'ltx-video', label: 'LTX-Video' },
@@ -125,21 +110,41 @@ const VideoCard = ({ video, label = 'Latest', tone = 'cyan' }) => {
   )
 }
 
-const Skeleton = () => (
-  <div className="rounded-2xl border border-gray-800 bg-gray-900/40 overflow-hidden">
-    <div className="aspect-[9/16] sm:aspect-video bg-gray-800/60 animate-pulse flex items-center justify-center">
-      <div className="text-center space-y-3 px-6">
-        <div className="w-16 h-16 mx-auto rounded-full border-2 border-cyan-500/40 border-t-cyan-400 animate-spin" />
-        <p className="text-gray-400 text-sm font-medium">Cooking up your video…</p>
-        <p className="text-gray-600 text-xs">This can take 30-90 seconds. Don't close the tab.</p>
+const STATUS_COPY = {
+  queued:        { label: 'Queued',     hint: 'Waiting for a worker to pick this up…',                 tone: 'cyan' },
+  gpu_offline:   { label: 'GPU offline', hint: 'GPU worker is asleep. Will start as soon as it wakes.', tone: 'amber' },
+  processing:    { label: 'Generating', hint: 'On a GPU now. Usually 60-90s.',                          tone: 'fuchsia' },
+  completed:     { label: 'Done',       hint: '',                                                       tone: 'emerald' },
+  failed:        { label: 'Failed',     hint: '',                                                       tone: 'rose' },
+}
+
+const Skeleton = ({ jobId, status, providerHint, workerOnline }) => {
+  const copy = STATUS_COPY[status] || STATUS_COPY.queued
+  const ringColor = {
+    cyan: 'border-cyan-500/40 border-t-cyan-400',
+    amber: 'border-amber-500/40 border-t-amber-400',
+    fuchsia: 'border-fuchsia-500/40 border-t-fuchsia-400',
+    emerald: 'border-emerald-500/40 border-t-emerald-400',
+    rose: 'border-rose-500/40 border-t-rose-400',
+  }[copy.tone]
+  return (
+    <div className="rounded-2xl border border-gray-800 bg-gray-900/40 overflow-hidden">
+      <div className="aspect-[9/16] sm:aspect-video bg-gray-800/60 animate-pulse flex items-center justify-center">
+        <div className="text-center space-y-3 px-6">
+          <div className={`w-16 h-16 mx-auto rounded-full border-2 ${ringColor} animate-spin`} />
+          <p className="text-gray-200 text-sm font-semibold">{copy.label}…</p>
+          <p className="text-gray-500 text-xs">{copy.hint}</p>
+          {providerHint === 'comfyui' && !workerOnline && status === 'queued' && (
+            <p className="text-amber-400/80 text-[11px] leading-snug">
+              GPU worker is asleep. Job is safe — it'll process when worker comes back online.
+            </p>
+          )}
+          {jobId && <p className="text-gray-700 text-[10px] font-mono break-all">{jobId}</p>}
+        </div>
       </div>
     </div>
-    <div className="p-4 space-y-2">
-      <div className="h-3 w-3/4 rounded bg-gray-800 animate-pulse" />
-      <div className="h-3 w-1/2 rounded bg-gray-800 animate-pulse" />
-    </div>
-  </div>
-)
+  )
+}
 
 const AIVideo = () => {
   const [prompt, setPrompt] = useState('')
@@ -154,13 +159,16 @@ const AIVideo = () => {
   const [imageUrl, setImageUrl] = useState('')
 
   const [loading, setLoading] = useState(false)
-  const [video, setVideo] = useState(null)
+  const [job, setJob] = useState(null)            // current in-flight or finished job
+  const [video, setVideo] = useState(null)         // resolved completed job
   const [error, setError] = useState(null)
+  const [workerOnline, setWorkerOnline] = useState(false)
 
   const [today, setToday] = useState(null)
   const [todayLoading, setTodayLoading] = useState(true)
 
   const [copied, setCopied] = useState(false)
+  const pollTimer = useRef(null)
 
   useEffect(() => {
     let cancelled = false
@@ -170,6 +178,9 @@ const AIVideo = () => {
         setTodayLoading(false)
       }
     })
+    getVideoProviders().then(({ data }) => {
+      if (!cancelled && data) setWorkerOnline(!!data.workerOnline)
+    })
     return () => { cancelled = true }
   }, [])
 
@@ -178,18 +189,63 @@ const AIVideo = () => {
     if (list.length && !list.find(m => m.value === model)) setModel(list[0].value)
   }, [provider]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => () => { if (pollTimer.current) clearInterval(pollTimer.current) }, [])
+
+  const startPolling = (jobId) => {
+    if (pollTimer.current) clearInterval(pollTimer.current)
+    let attempts = 0
+    pollTimer.current = setInterval(async () => {
+      attempts += 1
+      const { data, error: err } = await getJobStatus(jobId)
+      if (err) {
+        if (attempts > 5) {
+          clearInterval(pollTimer.current); pollTimer.current = null
+          setLoading(false); setError(err)
+        }
+        return
+      }
+      if (!data) return
+      setJob(data)
+      if (data.status === 'completed') {
+        clearInterval(pollTimer.current); pollTimer.current = null
+        setVideo(data); setLoading(false)
+        if (!today) setToday(data)
+      } else if (data.status === 'failed') {
+        clearInterval(pollTimer.current); pollTimer.current = null
+        setLoading(false); setError(data.error || 'Generation failed')
+      }
+      // Stop after 15 minutes max
+      if (attempts > 300) {
+        clearInterval(pollTimer.current); pollTimer.current = null
+        setLoading(false); setError('Timed out waiting for the job to complete')
+      }
+    }, 3000)
+  }
+
   const generate = async () => {
     if (!prompt.trim() || loading) return
-    setLoading(true); setError(null); setVideo(null)
+    setLoading(true); setError(null); setVideo(null); setJob(null)
     const { data, error: err } = await generateVideo(prompt.trim(), {
       provider, model, duration, resolution, aspectRatio, style, audio, imageUrl: imageUrl.trim(), generateCaption: withCaption,
     })
-    if (err) setError(err)
-    else if (data?.videoUrl) {
-      setVideo(data)
-      if (!today) setToday(data)
+    if (err) {
+      setLoading(false); setError(err); return
     }
-    setLoading(false)
+    if (data?.jobId) {
+      setJob({ ...data })
+      startPolling(data.jobId)
+    } else if (data?.videoUrl) {
+      setVideo(data); setLoading(false)
+      if (!today) setToday(data)
+    } else {
+      setLoading(false); setError('Unexpected backend response')
+    }
+  }
+
+  const cancel = () => {
+    if (pollTimer.current) clearInterval(pollTimer.current)
+    pollTimer.current = null
+    setLoading(false); setJob(null)
   }
 
   const copyCaption = () => {
@@ -234,7 +290,7 @@ const AIVideo = () => {
           {/* Provider cards */}
           <div>
             <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-wider mb-2">1 — Pick a provider</p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
               {PROVIDERS.map(p => {
                 const active = provider === p.id
                 return (
@@ -393,7 +449,19 @@ const AIVideo = () => {
         {/* Preview column */}
         <div className="lg:col-span-2">
           <div className="lg:sticky lg:top-28 space-y-5">
-            {loading && <Skeleton />}
+            {loading && (
+              <div className="space-y-3">
+                <Skeleton
+                  jobId={job?.jobId}
+                  status={job?.status || 'queued'}
+                  providerHint={provider}
+                  workerOnline={workerOnline}
+                />
+                <Button block onClick={cancel} icon={<ReloadOutlined />}>
+                  Stop watching (job continues in background)
+                </Button>
+              </div>
+            )}
 
             {!loading && video && (
               <div className="space-y-3">
@@ -450,7 +518,7 @@ const AIVideo = () => {
               <>
                 <div className="text-[10px] uppercase tracking-wider text-gray-600 font-semibold">Video of the Day</div>
                 {todayLoading ? (
-                  <Skeleton />
+                  <Skeleton status="queued" providerHint="auto" workerOnline={workerOnline} />
                 ) : today ? (
                   <VideoCard video={today} label="Latest" tone="pink" />
                 ) : (

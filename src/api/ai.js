@@ -107,9 +107,27 @@ export async function generateVideo(prompt, options = {}) {
         imageUrl: options.imageUrl || '',
         generateCaption: options.generateCaption !== false,
       },
-      { timeout: 5 * 60 * 1000 }
+      { timeout: 30000 }
     );
     return { data: data?.data || data, error: null };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+}
+
+export async function getJobStatus(jobId) {
+  try {
+    const data = await get(`${ENDPOINTS.AI_VIDEO_STATUS}/${jobId}`, {}, { timeout: 6000 });
+    return { data: data?.data || null, error: null };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+}
+
+export async function getVideoProviders() {
+  try {
+    const data = await get(ENDPOINTS.AI_VIDEO_PROVIDERS, {}, { timeout: 6000 });
+    return { data: data?.data || null, error: null };
   } catch (err) {
     return { data: null, error: err.message };
   }
