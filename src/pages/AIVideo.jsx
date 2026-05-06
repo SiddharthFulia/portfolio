@@ -95,13 +95,12 @@ const MODELS_BY_PROVIDER = {
   ],
   local: [
     modelOpt('ltx-video',   'LTX-Video 2B',     'fast all-rounder • text + image-to-video'),
-    // Models below are wired in code but waiting for their checkpoints to finish downloading
-    modelOpt('wan-2.1',     'Wan 2.1 1.3B',     'downloading umT5 encoder…', true),
-    modelOpt('wan-2.1-i2v', 'Wan 2.1 I2V 14B',  'downloading 14B model…', true),
-    modelOpt('wan-2.2',     'Wan 2.2 5B',       'downloading…', true),
-    modelOpt('svd',         'SVD-XT 1.1',       'downloading…', true),
-    modelOpt('hunyuan',     'HunyuanVideo',     'workflow WIP', true),
-    modelOpt('mochi',       'Mochi 1',          'workflow WIP', true),
+    modelOpt('wan-2.1',     'Wan 2.1 1.3B',     'cinematic motion, T2V only'),
+    modelOpt('wan-2.1-i2v', 'Wan 2.1 I2V 14B',  'top quality I2V • 14B model'),
+    modelOpt('hunyuan',     'HunyuanVideo',     'Tencent • highest fidelity T2V'),
+    modelOpt('wan-2.2',     'Wan 2.2 5B',       'newest gen TI2V • text + image'),
+    modelOpt('mochi',       'Mochi 1',          'Apache-2 license • distinctive style'),
+    modelOpt('svd',         'SVD-XT 1.1',       'gated — needs HF login', true),
   ],
 }
 
@@ -389,7 +388,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
                 popupMatchSelectWidth={false}
                 options={MODELS_BY_PROVIDER.local} />
               <p className="text-[10px] text-gray-600 mt-1">
-                LTX-Video is live now (T2V + I2V). Wan 2.1 / 2.2 / SVD-XT unlock as their downloads complete.
+                7 models wired. Each becomes available the moment its checkpoint finishes downloading on the 5090.
               </p>
             </div>
           )}
