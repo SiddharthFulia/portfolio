@@ -31,7 +31,29 @@ const PROVIDERS = [
     border: 'border-emerald-500/60',
     glow: 'shadow-emerald-500/20',
   },
+  {
+    id: 'local',
+    label: '5090 Beast',
+    desc: 'My RTX 5090 • cinematic + huge models • ~30-60s',
+    badge: 'Luxury',
+    accent: 'from-amber-400 via-rose-400 to-fuchsia-500',
+    border: 'border-amber-400/60',
+    glow: 'shadow-amber-400/30',
+    luxe: true,
+  },
 ]
+
+// Model options per provider. Add new ones once the worker wires the workflow.
+const MODELS_BY_PROVIDER = {
+  zsky:   [{ value: 'cinematic', label: 'Cinematic' }],
+  worker: [{ value: 'ltx-video', label: 'LTX-Video 2B' }],
+  local:  [
+    { value: 'ltx-video', label: 'LTX-Video 2B  •  fast' },
+    { value: 'wan-2.1',   label: 'Wan 2.1 1.3B  •  cinematic' },
+    { value: 'hunyuan',   label: 'HunyuanVideo  •  coming soon', disabled: true },
+    { value: 'mochi',     label: 'Mochi 1  •  coming soon',      disabled: true },
+  ],
+}
 
 const PROMPT_PRESETS = [
   'a cat dancing',
@@ -50,13 +72,26 @@ const PROMPT_PRESETS = [
 
 const STATUS_COPY = {
   zsky_running: { label: 'Generating', hint: 'ZSky is rendering on hosted GPUs. ~60-90s.', tone: 'fuchsia' },
+  local_queued: { label: 'Queued',     hint: 'Waiting for the 5090 to wake up and pick up.', tone: 'amber' },
   queued:       { label: 'Queued',     hint: 'Waiting for the GPU worker to pick up.',     tone: 'cyan' },
-  processing:   { label: 'Generating', hint: 'On a GPU now. ~3-5 min on T4.',              tone: 'fuchsia' },
+  processing:   { label: 'Generating', hint: 'On a GPU now.',                              tone: 'fuchsia' },
   completed:    { label: 'Done',       hint: '',                                           tone: 'emerald' },
   failed:       { label: 'Failed',     hint: '',                                           tone: 'rose' },
 }
 
 const resolveVideoUrl = (url) => (url?.startsWith('http') ? url : `${BE_URL}${url}`)
+
+// Build a Cloudinary thumbnail (single JPG frame) URL from a stored video URL.
+// Works only for Cloudinary-hosted assets; returns null otherwise.
+const thumbFromVideo = (videoUrl, opts = {}) => {
+  if (!videoUrl || !/cloudinary\.com\/.+\/video\/upload\//.test(videoUrl)) return null
+  const w = opts.width || 400
+  const so = opts.startOffset != null ? opts.startOffset : 1
+  const transform = `so_${so},w_${w},c_fill,q_auto,f_jpg`
+  return videoUrl
+    .replace('/video/upload/', `/video/upload/${transform}/`)
+    .replace(/\.(mp4|webm|mov)$/i, '.jpg')
+}
 
 const Tag = ({ children, tone = 'gray' }) => {
   const tones = {
@@ -106,6 +141,7 @@ const Skeleton = ({ jobId, status }) => {
   const ringColor = {
     cyan: 'border-cyan-500/40 border-t-cyan-400',
     fuchsia: 'border-fuchsia-500/40 border-t-fuchsia-400',
+    amber: 'border-amber-400/40 border-t-amber-300',
   }[copy.tone] || 'border-cyan-500/40 border-t-cyan-400'
   return (
     <div className="rounded-2xl border border-gray-800 bg-gray-900/40 overflow-hidden">
@@ -125,6 +161,7 @@ const Skeleton = ({ jobId, status }) => {
 const GenerateTab = ({ today, setToday, onJobCompleted }) => {
   const [prompt, setPrompt] = useState('')
   const [provider, setProvider] = useState('zsky')
+  const [model, setModel] = useState('ltx-video')
   const [duration, setDuration] = useState(5)
   const [resolution, setResolution] = useState('720p')
   const [aspectRatio, setAspectRatio] = useState('9:16')
@@ -138,13 +175,25 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
   const [video, setVideo] = useState(null)
   const [error, setError] = useState(null)
   const [workerOnline, setWorkerOnline] = useState(false)
+  const [localOnline, setLocalOnline] = useState(false)
   const [copied, setCopied] = useState(false)
   const pollTimer = useRef(null)
 
   useEffect(() => {
-    getVideoProviders().then(({ data }) => { if (data) setWorkerOnline(!!data.workerOnline) })
+    getVideoProviders().then(({ data }) => {
+      if (!data) return
+      setWorkerOnline(!!(data.workers?.worker?.online ?? data.workerOnline))
+      setLocalOnline(!!data.workers?.local?.online)
+    })
     return () => { if (pollTimer.current) clearInterval(pollTimer.current) }
   }, [])
+
+  // Reset model to the first usable option when provider changes
+  useEffect(() => {
+    const list = MODELS_BY_PROVIDER[provider] || []
+    const firstUsable = list.find(m => !m.disabled) || list[0]
+    if (firstUsable) setModel(firstUsable.value)
+  }, [provider])
 
   const startPolling = (jobId) => {
     if (pollTimer.current) clearInterval(pollTimer.current)
@@ -178,7 +227,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
     if (!prompt.trim() || loading) return
     setLoading(true); setError(null); setVideo(null); setJob(null)
     const { data, error: err } = await generateVideo(prompt.trim(), {
-      provider, duration, resolution, aspectRatio, style, audio,
+      provider, model, duration, resolution, aspectRatio, style, audio,
       imageUrl: imageUrl.trim(), generateCaption: withCaption,
     })
     if (err) { setLoading(false); setError(err); return }
@@ -224,33 +273,57 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
       <div className="lg:col-span-3 space-y-5">
         <div>
           <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-wider mb-2">1 — Pick a provider</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {PROVIDERS.map(p => {
               const active = provider === p.id
+              const isOnline = p.id === 'worker' ? workerOnline : p.id === 'local' ? localOnline : null
               return (
                 <button key={p.id} onClick={() => setProvider(p.id)} type="button"
                   aria-pressed={active}
-                  className={`relative p-4 rounded-xl border text-left transition-all duration-200 ${
+                  className={`relative p-4 rounded-xl border text-left transition-all duration-200 overflow-hidden ${
                     active
                       ? `border-2 ${p.border.replace('/60', '')} bg-gray-900 shadow-xl ${p.glow.replace('/20', '/40')} scale-[1.02] ring-1 ring-white/5`
                       : 'border-2 border-gray-800 bg-gray-900/40 hover:bg-gray-900 hover:border-gray-700 hover:scale-[1.01]'
                   }`}>
+                  {p.luxe && (
+                    <div aria-hidden className={`absolute inset-0 pointer-events-none opacity-30 bg-gradient-to-br ${p.accent} mix-blend-overlay`} />
+                  )}
                   {active && (
-                    <div className={`absolute -top-2 -right-2 w-6 h-6 rounded-full bg-gradient-to-br ${p.accent} flex items-center justify-center text-black shadow-md`}>
+                    <div className={`absolute -top-2 -right-2 w-6 h-6 rounded-full bg-gradient-to-br ${p.accent} flex items-center justify-center text-black shadow-md z-10`}>
                       <CheckOutlined className="text-[10px] font-bold" />
                     </div>
                   )}
-                  <div className="flex items-start justify-between gap-1 mb-1">
-                    <span className={`text-sm font-bold ${active ? 'text-white' : 'text-gray-300'}`}>{p.label}</span>
+                  <div className="relative flex items-start justify-between gap-1 mb-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-sm font-bold ${active ? 'text-white' : 'text-gray-300'}`}>{p.label}</span>
+                      {isOnline === true && (
+                        <span title="Worker online" className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      )}
+                      {isOnline === false && (
+                        <span title="Worker offline" className="w-1.5 h-1.5 rounded-full bg-gray-600" />
+                      )}
+                    </div>
                     <span className={`text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-full bg-gradient-to-r ${p.accent} text-black whitespace-nowrap`}>
                       {p.badge}
                     </span>
                   </div>
-                  <p className={`text-[11px] leading-snug ${active ? 'text-gray-400' : 'text-gray-500'}`}>{p.desc}</p>
+                  <p className={`relative text-[11px] leading-snug ${active ? 'text-gray-400' : 'text-gray-500'}`}>{p.desc}</p>
                 </button>
               )
             })}
           </div>
+
+          {provider === 'local' && (
+            <div className="mt-3">
+              <label className="text-[10px] text-gray-500 block mb-1 uppercase tracking-wider">Model</label>
+              <Select size="middle" value={model} onChange={setModel} style={{ width: '100%' }}
+                popupMatchSelectWidth={false}
+                options={MODELS_BY_PROVIDER.local} />
+              <p className="text-[10px] text-gray-600 mt-1">
+                LTX-Video and Wan 2.1 are wired today. Hunyuan / Mochi will be added on request.
+              </p>
+            </div>
+          )}
         </div>
 
         <div>
@@ -372,7 +445,12 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
             <div className="space-y-3">
               <Skeleton
                 jobId={job?.jobId || job?.videoId}
-                status={job?.status || (provider === 'zsky' ? 'zsky_running' : 'queued')}
+                status={
+                  job?.status ||
+                  (provider === 'zsky'  ? 'zsky_running' :
+                   provider === 'local' ? 'local_queued' :
+                   'queued')
+                }
               />
               <Button block onClick={cancel} icon={<ReloadOutlined />}>
                 Stop watching (job continues in background)
@@ -432,16 +510,30 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
 
 // ─── Library tab — paginated, no eager video loads ─────────
 const LibraryCard = ({ video, onClick, onDelete }) => {
-  const provColor = video.provider === 'zsky'
-    ? 'from-sky-500 to-blue-400'
-    : 'from-emerald-500 to-cyan-400'
+  const provColor =
+    video.provider === 'zsky'  ? 'from-sky-500 to-blue-400' :
+    video.provider === 'local' ? 'from-amber-400 via-rose-400 to-fuchsia-500' :
+                                 'from-emerald-500 to-cyan-400'
   const date = new Date(video.createdAt)
   const dateLabel = isNaN(date.getTime()) ? '' : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  const thumb = thumbFromVideo(resolveVideoUrl(video.videoUrl))
+
   return (
     <div className="group relative rounded-xl overflow-hidden border border-gray-800 bg-gray-900/50 hover:bg-gray-900 hover:border-gray-700 transition-all">
       <button onClick={onClick} className="w-full text-left">
-        <div className="relative aspect-[9/16] bg-gradient-to-br from-gray-800/80 to-gray-950 flex items-center justify-center">
-          <PlayCircleOutlined className="text-4xl text-gray-700 group-hover:text-cyan-400 transition-colors" />
+        <div className="relative aspect-[9/16] bg-gradient-to-br from-gray-800/80 to-gray-950 overflow-hidden">
+          {thumb ? (
+            <img src={thumb} alt={video.prompt} loading="lazy"
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <PlayCircleOutlined className="text-4xl text-gray-700" />
+            </div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/0 to-black/30 opacity-100 group-hover:from-black/40 transition-opacity" />
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <PlayCircleOutlined className="text-5xl text-white drop-shadow-lg" />
+          </div>
           <div className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-gradient-to-r ${provColor} text-black`}>
             {video.provider}
           </div>
@@ -460,7 +552,7 @@ const LibraryCard = ({ video, onClick, onDelete }) => {
       <button
         onClick={(e) => { e.stopPropagation(); onDelete?.(video) }}
         title="Delete video"
-        className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full bg-black/60 hover:bg-rose-600 text-gray-300 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
+        className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full bg-black/60 hover:bg-rose-600 text-gray-300 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity z-10">
         <DeleteOutlined className="text-xs" />
       </button>
     </div>
@@ -522,7 +614,8 @@ const LibraryTab = ({ refreshKey }) => {
   const filters = [
     { v: 'all', label: 'All' },
     { v: 'zsky', label: 'ZSky' },
-    { v: 'worker', label: 'My GPU Worker' },
+    { v: 'worker', label: 'GPU Worker' },
+    { v: 'local', label: '5090 Beast' },
   ]
 
   return (
