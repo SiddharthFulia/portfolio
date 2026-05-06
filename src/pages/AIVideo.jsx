@@ -25,7 +25,7 @@ const PROVIDERS = [
   {
     id: 'worker',
     label: 'My GPU Worker',
-    desc: 'ComfyUI on Lightning • LTX-Video • ~3-5min',
+    desc: 'ComfyUI on Lightning • text-to-video only • ~3-5min',
     badge: 'Free',
     accent: 'from-emerald-500 to-cyan-400',
     border: 'border-emerald-500/60',
@@ -34,7 +34,7 @@ const PROVIDERS = [
   {
     id: 'local',
     label: '5090 Beast',
-    desc: 'My RTX 5090 • cinematic + huge models • ~30-60s',
+    desc: 'My RTX 5090 • text + image-to-video • ~30-60s',
     badge: 'Luxury',
     accent: 'from-amber-400 via-rose-400 to-fuchsia-500',
     border: 'border-amber-400/60',
@@ -43,15 +43,65 @@ const PROVIDERS = [
   },
 ]
 
-// Model options per provider. Add new ones once the worker wires the workflow.
+// Model options per provider. Each option gets a 2-line render: name + tagline.
+const modelOpt = (value, name, tagline, disabled = false) => ({
+  value,
+  disabled,
+  label: (
+    <div className="leading-tight py-0.5">
+      <div className="text-sm">{name}</div>
+      <div className="text-[10px] text-gray-500">{tagline}</div>
+    </div>
+  ),
+})
+
+// Per-provider capability map — drives which form fields show.
+// imageUrl: provider can animate a still photo (image-to-video)
+// audio:    provider can attach generated audio
+// style:    provider exposes an explicit style preset (drawing/cinematic/etc.)
+// caption:  provider can auto-write a Reel caption (uses Groq, available everywhere)
+const CAPABILITIES = {
+  zsky:   { imageUrl: true,  audio: true,  style: true,  caption: true },
+  worker: { imageUrl: false, audio: false, style: false, caption: true },
+  local:  { imageUrl: true,  audio: false, style: false, caption: true },
+}
+
+// Per-model overrides for the local provider — finer control than the
+// provider-level CAPABILITIES because individual models have very different
+// requirements (SVD has no prompt, Wan I2V needs an image, etc.).
+//   t2v:           supports text-only generation
+//   i2v:           supports image conditioning
+//   imageRequired: image is mandatory (model is image-only)
+//   prompt:        accepts a text prompt at all
+const MODEL_CAPS = {
+  'ltx-video':   { t2v: true,  i2v: true,  imageRequired: false, prompt: true  },
+  'wan-2.1':     { t2v: true,  i2v: false, imageRequired: false, prompt: true  },
+  'wan-2.1-i2v': { t2v: false, i2v: true,  imageRequired: true,  prompt: true  },
+  'wan-2.2':     { t2v: true,  i2v: true,  imageRequired: false, prompt: true  },
+  'svd':         { t2v: false, i2v: true,  imageRequired: true,  prompt: false },
+  'hunyuan':     { t2v: true,  i2v: false, imageRequired: false, prompt: true  },
+  'mochi':       { t2v: true,  i2v: false, imageRequired: false, prompt: true  },
+}
+
 const MODELS_BY_PROVIDER = {
-  zsky:   [{ value: 'cinematic', label: 'Cinematic' }],
-  worker: [{ value: 'ltx-video', label: 'LTX-Video 2B' }],
-  local:  [
-    { value: 'ltx-video', label: 'LTX-Video 2B  •  fast' },
-    { value: 'wan-2.1',   label: 'Wan 2.1 1.3B  •  cinematic' },
-    { value: 'hunyuan',   label: 'HunyuanVideo  •  coming soon', disabled: true },
-    { value: 'mochi',     label: 'Mochi 1  •  coming soon',      disabled: true },
+  zsky: [
+    modelOpt('cinematic', 'Cinematic', 'film grade, soft motion'),
+    modelOpt('realistic', 'Realistic', 'natural lighting, photo-real'),
+    modelOpt('anime',     'Anime',     'illustrated, stylized'),
+    modelOpt('cartoon',   'Cartoon',   'flat shading, vibrant'),
+  ],
+  worker: [
+    modelOpt('ltx-video', 'LTX-Video 2B', 'balanced quality + speed'),
+  ],
+  local: [
+    modelOpt('ltx-video',   'LTX-Video 2B',     'fast all-rounder • text + image-to-video'),
+    // Models below are wired in code but waiting for their checkpoints to finish downloading
+    modelOpt('wan-2.1',     'Wan 2.1 1.3B',     'downloading umT5 encoder…', true),
+    modelOpt('wan-2.1-i2v', 'Wan 2.1 I2V 14B',  'downloading 14B model…', true),
+    modelOpt('wan-2.2',     'Wan 2.2 5B',       'downloading…', true),
+    modelOpt('svd',         'SVD-XT 1.1',       'downloading…', true),
+    modelOpt('hunyuan',     'HunyuanVideo',     'workflow WIP', true),
+    modelOpt('mochi',       'Mochi 1',          'workflow WIP', true),
   ],
 }
 
@@ -224,11 +274,30 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
   }
 
   const generate = async () => {
-    if (!prompt.trim() || loading) return
+    if (loading) return
+    const caps = CAPABILITIES[provider] || {}
+    const mc = provider === 'local' ? MODEL_CAPS[model] : null
+    const promptNeeded = !mc || mc.prompt !== false
+    const imageNeeded = !!mc?.imageRequired
+    if (promptNeeded && !prompt.trim()) {
+      setError('Prompt is required for this model')
+      return
+    }
+    if (imageNeeded && !imageUrl.trim()) {
+      setError(`This model is image-only — paste a source image URL above`)
+      return
+    }
     setLoading(true); setError(null); setVideo(null); setJob(null)
-    const { data, error: err } = await generateVideo(prompt.trim(), {
-      provider, model, duration, resolution, aspectRatio, style, audio,
-      imageUrl: imageUrl.trim(), generateCaption: withCaption,
+    const { data, error: err } = await generateVideo(prompt.trim() || `(${model} animating image)`, {
+      provider,
+      model,
+      duration,
+      resolution,
+      aspectRatio,
+      style: caps.style ? style : '',
+      audio: caps.audio ? audio : false,
+      imageUrl: caps.imageUrl ? imageUrl.trim() : '',
+      generateCaption: withCaption,
     })
     if (err) { setLoading(false); setError(err); return }
 
@@ -320,46 +389,72 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
                 popupMatchSelectWidth={false}
                 options={MODELS_BY_PROVIDER.local} />
               <p className="text-[10px] text-gray-600 mt-1">
-                LTX-Video and Wan 2.1 are wired today. Hunyuan / Mochi will be added on request.
+                LTX-Video is live now (T2V + I2V). Wan 2.1 / 2.2 / SVD-XT unlock as their downloads complete.
               </p>
             </div>
           )}
         </div>
 
         <div>
-          <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-wider mb-2">2 — Describe your video</p>
-          <Input.TextArea value={prompt} onChange={e => setPrompt(e.target.value)}
-            placeholder="a cat dancing"
-            autoSize={{ minRows: 3, maxRows: 6 }} maxLength={400} showCount />
-
-          <div className="mt-3">
-            <div className="flex items-center justify-between mb-1.5">
-              <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider">Verified prompts</p>
-              <span className="text-[9px] text-emerald-500 font-semibold">✓ pass safety filter</span>
+          {provider === 'local' && MODEL_CAPS[model]?.prompt === false ? (
+            <div className="p-4 rounded-lg bg-gradient-to-br from-amber-500/5 to-rose-500/5 border border-amber-400/20 text-xs text-gray-300">
+              <p className="font-semibold text-amber-200 mb-1">No prompt needed for SVD-XT</p>
+              <p className="text-gray-400 leading-relaxed">
+                SVD-XT animates the source image directly using motion priors. Skip the prompt and
+                paste an image URL below.
+              </p>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-              {PROMPT_PRESETS.map(p => {
-                const active = prompt === p
-                return (
-                  <button key={p} onClick={() => setPrompt(p)}
-                    className={`px-3 py-2 text-left text-xs rounded-lg transition-colors break-words whitespace-normal leading-snug ${
-                      active ? 'bg-cyan-600/20 text-cyan-200 border border-cyan-500/50'
-                             : 'bg-gray-800 hover:bg-gray-700 text-gray-300 border border-transparent'
-                    }`}>
-                    {p}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+          ) : (
+            <>
+              <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-wider mb-2">2 — Describe your video</p>
+              <Input.TextArea value={prompt} onChange={e => setPrompt(e.target.value)}
+                placeholder="a cat dancing"
+                autoSize={{ minRows: 3, maxRows: 6 }} maxLength={400} showCount />
 
-          <div className="mt-3">
-            <label className="text-[10px] text-gray-500 block mb-1 uppercase tracking-wider">
-              Image URL <span className="text-gray-700 normal-case">— optional, animates a still photo (ZSky only)</span>
-            </label>
-            <Input value={imageUrl} onChange={e => setImageUrl(e.target.value)}
-              placeholder="https://example.com/photo.jpg" allowClear />
-          </div>
+              <div className="mt-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider">Verified prompts</p>
+                  <span className="text-[9px] text-emerald-500 font-semibold">✓ pass safety filter</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  {PROMPT_PRESETS.map(p => {
+                    const active = prompt === p
+                    return (
+                      <button key={p} onClick={() => setPrompt(p)}
+                        className={`px-3 py-2 text-left text-xs rounded-lg transition-colors break-words whitespace-normal leading-snug ${
+                          active ? 'bg-cyan-600/20 text-cyan-200 border border-cyan-500/50'
+                                 : 'bg-gray-800 hover:bg-gray-700 text-gray-300 border border-transparent'
+                        }`}>
+                        {p}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+
+          {(() => {
+            const mc = provider === 'local' ? MODEL_CAPS[model] : null
+            const provImg = CAPABILITIES[provider]?.imageUrl
+            // Show field if provider supports i2v AND (no model gating OR model supports i2v)
+            const showImage = provImg && (!mc || mc.i2v)
+            if (!showImage) return null
+            const required = mc?.imageRequired
+            return (
+              <div className="mt-3">
+                <label className="text-[10px] text-gray-500 block mb-1 uppercase tracking-wider">
+                  Image URL
+                  <span className={`normal-case ml-1 ${required ? 'text-rose-400' : 'text-gray-700'}`}>
+                    — {required ? 'required for this model' : 'optional, animates a still photo'}
+                  </span>
+                </label>
+                <Input value={imageUrl} onChange={e => setImageUrl(e.target.value)}
+                  placeholder="https://example.com/photo.jpg" allowClear
+                  status={required && !imageUrl.trim() ? 'warning' : undefined} />
+              </div>
+            )
+          })()}
         </div>
 
         <div>
@@ -384,19 +479,21 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
                   { value: '1080p', label: '1080p' },
                 ]} />
             </div>
-            <div>
-              <label className="text-[10px] text-gray-500 block mb-1 uppercase tracking-wider">Style</label>
-              <Select size="middle" value={style} onChange={setStyle} style={{ width: '100%' }}
-                popupMatchSelectWidth={false}
-                options={[
-                  { value: 'cinematic', label: 'Cinematic' },
-                  { value: 'realistic', label: 'Realistic' },
-                  { value: 'anime', label: 'Anime' },
-                  { value: '3d render', label: '3D Render' },
-                  { value: 'cyberpunk', label: 'Cyberpunk' },
-                  { value: 'oil painting', label: 'Oil Painting' },
-                ]} />
-            </div>
+            {CAPABILITIES[provider]?.style && (
+              <div>
+                <label className="text-[10px] text-gray-500 block mb-1 uppercase tracking-wider">Style</label>
+                <Select size="middle" value={style} onChange={setStyle} style={{ width: '100%' }}
+                  popupMatchSelectWidth={false}
+                  options={[
+                    { value: 'cinematic', label: 'Cinematic' },
+                    { value: 'realistic', label: 'Realistic' },
+                    { value: 'anime', label: 'Anime' },
+                    { value: '3d render', label: '3D Render' },
+                    { value: 'cyberpunk', label: 'Cyberpunk' },
+                    { value: 'oil painting', label: 'Oil Painting' },
+                  ]} />
+              </div>
+            )}
             <div>
               <label className="text-[10px] text-gray-500 block mb-1 uppercase tracking-wider">Duration</label>
               <Select size="middle" value={duration} onChange={setDuration} style={{ width: '100%' }}
@@ -407,13 +504,15 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
                   { value: 10, label: '10s' },
                 ]} />
             </div>
-            <div className="col-span-2 sm:col-span-1">
-              <label className="text-[10px] text-gray-500 block mb-1 uppercase tracking-wider">Audio</label>
-              <div className="h-[36px] flex items-center px-3 rounded-md bg-gray-900/60 border border-gray-800">
-                <Switch checked={audio} onChange={setAudio} size="small" />
-                <span className="ml-2 text-xs text-gray-400">{audio ? 'on' : 'off'}</span>
+            {CAPABILITIES[provider]?.audio && (
+              <div className="col-span-2 sm:col-span-1">
+                <label className="text-[10px] text-gray-500 block mb-1 uppercase tracking-wider">Audio</label>
+                <div className="h-[36px] flex items-center px-3 rounded-md bg-gray-900/60 border border-gray-800">
+                  <Switch checked={audio} onChange={setAudio} size="small" />
+                  <span className="ml-2 text-xs text-gray-400">{audio ? 'on' : 'off'}</span>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           <label className="flex items-center justify-between p-3 rounded-lg bg-gray-900/60 border border-gray-800 cursor-pointer mt-3">
@@ -423,17 +522,24 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
         </div>
 
         <Button type="primary" size="large" block onClick={generate} loading={loading}
-          disabled={!prompt.trim()} icon={<ThunderboltOutlined />}
+          disabled={(() => {
+            const mc = provider === 'local' ? MODEL_CAPS[model] : null
+            const promptNeeded = !mc || mc.prompt !== false
+            const imageNeeded = !!mc?.imageRequired
+            if (promptNeeded && !prompt.trim()) return true
+            if (imageNeeded && !imageUrl.trim()) return true
+            return false
+          })()}
+          icon={<ThunderboltOutlined />}
           style={{ height: 52, background: 'linear-gradient(135deg, #7c3aed, #06b6d4, #f59e0b)', border: 'none', fontWeight: 700, fontSize: 15 }}>
           {loading ? 'Generating…' : 'Generate Video'}
         </Button>
 
-        <div className="p-3 rounded-lg bg-gray-900/40 border border-gray-800 flex items-start gap-2">
-          <InfoCircleOutlined className="text-gray-500 mt-0.5" />
-          <div className="text-[11px] text-gray-500 leading-relaxed">
-            <span className="text-gray-300 font-semibold">My GPU Worker</span> queues your request and renders
-            it on a dedicated ComfyUI rig — appears in the Library when ready.{' '}
-            <span className="text-gray-300 font-semibold">ZSky</span> is hosted but requires a Pro API key.
+        <div className="p-3 rounded-lg bg-gradient-to-br from-amber-500/5 via-rose-500/5 to-fuchsia-500/5 border border-amber-400/20 flex items-start gap-2">
+          <InfoCircleOutlined className="text-amber-400/80 mt-0.5" />
+          <div className="text-[11px] text-gray-400 leading-relaxed">
+            <span className="text-amber-300 font-semibold">5090 Beast</span> is the exclusive luxe path — when it's online, your video renders in seconds on Siddharth's personal RTX 5090 with the latest open-source models.
+            Status dot on each card shows what's live right now.
           </div>
         </div>
       </div>
@@ -727,13 +833,13 @@ const AIVideo = () => {
         <div className="relative max-w-6xl mx-auto px-5 sm:px-6 pt-28 sm:pt-32 pb-8">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gray-800/60 border border-gray-700 backdrop-blur-sm mb-3">
             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-            <span className="text-[11px] uppercase tracking-wider text-gray-300 font-semibold">2 providers • free</span>
+            <span className="text-[11px] uppercase tracking-wider text-gray-300 font-semibold">3 providers • free</span>
           </div>
           <h1 className="font-poppins font-black text-4xl sm:text-5xl md:text-6xl bg-gradient-to-r from-cyan-300 via-purple-300 to-amber-300 bg-clip-text text-transparent leading-tight mb-2">
             AI Video Studio
           </h1>
           <p className="text-gray-400 text-sm sm:text-base max-w-xl">
-            Type a prompt → get a Reel-style video. ZSky for instant results, my GPU worker for full open-source ComfyUI rendering.
+            Type a prompt → get a Reel-style video. ZSky for instant results, GPU Worker for queued open-source ComfyUI, or my 5090 Beast for fast text + image-to-video.
           </p>
         </div>
       </div>
