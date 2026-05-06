@@ -93,21 +93,23 @@ export async function editImage(image, prompt, options = {}) {
 
 export async function generateVideo(prompt, options = {}) {
   try {
+    const provider = options.provider || 'zsky';
+    // ZSky is sync (~60-90s); worker is async (returns instantly).
+    const timeout = provider === 'zsky' ? 5 * 60 * 1000 : 30000;
     const data = await post(
       ENDPOINTS.AI_VIDEO_GENERATE,
       {
         prompt,
-        provider: options.provider || 'auto',
-        model: options.model,
+        provider,
         duration: options.duration || 5,
-        resolution: options.resolution || '1080p',
+        resolution: options.resolution || '720p',
         aspectRatio: options.aspectRatio || '9:16',
         style: options.style || 'cinematic',
         audio: options.audio !== false,
         imageUrl: options.imageUrl || '',
         generateCaption: options.generateCaption !== false,
       },
-      { timeout: 30000 }
+      { timeout }
     );
     return { data: data?.data || data, error: null };
   } catch (err) {
@@ -119,6 +121,22 @@ export async function getJobStatus(jobId) {
   try {
     const data = await get(`${ENDPOINTS.AI_VIDEO_STATUS}/${jobId}`, {}, { timeout: 6000 });
     return { data: data?.data || null, error: null };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+}
+
+export async function deleteVideo(videoId) {
+  try {
+    const url = `${import.meta.env.VITE_BE_URL || 'http://localhost:4001'}/api/ai-video/${encodeURIComponent(videoId)}`;
+    const res = await fetch(url, { method: 'DELETE' });
+    if (!res.ok) {
+      let msg = `Delete failed: ${res.status}`;
+      try { const b = await res.json(); if (b?.message) msg = b.message; } catch {}
+      throw new Error(msg);
+    }
+    const data = await res.json();
+    return { data: data?.data || data, error: null };
   } catch (err) {
     return { data: null, error: err.message };
   }
@@ -142,12 +160,28 @@ export async function getTodayVideo() {
   }
 }
 
-export async function listVideos(limit = 12) {
+export async function listVideos(opts = {}) {
   try {
-    const data = await get(ENDPOINTS.AI_VIDEO_LIST, { limit }, { timeout: 6000 });
-    return { data: data?.data || [], error: null };
+    const params = {
+      page: opts.page || 1,
+      limit: opts.limit || 12,
+    };
+    if (opts.provider) params.provider = opts.provider;
+    const data = await get(ENDPOINTS.AI_VIDEO_LIST, params, { timeout: 6000 });
+    const payload = data?.data || {};
+    return {
+      data: {
+        items: Array.isArray(payload.items) ? payload.items : [],
+        total: payload.total || 0,
+        page: payload.page || 1,
+        limit: payload.limit || params.limit,
+        pages: payload.pages || 1,
+        hasMore: !!payload.hasMore,
+      },
+      error: null,
+    };
   } catch (err) {
-    return { data: [], error: err.message };
+    return { data: { items: [], total: 0, page: 1, limit: 12, pages: 1, hasMore: false }, error: err.message };
   }
 }
 
