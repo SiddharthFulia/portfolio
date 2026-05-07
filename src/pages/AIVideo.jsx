@@ -614,7 +614,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
 }
 
 // ─── Library tab — paginated, no eager video loads ─────────
-const LibraryCard = ({ video, onClick, onDelete }) => {
+const LibraryCard = ({ video, onClick, onDelete, selectMode, isSelected, onToggleSelect }) => {
   const provColor =
     video.provider === 'zsky'  ? 'from-sky-500 to-blue-400' :
     video.provider === 'local' ? 'from-amber-400 via-rose-400 to-fuchsia-500' :
@@ -623,28 +623,50 @@ const LibraryCard = ({ video, onClick, onDelete }) => {
   const dateLabel = isNaN(date.getTime()) ? '' : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
   const thumb = thumbFromVideo(resolveVideoUrl(video.videoUrl))
 
+  const handleClick = () => {
+    if (selectMode) onToggleSelect?.(video.videoId)
+    else onClick?.()
+  }
+
   return (
-    <div className="group relative rounded-xl overflow-hidden border border-gray-800 bg-gray-900/50 hover:bg-gray-900 hover:border-gray-700 transition-all">
-      <button onClick={onClick} className="w-full text-left">
+    <div className={`group relative rounded-xl overflow-hidden border bg-gray-900/50 hover:bg-gray-900 transition-all ${
+      isSelected
+        ? 'border-cyan-400 ring-2 ring-cyan-400/40'
+        : 'border-gray-800 hover:border-gray-700'
+    }`}>
+      <button onClick={handleClick} className="w-full text-left">
         <div className="relative aspect-[9/16] bg-gradient-to-br from-gray-800/80 to-gray-950 overflow-hidden">
           {thumb ? (
             <img src={thumb} alt={video.prompt} loading="lazy"
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+              className={`w-full h-full object-cover transition-transform duration-300 ${
+                isSelected ? 'scale-95 opacity-80' : 'group-hover:scale-105'
+              }`} />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <PlayCircleOutlined className="text-4xl text-gray-700" />
             </div>
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/0 to-black/30 opacity-100 group-hover:from-black/40 transition-opacity" />
-          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-            <PlayCircleOutlined className="text-5xl text-white drop-shadow-lg" />
-          </div>
+          {!selectMode && (
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <PlayCircleOutlined className="text-5xl text-white drop-shadow-lg" />
+            </div>
+          )}
           <div className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-gradient-to-r ${provColor} text-black`}>
             {video.provider}
           </div>
           {dateLabel && (
             <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full text-[9px] bg-black/60 text-gray-300 border border-white/10">
               {dateLabel}
+            </div>
+          )}
+          {selectMode && (
+            <div className={`absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-md border-2 transition-all ${
+              isSelected
+                ? 'bg-cyan-400 border-cyan-400 text-black'
+                : 'bg-black/60 border-white/40 text-transparent'
+            }`}>
+              <CheckOutlined className="text-[12px] font-bold" />
             </div>
           )}
         </div>
@@ -654,12 +676,14 @@ const LibraryCard = ({ video, onClick, onDelete }) => {
           </p>
         </div>
       </button>
-      <button
-        onClick={(e) => { e.stopPropagation(); onDelete?.(video) }}
-        title="Delete video"
-        className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full bg-black/60 hover:bg-rose-600 text-gray-300 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity z-10">
-        <DeleteOutlined className="text-xs" />
-      </button>
+      {!selectMode && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete?.(video) }}
+          title="Delete video"
+          className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full bg-black/60 hover:bg-rose-600 text-gray-300 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity z-10">
+          <DeleteOutlined className="text-xs" />
+        </button>
+      )}
     </div>
   )
 }
@@ -672,6 +696,65 @@ const LibraryTab = ({ refreshKey }) => {
   const [selected, setSelected] = useState(null)
   const [deleting, setDeleting] = useState(null)
   const [internalReload, setInternalReload] = useState(0)
+  // Multi-select state
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState(() => new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+
+  // Reset selection when leaving select mode or paging
+  useEffect(() => { if (!selectMode) setSelectedIds(new Set()) }, [selectMode])
+  useEffect(() => { setSelectedIds(new Set()) }, [page, filter, refreshKey])
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const selectAllOnPage = () => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      data.items.forEach(it => next.add(it.videoId))
+      return next
+    })
+  }
+
+  const clearSelection = () => setSelectedIds(new Set())
+
+  const askDeleteSelected = () => {
+    const ids = [...selectedIds]
+    if (ids.length === 0) return
+    Modal.confirm({
+      title: `Delete ${ids.length} video${ids.length === 1 ? '' : 's'}?`,
+      content: (
+        <p className="text-xs text-gray-500">
+          Permanently removes them from Cloudinary. Can't be undone.
+        </p>
+      ),
+      okText: `Delete ${ids.length}`,
+      okButtonProps: { danger: true },
+      cancelText: 'Keep',
+      centered: true,
+      onOk: async () => {
+        setBulkDeleting(true)
+        const results = await Promise.allSettled(ids.map(id => deleteVideo(id)))
+        const failed = results.filter(r => r.status === 'rejected' || r.value?.error)
+        setBulkDeleting(false)
+        setSelectedIds(new Set())
+        setSelectMode(false)
+        setInternalReload(n => n + 1)
+        if (failed.length > 0) {
+          Modal.error({
+            title: `${failed.length} of ${ids.length} failed to delete`,
+            content: 'The rest were removed. Check console for details.',
+          })
+        }
+      },
+    })
+  }
 
   useEffect(() => { setPage(1) }, [filter, refreshKey])
 
@@ -723,6 +806,8 @@ const LibraryTab = ({ refreshKey }) => {
     { v: 'local', label: '5090 Beast' },
   ]
 
+  const allOnPageSelected = data.items.length > 0 && data.items.every(it => selectedIds.has(it.videoId))
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -737,8 +822,36 @@ const LibraryTab = ({ refreshKey }) => {
             </button>
           ))}
         </div>
-        <div className="text-[11px] text-gray-500">
-          {data.total > 0 ? `${data.total} video${data.total === 1 ? '' : 's'}` : ''}
+        <div className="flex items-center gap-2 flex-wrap">
+          {!selectMode ? (
+            <>
+              <span className="text-[11px] text-gray-500">
+                {data.total > 0 ? `${data.total} video${data.total === 1 ? '' : 's'}` : ''}
+              </span>
+              {data.items.length > 0 && (
+                <Button size="small" onClick={() => setSelectMode(true)}>Select</Button>
+              )}
+            </>
+          ) : (
+            <>
+              <span className="text-[11px] text-cyan-300">
+                {selectedIds.size} selected
+              </span>
+              <Button size="small" onClick={allOnPageSelected ? clearSelection : selectAllOnPage}>
+                {allOnPageSelected ? 'Clear' : 'Select all on page'}
+              </Button>
+              <Button size="small" danger
+                disabled={selectedIds.size === 0}
+                loading={bulkDeleting}
+                icon={<DeleteOutlined />}
+                onClick={askDeleteSelected}>
+                Delete ({selectedIds.size})
+              </Button>
+              <Button size="small" type="text" onClick={() => setSelectMode(false)}>
+                Cancel
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -775,6 +888,9 @@ const LibraryTab = ({ refreshKey }) => {
                 video={item}
                 onClick={() => setSelected(item)}
                 onDelete={askDelete}
+                selectMode={selectMode}
+                isSelected={selectedIds.has(item.videoId)}
+                onToggleSelect={toggleSelect}
               />
             ))}
           </div>
