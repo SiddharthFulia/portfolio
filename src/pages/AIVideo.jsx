@@ -79,7 +79,7 @@ const MODEL_CAPS = {
   'wan-2.1-i2v': { t2v: false, i2v: true,  imageRequired: true,  prompt: true  },
   'wan-2.2':     { t2v: true,  i2v: true,  imageRequired: false, prompt: true  },
   'svd':         { t2v: false, i2v: true,  imageRequired: true,  prompt: false },
-  'hunyuan':     { t2v: true,  i2v: false, imageRequired: false, prompt: true  },
+  'hunyuan':     { t2v: true,  i2v: true,  imageRequired: false, prompt: true  },
   'mochi':       { t2v: true,  i2v: false, imageRequired: false, prompt: true  },
 }
 
@@ -97,10 +97,10 @@ const MODELS_BY_PROVIDER = {
     modelOpt('ltx-video',   'LTX-Video 2B',     'fast all-rounder • text + image-to-video'),
     modelOpt('wan-2.1',     'Wan 2.1 1.3B',     'cinematic motion, T2V only'),
     modelOpt('wan-2.1-i2v', 'Wan 2.1 I2V 14B',  'top quality I2V • 14B model'),
-    modelOpt('hunyuan',     'HunyuanVideo',     'Tencent • highest fidelity T2V'),
+    modelOpt('hunyuan',     'HunyuanVideo',     'Tencent • highest fidelity T2V + I2V'),
     modelOpt('wan-2.2',     'Wan 2.2 5B',       'newest gen TI2V • text + image'),
     modelOpt('mochi',       'Mochi 1',          'Apache-2 license • distinctive style'),
-    modelOpt('svd',         'SVD-XT 1.1',       'gated — needs HF login', true),
+    modelOpt('svd',         'SVD-XT 1.1',       'image-only animation, no prompt'),
   ],
 }
 
@@ -388,7 +388,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
                 popupMatchSelectWidth={false}
                 options={MODELS_BY_PROVIDER.local} />
               <p className="text-[10px] text-gray-600 mt-1">
-                7 models wired. Each becomes available the moment its checkpoint finishes downloading on the 5090.
+                7 models live: LTX, Wan 2.1, Wan 2.1 I2V, Wan 2.2, Hunyuan, Mochi, SVD-XT.
               </p>
             </div>
           )}
