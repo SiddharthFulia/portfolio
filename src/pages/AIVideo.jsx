@@ -85,6 +85,18 @@ const MODEL_CAPS = {
   'mochi':       { t2v: true,  i2v: false, imageRequired: false, prompt: true  },
 }
 
+// Recommended step counts per model. Auto-applied when the user picks a model;
+// the user can still override via the Steps dropdown.
+const MODEL_DEFAULT_STEPS = {
+  'ltx-video':   30,   // template default
+  'wan-2.1':     30,
+  'wan-2.1-i2v': 30,
+  'wan-2.2':     20,   // Wan 2.2 official template uses 20
+  'svd':         25,
+  'hunyuan':     20,   // Hunyuan template default; higher hurts a lot
+  'mochi':       30,
+}
+
 const MODELS_BY_PROVIDER = {
   zsky: [
     modelOpt('cinematic', 'Cinematic', 'film grade, soft motion'),
@@ -218,6 +230,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
   const [aspectRatio, setAspectRatio] = useState('9:16')
   const [style, setStyle] = useState('cinematic')
   const [audio, setAudio] = useState(true)
+  const [steps, setSteps] = useState(30)
   const [withCaption, setWithCaption] = useState(true)
   const [imageUrl, setImageUrl] = useState('')
 
@@ -269,6 +282,14 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
     if (firstUsable) setModel(firstUsable.value)
   }, [provider])
 
+  // Auto-update step count to the model's recommended default when model changes.
+  // (User can still override via the Steps dropdown afterwards.)
+  useEffect(() => {
+    if (provider !== 'local') return
+    const def = MODEL_DEFAULT_STEPS[model]
+    if (def) setSteps(def)
+  }, [model, provider])
+
   const startPolling = (jobId) => {
     if (pollTimer.current) clearInterval(pollTimer.current)
     let attempts = 0
@@ -318,6 +339,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
       duration,
       resolution,
       aspectRatio,
+      steps,
       style: caps.style ? style : '',
       audio: caps.audio ? audio : false,
       imageUrl: caps.imageUrl ? imageUrl.trim() : '',
@@ -548,6 +570,19 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
                   { value: 10, label: '10s' },
                 ]} />
             </div>
+            {provider === 'local' && (
+              <div>
+                <label className="text-[10px] text-gray-500 block mb-1 uppercase tracking-wider">Steps</label>
+                <Select size="middle" value={steps} onChange={setSteps} style={{ width: '100%' }}
+                  popupMatchSelectWidth={false}
+                  options={[
+                    { value: 20, label: '20 — fast' },
+                    { value: 30, label: '30 — default' },
+                    { value: 40, label: '40 — sharper' },
+                    { value: 50, label: '50 — slow, max quality' },
+                  ]} />
+              </div>
+            )}
             {CAPABILITIES[provider]?.audio && (
               <div className="col-span-2 sm:col-span-1">
                 <label className="text-[10px] text-gray-500 block mb-1 uppercase tracking-wider">Audio</label>

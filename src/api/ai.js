@@ -105,6 +105,7 @@ export async function generateVideo(prompt, options = {}) {
         duration: options.duration || 5,
         resolution: options.resolution || '720p',
         aspectRatio: options.aspectRatio || '9:16',
+        steps: options.steps || 30,
         style: options.style || 'cinematic',
         audio: options.audio !== false,
         imageUrl: options.imageUrl || '',
