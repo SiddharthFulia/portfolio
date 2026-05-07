@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Input, Button, Select, Switch, Tabs, Modal } from 'antd'
+import { Input, Button, Select, Switch, Tabs, Modal, Upload, message as antMessage } from 'antd'
 import {
   VideoCameraOutlined, ThunderboltOutlined, CopyOutlined, CheckOutlined,
   DownloadOutlined, ReloadOutlined, LinkOutlined, InfoCircleOutlined, AppstoreOutlined,
@@ -7,7 +7,9 @@ import {
 } from '@ant-design/icons'
 import {
   generateVideo, getJobStatus, getTodayVideo, getVideoProviders, listVideos, deleteVideo,
+  uploadSourceImage,
 } from '../api/ai'
+import { UploadOutlined } from '@ant-design/icons'
 import { DeleteOutlined } from '@ant-design/icons'
 
 const BE_URL = import.meta.env.VITE_BE_URL || 'http://localhost:4001'
@@ -226,7 +228,30 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
   const [workerOnline, setWorkerOnline] = useState(false)
   const [localOnline, setLocalOnline] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
   const pollTimer = useRef(null)
+
+  // Upload a local file → BE → Cloudinary → set imageUrl to the returned URL.
+  // Cloudinary auto-converts HEIC, WEBP, BMP, etc. to JPG when delivered, so any
+  // browser-readable image works with the worker downstream.
+  const handleImageUpload = async (file) => {
+    if (!file) return false
+    if (file.size > 25 * 1024 * 1024) {
+      antMessage.error('Image too large (max 25 MB)')
+      return false
+    }
+    setUploadingImage(true)
+    setError(null)
+    const { data, error: err } = await uploadSourceImage(file)
+    setUploadingImage(false)
+    if (err) {
+      antMessage.error(`Upload failed: ${err}`)
+      return false
+    }
+    setImageUrl(data.url)
+    antMessage.success('Image uploaded')
+    return false   // false = don't let antd Upload also do its own POST
+  }
 
   useEffect(() => {
     getVideoProviders().then(({ data }) => {
@@ -436,21 +461,41 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
           {(() => {
             const mc = provider === 'local' ? MODEL_CAPS[model] : null
             const provImg = CAPABILITIES[provider]?.imageUrl
-            // Show field if provider supports i2v AND (no model gating OR model supports i2v)
             const showImage = provImg && (!mc || mc.i2v)
             if (!showImage) return null
             const required = mc?.imageRequired
             return (
               <div className="mt-3">
                 <label className="text-[10px] text-gray-500 block mb-1 uppercase tracking-wider">
-                  Image URL
+                  Source image
                   <span className={`normal-case ml-1 ${required ? 'text-rose-400' : 'text-gray-700'}`}>
-                    — {required ? 'required for this model' : 'optional, animates a still photo'}
+                    — {required ? 'required' : 'optional, animates a still photo'}
                   </span>
                 </label>
-                <Input value={imageUrl} onChange={e => setImageUrl(e.target.value)}
-                  placeholder="https://example.com/photo.jpg" allowClear
-                  status={required && !imageUrl.trim() ? 'warning' : undefined} />
+                <div className="flex gap-2">
+                  <Input value={imageUrl} onChange={e => setImageUrl(e.target.value)}
+                    placeholder="paste a URL or upload from your device →" allowClear
+                    status={required && !imageUrl.trim() ? 'warning' : undefined} />
+                  <Upload
+                    accept="image/*,.heic,.heif"
+                    showUploadList={false}
+                    beforeUpload={handleImageUpload}>
+                    <Button icon={<UploadOutlined />} loading={uploadingImage}>
+                      {uploadingImage ? 'Uploading' : 'Upload'}
+                    </Button>
+                  </Upload>
+                </div>
+                {imageUrl && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <img src={imageUrl} alt="source preview"
+                      className="w-16 h-16 object-cover rounded-md border border-gray-700"
+                      onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                    <span className="text-[10px] text-gray-500 break-all">{imageUrl.slice(0, 80)}{imageUrl.length > 80 ? '…' : ''}</span>
+                  </div>
+                )}
+                <p className="text-[10px] text-gray-600 mt-1">
+                  Accepts JPG, PNG, WEBP, HEIC, BMP — any image your browser can read.
+                </p>
               </div>
             )
           })()}

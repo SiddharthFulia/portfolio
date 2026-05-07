@@ -20,6 +20,7 @@ export const ENDPOINTS = {
   AI_VIDEO_TODAY: '/api/ai-video/today',
   AI_VIDEO_LIST: '/api/ai-video/list',
   AI_VIDEO_PROVIDERS: '/api/ai-video/providers',
+  AI_VIDEO_UPLOAD_IMAGE: '/api/ai-video/upload-image',
 
   // Vision
   FACE_ANALYZE: '/api/face-analyze',

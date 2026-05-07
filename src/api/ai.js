@@ -117,6 +117,27 @@ export async function generateVideo(prompt, options = {}) {
   }
 }
 
+// Reads a File (or Blob) into a base64 data URL the BE can pass to Cloudinary.
+// Supports any image type the browser can read (JPG, PNG, WEBP, GIF, BMP, HEIC if browser supports).
+export function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error || new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
+export async function uploadSourceImage(file) {
+  try {
+    const dataUrl = await fileToDataUrl(file);
+    const data = await post(ENDPOINTS.AI_VIDEO_UPLOAD_IMAGE, { dataUrl }, { timeout: 60000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+}
+
 export async function getJobStatus(jobId) {
   try {
     const data = await get(`${ENDPOINTS.AI_VIDEO_STATUS}/${jobId}`, {}, { timeout: 6000 });
