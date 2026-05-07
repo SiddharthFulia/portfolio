@@ -101,6 +101,7 @@ export async function generateVideo(prompt, options = {}) {
       {
         prompt,
         provider,
+        model: options.model,
         duration: options.duration || 5,
         resolution: options.resolution || '720p',
         aspectRatio: options.aspectRatio || '9:16',
