@@ -110,6 +110,7 @@ export async function generateVideo(prompt, options = {}) {
         audio: options.audio !== false,
         imageUrl: options.imageUrl || '',
         generateCaption: options.generateCaption !== false,
+        mode: options.mode,
       },
       { timeout }
     );

@@ -26,12 +26,23 @@ const PROVIDERS = [
   },
   {
     id: 'worker',
-    label: 'My GPU Worker',
-    desc: 'ComfyUI on Lightning • text-to-video only • ~3-5min',
-    badge: 'Free',
+    label: 'GPU Worker',
+    desc: 'ComfyUI on Lightning • offline for now',
+    badge: 'Off',
     accent: 'from-emerald-500 to-cyan-400',
     border: 'border-emerald-500/60',
     glow: 'shadow-emerald-500/20',
+    disabled: true,
+  },
+  {
+    id: 'optimized',
+    label: '5090 Optimized',
+    desc: 'Speed-tuned • LTX distilled / Wan 2.2 / cache acceleration',
+    badge: 'Fast',
+    accent: 'from-cyan-300 via-fuchsia-400 to-purple-500',
+    border: 'border-cyan-300/60',
+    glow: 'shadow-cyan-300/30',
+    luxe: true,
   },
   {
     id: 'local',
@@ -63,9 +74,10 @@ const modelOpt = (value, name, tagline, disabled = false) => ({
 // style:    provider exposes an explicit style preset (drawing/cinematic/etc.)
 // caption:  provider can auto-write a Reel caption (uses Groq, available everywhere)
 const CAPABILITIES = {
-  zsky:   { imageUrl: true,  audio: true,  style: true,  caption: true },
-  worker: { imageUrl: false, audio: false, style: false, caption: true },
-  local:  { imageUrl: true,  audio: false, style: false, caption: true },
+  zsky:      { imageUrl: true,  audio: true,  style: true,  caption: true },
+  worker:    { imageUrl: false, audio: false, style: false, caption: true },
+  local:     { imageUrl: true,  audio: false, style: false, caption: true },
+  optimized: { imageUrl: true,  audio: false, style: false, caption: true },
 }
 
 // Per-model overrides for the local provider — finer control than the
@@ -76,6 +88,7 @@ const CAPABILITIES = {
 //   imageRequired: image is mandatory (model is image-only)
 //   prompt:        accepts a text prompt at all
 const MODEL_CAPS = {
+  'ltx-distilled': { t2v: true, i2v: true, imageRequired: false, prompt: true },
   'ltx-video':   { t2v: true,  i2v: true,  imageRequired: false, prompt: true  },
   'wan-2.1':     { t2v: true,  i2v: false, imageRequired: false, prompt: true  },
   'wan-2.1-i2v': { t2v: false, i2v: true,  imageRequired: true,  prompt: true  },
@@ -84,6 +97,31 @@ const MODEL_CAPS = {
   'hunyuan':     { t2v: true,  i2v: true,  imageRequired: false, prompt: true  },
   'mochi':       { t2v: true,  i2v: false, imageRequired: false, prompt: true  },
 }
+
+// Speed modes for the '5090 Optimized' provider — each picks a model + sane defaults.
+const OPTIMIZED_MODES = [
+  {
+    id: 'preview',
+    label: 'Fast Preview',
+    desc: 'LTX distilled • 8 steps • ~10-25 sec',
+    target: '~15s',
+    accent: 'from-cyan-300 to-blue-400',
+  },
+  {
+    id: 'balanced',
+    label: 'Balanced',
+    desc: 'Wan 2.2 5B • 14 steps • ~30-90 sec',
+    target: '~60s',
+    accent: 'from-fuchsia-400 to-purple-500',
+  },
+  {
+    id: 'quality',
+    label: 'Quality',
+    desc: 'HunyuanVideo • 20 steps • 2-8 min',
+    target: '~3min',
+    accent: 'from-amber-400 via-rose-400 to-fuchsia-500',
+  },
+]
 
 // Recommended step counts per model. Auto-applied when the user picks a model;
 // the user can still override via the Steps dropdown.
@@ -297,6 +335,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
   const [steps, setSteps] = useState(30)
   const [withCaption, setWithCaption] = useState(true)
   const [imageUrl, setImageUrl] = useState('')
+  const [optimizedMode, setOptimizedMode] = useState('balanced')   // preview | balanced | quality
 
   const [loading, setLoading] = useState(false)
   const [job, setJob] = useState(null)
@@ -408,6 +447,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
       audio: caps.audio ? audio : false,
       imageUrl: caps.imageUrl ? imageUrl.trim() : '',
       generateCaption: withCaption,
+      mode: provider === 'optimized' ? optimizedMode : undefined,
     })
     if (err) { setLoading(false); setError(err); return }
 
@@ -457,12 +497,16 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
               const active = provider === p.id
               const isOnline = p.id === 'worker' ? workerOnline : p.id === 'local' ? localOnline : null
               return (
-                <button key={p.id} onClick={() => setProvider(p.id)} type="button"
+                <button key={p.id} onClick={() => !p.disabled && setProvider(p.id)} type="button"
                   aria-pressed={active}
+                  aria-disabled={!!p.disabled}
+                  disabled={!!p.disabled}
                   className={`relative p-4 rounded-xl border text-left transition-all duration-200 overflow-hidden ${
-                    active
-                      ? `border-2 ${p.border.replace('/60', '')} bg-gray-900 shadow-xl ${p.glow.replace('/20', '/40')} scale-[1.02] ring-1 ring-white/5`
-                      : 'border-2 border-gray-800 bg-gray-900/40 hover:bg-gray-900 hover:border-gray-700 hover:scale-[1.01]'
+                    p.disabled
+                      ? 'border-2 border-gray-900 bg-gray-900/30 opacity-50 cursor-not-allowed grayscale'
+                      : active
+                        ? `border-2 ${p.border.replace('/60', '')} bg-gray-900 shadow-xl ${p.glow.replace('/20', '/40')} scale-[1.02] ring-1 ring-white/5`
+                        : 'border-2 border-gray-800 bg-gray-900/40 hover:bg-gray-900 hover:border-gray-700 hover:scale-[1.01]'
                   }`}>
                   {p.luxe && (
                     <div aria-hidden className={`absolute inset-0 pointer-events-none opacity-30 bg-gradient-to-br ${p.accent} mix-blend-overlay`} />
@@ -500,6 +544,43 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
                 options={MODELS_BY_PROVIDER.local} />
               <p className="text-[10px] text-gray-600 mt-1">
                 7 models live: LTX, Wan 2.1, Wan 2.1 I2V, Wan 2.2, Hunyuan, Mochi, SVD-XT.
+              </p>
+            </div>
+          )}
+
+          {provider === 'optimized' && (
+            <div className="mt-3 space-y-2">
+              <label className="text-[10px] text-gray-500 block uppercase tracking-wider">
+                Speed mode
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {OPTIMIZED_MODES.map(m => {
+                  const active = optimizedMode === m.id
+                  return (
+                    <button key={m.id} onClick={() => setOptimizedMode(m.id)} type="button"
+                      className={`p-2.5 rounded-lg border text-left transition-all ${
+                        active
+                          ? `border-cyan-300/70 bg-gradient-to-br ${m.accent} bg-opacity-10 shadow-md`
+                          : 'border-gray-800 bg-gray-900/40 hover:border-gray-700 hover:bg-gray-900'
+                      }`}>
+                      <div className="flex items-baseline justify-between mb-0.5">
+                        <span className={`text-xs font-semibold ${active ? 'text-white' : 'text-gray-200'}`}>
+                          {m.label}
+                        </span>
+                        <span className={`text-[9px] font-mono ${active ? 'text-white/80' : 'text-gray-500'}`}>
+                          {m.target}
+                        </span>
+                      </div>
+                      <p className={`text-[10px] leading-snug ${active ? 'text-white/70' : 'text-gray-500'}`}>
+                        {m.desc}
+                      </p>
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="text-[10px] text-gray-600">
+                Optimized lane uses distilled checkpoints, lower frame counts, and cache acceleration where supported.
+                Steps / resolution / duration are auto-tuned per mode — override below if you want.
               </p>
             </div>
           )}
