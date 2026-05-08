@@ -3,7 +3,8 @@ import { Input, Button, Select, Switch, Tabs, Modal, Upload, message as antMessa
 import {
   VideoCameraOutlined, ThunderboltOutlined, CopyOutlined, CheckOutlined,
   DownloadOutlined, ReloadOutlined, LinkOutlined, InfoCircleOutlined, AppstoreOutlined,
-  PlayCircleOutlined, LeftOutlined, RightOutlined,
+  PlayCircleOutlined, LeftOutlined, RightOutlined, ExpandAltOutlined, PauseOutlined,
+  CaretRightOutlined,
 } from '@ant-design/icons'
 import {
   generateVideo, getJobStatus, getTodayVideo, getVideoProviders, listVideos, deleteVideo,
@@ -254,7 +255,38 @@ const fmtSec = (s) => {
   return m > 0 ? `${m}m ${r}s` : `${r}s`
 }
 
+// Pretty timestamp for the modal: hh:mm:ss with millis
+const fmtTs = (ts) => {
+  if (!ts) return ''
+  const d = new Date(ts)
+  const pad = (n, w = 2) => String(n).padStart(w, '0')
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`
+}
+
+// Tone-from-text — same rules used in the inline feed and the modal so the
+// expanded view shows the exact same colour coding the user saw in-card.
+const logTone = (text) => {
+  if (text.startsWith('✗')) return 'text-rose-400'
+  if (text.startsWith('🎬')) return 'text-emerald-300'
+  if (text.startsWith('✓')) return 'text-emerald-400/80'
+  if (text.startsWith('⚡')) return 'text-amber-300'
+  if (text.startsWith('⏱')) return 'text-cyan-300'
+  if (text.startsWith('→') || text.startsWith('↑')) return 'text-fuchsia-300'
+  if (text.startsWith('sampler')) return 'text-sky-300'
+  return 'text-gray-400'
+}
+
 const Skeleton = ({ jobId, status, job, paused = false, onTogglePause }) => {
+  const [logsOpen, setLogsOpen] = useState(false)
+  // Auto-scroll the modal log list to the latest line whenever new entries arrive
+  const modalScrollRef = useRef(null)
+  useEffect(() => {
+    if (logsOpen && modalScrollRef.current) {
+      modalScrollRef.current.scrollTop = modalScrollRef.current.scrollHeight
+    }
+  }, [logsOpen, job?.logs?.length])
+
+  const allLogs = Array.isArray(job?.logs) ? job.logs : []
   const copy = STATUS_COPY[status] || STATUS_COPY.queued
   const ringColor = {
     cyan: 'border-cyan-500/40 border-t-cyan-400',
@@ -317,49 +349,113 @@ const Skeleton = ({ jobId, status, job, paused = false, onTogglePause }) => {
 
           {jobId && <p className="text-gray-700 text-[10px] font-mono break-all pt-1">{jobId}</p>}
 
-          {/* Live log feed — populated by worker via /job-progress logLine.
-              Worker emits at every milestone (queued, ETA, sampler 8/30, VAE,
-              upload, published URL, …) so the user sees what's happening in
-              real time, same as the worker terminal. Pause button suspends
-              polling without losing the elapsed timer. */}
-          {(Array.isArray(job?.logs) && job.logs.length > 0) || onTogglePause ? (
-            <div className="mt-3">
+          {/* Live log feed — fills the otherwise-empty bottom of the spinner card
+              with a tall, scrollable, terminal-style activity stream. Click anywhere
+              in the panel (or the Expand button) to open a full-height modal that
+              shows the entire log history with timestamps. Pause/Resume halts the
+              polling but the elapsed timer keeps running. */}
+          {(allLogs.length > 0) || onTogglePause ? (
+            <div className="mt-4 w-full">
               {onTogglePause && (
-                <div className="flex items-center justify-between mb-1.5 px-1">
-                  <span className={`text-[10px] font-semibold uppercase tracking-wider ${paused ? 'text-amber-400' : 'text-emerald-400'}`}>
-                    {paused ? '● paused' : '● live'}
+                <div className="flex items-center justify-between mb-2 px-1">
+                  <span className={`flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider ${paused ? 'text-amber-400' : 'text-emerald-400'}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${paused ? 'bg-amber-400' : 'bg-emerald-400 animate-pulse'}`} />
+                    {paused ? 'paused' : 'live'} · {allLogs.length} {allLogs.length === 1 ? 'event' : 'events'}
                   </span>
-                  <button type="button" onClick={onTogglePause}
-                    className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-gray-700 hover:border-gray-500 text-gray-300 hover:text-white transition-colors">
-                    {paused ? 'Resume logs' : 'Pause logs'}
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button type="button" onClick={(e) => { e.stopPropagation(); onTogglePause() }}
+                      className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-gray-700 hover:border-gray-500 text-gray-300 hover:text-white transition-colors">
+                      {paused ? <><CaretRightOutlined className="text-[9px]" /> Resume</>
+                              : <><PauseOutlined className="text-[9px]" /> Pause</>}
+                    </button>
+                    {allLogs.length > 0 && (
+                      <button type="button" onClick={(e) => { e.stopPropagation(); setLogsOpen(true) }}
+                        className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-cyan-500/40 hover:border-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 hover:text-cyan-200 transition-colors">
+                        <ExpandAltOutlined className="text-[9px]" /> Expand
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
-              {Array.isArray(job?.logs) && job.logs.length > 0 && (
-                <div className="max-h-40 overflow-y-auto rounded-lg bg-black/40 border border-gray-800/60 p-2 text-left">
-                  <ul className="space-y-0.5">
-                    {job.logs.slice(-12).map((entry, i) => {
-                      const text = entry?.msg || ''
-                      const isErr = text.startsWith('✗')
-                      const isOk = text.startsWith('✓')
-                      const isUrl = text.startsWith('🎬')
-                      return (
+              {allLogs.length > 0 && (
+                <button type="button" onClick={() => setLogsOpen(true)}
+                  className="block w-full text-left rounded-xl bg-gradient-to-b from-black/70 to-black/40 border border-gray-800/80 hover:border-cyan-500/40 transition-colors overflow-hidden group">
+                  <div className="max-h-72 sm:max-h-80 overflow-y-auto p-3">
+                    <ul className="space-y-1">
+                      {allLogs.slice(-22).map((entry, i) => (
                         <li key={`${entry?.ts || i}-${i}`}
-                            className={`text-[10px] font-mono leading-snug break-all ${
-                              isErr ? 'text-rose-400'
-                                : isUrl ? 'text-emerald-300'
-                                  : isOk ? 'text-emerald-400/80'
-                                    : 'text-gray-400'
-                            }`}>
-                          {text}
+                            className={`text-[11px] font-mono leading-relaxed break-all ${logTone(entry?.msg || '')}`}>
+                          {entry?.msg || ''}
                         </li>
-                      )
-                    })}
-                  </ul>
-                </div>
+                      ))}
+                    </ul>
+                    {allLogs.length > 22 && (
+                      <p className="text-[10px] text-gray-500 mt-2 text-center group-hover:text-cyan-300 transition-colors">
+                        + {allLogs.length - 22} earlier events — click to view all
+                      </p>
+                    )}
+                  </div>
+                </button>
               )}
             </div>
           ) : null}
+
+          {/* Full-history modal — opens when the user clicks the log panel or
+              the Expand button. Auto-scrolls to the newest line when more
+              events arrive while it's open. */}
+          <Modal open={logsOpen} onCancel={() => setLogsOpen(false)} footer={null}
+            width={760}
+            styles={{
+              content: { background: '#0b0f17', padding: 0, borderRadius: 16, border: '1px solid rgba(34,211,238,0.25)' },
+              body: { padding: 0 },
+              header: { display: 'none' },
+              mask: { backdropFilter: 'blur(6px)' },
+            }}
+            closeIcon={null}
+            centered>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-800/80 bg-gradient-to-r from-cyan-500/10 via-fuchsia-500/5 to-transparent">
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${paused ? 'bg-amber-400' : 'bg-emerald-400 animate-pulse'}`} />
+                <h3 className="text-sm font-semibold text-white tracking-wide">
+                  Worker activity · <span className="font-mono text-cyan-300">{jobId}</span>
+                </h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] uppercase tracking-wider text-gray-500">
+                  {allLogs.length} {allLogs.length === 1 ? 'event' : 'events'}
+                </span>
+                {onTogglePause && (
+                  <button type="button" onClick={onTogglePause}
+                    className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full border border-gray-700 hover:border-gray-500 text-gray-300 hover:text-white transition-colors">
+                    {paused ? <><CaretRightOutlined className="text-[9px]" /> Resume</>
+                            : <><PauseOutlined className="text-[9px]" /> Pause</>}
+                  </button>
+                )}
+                <button type="button" onClick={() => setLogsOpen(false)}
+                  className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded">
+                  ✕
+                </button>
+              </div>
+            </div>
+            <div ref={modalScrollRef} className="max-h-[65vh] overflow-y-auto p-5 bg-[#06080d]">
+              {allLogs.length === 0 ? (
+                <p className="text-gray-500 text-sm text-center py-12">Waiting for the worker to emit its first event…</p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {allLogs.map((entry, i) => (
+                    <li key={`${entry?.ts || i}-${i}`} className="flex gap-3 items-start">
+                      <span className="text-[10px] font-mono text-gray-600 shrink-0 pt-0.5 select-none">
+                        {fmtTs(entry?.ts)}
+                      </span>
+                      <span className={`text-[12px] font-mono leading-relaxed break-all ${logTone(entry?.msg || '')}`}>
+                        {entry?.msg || ''}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </Modal>
         </div>
       </div>
     </div>
