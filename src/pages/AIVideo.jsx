@@ -254,7 +254,7 @@ const fmtSec = (s) => {
   return m > 0 ? `${m}m ${r}s` : `${r}s`
 }
 
-const Skeleton = ({ jobId, status, job }) => {
+const Skeleton = ({ jobId, status, job, paused = false, onTogglePause }) => {
   const copy = STATUS_COPY[status] || STATUS_COPY.queued
   const ringColor = {
     cyan: 'border-cyan-500/40 border-t-cyan-400',
@@ -316,6 +316,50 @@ const Skeleton = ({ jobId, status, job }) => {
           )}
 
           {jobId && <p className="text-gray-700 text-[10px] font-mono break-all pt-1">{jobId}</p>}
+
+          {/* Live log feed — populated by worker via /job-progress logLine.
+              Worker emits at every milestone (queued, ETA, sampler 8/30, VAE,
+              upload, published URL, …) so the user sees what's happening in
+              real time, same as the worker terminal. Pause button suspends
+              polling without losing the elapsed timer. */}
+          {(Array.isArray(job?.logs) && job.logs.length > 0) || onTogglePause ? (
+            <div className="mt-3">
+              {onTogglePause && (
+                <div className="flex items-center justify-between mb-1.5 px-1">
+                  <span className={`text-[10px] font-semibold uppercase tracking-wider ${paused ? 'text-amber-400' : 'text-emerald-400'}`}>
+                    {paused ? '● paused' : '● live'}
+                  </span>
+                  <button type="button" onClick={onTogglePause}
+                    className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-gray-700 hover:border-gray-500 text-gray-300 hover:text-white transition-colors">
+                    {paused ? 'Resume logs' : 'Pause logs'}
+                  </button>
+                </div>
+              )}
+              {Array.isArray(job?.logs) && job.logs.length > 0 && (
+                <div className="max-h-40 overflow-y-auto rounded-lg bg-black/40 border border-gray-800/60 p-2 text-left">
+                  <ul className="space-y-0.5">
+                    {job.logs.slice(-12).map((entry, i) => {
+                      const text = entry?.msg || ''
+                      const isErr = text.startsWith('✗')
+                      const isOk = text.startsWith('✓')
+                      const isUrl = text.startsWith('🎬')
+                      return (
+                        <li key={`${entry?.ts || i}-${i}`}
+                            className={`text-[10px] font-mono leading-snug break-all ${
+                              isErr ? 'text-rose-400'
+                                : isUrl ? 'text-emerald-300'
+                                  : isOk ? 'text-emerald-400/80'
+                                    : 'text-gray-400'
+                            }`}>
+                          {text}
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
@@ -345,7 +389,12 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
   const [localOnline, setLocalOnline] = useState(false)
   const [copied, setCopied] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [logsPaused, setLogsPaused] = useState(false)
   const pollTimer = useRef(null)
+  // Ref mirrors logsPaused so the setInterval closure reads fresh state
+  // without needing to recreate the timer when the user toggles.
+  const pausedRef = useRef(false)
+  useEffect(() => { pausedRef.current = logsPaused }, [logsPaused])
 
   // Upload a local file → BE → Cloudinary → set imageUrl to the returned URL.
   // Cloudinary auto-converts HEIC, WEBP, BMP, etc. to JPG when delivered, so any
@@ -397,6 +446,10 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
     if (pollTimer.current) clearInterval(pollTimer.current)
     let attempts = 0
     pollTimer.current = setInterval(async () => {
+      // User-controlled pause — polling halts, elapsed timer keeps ticking via
+      // its own clock so the spinner still shows "live" duration. Resume just
+      // re-enters this branch on the next interval tick (no restart needed).
+      if (pausedRef.current) return
       attempts += 1
       const { data, error: err } = await getJobStatus(jobId)
       if (err) {
@@ -414,11 +467,11 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
         clearInterval(pollTimer.current); pollTimer.current = null
         setLoading(false); setError(data.error || 'Generation failed')
       }
-      if (attempts > 600) {
+      if (attempts > 1200) {
         clearInterval(pollTimer.current); pollTimer.current = null
         setLoading(false); setError('Timed out waiting for the job')
       }
-    }, 3000)
+    }, 1500)   // tighter poll so the log feed and progress bar feel live
   }
 
   const generate = async () => {
@@ -796,9 +849,19 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
                 job={job}
                 status={
                   job?.status ||
-                  (provider === 'zsky'  ? 'zsky_running' :
-                   provider === 'local' ? 'local_queued' :
+                  (provider === 'zsky'      ? 'zsky_running' :
+                   provider === 'local'     ? 'local_queued' :
+                   provider === 'optimized' ? 'local_queued' :
                    'queued')
+                }
+                paused={logsPaused}
+                onTogglePause={
+                  // Only show the pause button for the 5090 lanes — ZSky is so
+                  // fast (sub-30s) that pausing is meaningless, and Lightning's
+                  // worker doesn't emit logs.
+                  (provider === 'local' || provider === 'optimized')
+                    ? () => setLogsPaused(p => !p)
+                    : undefined
                 }
               />
               <Button block onClick={cancel} icon={<ReloadOutlined />}>
