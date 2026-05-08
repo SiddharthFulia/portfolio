@@ -199,21 +199,85 @@ const VideoCard = ({ video, label = 'Latest', tone = 'cyan', compact = false }) 
   )
 }
 
-const Skeleton = ({ jobId, status }) => {
+// Tick every second so countdown / elapsed display updates smoothly
+const useTick = (active) => {
+  const [, set] = useState(0)
+  useEffect(() => {
+    if (!active) return undefined
+    const id = setInterval(() => set(n => n + 1), 1000)
+    return () => clearInterval(id)
+  }, [active])
+}
+
+const fmtSec = (s) => {
+  if (!Number.isFinite(s) || s < 0) s = 0
+  const m = Math.floor(s / 60)
+  const r = Math.floor(s % 60)
+  return m > 0 ? `${m}m ${r}s` : `${r}s`
+}
+
+const Skeleton = ({ jobId, status, job }) => {
   const copy = STATUS_COPY[status] || STATUS_COPY.queued
   const ringColor = {
     cyan: 'border-cyan-500/40 border-t-cyan-400',
     fuchsia: 'border-fuchsia-500/40 border-t-fuchsia-400',
     amber: 'border-amber-400/40 border-t-amber-300',
   }[copy.tone] || 'border-cyan-500/40 border-t-cyan-400'
+
+  // Tick once per second so the live ETA / elapsed values refresh
+  useTick(true)
+
+  // Progress math — startedAt + estimatedSeconds come from BE/worker
+  const startedAt = job?.startedAt ? new Date(job.startedAt).getTime() : null
+  const estTotal = Number(job?.estimatedSeconds) || null
+  const elapsed = startedAt ? Math.max(0, (Date.now() - startedAt) / 1000) : 0
+  const remaining = estTotal ? Math.max(0, estTotal - elapsed) : null
+  const pct = (estTotal && elapsed > 0)
+    ? Math.min(99, Math.round((elapsed / estTotal) * 100))
+    : null
+
+  const barColor = {
+    cyan: 'from-cyan-500 to-blue-400',
+    fuchsia: 'from-fuchsia-500 to-pink-400',
+    amber: 'from-amber-400 via-rose-400 to-fuchsia-500',
+  }[copy.tone] || 'from-cyan-500 to-blue-400'
+
   return (
     <div className="rounded-2xl border border-gray-800 bg-gray-900/40 overflow-hidden">
-      <div className="aspect-[9/16] sm:aspect-video bg-gray-800/60 animate-pulse flex items-center justify-center">
-        <div className="text-center space-y-3 px-6">
+      <div className="aspect-[9/16] sm:aspect-video bg-gray-800/60 flex items-center justify-center relative overflow-hidden">
+        {/* Subtle moving gradient backdrop */}
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-800/40 via-gray-900/40 to-gray-800/40 animate-pulse" />
+        <div className="relative text-center space-y-3 px-6 max-w-sm w-full">
           <div className={`w-16 h-16 mx-auto rounded-full border-2 ${ringColor} animate-spin`} />
           <p className="text-gray-200 text-sm font-semibold">{copy.label}…</p>
-          <p className="text-gray-500 text-xs">{copy.hint}</p>
-          {jobId && <p className="text-gray-700 text-[10px] font-mono break-all">{jobId}</p>}
+
+          {job?.progressMessage ? (
+            <p className="text-gray-300 text-xs leading-relaxed">{job.progressMessage}</p>
+          ) : (
+            <p className="text-gray-500 text-xs">{copy.hint}</p>
+          )}
+
+          {pct != null && (
+            <>
+              <div className="w-full h-1.5 rounded-full bg-gray-800 overflow-hidden">
+                <div className={`h-full bg-gradient-to-r ${barColor} transition-all duration-1000 ease-linear`}
+                  style={{ width: `${pct}%` }} />
+              </div>
+              <div className="flex justify-between text-[10px] text-gray-500 font-mono">
+                <span>elapsed {fmtSec(elapsed)}</span>
+                <span className="text-gray-300">{pct}%</span>
+                <span>~{fmtSec(remaining)} left</span>
+              </div>
+            </>
+          )}
+
+          {pct == null && estTotal && (
+            <p className="text-[10px] text-gray-600">
+              ETA ~{fmtSec(estTotal)} once it picks up
+            </p>
+          )}
+
+          {jobId && <p className="text-gray-700 text-[10px] font-mono break-all pt-1">{jobId}</p>}
         </div>
       </div>
     </div>
@@ -614,11 +678,29 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
           {loading ? 'Generating…' : 'Generate Video'}
         </Button>
 
-        <div className="p-3 rounded-lg bg-gradient-to-br from-amber-500/5 via-rose-500/5 to-fuchsia-500/5 border border-amber-400/20 flex items-start gap-2">
-          <InfoCircleOutlined className="text-amber-400/80 mt-0.5" />
-          <div className="text-[11px] text-gray-400 leading-relaxed">
-            <span className="text-amber-300 font-semibold">5090 Beast</span> is the exclusive luxe path — when it's online, your video renders in seconds on Siddharth's personal RTX 5090 with the latest open-source models.
-            Status dot on each card shows what's live right now.
+        <div className="relative overflow-hidden rounded-xl border border-amber-400/25 bg-gradient-to-br from-amber-500/[0.06] via-rose-500/[0.05] to-fuchsia-500/[0.06]">
+          <div aria-hidden className="absolute -top-12 -right-12 w-44 h-44 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
+          <div aria-hidden className="absolute -bottom-16 -left-12 w-44 h-44 bg-fuchsia-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="relative p-3.5 flex items-start gap-3">
+            <div className="shrink-0 mt-0.5 w-7 h-7 rounded-full bg-gradient-to-br from-amber-300 via-rose-400 to-fuchsia-500 flex items-center justify-center shadow-md shadow-rose-500/20">
+              <ThunderboltOutlined className="text-black text-xs" />
+            </div>
+            <div className="text-[11px] leading-relaxed">
+              <p className="mb-0.5">
+                <span className="font-semibold bg-gradient-to-r from-amber-200 via-rose-200 to-fuchsia-300 bg-clip-text text-transparent tracking-wide">
+                  5090 Beast
+                </span>
+                <span className="text-gray-500"> · the personal lane</span>
+              </p>
+              <p className="text-gray-400">
+                Real RTX 5090 in Siddharth's home, polling for jobs in real time. Renders the same workflows that ship in ComfyUI's official examples — LTX, Wan, Hunyuan, Mochi, SVD —
+                with thermal-managed power capping and live progress streaming back to this page.
+              </p>
+              <p className="text-[10px] text-gray-600 mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
+                <span>· status dot on each card shows live availability</span>
+                <span>· capped at {`${import.meta.env.VITE_GPU_POWER_LIMIT_W || 525}W`} for cool-running stability</span>
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -630,6 +712,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
             <div className="space-y-3">
               <Skeleton
                 jobId={job?.jobId || job?.videoId}
+                job={job}
                 status={
                   job?.status ||
                   (provider === 'zsky'  ? 'zsky_running' :
