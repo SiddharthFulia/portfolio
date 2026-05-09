@@ -1,4 +1,4 @@
-import { get, post } from './request';
+import { get, post, del } from './request';
 import { ENDPOINTS } from './endpoints';
 
 export async function checkHealth() {
@@ -172,6 +172,15 @@ export async function getImageStatus(imageId) {
   try {
     const data = await get(`${ENDPOINTS.IMAGE_ENHANCE_STATUS}/${imageId}`, {}, { timeout: 6000 });
     return { data: data?.data || null, error: null };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+}
+
+export async function deleteEnhancedImage(imageId) {
+  try {
+    const data = await del(`${ENDPOINTS.IMAGE_ENHANCE}/${imageId}`, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
   } catch (err) {
     return { data: null, error: err.message };
   }

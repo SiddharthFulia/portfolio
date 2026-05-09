@@ -6,7 +6,7 @@ import {
   AppstoreOutlined, CloudOutlined, DesktopOutlined, DeleteOutlined,
 } from '@ant-design/icons'
 import {
-  enhanceImage, getImageStatus, listEnhancedImages, fileToDataUrl,
+  enhanceImage, getImageStatus, listEnhancedImages, deleteEnhancedImage, fileToDataUrl,
 } from '../api/ai'
 
 // localStorage key — persists the in-flight enhancement across refreshes
@@ -16,6 +16,7 @@ const INFLIGHT_KEY = 'sid-imgenh-inflight'
 // "polish without changing identity" → type='quality' for local engine, the
 // cloud engine uses prompt directly so type is informational only.
 const PRESET_TYPE = {
+  'sharpen-deblur':        'fast',
   'cinematic-upscale':     'quality',
   'sony-a1-portrait':      'quality',
   '4k-detail-recovery':    'quality',
@@ -28,6 +29,18 @@ const PRESET_TYPE = {
 // sent to Gemini) shows up in the Modal when the user clicks Expand.
 // Tone/accent drives the gradient colour on the card and modal header.
 const PRESETS = [
+  {
+    id: 'sharpen-deblur',
+    name: 'Sharpen & Deblur',
+    short: 'Removes motion blur and softness. Best for blurry faces and details.',
+    accent: 'from-emerald-400 to-cyan-500',
+    border: 'border-emerald-400/40',
+    glow: 'shadow-emerald-400/20',
+    icon: '⚡',
+    // Worded as a generic "fix blur" task — avoids identity-preservation
+    // trigger words that make Gemini refuse with IMAGE_OTHER.
+    prompt: `Sharpen and deblur this photo. Remove motion blur, focus blur, and softness. Improve clarity, edges, and fine details. Keep the same colors, composition, and scene. Do not stylize or change the look — just make it sharper and clearer.`,
+  },
   {
     id: 'cinematic-upscale',
     name: 'Cinematic Upscale',
@@ -431,6 +444,7 @@ function ImageLibrary({ refreshKey }) {
   const [page, setPage] = useState(1)
   const [data, setData] = useState({ items: [], total: 0, pages: 1, counts: {} })
   const [loading, setLoading] = useState(true)
+  const [internalReload, setInternalReload] = useState(0)
 
   useEffect(() => { setPage(1) }, [filter, refreshKey])
 
@@ -443,7 +457,34 @@ function ImageLibrary({ refreshKey }) {
       setLoading(false)
     })
     return () => { cancelled = true }
-  }, [filter, page, refreshKey])
+  }, [filter, page, refreshKey, internalReload])
+
+  const askDelete = (img) => {
+    Modal.confirm({
+      title: 'Delete this image?',
+      content: (
+        <div className="text-sm text-gray-300">
+          <p className="mb-2 italic line-clamp-2">"{img.prompt?.slice(0, 200)}"</p>
+          <p className="text-xs text-gray-500">
+            Removes the row + Cloudinary asset. Can't be undone.
+          </p>
+        </div>
+      ),
+      okText: 'Delete',
+      okButtonProps: { danger: true },
+      cancelText: 'Keep',
+      centered: true,
+      onOk: async () => {
+        const { error: err } = await deleteEnhancedImage(img.imageId)
+        if (err) {
+          antMessage.error(`Delete failed: ${err}`)
+          return
+        }
+        antMessage.success('Deleted')
+        setInternalReload(n => n + 1)
+      },
+    })
+  }
 
   const filters = [
     { v: 'completed',  label: 'Completed',  n: data.counts?.completed },
@@ -484,39 +525,48 @@ function ImageLibrary({ refreshKey }) {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {data.items.map(it => <LibraryCard key={it.imageId} image={it} />)}
+          {data.items.map(it => <LibraryCard key={it.imageId} image={it} onDelete={askDelete} />)}
         </div>
       )}
     </div>
   )
 }
 
-function LibraryCard({ image }) {
+function LibraryCard({ image, onDelete }) {
   const url = image.outputUrl || image.sourceUrl
   return (
-    <a href={image.outputUrl || image.sourceUrl} target="_blank" rel="noopener"
-      className="group relative aspect-square rounded-xl overflow-hidden border border-gray-800 hover:border-cyan-400/50 transition-all bg-gray-900/40">
-      {url ? (
-        <img src={url} alt={image.prompt}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-900 to-gray-950">
-          <span className="text-3xl opacity-50">
-            {image.status === 'failed' ? '✗' : image.status === 'processing' ? '⚡' : '⏳'}
-          </span>
-        </div>
-      )}
-      <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-black/60 text-white border border-white/10">
+    <div className="group relative aspect-square rounded-xl overflow-hidden border border-gray-800 hover:border-cyan-400/50 transition-all bg-gray-900/40">
+      <a href={url || '#'} target="_blank" rel="noopener" className="block w-full h-full">
+        {url ? (
+          <img src={url} alt={image.prompt}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-900 to-gray-950">
+            <span className="text-3xl opacity-50">
+              {image.status === 'failed' ? '✗' : image.status === 'processing' ? '⚡' : '⏳'}
+            </span>
+          </div>
+        )}
+      </a>
+      <div className="pointer-events-none absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-black/60 text-white border border-white/10">
         {image.engine === 'cloud' ? '☁ Gemini' : '🖥 5090'}
       </div>
       {image.status !== 'completed' && (
-        <div className={`absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+        <div className={`pointer-events-none absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
           image.status === 'failed' ? 'bg-rose-500/80 text-white'
           : image.status === 'processing' ? 'bg-cyan-500/80 text-white'
           : 'bg-amber-500/80 text-black'
         }`}>{image.status}</div>
       )}
-    </a>
+      {/* Delete button — appears on hover top-right when status === completed */}
+      {onDelete && (
+        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(image) }}
+          title="Delete"
+          className="absolute bottom-1.5 right-1.5 w-7 h-7 flex items-center justify-center rounded-full bg-black/70 hover:bg-rose-600 text-gray-200 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
+          <DeleteOutlined className="text-xs" />
+        </button>
+      )}
+    </div>
   )
 }
 

@@ -55,3 +55,19 @@ export async function post(endpoint, body = {}, options = {}) {
   }
   return res.json();
 }
+
+export async function del(endpoint, options = {}) {
+  const res = await fetch(`${BE_URL}${endpoint}`, {
+    method: 'DELETE',
+    headers: { ...options.headers },
+    signal: options.signal || (options.timeout ? AbortSignal.timeout(options.timeout) : undefined),
+  });
+  if (!res.ok) {
+    let msg = `Request failed: ${res.status}`;
+    try { const b = await res.json(); if (b?.message) msg = b.message; } catch {}
+    const err = new Error(msg);
+    err.status = res.status;
+    throw err;
+  }
+  return res.json();
+}
