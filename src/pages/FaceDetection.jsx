@@ -5,9 +5,6 @@ const ImageEdit = lazy(() => import('../components/vision/ImageEdit'))
 const ObjectDetect = lazy(() => import('../components/vision/ObjectDetect'))
 const OCRTool = lazy(() => import('../components/vision/OCRTool'))
 const FaceLab = lazy(() => import('../components/vision/FaceLab'))
-// AIStudio used to live at /studio. Folded into Vision so all multimodal tools
-// (image gen, gemini-vision, TTS) sit alongside the camera-driven ones.
-const AIStudio = lazy(() => import('./AIStudio'))
 
 const TOOLS = [
   {
@@ -77,19 +74,6 @@ const TOOLS = [
     accent: 'from-violet-500 to-fuchsia-500',
     glow: 'shadow-violet-500/20',
     border: 'border-violet-500/60',
-  },
-  {
-    id: 'studio',
-    label: 'AI Studio',
-    blurb: 'Image gen, Gemini vision Q&A, text-to-speech.',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
-        <path d="M12 3l2.6 5.3L20 9.2l-4 3.9.9 5.5L12 16l-4.9 2.6L8 13.1l-4-3.9 5.4-.9z" />
-      </svg>
-    ),
-    accent: 'from-cyan-400 to-blue-500',
-    glow: 'shadow-cyan-500/20',
-    border: 'border-cyan-500/60',
   },
 ]
 
@@ -170,7 +154,6 @@ const FaceDetection = () => {
         </div>
 
         <Suspense fallback={<Skeleton />}>
-          {mode === 'studio' && <AIStudio />}
           {mode === 'face' && <FaceAI />}
           {mode === 'edit' && <ImageEdit />}
           {mode === 'object' && <ObjectDetect />}
