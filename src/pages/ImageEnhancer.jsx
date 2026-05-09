@@ -105,7 +105,6 @@ export default function ImageEnhancer() {
   const [error, setError] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const pollTimer = useRef(null)
-  const fileInputRef = useRef(null)
 
   useEffect(() => { document.title = 'Image Enhancer · Sid' }, [])
 
@@ -308,7 +307,6 @@ function GenerateSection({
                 showUploadList={false}
                 accept="image/*"
                 beforeUpload={handleFile}
-                ref={fileInputRef}
                 style={{ background: 'transparent', borderColor: 'transparent', padding: '20px 0' }}>
                 <UploadOutlined className="text-3xl text-cyan-400 mb-2" />
                 <p className="text-sm text-gray-300">Drop image or click to upload</p>
