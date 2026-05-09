@@ -15,6 +15,12 @@ import { DeleteOutlined } from '@ant-design/icons'
 
 const BE_URL = import.meta.env.VITE_BE_URL || 'http://localhost:4001'
 
+// localStorage key for an in-flight job id. We persist this on /generate so
+// that a page refresh can resume the live spinner + log feed instead of
+// orphaning the user mid-render. Cleared on completion, failure, or manual
+// cancel.
+const INFLIGHT_JOB_KEY = 'sid-aivideo-inflight-job'
+
 const PROVIDERS = [
   {
     id: 'zsky',
@@ -118,8 +124,8 @@ const OPTIMIZED_MODES = [
   {
     id: 'quality',
     label: 'Quality',
-    desc: 'HunyuanVideo • 20 steps • 2-8 min',
-    target: '~3min',
+    desc: 'HunyuanVideo • 16 steps • slow but premium output',
+    target: '~30min',
     accent: 'from-amber-400 via-rose-400 to-fuchsia-500',
   },
 ]
@@ -476,6 +482,8 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
   const [withCaption, setWithCaption] = useState(true)
   const [imageUrl, setImageUrl] = useState('')
   const [optimizedMode, setOptimizedMode] = useState('balanced')   // preview | balanced | quality
+  const [withMusic, setWithMusic] = useState(false)
+  const [musicPrompt, setMusicPrompt] = useState('')
 
   const [loading, setLoading] = useState(false)
   const [job, setJob] = useState(null)
@@ -520,6 +528,33 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
       setWorkerOnline(!!(data.workers?.worker?.online ?? data.workerOnline))
       setLocalOnline(!!data.workers?.local?.online)
     })
+
+    // Resume an in-flight job after a page refresh. If the BE has it as
+    // queued/processing → reattach the spinner + start polling. If it already
+    // completed → show the finished video. If failed → surface the error.
+    // If gone (404) → silently clear; the BE may have already evicted it.
+    let inflight
+    try { inflight = localStorage.getItem(INFLIGHT_JOB_KEY) } catch {}
+    if (inflight) {
+      getJobStatus(inflight).then(({ data, error: err }) => {
+        if (err || !data) {
+          try { localStorage.removeItem(INFLIGHT_JOB_KEY) } catch {}
+          return
+        }
+        if (data.status === 'completed' && data.videoUrl) {
+          try { localStorage.removeItem(INFLIGHT_JOB_KEY) } catch {}
+          setVideo(data)
+          if (!today) setToday(data)
+        } else if (data.status === 'failed') {
+          try { localStorage.removeItem(INFLIGHT_JOB_KEY) } catch {}
+          setError(data.error || 'Generation failed')
+        } else {
+          // queued or processing — reattach
+          setJob(data); setLoading(true); startPolling(inflight)
+        }
+      })
+    }
+
     return () => { if (pollTimer.current) clearInterval(pollTimer.current) }
   }, [])
 
@@ -556,11 +591,13 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
       setJob(data)
       if (data.status === 'completed') {
         clearInterval(pollTimer.current); pollTimer.current = null
+        try { localStorage.removeItem(INFLIGHT_JOB_KEY) } catch {}
         setVideo(data); setLoading(false)
         if (!today) setToday(data)
         onJobCompleted?.()
       } else if (data.status === 'failed') {
         clearInterval(pollTimer.current); pollTimer.current = null
+        try { localStorage.removeItem(INFLIGHT_JOB_KEY) } catch {}
         setLoading(false); setError(data.error || 'Generation failed')
       }
       if (attempts > 1200) {
@@ -597,6 +634,8 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
       imageUrl: caps.imageUrl ? imageUrl.trim() : '',
       generateCaption: withCaption,
       mode: provider === 'optimized' ? optimizedMode : undefined,
+      withMusic: (provider === 'optimized' || provider === 'local') ? withMusic : false,
+      musicPrompt: withMusic ? musicPrompt.trim() : '',
     })
     if (err) { setLoading(false); setError(err); return }
 
@@ -606,7 +645,9 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
       if (!today) setToday(data)
       onJobCompleted?.()
     } else if (data?.jobId) {
-      // Worker async path
+      // Worker async path — persist the jobId so a page refresh can resume the
+      // spinner + log feed instead of dropping the user mid-flight.
+      try { localStorage.setItem(INFLIGHT_JOB_KEY, data.jobId) } catch {}
       setJob(data); startPolling(data.jobId)
     } else {
       setLoading(false); setError('Unexpected backend response')
@@ -616,6 +657,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
   const cancel = () => {
     if (pollTimer.current) clearInterval(pollTimer.current)
     pollTimer.current = null
+    try { localStorage.removeItem(INFLIGHT_JOB_KEY) } catch {}
     setLoading(false); setJob(null)
   }
 
@@ -731,6 +773,34 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
                 Optimized lane uses distilled checkpoints, lower frame counts, and cache acceleration where supported.
                 Steps / resolution / duration are auto-tuned per mode — override below if you want.
               </p>
+            </div>
+          )}
+
+          {/* Background music — 5090 lanes only. Worker generates audio via
+              MusicGen on the local GPU and ffmpeg-muxes it into the mp4. */}
+          {(provider === 'local' || provider === 'optimized') && (
+            <div className="mt-4 p-3 rounded-lg border border-gray-800 bg-gray-900/40">
+              <label className="flex items-center justify-between gap-2 cursor-pointer">
+                <span className="flex items-center gap-2">
+                  <span className="text-base">🎵</span>
+                  <span className="text-xs font-semibold text-gray-200">Add background music</span>
+                  <span className="text-[10px] text-gray-500">+10-30s · MusicGen on 5090</span>
+                </span>
+                <Switch size="small" checked={withMusic} onChange={setWithMusic} />
+              </label>
+              {withMusic && (
+                <div className="mt-2 space-y-1">
+                  <Input.TextArea
+                    value={musicPrompt} onChange={e => setMusicPrompt(e.target.value)}
+                    autoSize={{ minRows: 2, maxRows: 4 }}
+                    placeholder="e.g. 'cinematic orchestral build, slow cellos, hopeful' — leave blank to auto-derive from the video prompt"
+                    maxLength={400}
+                  />
+                  <p className="text-[10px] text-gray-500">
+                    First time will download the MusicGen model (~6 GB) on the 5090.
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1202,11 +1272,15 @@ const LibraryTab = ({ refreshKey }) => {
     })
   }
 
+  // Library provider filters. 'optimized' and 'local' both run on the same
+  // physical 5090, but the BE now persists the original FE provider on the
+  // job's Cloudinary context so we can split them visually here.
   const filters = [
-    { v: 'all', label: 'All' },
-    { v: 'zsky', label: 'ZSky' },
-    { v: 'worker', label: 'GPU Worker' },
-    { v: 'local', label: '5090 Beast' },
+    { v: 'all',       label: 'All' },
+    { v: 'zsky',      label: 'ZSky' },
+    { v: 'optimized', label: '5090 Optimized' },
+    { v: 'local',     label: '5090 Beast' },
+    { v: 'worker',    label: 'GPU Worker' },
   ]
 
   const allOnPageSelected = data.items.length > 0 && data.items.every(it => selectedIds.has(it.videoId))

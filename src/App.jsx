@@ -23,6 +23,7 @@ const ExploreModule = lazy(() => import("./pages/ExploreModule"));
 const AIChat = lazy(() => import("./pages/AIChat"));
 const AIStudio = lazy(() => import("./pages/AIStudio"));
 const AIVideo = lazy(() => import("./pages/AIVideo"));
+const ImageEnhancer = lazy(() => import("./pages/ImageEnhancer"));
 
 /* ── Skeleton building blocks ── */
 const B = "animate-pulse bg-slate-200 rounded";
@@ -163,9 +164,12 @@ const App = () => {
           <Route path='/explore' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><Explore /></PageTransition></Suspense>} />
           <Route path='/explore/:module' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><ExploreModule /></PageTransition></Suspense>} />
           <Route path='/ai' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><AIChat /></PageTransition></Suspense>} />
-          <Route path='/studio' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><AIStudio /></PageTransition></Suspense>} />
+          {/* /studio kept as an alias — the actual UI now lives as a tab inside /vision */}
+          <Route path='/studio' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><FaceDetection /></PageTransition></Suspense>} />
           <Route path='/ai-video' element={<Suspense fallback={<AIVideoSkeleton />}><PageTransition><AIVideo /></PageTransition></Suspense>} />
           <Route path='/video' element={<Suspense fallback={<AIVideoSkeleton />}><PageTransition><AIVideo /></PageTransition></Suspense>} />
+          <Route path='/image-enhancer' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><ImageEnhancer /></PageTransition></Suspense>} />
+          <Route path='/enhance' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><ImageEnhancer /></PageTransition></Suspense>} />
         </Routes>
         <ConditionalFooter />
       </Router>

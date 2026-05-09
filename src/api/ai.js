@@ -111,6 +111,8 @@ export async function generateVideo(prompt, options = {}) {
         imageUrl: options.imageUrl || '',
         generateCaption: options.generateCaption !== false,
         mode: options.mode,
+        withMusic: !!options.withMusic,
+        musicPrompt: options.musicPrompt || '',
       },
       { timeout }
     );
@@ -135,6 +137,20 @@ export async function uploadSourceImage(file) {
   try {
     const dataUrl = await fileToDataUrl(file);
     const data = await post(ENDPOINTS.AI_VIDEO_UPLOAD_IMAGE, { dataUrl }, { timeout: 60000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+}
+
+// Image Enhancer — sends a base64 dataUrl OR an existing imageUrl plus a
+// polishing prompt to Gemini 2.5 Flash Image. Returns the new Cloudinary URL.
+export async function enhanceImage({ dataUrl, imageUrl, prompt, presetId }) {
+  try {
+    const body = { prompt, presetId };
+    if (dataUrl) body.dataUrl = dataUrl;
+    if (imageUrl) body.imageUrl = imageUrl;
+    const data = await post(ENDPOINTS.IMAGE_ENHANCE, body, { timeout: 120000 });
     return { data: data?.data || data, error: null };
   } catch (err) {
     return { data: null, error: err.message };
