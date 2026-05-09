@@ -8,7 +8,7 @@ import {
 } from '@ant-design/icons'
 import {
   generateVideo, getJobStatus, getTodayVideo, getVideoProviders, listVideos, deleteVideo,
-  uploadSourceImage,
+  uploadSourceImage, listJobs,
 } from '../api/ai'
 import { UploadOutlined } from '@ant-design/icons'
 import { DeleteOutlined } from '@ant-design/icons'
@@ -1161,6 +1161,173 @@ const LibraryCard = ({ video, onClick, onDelete, selectMode, isSelected, onToggl
   )
 }
 
+// ─── Jobs tab ─────────────────────────────────────────────
+// Unified view across queued / processing / completed / failed.
+// Reads from `GET /api/ai-video/jobs` (SQLite-backed, paginated, gzipped).
+// Cards stream live updates only while user is on this tab — refresh on
+// status filter change, page change, or every 4s if there are still active
+// jobs (queued/processing). Completed-only view = no polling at all.
+const JOB_STATUS_META = {
+  queued:     { tone: 'amber',   ring: 'border-amber-400/60',   chip: 'bg-amber-500/15 text-amber-300 border-amber-500/40',   icon: '⏳', label: 'Queued' },
+  processing: { tone: 'cyan',    ring: 'border-cyan-400/70',    chip: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/40',     icon: '⚡', label: 'Processing' },
+  completed:  { tone: 'emerald', ring: 'border-emerald-500/50', chip: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40', icon: '✓', label: 'Completed' },
+  failed:     { tone: 'rose',    ring: 'border-rose-500/60',    chip: 'bg-rose-500/15 text-rose-300 border-rose-500/40',     icon: '✗', label: 'Failed' },
+}
+
+const LANE_COPY = {
+  optimized: { label: '5090 Optimized', bg: 'from-cyan-300 via-fuchsia-400 to-purple-500' },
+  local:     { label: '5090 Beast',     bg: 'from-amber-400 via-rose-400 to-fuchsia-500' },
+  worker:    { label: 'GPU Worker',     bg: 'from-emerald-500 to-cyan-400' },
+  zsky:      { label: 'ZSky',           bg: 'from-sky-500 to-blue-400' },
+}
+
+const JobCard = ({ job }) => {
+  const meta = JOB_STATUS_META[job.status] || JOB_STATUS_META.queued
+  const lane = LANE_COPY[job.lane] || { label: job.lane || '?', bg: 'from-gray-500 to-gray-600' }
+  const created = job.createdAt ? new Date(job.createdAt) : null
+  const ago = created ? timeAgo(created) : ''
+  const errShort = (job.error || '').slice(0, 120)
+
+  return (
+    <div className={`group relative rounded-2xl border ${meta.ring} bg-gradient-to-b from-gray-900/70 to-gray-950/50 overflow-hidden transition-all hover:scale-[1.01] hover:shadow-xl`}>
+      <div className="aspect-video bg-black/40 relative overflow-hidden">
+        {job.status === 'completed' && job.videoUrl ? (
+          <video src={job.videoUrl} muted loop playsInline
+            onMouseEnter={(e) => e.currentTarget.play().catch(()=>{})}
+            onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0 }}
+            className="w-full h-full object-cover" />
+        ) : (
+          <div className={`w-full h-full flex items-center justify-center bg-gradient-to-br ${lane.bg} opacity-30`}>
+            <span className="text-5xl opacity-60">{meta.icon}</span>
+          </div>
+        )}
+        <div className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${meta.chip}`}>
+          {meta.icon} {meta.label}
+        </div>
+        <div className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-gradient-to-r ${lane.bg} text-black`}>
+          {lane.label}
+        </div>
+      </div>
+      <div className="p-3 space-y-1.5">
+        <p className="text-xs text-gray-200 line-clamp-2 leading-snug min-h-[2.4em]">
+          {job.prompt || '(no prompt)'}
+        </p>
+        <div className="flex items-center justify-between text-[10px] text-gray-500 font-mono">
+          <span>{job.model || '?'} · {job.duration ?? '?'}s · {job.resolution}</span>
+          <span>{ago}</span>
+        </div>
+        {job.status === 'failed' && errShort && (
+          <p className="text-[10px] text-rose-400/80 font-mono line-clamp-2 pt-1 border-t border-rose-500/20">
+            ✗ {errShort}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+const timeAgo = (date) => {
+  const sec = Math.floor((Date.now() - date.getTime()) / 1000)
+  if (sec < 60) return `${sec}s ago`
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`
+  return `${Math.floor(sec / 86400)}d ago`
+}
+
+const JobsTab = ({ refreshKey }) => {
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const [data, setData] = useState({ items: [], total: 0, pages: 1, counts: { queued: 0, processing: 0, completed: 0, failed: 0 } })
+  const [loading, setLoading] = useState(true)
+
+  // Reset page on filter change so we don't paginate to ghost pages
+  useEffect(() => { setPage(1) }, [statusFilter, refreshKey])
+
+  // Fetch on mount + on dependency change. Auto-refresh every 4s ONLY if
+  // there are active (queued/processing) jobs visible — otherwise idle.
+  useEffect(() => {
+    let cancelled = false
+    const fetchPage = async () => {
+      const { data: result } = await listJobs({ status: statusFilter, page, limit: 24 })
+      if (cancelled) return
+      if (result) setData(result)
+      setLoading(false)
+    }
+    setLoading(true)
+    fetchPage()
+
+    // Tick if active work is in flight
+    const hasActive = (data.counts?.queued || 0) + (data.counts?.processing || 0) > 0
+    if (!hasActive) return () => { cancelled = true }
+    const iv = setInterval(fetchPage, 4000)
+    return () => { cancelled = true; clearInterval(iv) }
+  }, [statusFilter, page, refreshKey, data.counts?.queued, data.counts?.processing])
+
+  const filters = [
+    { v: 'all',        label: 'All',        n: data.counts ? (data.counts.queued + data.counts.processing + data.counts.completed + data.counts.failed) : null },
+    { v: 'queued',     label: 'Queued',     n: data.counts?.queued },
+    { v: 'processing', label: 'Processing', n: data.counts?.processing },
+    { v: 'completed',  label: 'Completed',  n: data.counts?.completed },
+    { v: 'failed',     label: 'Failed',     n: data.counts?.failed },
+  ]
+
+  return (
+    <div className="space-y-5">
+      {/* Filter chips */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {filters.map(f => {
+          const active = statusFilter === f.v
+          const meta = JOB_STATUS_META[f.v]
+          return (
+            <button key={f.v} onClick={() => setStatusFilter(f.v)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                active
+                  ? meta ? meta.chip : 'bg-cyan-600/20 text-cyan-300 border-cyan-500/40'
+                  : 'bg-gray-800/60 hover:bg-gray-800 text-gray-400 border-transparent hover:border-gray-700'
+              }`}>
+              {meta && <span>{meta.icon}</span>}
+              <span>{f.label}</span>
+              {f.n != null && <span className="text-[10px] opacity-70 font-mono">({f.n})</span>}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Cards grid */}
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1,2,3,4,5,6].map(i => (
+            <div key={i} className="aspect-[4/3] rounded-2xl bg-gray-900/40 animate-pulse" />
+          ))}
+        </div>
+      ) : data.items.length === 0 ? (
+        <div className="py-16 text-center text-gray-500 text-sm">
+          No {statusFilter === 'all' ? '' : statusFilter} jobs yet.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {data.items.map(j => <JobCard key={`${j.src}-${j.videoId}-${j.ts}`} job={j} />)}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {data.pages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-2">
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+            className="px-3 py-1.5 text-xs rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed">
+            <LeftOutlined />
+          </button>
+          <span className="text-xs text-gray-500 font-mono">{page} / {data.pages}</span>
+          <button onClick={() => setPage(p => Math.min(data.pages, p + 1))} disabled={page === data.pages}
+            className="px-3 py-1.5 text-xs rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed">
+            <RightOutlined />
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 const LibraryTab = ({ refreshKey }) => {
   const [filter, setFilter] = useState('all')
   const [page, setPage] = useState(1)
@@ -1445,6 +1612,11 @@ const AIVideo = () => {
               key: 'generate',
               label: <span><ThunderboltOutlined /> Generate</span>,
               children: <GenerateTab today={today} setToday={setToday} onJobCompleted={onCompleted} />,
+            },
+            {
+              key: 'jobs',
+              label: <span><InfoCircleOutlined /> Jobs</span>,
+              children: <JobsTab refreshKey={refreshKey} />,
             },
             {
               key: 'library',

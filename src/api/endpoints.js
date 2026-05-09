@@ -21,6 +21,7 @@ export const ENDPOINTS = {
   AI_VIDEO_LIST: '/api/ai-video/list',
   AI_VIDEO_PROVIDERS: '/api/ai-video/providers',
   AI_VIDEO_UPLOAD_IMAGE: '/api/ai-video/upload-image',
+  AI_VIDEO_JOBS:        '/api/ai-video/jobs',
   IMAGE_ENHANCE:        '/api/image-enhance',
 
   // Vision

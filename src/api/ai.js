@@ -143,6 +143,17 @@ export async function uploadSourceImage(file) {
   }
 }
 
+// Unified jobs feed — queued + processing + completed + failed in one call.
+// Powers the Jobs tab. Paginated, served straight from SQLite.
+export async function listJobs({ status = 'all', page = 1, limit = 24 } = {}) {
+  try {
+    const data = await get(ENDPOINTS.AI_VIDEO_JOBS, { status, page, limit }, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+}
+
 // Image Enhancer — sends a base64 dataUrl OR an existing imageUrl plus a
 // polishing prompt to Gemini 2.5 Flash Image. Returns the new Cloudinary URL.
 export async function enhanceImage({ dataUrl, imageUrl, prompt, presetId }) {
