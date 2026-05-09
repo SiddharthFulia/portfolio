@@ -1,10 +1,27 @@
 import { useState, useEffect, useRef } from 'react'
-import { Modal, Upload, message as antMessage } from 'antd'
+import { Modal, Upload, Tabs, message as antMessage } from 'antd'
 import {
   UploadOutlined, ExpandAltOutlined, DownloadOutlined,
   CheckOutlined, ReloadOutlined, ThunderboltOutlined,
+  AppstoreOutlined, CloudOutlined, DesktopOutlined, DeleteOutlined,
 } from '@ant-design/icons'
-import { enhanceImage, fileToDataUrl } from '../api/ai'
+import {
+  enhanceImage, getImageStatus, listEnhancedImages, fileToDataUrl,
+} from '../api/ai'
+
+// localStorage key — persists the in-flight enhancement across refreshes
+const INFLIGHT_KEY = 'sid-imgenh-inflight'
+
+// Map a preset to a workflow `type` for the BE. All current presets are
+// "polish without changing identity" → type='quality' for local engine, the
+// cloud engine uses prompt directly so type is informational only.
+const PRESET_TYPE = {
+  'cinematic-upscale':     'quality',
+  'sony-a1-portrait':      'quality',
+  '4k-detail-recovery':    'quality',
+  'studio-cinematic-light': 'cinematic',
+  'hong-kong-night':       'cinematic',
+}
 
 // ─── Preset prompts ─────────────────────────────────────────────
 // Each card on the page is one of these. The full text (the actual prompt
@@ -81,24 +98,68 @@ export default function ImageEnhancer() {
   const [sourceFile, setSourceFile] = useState(null)
   const [sourceDataUrl, setSourceDataUrl] = useState('')
   const [selectedPreset, setSelectedPreset] = useState(PRESETS[0].id)
-  const [expandedPreset, setExpandedPreset] = useState(null)   // for the modal
+  const [expandedPreset, setExpandedPreset] = useState(null)
+  const [engine, setEngine] = useState('cloud')          // cloud (Gemini) | local (5090)
   const [working, setWorking] = useState(false)
-  const [result, setResult] = useState(null)                    // { imageUrl, presetId, model, elapsedMs }
+  const [job, setJob] = useState(null)                    // active or last-finished SQLite row
   const [error, setError] = useState(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const pollTimer = useRef(null)
   const fileInputRef = useRef(null)
 
   useEffect(() => { document.title = 'Image Enhancer · Sid' }, [])
 
+  // Resume an in-flight job after a page refresh
+  useEffect(() => {
+    let inflight
+    try { inflight = localStorage.getItem(INFLIGHT_KEY) } catch {}
+    if (!inflight) return
+    getImageStatus(inflight).then(({ data }) => {
+      if (!data) { try { localStorage.removeItem(INFLIGHT_KEY) } catch {}; return }
+      if (['completed', 'failed'].includes(data.status)) {
+        try { localStorage.removeItem(INFLIGHT_KEY) } catch {}
+        setJob(data)
+        if (data.status === 'failed') setError(data.error || 'Enhancement failed')
+      } else {
+        setJob(data); setWorking(true); startPolling(inflight)
+      }
+    })
+    return () => { if (pollTimer.current) clearInterval(pollTimer.current) }
+  }, [])
+
+  const startPolling = (imageId) => {
+    if (pollTimer.current) clearInterval(pollTimer.current)
+    let attempts = 0
+    pollTimer.current = setInterval(async () => {
+      attempts += 1
+      const { data, error: err } = await getImageStatus(imageId)
+      if (err) {
+        if (attempts > 5) { clearInterval(pollTimer.current); pollTimer.current = null; setWorking(false); setError(err) }
+        return
+      }
+      if (!data) return
+      setJob(data)
+      if (data.status === 'completed') {
+        clearInterval(pollTimer.current); pollTimer.current = null
+        try { localStorage.removeItem(INFLIGHT_KEY) } catch {}
+        setWorking(false)
+        setRefreshKey(k => k + 1)   // reload Library tab
+      } else if (data.status === 'failed') {
+        clearInterval(pollTimer.current); pollTimer.current = null
+        try { localStorage.removeItem(INFLIGHT_KEY) } catch {}
+        setWorking(false); setError(data.error || 'Enhancement failed')
+      }
+      if (attempts > 200) {
+        clearInterval(pollTimer.current); pollTimer.current = null
+        setWorking(false); setError('Timed out waiting for enhancement')
+      }
+    }, 1500)
+  }
+
   const handleFile = async (file) => {
-    setError(null); setResult(null)
-    if (!file?.type?.startsWith('image/')) {
-      antMessage.error('Pick an image file')
-      return false
-    }
-    if (file.size > 8 * 1024 * 1024) {
-      antMessage.error('Image too large (max 8 MB)')
-      return false
-    }
+    setError(null); setJob(null)
+    if (!file?.type?.startsWith('image/')) { antMessage.error('Pick an image file'); return false }
+    if (file.size > 8 * 1024 * 1024)        { antMessage.error('Image too large (max 8 MB)'); return false }
     setSourceFile(file)
     try {
       const dataUrl = await fileToDataUrl(file)
@@ -106,63 +167,131 @@ export default function ImageEnhancer() {
     } catch {
       antMessage.error('Could not read the image')
     }
-    return false   // antd Upload's own POST is suppressed
+    return false
   }
 
   const enhance = async () => {
     const preset = PRESETS.find(p => p.id === selectedPreset)
     if (!preset) return
-    if (!sourceDataUrl) {
-      setError('Upload an image first.')
-      return
-    }
-    setError(null); setResult(null); setWorking(true)
+    if (!sourceDataUrl) { setError('Upload an image first.'); return }
+    setError(null); setJob(null); setWorking(true)
     const { data, error: err } = await enhanceImage({
       dataUrl: sourceDataUrl,
       prompt: preset.prompt,
       presetId: preset.id,
+      type: PRESET_TYPE[preset.id] || 'fast',
+      engine,
     })
-    setWorking(false)
-    if (err) { setError(err); return }
-    setResult({ ...data, presetId: preset.id, presetName: preset.name })
+    if (err) { setWorking(false); setError(err); return }
+    setJob(data)
+    try { localStorage.setItem(INFLIGHT_KEY, data.imageId) } catch {}
+    startPolling(data.imageId)
   }
 
   const reset = () => {
+    if (pollTimer.current) clearInterval(pollTimer.current)
+    pollTimer.current = null
+    try { localStorage.removeItem(INFLIGHT_KEY) } catch {}
     setSourceFile(null); setSourceDataUrl('')
-    setResult(null); setError(null)
+    setJob(null); setError(null); setWorking(false)
   }
 
   const downloadResult = () => {
-    if (!result?.imageUrl) return
+    if (!job?.outputUrl) return
     const a = document.createElement('a')
-    a.href = result.imageUrl
-    a.download = `enhanced-${result.presetId}-${Date.now()}.png`
+    a.href = job.outputUrl
+    a.download = `enhanced-${job.presetId || job.imageId}-${Date.now()}.png`
     a.target = '_blank'; a.rel = 'noopener'
     a.click()
   }
 
   const expanded = expandedPreset ? PRESETS.find(p => p.id === expandedPreset) : null
   const activePreset = PRESETS.find(p => p.id === selectedPreset)
+  const resultUrl = job?.outputUrl
+  const status = job?.status
 
   return (
     <div className="min-h-screen bg-black text-gray-100 pt-20 pb-16 px-4 sm:px-6">
       <div className="max-w-5xl mx-auto">
         <header className="mb-8">
-          <div className="flex items-center gap-2 mb-2">
-            <ThunderboltOutlined className="text-amber-400 text-xl" />
-            <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-amber-300 bg-clip-text text-transparent">
-              Image Enhancer
-            </h1>
+          <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <ThunderboltOutlined className="text-amber-400 text-xl" />
+              <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-amber-300 bg-clip-text text-transparent">
+                Image Enhancer
+              </h1>
+            </div>
+            {/* Engine toggle — Cloud (Gemini, fast) vs Local (5090, free) */}
+            <div className="flex items-center gap-1 p-1 rounded-full bg-gray-900/60 border border-gray-800">
+              {[
+                { id: 'cloud', label: 'Cloud', icon: <CloudOutlined />, sub: 'Gemini · 10-15s' },
+                { id: 'local', label: 'Local', icon: <DesktopOutlined />, sub: '5090 · free' },
+              ].map(opt => (
+                <button key={opt.id} onClick={() => setEngine(opt.id)}
+                  disabled={working}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-all ${
+                    engine === opt.id
+                      ? 'bg-gradient-to-r from-cyan-500/30 to-fuchsia-500/30 text-white border border-cyan-400/40'
+                      : 'text-gray-400 hover:text-gray-200'
+                  } ${working ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  {opt.icon}
+                  <span className="font-semibold">{opt.label}</span>
+                  <span className="text-[9px] opacity-60">{opt.sub}</span>
+                </button>
+              ))}
+            </div>
           </div>
           <p className="text-sm text-gray-400 max-w-2xl">
-            Polish photos with cinematic prompts via Gemini 2.5 Flash Image. Pick a preset
-            below, click <span className="text-cyan-300">Expand</span> to read the full prompt,
+            Polish photos with cinematic prompts. Pick a preset below, click{' '}
+            <span className="text-cyan-300">Expand</span> to read the full prompt,
             upload an image, and hit <span className="text-amber-300">Enhance</span>.
+            Cloud uses Gemini 2.5 Flash Image. Local uses the 5090 + ComfyUI.
           </p>
         </header>
 
-        {/* ─── Upload + Preview ─── */}
-        <section className="grid sm:grid-cols-2 gap-4 mb-6">
+        <Tabs
+          defaultActiveKey="generate"
+          size="large"
+          items={[
+            {
+              key: 'generate',
+              label: <span><ThunderboltOutlined /> Generate</span>,
+              children: (
+                <GenerateSection
+                  sourceDataUrl={sourceDataUrl} reset={reset} handleFile={handleFile}
+                  resultUrl={resultUrl} status={status} working={working} engine={engine}
+                  job={job} activePreset={activePreset} downloadResult={downloadResult}
+                  error={error}
+                  selectedPreset={selectedPreset} setSelectedPreset={setSelectedPreset}
+                  setExpandedPreset={setExpandedPreset} enhance={enhance}
+                />
+              ),
+            },
+            {
+              key: 'library',
+              label: <span><AppstoreOutlined /> Library</span>,
+              children: <ImageLibrary refreshKey={refreshKey} />,
+            },
+          ]}
+        />
+
+        {/* Modal stays at root so it overlays both tabs */}
+        <ImageEnhancerModal expanded={expanded}
+          setExpandedPreset={setExpandedPreset} setSelectedPreset={setSelectedPreset} />
+      </div>
+    </div>
+  )
+}
+
+// ─── Generator section (extracted so the Tabs structure stays clean) ──
+function GenerateSection({
+  sourceDataUrl, reset, handleFile, resultUrl, status, working, engine, job,
+  activePreset, downloadResult, error, selectedPreset, setSelectedPreset,
+  setExpandedPreset, enhance,
+}) {
+  return (
+    <>
+      <section className="grid sm:grid-cols-2 gap-4 mb-6">
           <div className="rounded-2xl border-2 border-dashed border-gray-800 hover:border-cyan-500/40 transition-colors p-4 bg-gray-900/40">
             <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Source image</p>
             {sourceDataUrl ? (
@@ -189,13 +318,22 @@ export default function ImageEnhancer() {
           </div>
 
           <div className="rounded-2xl border border-gray-800 p-4 bg-gray-900/40 flex flex-col">
-            <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Enhanced output</p>
-            {result?.imageUrl ? (
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] uppercase tracking-wider text-gray-500">Enhanced output</p>
+              {status && status !== 'completed' && (
+                <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                  status === 'queued'     ? 'bg-amber-500/15 text-amber-300 border-amber-500/40'
+                  : status === 'processing' ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/40'
+                  : 'bg-rose-500/15 text-rose-300 border-rose-500/40'
+                }`}>{status}</span>
+              )}
+            </div>
+            {resultUrl ? (
               <>
-                <img src={result.imageUrl} alt="enhanced" className="w-full max-h-72 object-contain rounded-lg" />
+                <img src={resultUrl} alt="enhanced" className="w-full max-h-72 object-contain rounded-lg" />
                 <div className="mt-3 flex items-center justify-between gap-2">
                   <span className="text-[10px] text-gray-500">
-                    {result.presetName} · {result.model || 'gemini'} · {Math.round((result.elapsedMs || 0) / 1000)}s
+                    {activePreset?.name} · {job?.engine === 'cloud' ? 'Gemini' : '5090 local'}
                   </span>
                   <button onClick={downloadResult}
                     className="flex items-center gap-1 text-xs px-3 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 transition-colors">
@@ -206,7 +344,12 @@ export default function ImageEnhancer() {
             ) : working ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-2 py-8">
                 <div className="w-10 h-10 rounded-full border-2 border-cyan-500/30 border-t-cyan-400 animate-spin" />
-                <p className="text-xs text-gray-500">Enhancing… typically 5-15s</p>
+                <p className="text-xs text-gray-500">
+                  {status === 'queued' ? 'Queued — waiting for worker…'
+                    : status === 'processing' ? 'Enhancing…'
+                    : `Enhancing… typically ${engine === 'cloud' ? '5-15' : '20-60'}s`}
+                </p>
+                {job?.imageId && <p className="text-[10px] text-gray-700 font-mono break-all pt-1">{job.imageId}</p>}
               </div>
             ) : error ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-2 py-8 text-center">
@@ -280,49 +423,147 @@ export default function ImageEnhancer() {
             {working ? 'Enhancing…' : 'Enhance image'}
           </button>
         </div>
+    </>
+  )
+}
 
-        {/* ─── Full prompt modal ─── */}
-        <Modal
-          open={!!expanded}
-          onCancel={() => setExpandedPreset(null)}
-          footer={null}
-          width={720}
-          centered
-          closeIcon={null}
-          styles={{
-            content: { background: '#0b0f17', padding: 0, borderRadius: 16, border: '1px solid rgba(34,211,238,0.25)' },
-            body: { padding: 0 },
-            header: { display: 'none' },
-            mask: { backdropFilter: 'blur(6px)' },
-          }}>
-          {expanded && (
-            <>
-              <div className={`flex items-center justify-between px-5 py-3 border-b border-gray-800/80 bg-gradient-to-r ${expanded.accent.replace('via-', 'to-').split(' ')[0]} bg-opacity-10`}>
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">{expanded.icon}</span>
-                  <h3 className="text-sm font-semibold text-white tracking-wide">{expanded.name}</h3>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => { setSelectedPreset(expanded.id); setExpandedPreset(null) }}
-                    className="text-[10px] font-semibold px-2 py-1 rounded-full bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 transition-colors">
-                    Use this prompt
-                  </button>
-                  <button onClick={() => setExpandedPreset(null)}
-                    className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded">
-                    ✕
-                  </button>
-                </div>
-              </div>
-              <div className="max-h-[65vh] overflow-y-auto p-5 bg-[#06080d]">
-                <p className="text-xs text-gray-400 mb-3">{expanded.short}</p>
-                <pre className="text-[12px] font-mono text-gray-200 leading-relaxed whitespace-pre-wrap break-words bg-black/40 border border-gray-800 rounded-lg p-4">
-{expanded.prompt}
-                </pre>
-              </div>
-            </>
-          )}
-        </Modal>
+// ─── Library tab ─────────────────────────────────────────────────
+function ImageLibrary({ refreshKey }) {
+  const [filter, setFilter] = useState('completed')
+  const [page, setPage] = useState(1)
+  const [data, setData] = useState({ items: [], total: 0, pages: 1, counts: {} })
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => { setPage(1) }, [filter, refreshKey])
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    listEnhancedImages({ status: filter, page, limit: 24 }).then(({ data: result }) => {
+      if (cancelled) return
+      if (result) setData(result)
+      setLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [filter, page, refreshKey])
+
+  const filters = [
+    { v: 'completed',  label: 'Completed',  n: data.counts?.completed },
+    { v: 'processing', label: 'Processing', n: data.counts?.processing },
+    { v: 'queued',     label: 'Queued',     n: data.counts?.queued },
+    { v: 'failed',     label: 'Failed',     n: data.counts?.failed },
+    { v: 'all',        label: 'All',        n: null },
+  ]
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 flex-wrap">
+        {filters.map(f => {
+          const active = filter === f.v
+          return (
+            <button key={f.v} onClick={() => setFilter(f.v)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                active
+                  ? 'bg-cyan-600/20 text-cyan-300 border-cyan-500/40'
+                  : 'bg-gray-800/60 hover:bg-gray-800 text-gray-400 border-transparent hover:border-gray-700'
+              }`}>
+              <span>{f.label}</span>
+              {f.n != null && <span className="text-[10px] opacity-70 font-mono">({f.n})</span>}
+            </button>
+          )
+        })}
       </div>
+
+      {loading ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {[1,2,3,4,5,6,7,8].map(i => (
+            <div key={i} className="aspect-square rounded-xl bg-gray-900/40 animate-pulse" />
+          ))}
+        </div>
+      ) : data.items.length === 0 ? (
+        <div className="py-16 text-center text-gray-500 text-sm">
+          No {filter === 'all' ? '' : filter} enhancements yet.
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {data.items.map(it => <LibraryCard key={it.imageId} image={it} />)}
+        </div>
+      )}
     </div>
+  )
+}
+
+function LibraryCard({ image }) {
+  const url = image.outputUrl || image.sourceUrl
+  return (
+    <a href={image.outputUrl || image.sourceUrl} target="_blank" rel="noopener"
+      className="group relative aspect-square rounded-xl overflow-hidden border border-gray-800 hover:border-cyan-400/50 transition-all bg-gray-900/40">
+      {url ? (
+        <img src={url} alt={image.prompt}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-900 to-gray-950">
+          <span className="text-3xl opacity-50">
+            {image.status === 'failed' ? '✗' : image.status === 'processing' ? '⚡' : '⏳'}
+          </span>
+        </div>
+      )}
+      <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-black/60 text-white border border-white/10">
+        {image.engine === 'cloud' ? '☁ Gemini' : '🖥 5090'}
+      </div>
+      {image.status !== 'completed' && (
+        <div className={`absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+          image.status === 'failed' ? 'bg-rose-500/80 text-white'
+          : image.status === 'processing' ? 'bg-cyan-500/80 text-white'
+          : 'bg-amber-500/80 text-black'
+        }`}>{image.status}</div>
+      )}
+    </a>
+  )
+}
+
+// ─── Full-prompt modal (extracted so it can sit above the Tabs) ──
+function ImageEnhancerModal({ expanded, setExpandedPreset, setSelectedPreset }) {
+  return (
+    <Modal
+      open={!!expanded}
+      onCancel={() => setExpandedPreset(null)}
+      footer={null}
+      width={720}
+      centered
+      closeIcon={null}
+      styles={{
+        content: { background: '#0b0f17', padding: 0, borderRadius: 16, border: '1px solid rgba(34,211,238,0.25)' },
+        body: { padding: 0 },
+        header: { display: 'none' },
+        mask: { backdropFilter: 'blur(6px)' },
+      }}>
+      {expanded && (
+        <>
+          <div className={`flex items-center justify-between px-5 py-3 border-b border-gray-800/80 bg-gradient-to-r ${expanded.accent.replace('via-', 'to-').split(' ')[0]} bg-opacity-10`}>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">{expanded.icon}</span>
+              <h3 className="text-sm font-semibold text-white tracking-wide">{expanded.name}</h3>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => { setSelectedPreset(expanded.id); setExpandedPreset(null) }}
+                className="text-[10px] font-semibold px-2 py-1 rounded-full bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 transition-colors">
+                Use this prompt
+              </button>
+              <button onClick={() => setExpandedPreset(null)}
+                className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded">
+                ✕
+              </button>
+            </div>
+          </div>
+          <div className="max-h-[65vh] overflow-y-auto p-5 bg-[#06080d]">
+            <p className="text-xs text-gray-400 mb-3">{expanded.short}</p>
+            <pre className="text-[12px] font-mono text-gray-200 leading-relaxed whitespace-pre-wrap break-words bg-black/40 border border-gray-800 rounded-lg p-4">
+{expanded.prompt}
+            </pre>
+          </div>
+        </>
+      )}
+    </Modal>
   )
 }

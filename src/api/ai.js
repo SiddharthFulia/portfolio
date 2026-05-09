@@ -154,14 +154,35 @@ export async function listJobs({ status = 'all', page = 1, limit = 24 } = {}) {
   }
 }
 
-// Image Enhancer — sends a base64 dataUrl OR an existing imageUrl plus a
-// polishing prompt to Gemini 2.5 Flash Image. Returns the new Cloudinary URL.
-export async function enhanceImage({ dataUrl, imageUrl, prompt, presetId }) {
+// Image Enhancer — async. Submits the job; returns { imageId, status }.
+// FE polls getImageStatus until status == 'completed' | 'failed'.
+export async function enhanceImage({ dataUrl, imageUrl, prompt, presetId, type = 'fast', engine = 'cloud' }) {
   try {
-    const body = { prompt, presetId };
+    const body = { prompt, presetId, type, engine };
     if (dataUrl) body.dataUrl = dataUrl;
     if (imageUrl) body.imageUrl = imageUrl;
-    const data = await post(ENDPOINTS.IMAGE_ENHANCE, body, { timeout: 120000 });
+    const data = await post(ENDPOINTS.IMAGE_ENHANCE, body, { timeout: 60000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+}
+
+export async function getImageStatus(imageId) {
+  try {
+    const data = await get(`${ENDPOINTS.IMAGE_ENHANCE_STATUS}/${imageId}`, {}, { timeout: 6000 });
+    return { data: data?.data || null, error: null };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+}
+
+export async function listEnhancedImages({ status = 'completed', type, engine, page = 1, limit = 24 } = {}) {
+  try {
+    const q = { status, page, limit };
+    if (type) q.type = type;
+    if (engine) q.engine = engine;
+    const data = await get(ENDPOINTS.IMAGE_ENHANCE_LIST, q, { timeout: 8000 });
     return { data: data?.data || data, error: null };
   } catch (err) {
     return { data: null, error: err.message };

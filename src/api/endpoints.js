@@ -23,6 +23,8 @@ export const ENDPOINTS = {
   AI_VIDEO_UPLOAD_IMAGE: '/api/ai-video/upload-image',
   AI_VIDEO_JOBS:        '/api/ai-video/jobs',
   IMAGE_ENHANCE:        '/api/image-enhance',
+  IMAGE_ENHANCE_STATUS: '/api/image-enhance/status',
+  IMAGE_ENHANCE_LIST:   '/api/image-enhance/list',
 
   // Vision
   FACE_ANALYZE: '/api/face-analyze',
