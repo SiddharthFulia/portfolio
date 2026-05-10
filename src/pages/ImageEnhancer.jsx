@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Modal, Upload, Tabs, Input, message as antMessage } from 'antd'
+import { Modal, Upload, Tabs, Input, Select, message as antMessage } from 'antd'
 import {
   UploadOutlined, ExpandAltOutlined, DownloadOutlined,
   CheckOutlined, ReloadOutlined, ThunderboltOutlined,
@@ -46,6 +46,43 @@ const PRESET_TYPE = {
   '4k-detail-recovery':    'quality',
   'studio-cinematic-light': 'cinematic',
   'hong-kong-night':       'cinematic',
+}
+
+// Pre-made prompt templates — grouped by use-case. Each one drops into the
+// Atelier prompt textarea on selection; the user can still freely edit.
+// Add as many as you want — the dropdown auto-renders all of them.
+const PROMPT_TEMPLATES = [
+  { group: 'Polish & Restore', id: 'sharpen-face',     label: '🪞 Sharpen face',       text: 'sharpen the face, recover skin texture, defined eyes and lashes, natural pores, photorealistic detail. preserve identity.' },
+  { group: 'Polish & Restore', id: 'remove-blur',      label: '⚡ Remove blur',         text: 'remove motion blur and softness, restore sharp edges, recover fine detail, keep colors and composition unchanged.' },
+  { group: 'Polish & Restore', id: 'denoise-clean',    label: '✨ Denoise / clean',     text: 'remove noise, jpeg artifacts, and grain. clean up the image without losing detail. natural skin tone, no plastic look.' },
+  { group: 'Polish & Restore', id: 'detail-recovery',  label: '🔍 4K detail recovery',  text: 'recover micro-detail at 4K resolution, sharp eyes, individually defined hair strands, fabric weave, natural skin pores. zero stylization.' },
+
+  { group: 'Look & Lighting',  id: 'cinematic',        label: '🎬 Cinematic',           text: 'cinematic lighting, balanced studio quality, expanded dynamic range, soft directional light, warm highlights, cool shadows, film-grade color.' },
+  { group: 'Look & Lighting',  id: 'sony-a1',          label: '📷 Sony A1 portrait',    text: 'shot on Sony A1, 85mm f/1.4 lens, ISO 100, cinematic shallow depth of field, perfect facial focus, editorial color profile.' },
+  { group: 'Look & Lighting',  id: 'magazine-cover',   label: '📰 Magazine cover',      text: 'magazine editorial portrait, premium clarity, soft beauty light, glossy finish, fashion magazine grade, cover-ready.' },
+  { group: 'Look & Lighting',  id: 'hong-kong-night',  label: '🌙 Hong Kong night',     text: 'wong kar-wai 1990s hong kong cinema, deep emerald and crimson tones, neon reflections, soft bloom, film grain, moody atmosphere.' },
+  { group: 'Look & Lighting',  id: 'bw-film',          label: '🖤 B&W film',            text: 'black and white classic film, deep blacks, creamy mid-tones, film grain, ilford hp5 look, timeless portrait.' },
+
+  { group: 'Text → Image',     id: 't2i-portrait',     label: '👤 Portrait (t2i)',      text: 'cinematic photo-realistic portrait of a person, soft window light, shallow depth of field, 85mm lens, neutral background, editorial style.' },
+  { group: 'Text → Image',     id: 't2i-landscape',    label: '🏞️ Landscape (t2i)',     text: 'wide cinematic landscape, golden hour, dramatic clouds, ultra-detailed terrain, photo-realistic, 35mm anamorphic.' },
+  { group: 'Text → Image',     id: 't2i-product',      label: '📦 Product shot (t2i)',  text: 'studio product photograph on white seamless background, three-point softbox lighting, ultra-sharp detail, commercial advertisement quality.' },
+
+  { group: 'Edit (Flux Kontext)', id: 'edit-color',     label: '🎨 Recolor element',    text: 'change the [object] to [color]. keep everything else exactly the same — pose, identity, background, lighting unchanged.' },
+  { group: 'Edit (Flux Kontext)', id: 'edit-bg-remove', label: '✂️ Remove background',  text: 'replace the background with a clean neutral grey studio backdrop. keep the subject identical — same pose, same lighting on subject.' },
+  { group: 'Edit (Flux Kontext)', id: 'edit-attire',    label: '👔 Change outfit',      text: 'change the outfit to a [describe]. preserve face, pose, body shape, and background. only change the clothing.' },
+]
+
+// Group templates by their `group` field for the Antd Select grouped dropdown
+function groupedTemplates() {
+  const groups = {}
+  for (const t of PROMPT_TEMPLATES) {
+    if (!groups[t.group]) groups[t.group] = []
+    groups[t.group].push(t)
+  }
+  return Object.entries(groups).map(([label, options]) => ({
+    label,
+    options: options.map(t => ({ value: t.id, label: t.label, _text: t.text })),
+  }))
 }
 
 // Atelier workflow catalog. Each entry knows what inputs it needs (image /
@@ -626,20 +663,47 @@ function GenerateSection({
               </div>
             </div>
 
-            {/* Prompt — required by some workflows */}
+            {/* Prompt — required by some workflows. Pick from a template (drops
+                into the textarea) or write your own freely. */}
             {wf.needsPrompt && (
               <div>
-                <label className="text-[10px] uppercase tracking-wider text-gray-500 block mb-1">Prompt</label>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <label className="text-[10px] uppercase tracking-wider text-gray-500">Prompt</label>
+                  <button type="button" onClick={() => setAtelierPrompt('')}
+                    className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors">
+                    clear
+                  </button>
+                </div>
+                <Select
+                  className="w-full mb-2"
+                  size="middle"
+                  placeholder="📋 Pick a template…  (or just type below)"
+                  options={groupedTemplates()}
+                  value={undefined}
+                  popupMatchSelectWidth={false}
+                  onChange={(_value, option) => {
+                    // Append a comma+space if the textarea already has content,
+                    // so users can stack templates. Otherwise replace.
+                    const next = atelierPrompt.trim()
+                      ? `${atelierPrompt.trim()}, ${option._text}`
+                      : option._text
+                    setAtelierPrompt(next)
+                  }}
+                />
                 <Input.TextArea
                   value={atelierPrompt} onChange={e => setAtelierPrompt(e.target.value)}
-                  autoSize={{ minRows: 2, maxRows: 5 }}
+                  autoSize={{ minRows: 3, maxRows: 8 }}
                   placeholder={wf.family === 't2i'
                     ? 'e.g. "a cinematic portrait of a wolf in misty forest, golden hour, 35mm film"'
                     : wf.family === 'edit'
                       ? 'e.g. "change the shirt to red, keep everything else the same"'
-                      : 'e.g. "high detail skin, sharp eyes, natural lighting"'}
-                  maxLength={1000}
+                      : 'e.g. "sharpen face, recover skin texture, natural lighting"'}
+                  maxLength={2000}
+                  showCount
                 />
+                <p className="text-[10px] text-gray-600 mt-1">
+                  Pick a template to autofill — or stack multiple. You can edit freely afterwards.
+                </p>
               </div>
             )}
 
