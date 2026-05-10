@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Modal, Upload, Tabs, message as antMessage } from 'antd'
+import { Modal, Upload, Tabs, Input, message as antMessage } from 'antd'
 import {
   UploadOutlined, ExpandAltOutlined, DownloadOutlined,
   CheckOutlined, ReloadOutlined, ThunderboltOutlined,
@@ -12,9 +12,33 @@ import {
 // localStorage key — persists the in-flight enhancement across refreshes
 const INFLIGHT_KEY = 'sid-imgenh-inflight'
 
-// Map a preset to a workflow `type` for the BE. All current presets are
-// "polish without changing identity" → type='quality' for local engine, the
-// cloud engine uses prompt directly so type is informational only.
+// Color a log line by its leading glyph — same scheme as the video-lane feed
+const logTone = (text) => {
+  if (!text) return 'text-gray-400'
+  if (text.startsWith('✗')) return 'text-rose-400'
+  if (text.startsWith('🖼')) return 'text-emerald-300'
+  if (text.startsWith('✓')) return 'text-emerald-400/80'
+  if (text.startsWith('⚡')) return 'text-amber-300'
+  if (text.startsWith('→') || text.startsWith('↑')) return 'text-fuchsia-300'
+  return 'text-gray-400'
+}
+
+const fmtLogTs = (ts) => {
+  if (!ts) return ''
+  const d = new Date(ts)
+  const pad = (n, w = 2) => String(n).padStart(w, '0')
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`
+}
+
+// Detects when Gemini refused for content/identity reasons. The BE error
+// string includes the finishReason or blockReason from the API response
+// (added in our diagnostic-error patch). When this matches, we show a
+// friendlier UI with a "Try on Local 5090" button instead of a raw error.
+const CLOUD_REFUSAL_RE = /IMAGE_OTHER|IMAGE_SAFETY|^SAFETY$|=SAFETY|RECITATION|blockReason|PROHIBITED|finishReason=SAFETY/i
+const isCloudRefusal = (msg) => !!msg && CLOUD_REFUSAL_RE.test(msg)
+
+// Map a preset to a workflow `type` for the BE. Cloud engine uses prompts
+// directly; type is informational on cloud but maps to a workflow on Atelier.
 const PRESET_TYPE = {
   'sharpen-deblur':        'fast',
   'cinematic-upscale':     'quality',
@@ -23,6 +47,58 @@ const PRESET_TYPE = {
   'studio-cinematic-light': 'cinematic',
   'hong-kong-night':       'cinematic',
 }
+
+// Atelier workflow catalog. Each entry knows what inputs it needs (image /
+// prompt / fine-tunes), what model file ComfyUI will load, and reasonable
+// defaults. The FE shows/hides the right input fields based on `family`.
+const ATELIER_WORKFLOWS = [
+  // ─── Upscalers — pure GAN, no diffusion. Fast, no prompt, no safety filter.
+  {
+    id: 'realesrgan-x4', family: 'upscale', label: 'Real-ESRGAN x4',
+    blurb: 'General 4× upscale. Default for anything.',
+    model: 'RealESRGAN_x4.pth', needsImage: true, needsPrompt: false,
+    eta: '~10s', icon: '⚡',
+  },
+  {
+    id: 'ultrasharp-x4', family: 'upscale', label: '4x-UltraSharp',
+    blurb: 'Sharper edges. Best for portraits + product shots.',
+    model: '4x-UltraSharp.pth', needsImage: true, needsPrompt: false,
+    eta: '~12s', icon: '🔪',
+  },
+  {
+    id: 'nmkd-siax', family: 'upscale', label: 'NMKD-Siax',
+    blurb: 'Tuned for face/skin texture recovery.',
+    model: '4x_NMKD-Siax_200k.pth', needsImage: true, needsPrompt: false,
+    eta: '~12s', icon: '👤',
+  },
+  // ─── Img2img polish — diffusion with low denoise, identity-preserving
+  {
+    id: 'sdxl-polish', family: 'img2img', label: 'SDXL Polish',
+    blurb: 'Photo-real polish with prompt steering. Low denoise keeps identity.',
+    checkpoint: 'Juggernaut-XL_v9_RunDiffusionPhoto_v2.safetensors',
+    needsImage: true, needsPrompt: true,
+    defaults: { steps: 20, denoise: 0.20, cfg: 5.0 },
+    eta: '~30s', icon: '🎨',
+  },
+  // ─── Text to image — no source needed
+  {
+    id: 'sdxl-t2i', family: 't2i', label: 'Text → Image (SDXL)',
+    blurb: 'Generate from prompt only. JuggernautXL photo-realistic.',
+    checkpoint: 'Juggernaut-XL_v9_RunDiffusionPhoto_v2.safetensors',
+    needsImage: false, needsPrompt: true,
+    defaults: { steps: 25, cfg: 5.0, width: 1024, height: 1024 },
+    eta: '~30s', icon: '✨',
+  },
+  // ─── Flux Kontext — prompt edit (Gemini-like, no safety filter)
+  {
+    id: 'flux-kontext-edit', family: 'edit', label: 'Flux Kontext (edit)',
+    blurb: 'Edit image with text instruction. Identity preserved natively.',
+    checkpoint: 'flux1-dev-kontext_fp8_scaled.safetensors',
+    needsImage: true, needsPrompt: true,
+    defaults: { steps: 20, cfg: 2.5 },
+    eta: '~45s', icon: '🪄',
+  },
+]
 
 // ─── Preset prompts ─────────────────────────────────────────────
 // Each card on the page is one of these. The full text (the actual prompt
@@ -112,7 +188,12 @@ export default function ImageEnhancer() {
   const [sourceDataUrl, setSourceDataUrl] = useState('')
   const [selectedPreset, setSelectedPreset] = useState(PRESETS[0].id)
   const [expandedPreset, setExpandedPreset] = useState(null)
-  const [engine, setEngine] = useState('cloud')          // cloud (Gemini) | local (5090)
+  const [engine, setEngine] = useState('cloud')          // cloud (Gemini) | atelier (5090)
+  // Atelier-only state: which workflow + fine-tune knobs
+  const [atelierWorkflow, setAtelierWorkflow] = useState(ATELIER_WORKFLOWS[0].id)
+  const [tunings, setTunings] = useState({ steps: 20, denoise: 0.2, cfg: 5.0, width: 1024, height: 1024 })
+  const [atelierPrompt, setAtelierPrompt] = useState('')
+  const [logsModalOpen, setLogsModalOpen] = useState(false)
   const [working, setWorking] = useState(false)
   const [job, setJob] = useState(null)                    // active or last-finished SQLite row
   const [error, setError] = useState(null)
@@ -120,6 +201,13 @@ export default function ImageEnhancer() {
   const pollTimer = useRef(null)
 
   useEffect(() => { document.title = 'Image Enhancer · Sid' }, [])
+
+  // When the user picks a different Atelier workflow, hydrate its defaults
+  // into the tuning sliders. They can still tweak afterwards.
+  useEffect(() => {
+    const wf = ATELIER_WORKFLOWS.find(w => w.id === atelierWorkflow)
+    if (wf?.defaults) setTunings(t => ({ ...t, ...wf.defaults }))
+  }, [atelierWorkflow])
 
   // Resume an in-flight job after a page refresh
   useEffect(() => {
@@ -182,18 +270,42 @@ export default function ImageEnhancer() {
     return false
   }
 
-  const enhance = async () => {
-    const preset = PRESETS.find(p => p.id === selectedPreset)
-    if (!preset) return
-    if (!sourceDataUrl) { setError('Upload an image first.'); return }
+  const enhance = async (engineOverride) => {
+    const useEngine = engineOverride || engine
+    const isAtelier = useEngine === 'atelier' || useEngine === 'local'
+    if (engineOverride && engineOverride !== engine) setEngine(engineOverride)
+
+    // Build the request body based on engine + workflow
+    let body
+    if (isAtelier) {
+      const wf = ATELIER_WORKFLOWS.find(w => w.id === atelierWorkflow) || ATELIER_WORKFLOWS[0]
+      if (wf.needsImage && !sourceDataUrl) { setError('Upload an image first.'); return }
+      if (wf.needsPrompt && !atelierPrompt.trim()) { setError('Add a prompt for this workflow.'); return }
+      body = {
+        engine: 'atelier',
+        workflow: wf.id,
+        type: wf.family,
+        prompt: atelierPrompt.trim() || wf.label,
+        ...(sourceDataUrl ? { dataUrl: sourceDataUrl } : {}),
+        // Fine-tunes — BE only persists the relevant ones for the workflow's family
+        steps: tunings.steps, denoise: tunings.denoise, cfg: tunings.cfg,
+        width: tunings.width, height: tunings.height,
+      }
+    } else {
+      const preset = PRESETS.find(p => p.id === selectedPreset)
+      if (!preset) return
+      if (!sourceDataUrl) { setError('Upload an image first.'); return }
+      body = {
+        engine: 'cloud',
+        dataUrl: sourceDataUrl,
+        prompt: preset.prompt,
+        presetId: preset.id,
+        type: PRESET_TYPE[preset.id] || 'fast',
+      }
+    }
+
     setError(null); setJob(null); setWorking(true)
-    const { data, error: err } = await enhanceImage({
-      dataUrl: sourceDataUrl,
-      prompt: preset.prompt,
-      presetId: preset.id,
-      type: PRESET_TYPE[preset.id] || 'fast',
-      engine,
-    })
+    const { data, error: err } = await enhanceImage(body)
     if (err) { setWorking(false); setError(err); return }
     setJob(data)
     try { localStorage.setItem(INFLIGHT_KEY, data.imageId) } catch {}
@@ -223,32 +335,32 @@ export default function ImageEnhancer() {
   const status = job?.status
 
   return (
-    <div className="min-h-screen bg-black text-gray-100 pt-20 pb-16 px-4 sm:px-6">
+    <div className="min-h-screen bg-black text-gray-100 pt-20 pb-16 px-3 sm:px-6">
       <div className="max-w-5xl mx-auto">
         <header className="mb-8">
           <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
             <div className="flex items-center gap-2">
               <ThunderboltOutlined className="text-amber-400 text-xl" />
-              <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-amber-300 bg-clip-text text-transparent">
+              <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-amber-300 bg-clip-text text-transparent">
                 Image Enhancer
               </h1>
             </div>
             {/* Engine toggle — Cloud (Gemini, fast) vs Local (5090, free) */}
             <div className="flex items-center gap-1 p-1 rounded-full bg-gray-900/60 border border-gray-800">
               {[
-                { id: 'cloud', label: 'Cloud', icon: <CloudOutlined />, sub: 'Gemini · 10-15s' },
-                { id: 'local', label: 'Local', icon: <DesktopOutlined />, sub: '5090 · free' },
+                { id: 'cloud',   label: 'Cloud',   icon: <CloudOutlined />,   sub: 'Gemini · 10-15s' },
+                { id: 'atelier', label: 'Atelier', icon: <DesktopOutlined />, sub: '5090 · free · 6 workflows' },
               ].map(opt => (
                 <button key={opt.id} onClick={() => setEngine(opt.id)}
                   disabled={working}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-all ${
+                  className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs transition-all ${
                     engine === opt.id
                       ? 'bg-gradient-to-r from-cyan-500/30 to-fuchsia-500/30 text-white border border-cyan-400/40'
                       : 'text-gray-400 hover:text-gray-200'
                   } ${working ? 'opacity-50 cursor-not-allowed' : ''}`}>
                   {opt.icon}
                   <span className="font-semibold">{opt.label}</span>
-                  <span className="text-[9px] opacity-60">{opt.sub}</span>
+                  <span className="hidden sm:inline text-[9px] opacity-60">{opt.sub}</span>
                 </button>
               ))}
             </div>
@@ -276,6 +388,9 @@ export default function ImageEnhancer() {
                   error={error}
                   selectedPreset={selectedPreset} setSelectedPreset={setSelectedPreset}
                   setExpandedPreset={setExpandedPreset} enhance={enhance}
+                  atelierWorkflow={atelierWorkflow} setAtelierWorkflow={setAtelierWorkflow}
+                  tunings={tunings} setTunings={setTunings}
+                  atelierPrompt={atelierPrompt} setAtelierPrompt={setAtelierPrompt}
                 />
               ),
             },
@@ -290,17 +405,43 @@ export default function ImageEnhancer() {
         {/* Modal stays at root so it overlays both tabs */}
         <ImageEnhancerModal expanded={expanded}
           setExpandedPreset={setExpandedPreset} setSelectedPreset={setSelectedPreset} />
+
+        {/* Full live-log viewer for the current job */}
+        <ImageLogModal open={logsModalOpen} onClose={() => setLogsModalOpen(false)} job={job} />
       </div>
     </div>
   )
 }
 
 // ─── Generator section (extracted so the Tabs structure stays clean) ──
+// Compact slider+number input — used for steps / denoise / cfg / w / h
+function Tuner({ label, value, min, max, step, onChange, fmt }) {
+  return (
+    <label className="block">
+      <div className="flex items-baseline justify-between mb-1">
+        <span className="text-[10px] uppercase tracking-wider text-gray-500">{label}</span>
+        <span className="text-xs font-mono text-cyan-300">{fmt ? fmt(value) : value}</span>
+      </div>
+      <input type="range" min={min} max={max} step={step} value={value}
+        onChange={e => onChange(parseFloat(e.target.value))}
+        className="w-full accent-cyan-400" />
+    </label>
+  )
+}
+
 function GenerateSection({
   sourceDataUrl, reset, handleFile, resultUrl, status, working, engine, job,
   activePreset, downloadResult, error, selectedPreset, setSelectedPreset,
   setExpandedPreset, enhance,
+  atelierWorkflow, setAtelierWorkflow, tunings, setTunings,
+  atelierPrompt, setAtelierPrompt,
 }) {
+  const isAtelier = engine === 'atelier' || engine === 'local'
+  const wf = ATELIER_WORKFLOWS.find(w => w.id === atelierWorkflow) || ATELIER_WORKFLOWS[0]
+  const showSteps = wf.defaults?.steps != null
+  const showDenoise = wf.defaults?.denoise != null
+  const showCfg = wf.defaults?.cfg != null
+  const showWH = wf.family === 't2i'
   return (
     <>
       <section className="grid sm:grid-cols-2 gap-4 mb-6">
@@ -353,23 +494,91 @@ function GenerateSection({
                 </div>
               </>
             ) : working ? (
-              <div className="flex-1 flex flex-col items-center justify-center gap-2 py-8">
-                <div className="w-10 h-10 rounded-full border-2 border-cyan-500/30 border-t-cyan-400 animate-spin" />
-                <p className="text-xs text-gray-500">
-                  {status === 'queued' ? 'Queued — waiting for worker…'
-                    : status === 'processing' ? 'Enhancing…'
-                    : `Enhancing… typically ${engine === 'cloud' ? '5-15' : '20-60'}s`}
-                </p>
-                {job?.imageId && <p className="text-[10px] text-gray-700 font-mono break-all pt-1">{job.imageId}</p>}
+              <div className="flex-1 flex flex-col gap-2 py-4">
+                <div className="flex items-center gap-3 px-2">
+                  <div className="w-8 h-8 rounded-full border-2 border-cyan-500/30 border-t-cyan-400 animate-spin shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-200 font-semibold">
+                      {status === 'queued' ? 'Queued — waiting for worker'
+                        : status === 'processing' ? 'Enhancing…'
+                        : 'Enhancing…'}
+                    </p>
+                    {job?.imageId && <p className="text-[9px] text-gray-700 font-mono break-all">{job.imageId}</p>}
+                  </div>
+                </div>
+                {/* Live log feed — Atelier path streams entries via /image-progress.
+                    Click the panel or the Expand button to open the full-history modal. */}
+                {Array.isArray(job?.logs) && job.logs.length > 0 && (
+                  <div className="mt-1">
+                    <div className="flex items-center justify-between mb-1 px-1">
+                      <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        live · {job.logs.length} {job.logs.length === 1 ? 'event' : 'events'}
+                      </span>
+                      <button type="button" onClick={() => setLogsModalOpen(true)}
+                        className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-cyan-500/40 hover:border-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 transition-colors">
+                        <ExpandAltOutlined className="text-[9px]" /> Expand
+                      </button>
+                    </div>
+                    <button type="button" onClick={() => setLogsModalOpen(true)}
+                      className="block w-full text-left rounded-lg bg-black/40 border border-gray-800/60 hover:border-cyan-500/40 transition-colors overflow-hidden">
+                      <div className="max-h-40 sm:max-h-48 overflow-y-auto p-2">
+                        <ul className="space-y-0.5">
+                          {job.logs.slice(-12).map((entry, i) => (
+                            <li key={`${entry?.ts || i}-${i}`}
+                                className={`text-[10px] sm:text-[11px] font-mono leading-snug break-all ${logTone(entry?.msg || '')}`}>
+                              {entry?.msg || ''}
+                            </li>
+                          ))}
+                        </ul>
+                        {job.logs.length > 12 && (
+                          <p className="text-[9px] text-gray-500 mt-1 text-center">
+                            + {job.logs.length - 12} earlier — click to see all
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                  </div>
+                )}
               </div>
             ) : error ? (
-              <div className="flex-1 flex flex-col items-center justify-center gap-2 py-8 text-center">
-                <p className="text-rose-400 text-sm font-mono">✗ {error}</p>
-                <button onClick={enhance}
-                  className="text-xs px-3 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300">
-                  <ReloadOutlined /> Retry
-                </button>
-              </div>
+              isCloudRefusal(error) ? (
+                // Friendly refusal UI — Gemini blocks identity-sensitive content.
+                // The local 5090 engine has no safety filter and handles these fine.
+                <div className="flex-1 flex flex-col items-center justify-center gap-3 py-6 px-3 text-center">
+                  <div className="text-3xl">🛡️</div>
+                  <div>
+                    <p className="text-amber-300 text-sm font-semibold mb-1">
+                      Gemini declined this one
+                    </p>
+                    <p className="text-gray-400 text-xs leading-relaxed max-w-[28ch] mx-auto">
+                      Cloud has safety filters around faces and identity-sensitive
+                      content. Switch to <span className="text-cyan-300 font-semibold">Local 5090</span> —
+                      no filters, runs free on the GPU, ~30 sec.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <button onClick={() => enhance('local')}
+                      className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-gradient-to-r from-cyan-400 via-fuchsia-400 to-amber-400 text-black font-semibold hover:scale-[1.03] transition-transform">
+                      <DesktopOutlined /> Try on 5090
+                    </button>
+                    <button onClick={() => enhance()}
+                      title="Retry on Cloud"
+                      className="text-xs px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 border border-gray-700">
+                      <ReloadOutlined />
+                    </button>
+                  </div>
+                  <p className="text-[9px] text-gray-600 font-mono pt-1 break-all">{error}</p>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center gap-2 py-8 text-center">
+                  <p className="text-rose-400 text-sm font-mono">✗ {error}</p>
+                  <button onClick={() => enhance()}
+                    className="text-xs px-3 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300">
+                    <ReloadOutlined /> Retry
+                  </button>
+                </div>
+              )
             ) : (
               <div className="flex-1 flex items-center justify-center text-xs text-gray-600">
                 Result will appear here
@@ -378,60 +587,146 @@ function GenerateSection({
           </div>
         </section>
 
-        {/* ─── Preset cards ─── */}
-        <section className="mb-6">
-          <h2 className="text-xs uppercase tracking-wider text-gray-500 mb-3">Choose a polish</h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {PRESETS.map(p => {
-              const active = selectedPreset === p.id
-              return (
-                <button key={p.id} type="button" onClick={() => setSelectedPreset(p.id)}
-                  className={`relative p-4 rounded-2xl text-left border-2 transition-all overflow-hidden ${
-                    active
-                      ? `${p.border.replace('/40', '')} bg-gray-900 shadow-xl ${p.glow} scale-[1.01]`
-                      : 'border-gray-800 bg-gray-900/40 hover:bg-gray-900 hover:border-gray-700'
-                  }`}>
-                  {active && (
-                    <div aria-hidden className={`absolute inset-0 pointer-events-none opacity-20 bg-gradient-to-br ${p.accent}`} />
-                  )}
-                  {active && (
-                    <div className={`absolute -top-2 -right-2 w-6 h-6 rounded-full bg-gradient-to-br ${p.accent} flex items-center justify-center text-black shadow-md z-10`}>
-                      <CheckOutlined className="text-[10px] font-bold" />
+        {/* ─── Workflow / Preset selector ─── */}
+        {isAtelier ? (
+          // Atelier mode: workflow dropdown + prompt + fine-tunes
+          <section className="mb-6 space-y-4">
+            <div>
+              <h2 className="text-xs uppercase tracking-wider text-gray-500 mb-2">Workflow</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                {ATELIER_WORKFLOWS.map(w => {
+                  const active = atelierWorkflow === w.id
+                  return (
+                    <button key={w.id} type="button" onClick={() => setAtelierWorkflow(w.id)}
+                      className={`p-3 rounded-xl text-left border-2 transition-all ${
+                        active
+                          ? 'border-cyan-400/70 bg-cyan-500/10 shadow-lg shadow-cyan-500/10'
+                          : 'border-gray-800 bg-gray-900/40 hover:border-gray-700 hover:bg-gray-900'
+                      }`}>
+                      <div className="flex items-baseline justify-between mb-0.5">
+                        <span className={`text-xs font-bold ${active ? 'text-white' : 'text-gray-200'}`}>
+                          {w.icon} {w.label}
+                        </span>
+                        <span className="text-[9px] font-mono text-gray-500">{w.eta}</span>
+                      </div>
+                      <p className={`text-[10px] leading-snug ${active ? 'text-gray-300' : 'text-gray-500'}`}>{w.blurb}</p>
+                      <div className="flex gap-1 mt-1.5 text-[9px]">
+                        <span className={`px-1.5 py-0.5 rounded uppercase font-mono ${
+                          w.family === 'upscale' ? 'bg-emerald-500/15 text-emerald-300'
+                          : w.family === 'img2img' ? 'bg-fuchsia-500/15 text-fuchsia-300'
+                          : w.family === 't2i'    ? 'bg-amber-500/15 text-amber-300'
+                          : 'bg-cyan-500/15 text-cyan-300'
+                        }`}>{w.family}</span>
+                        {w.needsImage && <span className="px-1.5 py-0.5 rounded uppercase font-mono bg-gray-800 text-gray-400">img</span>}
+                        {w.needsPrompt && <span className="px-1.5 py-0.5 rounded uppercase font-mono bg-gray-800 text-gray-400">prompt</span>}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Prompt — required by some workflows */}
+            {wf.needsPrompt && (
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-gray-500 block mb-1">Prompt</label>
+                <Input.TextArea
+                  value={atelierPrompt} onChange={e => setAtelierPrompt(e.target.value)}
+                  autoSize={{ minRows: 2, maxRows: 5 }}
+                  placeholder={wf.family === 't2i'
+                    ? 'e.g. "a cinematic portrait of a wolf in misty forest, golden hour, 35mm film"'
+                    : wf.family === 'edit'
+                      ? 'e.g. "change the shirt to red, keep everything else the same"'
+                      : 'e.g. "high detail skin, sharp eyes, natural lighting"'}
+                  maxLength={1000}
+                />
+              </div>
+            )}
+
+            {/* Fine-tunes — show only the ones relevant to this workflow */}
+            {(showSteps || showDenoise || showCfg || showWH) && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-xl bg-gray-900/40 border border-gray-800">
+                {showSteps && (
+                  <Tuner label="Steps" value={tunings.steps} min={1} max={50} step={1}
+                    onChange={v => setTunings(t => ({ ...t, steps: v }))} />
+                )}
+                {showDenoise && (
+                  <Tuner label="Denoise" value={tunings.denoise} min={0} max={1} step={0.05}
+                    onChange={v => setTunings(t => ({ ...t, denoise: v }))} fmt={v => v.toFixed(2)} />
+                )}
+                {showCfg && (
+                  <Tuner label="CFG" value={tunings.cfg} min={1} max={15} step={0.5}
+                    onChange={v => setTunings(t => ({ ...t, cfg: v }))} fmt={v => v.toFixed(1)} />
+                )}
+                {showWH && (
+                  <>
+                    <Tuner label="Width" value={tunings.width} min={512} max={1536} step={64}
+                      onChange={v => setTunings(t => ({ ...t, width: v }))} />
+                    <Tuner label="Height" value={tunings.height} min={512} max={1536} step={64}
+                      onChange={v => setTunings(t => ({ ...t, height: v }))} />
+                  </>
+                )}
+              </div>
+            )}
+          </section>
+        ) : (
+          // Cloud mode: existing preset cards
+          <section className="mb-6">
+            <h2 className="text-xs uppercase tracking-wider text-gray-500 mb-3">Choose a polish</h2>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {PRESETS.map(p => {
+                const active = selectedPreset === p.id
+                return (
+                  <button key={p.id} type="button" onClick={() => setSelectedPreset(p.id)}
+                    className={`relative p-4 rounded-2xl text-left border-2 transition-all overflow-hidden ${
+                      active
+                        ? `${p.border.replace('/40', '')} bg-gray-900 shadow-xl ${p.glow} scale-[1.01]`
+                        : 'border-gray-800 bg-gray-900/40 hover:bg-gray-900 hover:border-gray-700'
+                    }`}>
+                    {active && (
+                      <div aria-hidden className={`absolute inset-0 pointer-events-none opacity-20 bg-gradient-to-br ${p.accent}`} />
+                    )}
+                    {active && (
+                      <div className={`absolute -top-2 -right-2 w-6 h-6 rounded-full bg-gradient-to-br ${p.accent} flex items-center justify-center text-black shadow-md z-10`}>
+                        <CheckOutlined className="text-[10px] font-bold" />
+                      </div>
+                    )}
+                    <div className="relative">
+                      <div className="flex items-start justify-between mb-1.5">
+                        <span className={`text-sm font-bold ${active ? 'text-white' : 'text-gray-200'}`}>
+                          <span className="mr-1.5">{p.icon}</span>{p.name}
+                        </span>
+                        <button onClick={(e) => { e.stopPropagation(); setExpandedPreset(p.id) }}
+                          className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-gray-700 hover:border-cyan-400 text-gray-400 hover:text-cyan-300 transition-colors">
+                          <ExpandAltOutlined /> Expand
+                        </button>
+                      </div>
+                      <p className={`text-[11px] leading-snug ${active ? 'text-gray-300' : 'text-gray-500'}`}>
+                        {p.short}
+                      </p>
                     </div>
-                  )}
-                  <div className="relative">
-                    <div className="flex items-start justify-between mb-1.5">
-                      <span className={`text-sm font-bold ${active ? 'text-white' : 'text-gray-200'}`}>
-                        <span className="mr-1.5">{p.icon}</span>{p.name}
-                      </span>
-                      <button onClick={(e) => { e.stopPropagation(); setExpandedPreset(p.id) }}
-                        className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-gray-700 hover:border-cyan-400 text-gray-400 hover:text-cyan-300 transition-colors">
-                        <ExpandAltOutlined /> Expand
-                      </button>
-                    </div>
-                    <p className={`text-[11px] leading-snug ${active ? 'text-gray-300' : 'text-gray-500'}`}>
-                      {p.short}
-                    </p>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        </section>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+        )}
 
         {/* ─── Action ─── */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <p className="text-xs text-gray-500">
-            Active preset: <span className="text-cyan-300 font-semibold">{activePreset?.name}</span>
+            {isAtelier
+              ? <>Active: <span className="text-cyan-300 font-semibold">{wf.label}</span></>
+              : <>Active preset: <span className="text-cyan-300 font-semibold">{activePreset?.name}</span></>}
           </p>
-          <button onClick={enhance} disabled={!sourceDataUrl || working}
-            className={`flex items-center gap-2 px-5 py-2 rounded-xl font-semibold text-sm transition-all ${
-              !sourceDataUrl || working
+          <button onClick={() => enhance()} disabled={(wf.needsImage && !sourceDataUrl && isAtelier) || (!isAtelier && !sourceDataUrl) || working}
+            className={`flex items-center justify-center gap-2 w-full sm:w-auto px-5 py-2.5 rounded-xl font-semibold text-sm transition-all ${
+              ((wf.needsImage && !sourceDataUrl && isAtelier) || (!isAtelier && !sourceDataUrl) || working)
                 ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
                 : 'bg-gradient-to-r from-cyan-400 via-fuchsia-400 to-amber-400 text-black hover:shadow-xl hover:shadow-fuchsia-500/30 hover:scale-[1.02]'
             }`}>
             <ThunderboltOutlined />
-            {working ? 'Enhancing…' : 'Enhance image'}
+            {working ? 'Working…' : isAtelier ? `Run ${wf.label}` : 'Enhance image'}
           </button>
         </div>
     </>
@@ -567,6 +862,74 @@ function LibraryCard({ image, onDelete }) {
         </button>
       )}
     </div>
+  )
+}
+
+// ─── Full live-log viewer for an Atelier image job ──
+function ImageLogModal({ open, onClose, job }) {
+  const scrollRef = useRef(null)
+  // Auto-scroll to newest line as logs stream in while the modal is open
+  useEffect(() => {
+    if (open && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [open, job?.logs?.length])
+  const logs = Array.isArray(job?.logs) ? job.logs : []
+  return (
+    <Modal
+      open={open}
+      onCancel={onClose}
+      footer={null}
+      width={760}
+      centered
+      closeIcon={null}
+      styles={{
+        content: { background: '#0b0f17', padding: 0, borderRadius: 16, border: '1px solid rgba(34,211,238,0.25)', maxWidth: '95vw' },
+        body: { padding: 0 },
+        header: { display: 'none' },
+        mask: { backdropFilter: 'blur(6px)' },
+      }}>
+      <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-gray-800/80 bg-gradient-to-r from-cyan-500/10 via-fuchsia-500/5 to-transparent">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={`w-2 h-2 rounded-full shrink-0 ${
+            job?.status === 'completed' ? 'bg-emerald-400'
+            : job?.status === 'failed' ? 'bg-rose-400'
+            : 'bg-emerald-400 animate-pulse'
+          }`} />
+          <h3 className="text-xs sm:text-sm font-semibold text-white tracking-wide truncate">
+            <span className="text-gray-400">Atelier ·</span>{' '}
+            <span className="font-mono text-cyan-300 text-[10px] sm:text-xs">{job?.imageId}</span>
+          </h3>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="hidden sm:inline text-[10px] uppercase tracking-wider text-gray-500">
+            {logs.length} {logs.length === 1 ? 'event' : 'events'}
+          </span>
+          <button type="button" onClick={onClose}
+            className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded">
+            ✕
+          </button>
+        </div>
+      </div>
+      <div ref={scrollRef} className="max-h-[65vh] overflow-y-auto p-4 sm:p-5 bg-[#06080d]">
+        {logs.length === 0 ? (
+          <p className="text-gray-500 text-sm text-center py-12">Waiting for the worker to emit its first event…</p>
+        ) : (
+          <ul className="space-y-1.5">
+            {logs.map((entry, i) => (
+              <li key={`${entry?.ts || i}-${i}`} className="flex gap-2 sm:gap-3 items-start">
+                <span className="text-[9px] sm:text-[10px] font-mono text-gray-600 shrink-0 pt-0.5 select-none">
+                  {fmtLogTs(entry?.ts)}
+                </span>
+                <span className={`text-[11px] sm:text-[12px] font-mono leading-relaxed break-all ${logTone(entry?.msg || '')}`}>
+                  {entry?.msg || ''}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Modal>
   )
 }
 
