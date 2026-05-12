@@ -87,6 +87,33 @@ function groupedTemplates() {
   }))
 }
 
+// Per-checkpoint default tunings. When the user types a known filename into
+// the custom Model field, the sliders auto-adjust to that model's sweet
+// spot. Hyper / Lightning / Turbo variants need DRAMATICALLY different
+// settings — running them at default SDXL steps/CFG produces noise.
+const CHECKPOINT_DEFAULTS = {
+  // Hyper variants — distilled fast models. Low steps, very low CFG.
+  'realisticVisionV60B1_v51HyperVAE': { steps: 8, cfg: 1.5, denoise: 0.30,
+    note: 'Hyper variant — runs at 8 steps & CFG 1.5. Don\'t change.' },
+  // Pony family — needs CFG 6-7. Add "score_9, score_8_up, score_7_up" prefix to prompts.
+  'ponyDiffusionV6XL_v6StartWithThisOne': { steps: 28, cfg: 7.0, denoise: 0.35,
+    note: 'Pony — start prompts with "score_9, score_8_up, score_7_up, ..."' },
+  'autismmixSDXL_autismmixPony':        { steps: 28, cfg: 6.0, denoise: 0.35,
+    note: 'Pony fork — same "score_9..." prompt convention' },
+  // CyberRealistic — standard SDXL photo-real
+  'cyberrealisticXL_v100':              { steps: 30, cfg: 5.5, denoise: 0.30,
+    note: 'Photo-real SDXL — works great with negative "cartoon, painting, anime"' },
+  // JuggernautXL (already on disk)
+  'Juggernaut-XL_v9_RunDiffusionPhoto_v2': { steps: 25, cfg: 5.0, denoise: 0.25, note: '' },
+}
+
+// Strip extension before lookup so users can paste either with or without ".safetensors"
+function checkpointDefaults(filename) {
+  if (!filename) return null
+  const base = filename.replace(/\.safetensors$|\.ckpt$/i, '')
+  return CHECKPOINT_DEFAULTS[base] || null
+}
+
 // Atelier workflow catalog. Each entry knows what inputs it needs (image /
 // prompt / fine-tunes), what model file ComfyUI will load, and reasonable
 // defaults. The FE shows/hides the right input fields based on `family`.
@@ -273,6 +300,14 @@ export default function ImageEnhancer() {
     const wf = ATELIER_WORKFLOWS.find(w => w.id === atelierWorkflow)
     if (wf?.defaults) setTunings(t => ({ ...t, ...wf.defaults }))
   }, [atelierWorkflow])
+
+  // When the user types a known checkpoint into the custom Model field,
+  // hydrate that checkpoint's sweet-spot tunings (e.g. Hyper variants need
+  // 8 steps + CFG 1.5).
+  useEffect(() => {
+    const defs = checkpointDefaults(customModel)
+    if (defs) setTunings(t => ({ ...t, ...defs }))
+  }, [customModel])
 
   // Resume an in-flight job after a page refresh
   useEffect(() => {
@@ -479,6 +514,7 @@ export default function ImageEnhancer() {
                   tunings={tunings} setTunings={setTunings}
                   atelierPrompt={atelierPrompt} setAtelierPrompt={setAtelierPrompt}
                   customModel={customModel} setCustomModel={setCustomModel}
+                  setLogsModalOpen={setLogsModalOpen}
                 />
               ),
             },
@@ -562,6 +598,7 @@ function GenerateSection({
   setExpandedPreset, enhance,
   atelierWorkflow, setAtelierWorkflow, tunings, setTunings,
   atelierPrompt, setAtelierPrompt, customModel, setCustomModel,
+  setLogsModalOpen,
 }) {
   const isAtelier = engine === 'atelier' || engine === 'local'
   const wf = ATELIER_WORKFLOWS.find(w => w.id === atelierWorkflow) || ATELIER_WORKFLOWS[0]
@@ -815,25 +852,35 @@ function GenerateSection({
               </div>
             )}
 
-            {/* Custom model override — for advanced users who want to swap in a
-                LoRA or alternate SDXL/Flux checkpoint they've dropped into the
-                5090's ComfyUI/models/checkpoints/ folder. */}
-            {showCustomModel && (
-              <div>
-                <label className="text-[10px] uppercase tracking-wider text-gray-500 block mb-1">
-                  Model (advanced — override default checkpoint)
-                </label>
-                <Input
-                  value={customModel}
-                  onChange={e => setCustomModel(e.target.value)}
-                  placeholder={defaultModel}
-                  allowClear
-                />
-                <p className="text-[10px] text-gray-600 mt-1">
-                  Type a `.safetensors` filename from <span className="font-mono text-gray-400">ComfyUI/models/checkpoints/</span> — leave blank to use {wf.label}'s default.
-                </p>
-              </div>
-            )}
+            {/* Custom model override — for advanced users who want to swap in
+                an alternate SDXL/Flux checkpoint they've dropped into the
+                5090's ComfyUI/models/checkpoints/ folder. Auto-tuning kicks
+                in when a known filename is typed. */}
+            {showCustomModel && (() => {
+              const ckptDefs = checkpointDefaults(customModel)
+              return (
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-gray-500 block mb-1">
+                    Model (advanced — override default checkpoint)
+                  </label>
+                  <Input
+                    value={customModel}
+                    onChange={e => setCustomModel(e.target.value)}
+                    placeholder={defaultModel}
+                    allowClear
+                  />
+                  {ckptDefs?.note ? (
+                    <p className="text-[10px] text-cyan-300 mt-1 leading-snug">
+                      💡 Auto-tuned: steps={ckptDefs.steps}, CFG={ckptDefs.cfg}, denoise={ckptDefs.denoise}. {ckptDefs.note}
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-gray-600 mt-1">
+                      Type a `.safetensors` filename from <span className="font-mono text-gray-400">ComfyUI/models/checkpoints/</span> — leave blank to use {wf.label}'s default.
+                    </p>
+                  )}
+                </div>
+              )
+            })()}
 
             {/* Fine-tunes — show only the ones relevant to this workflow */}
             {(showSteps || showDenoise || showCfg || showWH) && (
