@@ -186,9 +186,9 @@ export async function deleteEnhancedImage(imageId) {
   }
 }
 
-export async function listEnhancedImages({ status = 'completed', type, engine, page = 1, limit = 24 } = {}) {
+export async function listEnhancedImages({ status = 'completed', type, engine, visibility = 'public', page = 1, limit = 24 } = {}) {
   try {
-    const q = { status, page, limit };
+    const q = { status, page, limit, visibility };
     if (type) q.type = type;
     if (engine) q.engine = engine;
     const data = await get(ENDPOINTS.IMAGE_ENHANCE_LIST, q, { timeout: 8000 });

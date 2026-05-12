@@ -1,5 +1,16 @@
 const BE_URL = import.meta.env.VITE_BE_URL || 'http://localhost:4001';
 
+// Pull the vault JWT from localStorage on every request. Cheap (no parse),
+// always returns the latest value (no stale state if user logged in/out
+// mid-session). BE only enforces it on protected routes — sending it on
+// open routes is harmless.
+function vaultHeaders() {
+  try {
+    const t = localStorage.getItem('sid-vault-token');
+    return t ? { Authorization: `Bearer ${t}` } : {};
+  } catch { return {}; }
+}
+
 export async function get(endpoint, params = {}, options = {}) {
   const url = new URL(endpoint, BE_URL);
   Object.entries(params).forEach(([key, value]) => {
@@ -10,7 +21,7 @@ export async function get(endpoint, params = {}, options = {}) {
 
   const res = await fetch(url.toString(), {
     method: 'GET',
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers: { 'Content-Type': 'application/json', ...vaultHeaders(), ...options.headers },
     signal: options.signal || (options.timeout ? AbortSignal.timeout(options.timeout) : undefined),
   });
 
@@ -38,7 +49,7 @@ export async function get(endpoint, params = {}, options = {}) {
 export async function post(endpoint, body = {}, options = {}) {
   const res = await fetch(`${BE_URL}${endpoint}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers: { 'Content-Type': 'application/json', ...vaultHeaders(), ...options.headers },
     body: JSON.stringify(body),
     signal: options.signal || (options.timeout ? AbortSignal.timeout(options.timeout) : undefined),
   });
@@ -59,7 +70,7 @@ export async function post(endpoint, body = {}, options = {}) {
 export async function del(endpoint, options = {}) {
   const res = await fetch(`${BE_URL}${endpoint}`, {
     method: 'DELETE',
-    headers: { ...options.headers },
+    headers: { ...vaultHeaders(), ...options.headers },
     signal: options.signal || (options.timeout ? AbortSignal.timeout(options.timeout) : undefined),
   });
   if (!res.ok) {

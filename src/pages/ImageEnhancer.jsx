@@ -126,7 +126,7 @@ const ATELIER_WORKFLOWS = [
     defaults: { steps: 25, cfg: 5.0, width: 1024, height: 1024 },
     eta: '~30s', icon: '✨',
   },
-  // ─── Flux Kontext — prompt edit (Gemini-like, no safety filter)
+  // ─── Flux Kontext — prompt edit
   {
     id: 'flux-kontext-edit', family: 'edit', label: 'Flux Kontext (edit)',
     blurb: 'Edit image with text instruction. Identity preserved natively.',
@@ -134,6 +134,23 @@ const ATELIER_WORKFLOWS = [
     needsImage: true, needsPrompt: true,
     defaults: { steps: 20, cfg: 2.5 },
     eta: '~45s', icon: '🪄',
+  },
+  // ─── Custom — bring your own checkpoint, full control on every knob
+  {
+    id: 'custom-sdxl', family: 'img2img', label: 'Custom (img2img)',
+    blurb: 'Bring any SDXL checkpoint. Full freedom on prompt, denoise, CFG, steps.',
+    checkpoint: 'Juggernaut-XL_v9_RunDiffusionPhoto_v2.safetensors',
+    needsImage: true, needsPrompt: true,
+    defaults: { steps: 22, denoise: 0.40, cfg: 6.0 },
+    eta: '~30s', icon: '🛠️',
+  },
+  {
+    id: 'custom-t2i', family: 't2i', label: 'Custom (text→image)',
+    blurb: 'Bring any SDXL checkpoint. Pure prompt-driven generation.',
+    checkpoint: 'Juggernaut-XL_v9_RunDiffusionPhoto_v2.safetensors',
+    needsImage: false, needsPrompt: true,
+    defaults: { steps: 28, cfg: 6.0, width: 1024, height: 1024 },
+    eta: '~30s', icon: '🛠️',
   },
 ]
 
@@ -230,6 +247,7 @@ export default function ImageEnhancer() {
   const [atelierWorkflow, setAtelierWorkflow] = useState(ATELIER_WORKFLOWS[0].id)
   const [tunings, setTunings] = useState({ steps: 20, denoise: 0.2, cfg: 5.0, width: 1024, height: 1024 })
   const [atelierPrompt, setAtelierPrompt] = useState('')
+  const [customModel, setCustomModel] = useState('')   // optional checkpoint override
   const [logsModalOpen, setLogsModalOpen] = useState(false)
   const [working, setWorking] = useState(false)
   const [job, setJob] = useState(null)                    // active or last-finished SQLite row
@@ -237,7 +255,7 @@ export default function ImageEnhancer() {
   const [refreshKey, setRefreshKey] = useState(0)
   const pollTimer = useRef(null)
 
-  useEffect(() => { document.title = 'Image Enhancer · Sid' }, [])
+  useEffect(() => { document.title = 'Image Studio · Sid' }, [])
 
   // When the user picks a different Atelier workflow, hydrate its defaults
   // into the tuning sliders. They can still tweak afterwards.
@@ -324,6 +342,7 @@ export default function ImageEnhancer() {
         type: wf.family,
         prompt: atelierPrompt.trim() || wf.label,
         ...(sourceDataUrl ? { dataUrl: sourceDataUrl } : {}),
+        ...(customModel.trim() ? { model: customModel.trim() } : {}),
         // Fine-tunes — BE only persists the relevant ones for the workflow's family
         steps: tunings.steps, denoise: tunings.denoise, cfg: tunings.cfg,
         width: tunings.width, height: tunings.height,
@@ -379,7 +398,7 @@ export default function ImageEnhancer() {
             <div className="flex items-center gap-2">
               <ThunderboltOutlined className="text-amber-400 text-xl" />
               <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-amber-300 bg-clip-text text-transparent">
-                Image Enhancer
+                Image Studio
               </h1>
             </div>
             {/* Engine toggle — Cloud (Gemini, fast) vs Local (5090, free) */}
@@ -428,6 +447,7 @@ export default function ImageEnhancer() {
                   atelierWorkflow={atelierWorkflow} setAtelierWorkflow={setAtelierWorkflow}
                   tunings={tunings} setTunings={setTunings}
                   atelierPrompt={atelierPrompt} setAtelierPrompt={setAtelierPrompt}
+                  customModel={customModel} setCustomModel={setCustomModel}
                 />
               ),
             },
@@ -471,7 +491,7 @@ function GenerateSection({
   activePreset, downloadResult, error, selectedPreset, setSelectedPreset,
   setExpandedPreset, enhance,
   atelierWorkflow, setAtelierWorkflow, tunings, setTunings,
-  atelierPrompt, setAtelierPrompt,
+  atelierPrompt, setAtelierPrompt, customModel, setCustomModel,
 }) {
   const isAtelier = engine === 'atelier' || engine === 'local'
   const wf = ATELIER_WORKFLOWS.find(w => w.id === atelierWorkflow) || ATELIER_WORKFLOWS[0]
@@ -479,6 +499,10 @@ function GenerateSection({
   const showDenoise = wf.defaults?.denoise != null
   const showCfg = wf.defaults?.cfg != null
   const showWH = wf.family === 't2i'
+  // Show custom-model input for workflows that load a checkpoint (sdxl + flux).
+  // Pure upscalers use a fixed .pth and don't accept overrides.
+  const showCustomModel = ['img2img', 't2i', 'edit'].includes(wf.family)
+  const defaultModel = wf.checkpoint || 'workflow default'
   return (
     <>
       <section className="grid sm:grid-cols-2 gap-4 mb-6">
@@ -707,6 +731,26 @@ function GenerateSection({
               </div>
             )}
 
+            {/* Custom model override — for advanced users who want to swap in a
+                LoRA or alternate SDXL/Flux checkpoint they've dropped into the
+                5090's ComfyUI/models/checkpoints/ folder. */}
+            {showCustomModel && (
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-gray-500 block mb-1">
+                  Model (advanced — override default checkpoint)
+                </label>
+                <Input
+                  value={customModel}
+                  onChange={e => setCustomModel(e.target.value)}
+                  placeholder={defaultModel}
+                  allowClear
+                />
+                <p className="text-[10px] text-gray-600 mt-1">
+                  Type a `.safetensors` filename from <span className="font-mono text-gray-400">ComfyUI/models/checkpoints/</span> — leave blank to use {wf.label}'s default.
+                </p>
+              </div>
+            )}
+
             {/* Fine-tunes — show only the ones relevant to this workflow */}
             {(showSteps || showDenoise || showCfg || showWH) && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-xl bg-gray-900/40 border border-gray-800">
@@ -800,23 +844,24 @@ function GenerateSection({
 // ─── Library tab ─────────────────────────────────────────────────
 function ImageLibrary({ refreshKey }) {
   const [filter, setFilter] = useState('completed')
+  const [visibility, setVisibility] = useState('public')   // public | vault
   const [page, setPage] = useState(1)
   const [data, setData] = useState({ items: [], total: 0, pages: 1, counts: {} })
   const [loading, setLoading] = useState(true)
   const [internalReload, setInternalReload] = useState(0)
 
-  useEffect(() => { setPage(1) }, [filter, refreshKey])
+  useEffect(() => { setPage(1) }, [filter, visibility, refreshKey])
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    listEnhancedImages({ status: filter, page, limit: 24 }).then(({ data: result }) => {
+    listEnhancedImages({ status: filter, visibility, page, limit: 24 }).then(({ data: result }) => {
       if (cancelled) return
       if (result) setData(result)
       setLoading(false)
     })
     return () => { cancelled = true }
-  }, [filter, page, refreshKey, internalReload])
+  }, [filter, visibility, page, refreshKey, internalReload])
 
   const askDelete = (img) => {
     Modal.confirm({
@@ -855,6 +900,24 @@ function ImageLibrary({ refreshKey }) {
 
   return (
     <div className="space-y-4">
+      {/* Visibility toggle — Public is the showcase, Vault is the private board */}
+      <div className="flex items-center gap-1 p-1 rounded-full bg-gray-900/60 border border-gray-800 w-fit">
+        {[
+          { v: 'public', label: '🌐 Public',  hint: 'showcase' },
+          { v: 'vault',  label: '🔒 Vault',   hint: 'private' },
+        ].map(opt => (
+          <button key={opt.v} onClick={() => setVisibility(opt.v)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-all ${
+              visibility === opt.v
+                ? 'bg-gradient-to-r from-cyan-500/30 to-fuchsia-500/30 text-white border border-cyan-400/40'
+                : 'text-gray-400 hover:text-gray-200'
+            }`}>
+            <span className="font-semibold">{opt.label}</span>
+            <span className="hidden sm:inline text-[9px] opacity-60">{opt.hint}</span>
+          </button>
+        ))}
+      </div>
+
       <div className="flex items-center gap-2 flex-wrap">
         {filters.map(f => {
           const active = filter === f.v

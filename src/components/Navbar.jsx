@@ -42,7 +42,7 @@ const Navbar = () => {
     { to: '/ai', label: 'AI Chat', color: 'from-blue-500 to-cyan-500' },
     { to: '/ai-video', label: 'AI Video', color: 'from-cyan-500 via-purple-500 to-amber-500' },
     { to: '/vision', label: 'Vision AI', color: 'from-purple-500 to-pink-600' },
-    { to: '/image-enhancer', label: 'Image Enhancer', color: 'from-cyan-300 via-fuchsia-400 to-amber-300' },
+    { to: '/image-enhancer', label: 'Image Studio', color: 'from-cyan-300 via-fuchsia-400 to-amber-300' },
     { to: '/science', label: 'Science', color: 'from-cyan-500 to-blue-600' },
     { to: '/explore', label: 'Explore', color: 'from-red-500 to-amber-500' },
   ];

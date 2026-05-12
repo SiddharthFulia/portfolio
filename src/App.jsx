@@ -5,6 +5,7 @@ import { Footer, Navbar } from "./components";
 import BackToTop from './components/BackToTop';
 import PageTransition from './components/PageTransition';
 import EasterEgg from './components/EasterEgg';
+import VaultGate from './components/VaultGate';
 
 /* ── Lazy page imports ── */
 const Home = lazy(() => import("./pages/Home"));
@@ -165,10 +166,13 @@ const App = () => {
           <Route path='/ai' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><AIChat /></PageTransition></Suspense>} />
           {/* /studio merged into /vision — keep alias so old links don't 404 */}
           <Route path='/studio' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><FaceDetection /></PageTransition></Suspense>} />
-          <Route path='/ai-video' element={<Suspense fallback={<AIVideoSkeleton />}><PageTransition><AIVideo /></PageTransition></Suspense>} />
-          <Route path='/video' element={<Suspense fallback={<AIVideoSkeleton />}><PageTransition><AIVideo /></PageTransition></Suspense>} />
-          <Route path='/image-enhancer' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><ImageEnhancer /></PageTransition></Suspense>} />
-          <Route path='/enhance' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><ImageEnhancer /></PageTransition></Suspense>} />
+          {/* AI-creation lanes — gated behind a single password vault. Keeps casual
+              visitors out of the heavy / personal tools. NOT a security boundary —
+              VITE_VAULT_PASSWORD is in the FE bundle and inspectable. */}
+          <Route path='/ai-video'        element={<VaultGate label="AI Video"><Suspense fallback={<AIVideoSkeleton />}><PageTransition><AIVideo /></PageTransition></Suspense></VaultGate>} />
+          <Route path='/video'           element={<VaultGate label="AI Video"><Suspense fallback={<AIVideoSkeleton />}><PageTransition><AIVideo /></PageTransition></Suspense></VaultGate>} />
+          <Route path='/image-enhancer'  element={<VaultGate label="Image Studio"><Suspense fallback={<DarkPageSkeleton />}><PageTransition><ImageEnhancer /></PageTransition></Suspense></VaultGate>} />
+          <Route path='/enhance'         element={<VaultGate label="Image Studio"><Suspense fallback={<DarkPageSkeleton />}><PageTransition><ImageEnhancer /></PageTransition></Suspense></VaultGate>} />
         </Routes>
         <ConditionalFooter />
       </Router>
