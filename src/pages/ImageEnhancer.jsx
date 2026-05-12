@@ -9,7 +9,7 @@ import {
 import {
   enhanceImage, getImageStatus, listEnhancedImages, deleteEnhancedImage, fileToDataUrl,
 } from '../api/ai'
-import { VaultLoginPanel, getVaultToken } from '../components/VaultGate'
+import { VaultLoginPanel, getVaultToken, setVaultToken } from '../components/VaultGate'
 
 // localStorage key — persists the in-flight enhancement across refreshes
 const INFLIGHT_KEY = 'sid-imgenh-inflight'
@@ -548,13 +548,29 @@ export default function ImageEnhancer() {
             <div className="rounded-2xl border border-emerald-500/40 bg-gradient-to-b from-gray-900/95 to-gray-950/90 p-6 text-center shadow-2xl shadow-emerald-500/10">
               <div className="inline-flex w-12 h-12 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-300 mb-2 text-2xl">✓</div>
               <p className="text-emerald-300 text-base font-bold">Vault unlocked</p>
-              <p className="text-gray-400 text-xs mt-1">
-                Outputs go to 🔒 Vault library. NSFW filter bypassed.
+              <p className="text-gray-400 text-xs mt-1 mb-4">
+                Outputs go to 🔒 Vault library · NSFW filter bypassed
               </p>
-              <button onClick={() => { setVaultLoginOpen(false); setNsfwBlocked(null) }}
-                className="mt-4 px-5 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-semibold">
-                Got it
-              </button>
+              <div className="space-y-2">
+                <button onClick={() => { setVaultLoginOpen(false); setNsfwBlocked(null) }}
+                  className="w-full px-5 py-2 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-semibold">
+                  Stay unlocked
+                </button>
+                <button onClick={() => {
+                    setVaultToken(null)
+                    setIsLoggedIn(false)
+                    setNsfwBlocked(null)
+                    setVaultLoginOpen(false)
+                    setRefreshKey(k => k + 1)   // force Library re-fetch
+                    antMessage.success('Vault locked — public view restored')
+                  }}
+                  className="w-full px-5 py-2 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/40 text-xs font-semibold flex items-center justify-center gap-1.5">
+                  <LockOutlined /> Lock vault (sign out)
+                </button>
+              </div>
+              <p className="text-[10px] text-gray-600 mt-3">
+                After locking, switch Library to 🌐 Public — your vault items vanish from view.
+              </p>
             </div>
           ) : (
             <>

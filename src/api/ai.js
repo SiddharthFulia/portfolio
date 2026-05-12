@@ -156,11 +156,18 @@ export async function listJobs({ status = 'all', page = 1, limit = 24 } = {}) {
 
 // Image Enhancer — async. Submits the job; returns { imageId, status }.
 // FE polls getImageStatus until status == 'completed' | 'failed'.
-export async function enhanceImage({ dataUrl, imageUrl, prompt, presetId, type = 'fast', engine = 'cloud' }) {
+// Forwards the FULL body so workflow / model / steps / denoise / cfg /
+// width / height all reach the BE (previous destructure dropped them).
+export async function enhanceImage(payload = {}) {
   try {
-    const body = { prompt, presetId, type, engine };
-    if (dataUrl) body.dataUrl = dataUrl;
-    if (imageUrl) body.imageUrl = imageUrl;
+    // Strip undefined keys so the BE doesn't get JSON nulls in fields it
+    // would otherwise default. Keep falsy-but-meaningful values (0, '').
+    const body = Object.fromEntries(
+      Object.entries(payload).filter(([_, v]) => v !== undefined && v !== null)
+    );
+    // Sensible defaults if caller didn't provide them
+    body.type   = body.type   || 'fast';
+    body.engine = body.engine || 'cloud';
     const data = await post(ENDPOINTS.IMAGE_ENHANCE, body, { timeout: 60000 });
     return { data: data?.data || data, error: null };
   } catch (err) {
