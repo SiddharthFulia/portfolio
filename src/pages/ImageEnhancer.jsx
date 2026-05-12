@@ -250,8 +250,14 @@ export default function ImageEnhancer() {
   const [tunings, setTunings] = useState({ steps: 20, denoise: 0.2, cfg: 5.0, width: 1024, height: 1024 })
   const [atelierPrompt, setAtelierPrompt] = useState('')
   const [customModel, setCustomModel] = useState('')   // optional checkpoint override
-  const [saveToVault, setSaveToVault] = useState(false)
+  // Vault login state: small lock button in the header opens an Antd modal
+  // with a password field. Once logged in, all outputs auto-route to the
+  // private Vault library AND the NSFW filter is bypassed server-side.
   const [vaultLoginOpen, setVaultLoginOpen] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(!!getVaultToken())
+  // NSFW rejection — BE returns 401 NSFW_BLOCKED; FE pops a friendly toast
+  // and opens the login modal so user can unlock + retry.
+  const [nsfwBlocked, setNsfwBlocked] = useState(null)
   const [logsModalOpen, setLogsModalOpen] = useState(false)
   const [working, setWorking] = useState(false)
   const [job, setJob] = useState(null)                    // active or last-finished SQLite row
@@ -350,7 +356,6 @@ export default function ImageEnhancer() {
         // Fine-tunes — BE only persists the relevant ones for the workflow's family
         steps: tunings.steps, denoise: tunings.denoise, cfg: tunings.cfg,
         width: tunings.width, height: tunings.height,
-        vault: saveToVault,
       }
     } else {
       const preset = PRESETS.find(p => p.id === selectedPreset)
@@ -362,22 +367,22 @@ export default function ImageEnhancer() {
         prompt: preset.prompt,
         presetId: preset.id,
         type: PRESET_TYPE[preset.id] || 'fast',
-        vault: saveToVault,
       }
     }
 
-    // Vault requires a token. If the toggle is on and we don't have one,
-    // prompt for password first — re-submit will run again automatically
-    // since the VaultGate stores the token in localStorage that request.js
-    // picks up on the next call.
-    if (saveToVault && !getVaultToken()) {
-      setVaultLoginOpen(true)
+    setError(null); setJob(null); setNsfwBlocked(null); setWorking(true)
+    const { data, error: err } = await enhanceImage(body)
+    if (err) {
+      setWorking(false)
+      // BE returns a `Looks NSFW —` message when the filter caught it.
+      if (/NSFW|Looks NSFW/i.test(err)) {
+        setNsfwBlocked(err)
+        setVaultLoginOpen(true)
+      } else {
+        setError(err)
+      }
       return
     }
-
-    setError(null); setJob(null); setWorking(true)
-    const { data, error: err } = await enhanceImage(body)
-    if (err) { setWorking(false); setError(err); return }
     setJob(data)
     try { localStorage.setItem(INFLIGHT_KEY, data.imageId) } catch {}
     startPolling(data.imageId)
@@ -415,6 +420,17 @@ export default function ImageEnhancer() {
               <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-amber-300 bg-clip-text text-transparent">
                 Image Studio
               </h1>
+              {/* Tiny vault lock — toggles login state. Logged-in users
+                  bypass the NSFW filter and their outputs land in Vault. */}
+              <button onClick={() => setVaultLoginOpen(true)} type="button"
+                title={isLoggedIn ? 'Vault unlocked — outputs go to Vault library' : 'Lock — click to unlock vault'}
+                className={`w-8 h-8 rounded-full flex items-center justify-center border transition-all ${
+                  isLoggedIn
+                    ? 'bg-emerald-500/20 border-emerald-400/50 text-emerald-300 hover:bg-emerald-500/30'
+                    : 'bg-gray-900/60 border-gray-700 text-gray-400 hover:border-cyan-400/50 hover:text-cyan-300'
+                }`}>
+                <LockOutlined className="text-sm" />
+              </button>
             </div>
             {/* Engine toggle — Cloud (Gemini, fast) vs Local (5090, free) */}
             <div className="flex items-center gap-1 p-1 rounded-full bg-gray-900/60 border border-gray-800">
@@ -463,7 +479,6 @@ export default function ImageEnhancer() {
                   tunings={tunings} setTunings={setTunings}
                   atelierPrompt={atelierPrompt} setAtelierPrompt={setAtelierPrompt}
                   customModel={customModel} setCustomModel={setCustomModel}
-                  saveToVault={saveToVault} setSaveToVault={setSaveToVault}
                 />
               ),
             },
@@ -482,23 +497,32 @@ export default function ImageEnhancer() {
         {/* Full live-log viewer for the current job */}
         <ImageLogModal open={logsModalOpen} onClose={() => setLogsModalOpen(false)} job={job} />
 
-        {/* Inline vault-login modal — only opens when the user tries to save
-            to Vault without a valid token. On successful login, the user can
-            click Run again and the saved token gets included automatically. */}
-        <Modal open={vaultLoginOpen} onCancel={() => setVaultLoginOpen(false)}
+        {/* Vault unlock modal — small password entry. Either opened by the
+            lock button in the header or auto-triggered when the BE returns
+            401 NSFW_BLOCKED on a prompt. */}
+        <Modal open={vaultLoginOpen}
+          onCancel={() => { setVaultLoginOpen(false); setNsfwBlocked(null); setIsLoggedIn(!!getVaultToken()) }}
           footer={null} closeIcon={null} centered width={460}
           styles={{
             content: { background: 'transparent', padding: 0, boxShadow: 'none' },
             body: { padding: 0 },
             mask: { backdropFilter: 'blur(6px)' },
           }}>
-          <VaultGate label="Save to Vault">
-            <div className="rounded-2xl border border-emerald-500/40 bg-gradient-to-b from-gray-900/90 to-gray-950/80 p-6 text-center">
-              <p className="text-emerald-300 text-sm font-semibold">✓ Signed in</p>
-              <p className="text-gray-400 text-xs mt-1">
-                Close this and click Run — your output will go to the 🔒 Vault library.
+          {nsfwBlocked && (
+            <div className="mb-3 p-3 rounded-xl border border-amber-500/40 bg-amber-500/10 text-center">
+              <p className="text-amber-300 text-xs font-semibold">🛡️ Prompt looks NSFW</p>
+              <p className="text-gray-300 text-[11px] mt-0.5">
+                Public users can't generate this. Unlock with the password to bypass.
               </p>
-              <button onClick={() => setVaultLoginOpen(false)}
+            </div>
+          )}
+          <VaultGate label="Unlock vault">
+            <div className="rounded-2xl border border-emerald-500/40 bg-gradient-to-b from-gray-900/90 to-gray-950/80 p-6 text-center">
+              <p className="text-emerald-300 text-sm font-semibold">✓ Vault unlocked</p>
+              <p className="text-gray-400 text-xs mt-1">
+                Outputs now go to the 🔒 Vault library, NSFW filter bypassed.
+              </p>
+              <button onClick={() => { setVaultLoginOpen(false); setNsfwBlocked(null); setIsLoggedIn(true) }}
                 className="mt-3 px-4 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-semibold">
                 OK
               </button>
@@ -532,7 +556,6 @@ function GenerateSection({
   setExpandedPreset, enhance,
   atelierWorkflow, setAtelierWorkflow, tunings, setTunings,
   atelierPrompt, setAtelierPrompt, customModel, setCustomModel,
-  saveToVault, setSaveToVault,
 }) {
   const isAtelier = engine === 'atelier' || engine === 'local'
   const wf = ATELIER_WORKFLOWS.find(w => w.id === atelierWorkflow) || ATELIER_WORKFLOWS[0]
@@ -712,7 +735,7 @@ function GenerateSection({
                         <span className="text-[9px] font-mono text-gray-500">{w.eta}</span>
                       </div>
                       <p className={`text-[10px] leading-snug ${active ? 'text-gray-300' : 'text-gray-500'}`}>{w.blurb}</p>
-                      <div className="flex gap-1 mt-1.5 text-[9px]">
+                      <div className="flex gap-1 mt-1.5 text-[9px] flex-wrap">
                         <span className={`px-1.5 py-0.5 rounded uppercase font-mono ${
                           w.family === 'upscale' ? 'bg-emerald-500/15 text-emerald-300'
                           : w.family === 'img2img' ? 'bg-fuchsia-500/15 text-fuchsia-300'
@@ -861,24 +884,6 @@ function GenerateSection({
           </section>
         )}
 
-        {/* ─── Save to Vault toggle ─── */}
-        <div className="mb-3 p-3 rounded-xl border border-gray-800 bg-gray-900/40 flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2">
-            <LockOutlined className={saveToVault ? 'text-cyan-300' : 'text-gray-500'} />
-            <div>
-              <p className="text-xs font-semibold text-gray-200">
-                Save to Vault <span className="text-[10px] text-gray-500 font-normal">(private)</span>
-              </p>
-              <p className="text-[10px] text-gray-500">
-                {saveToVault
-                  ? 'Output stays in the 🔒 Vault library — visible only when logged in'
-                  : 'Default: output goes to the 🌐 Public library, visible to anyone'}
-              </p>
-            </div>
-          </div>
-          <Switch size="small" checked={saveToVault} onChange={setSaveToVault} />
-        </div>
-
         {/* ─── Action ─── */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <p className="text-xs text-gray-500">
@@ -957,24 +962,32 @@ function ImageLibrary({ refreshKey }) {
     { v: 'all',        label: 'All',        n: null },
   ]
 
+  const loggedIn = !!getVaultToken()
   return (
     <div className="space-y-4">
-      {/* Visibility toggle — Public is the showcase, Vault is the private board */}
+      {/* Visibility toggle — Public showcase / Vault (private, requires login).
+          Vault chip is hidden entirely when not logged in. */}
       <div className="flex items-center gap-1 p-1 rounded-full bg-gray-900/60 border border-gray-800 w-fit">
-        {[
-          { v: 'public', label: '🌐 Public',  hint: 'showcase' },
-          { v: 'vault',  label: '🔒 Vault',   hint: 'private' },
-        ].map(opt => (
-          <button key={opt.v} onClick={() => setVisibility(opt.v)}
+        <button onClick={() => setVisibility('public')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-all ${
+            visibility === 'public'
+              ? 'bg-gradient-to-r from-cyan-500/30 to-fuchsia-500/30 text-white border border-cyan-400/40'
+              : 'text-gray-400 hover:text-gray-200'
+          }`}>
+          <span className="font-semibold">🌐 Public</span>
+          <span className="hidden sm:inline text-[9px] opacity-60">showcase</span>
+        </button>
+        {loggedIn && (
+          <button onClick={() => setVisibility('vault')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-all ${
-              visibility === opt.v
+              visibility === 'vault'
                 ? 'bg-gradient-to-r from-cyan-500/30 to-fuchsia-500/30 text-white border border-cyan-400/40'
                 : 'text-gray-400 hover:text-gray-200'
             }`}>
-            <span className="font-semibold">{opt.label}</span>
-            <span className="hidden sm:inline text-[9px] opacity-60">{opt.hint}</span>
+            <span className="font-semibold">🔒 Vault</span>
+            <span className="hidden sm:inline text-[9px] opacity-60">private</span>
           </button>
-        ))}
+        )}
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
