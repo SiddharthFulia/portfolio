@@ -9,7 +9,7 @@ import {
 import {
   enhanceImage, getImageStatus, listEnhancedImages, deleteEnhancedImage, fileToDataUrl,
 } from '../api/ai'
-import VaultGate, { getVaultToken } from '../components/VaultGate'
+import { VaultLoginPanel, getVaultToken } from '../components/VaultGate'
 
 // localStorage key — persists the in-flight enhancement across refreshes
 const INFLIGHT_KEY = 'sid-imgenh-inflight'
@@ -497,37 +497,43 @@ export default function ImageEnhancer() {
         {/* Full live-log viewer for the current job */}
         <ImageLogModal open={logsModalOpen} onClose={() => setLogsModalOpen(false)} job={job} />
 
-        {/* Vault unlock modal — small password entry. Either opened by the
-            lock button in the header or auto-triggered when the BE returns
-            401 NSFW_BLOCKED on a prompt. */}
+        {/* Vault unlock modal — centered compact card. Opened by the header
+            lock OR auto-triggered when BE returns 401 NSFW_BLOCKED. */}
         <Modal open={vaultLoginOpen}
           onCancel={() => { setVaultLoginOpen(false); setNsfwBlocked(null); setIsLoggedIn(!!getVaultToken()) }}
-          footer={null} closeIcon={null} centered width={460}
+          footer={null} closeIcon={null} centered width={420}
+          maskClosable
           styles={{
             content: { background: 'transparent', padding: 0, boxShadow: 'none' },
             body: { padding: 0 },
-            mask: { backdropFilter: 'blur(6px)' },
+            mask: { backdropFilter: 'blur(6px)', background: 'rgba(0,0,0,0.7)' },
           }}>
-          {nsfwBlocked && (
-            <div className="mb-3 p-3 rounded-xl border border-amber-500/40 bg-amber-500/10 text-center">
-              <p className="text-amber-300 text-xs font-semibold">🛡️ Prompt looks NSFW</p>
-              <p className="text-gray-300 text-[11px] mt-0.5">
-                Public users can't generate this. Unlock with the password to bypass.
-              </p>
-            </div>
-          )}
-          <VaultGate label="Unlock vault">
-            <div className="rounded-2xl border border-emerald-500/40 bg-gradient-to-b from-gray-900/90 to-gray-950/80 p-6 text-center">
-              <p className="text-emerald-300 text-sm font-semibold">✓ Vault unlocked</p>
+          {isLoggedIn ? (
+            <div className="rounded-2xl border border-emerald-500/40 bg-gradient-to-b from-gray-900/95 to-gray-950/90 p-6 text-center shadow-2xl shadow-emerald-500/10">
+              <div className="inline-flex w-12 h-12 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-300 mb-2 text-2xl">✓</div>
+              <p className="text-emerald-300 text-base font-bold">Vault unlocked</p>
               <p className="text-gray-400 text-xs mt-1">
-                Outputs now go to the 🔒 Vault library, NSFW filter bypassed.
+                Outputs go to 🔒 Vault library. NSFW filter bypassed.
               </p>
-              <button onClick={() => { setVaultLoginOpen(false); setNsfwBlocked(null); setIsLoggedIn(true) }}
-                className="mt-3 px-4 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-semibold">
-                OK
+              <button onClick={() => { setVaultLoginOpen(false); setNsfwBlocked(null) }}
+                className="mt-4 px-5 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-semibold">
+                Got it
               </button>
             </div>
-          </VaultGate>
+          ) : (
+            <>
+              {nsfwBlocked && (
+                <div className="mb-3 p-3 rounded-xl border border-amber-500/40 bg-amber-500/10 text-center">
+                  <p className="text-amber-300 text-xs font-semibold">🛡️ Prompt looks NSFW</p>
+                  <p className="text-gray-300 text-[11px] mt-0.5">
+                    Unlock with the password to bypass and save to Vault.
+                  </p>
+                </div>
+              )}
+              <VaultLoginPanel label="Unlock vault"
+                onUnlocked={() => setIsLoggedIn(true)} />
+            </>
+          )}
         </Modal>
       </div>
     </div>
@@ -621,15 +627,29 @@ function GenerateSection({
             ) : working ? (
               <div className="flex-1 flex flex-col gap-2 py-4">
                 <div className="flex items-center gap-3 px-2">
-                  <div className="w-8 h-8 rounded-full border-2 border-cyan-500/30 border-t-cyan-400 animate-spin shrink-0" />
+                  <div className={`w-8 h-8 rounded-full border-2 shrink-0 animate-spin ${
+                    status === 'processing'
+                      ? 'border-cyan-500/30 border-t-cyan-400'
+                      : 'border-amber-500/30 border-t-amber-400'
+                  }`} />
                   <div className="flex-1">
-                    <p className="text-xs text-gray-200 font-semibold">
-                      {status === 'queued' ? 'Queued — waiting for worker'
-                        : status === 'processing' ? 'Enhancing…'
-                        : 'Enhancing…'}
+                    <p className="text-xs font-semibold flex items-center gap-1.5">
+                      {status === 'queued' ? (
+                        <><span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" /><span className="text-amber-300">Queued</span><span className="text-gray-500 font-normal">— waiting for worker</span></>
+                      ) : status === 'processing' ? (
+                        <><span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" /><span className="text-cyan-300">Processing</span><span className="text-gray-500 font-normal">— on the 5090</span></>
+                      ) : (
+                        <span className="text-gray-200">Enhancing…</span>
+                      )}
                     </p>
                     {job?.imageId && <p className="text-[9px] text-gray-700 font-mono break-all">{job.imageId}</p>}
                   </div>
+                  {/* Prominent View Logs button — always visible during processing */}
+                  <button type="button" onClick={() => setLogsModalOpen(true)}
+                    className="flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 transition-colors shrink-0">
+                    <ExpandAltOutlined className="text-[10px]" />
+                    Live logs
+                  </button>
                 </div>
                 {/* Live log feed — Atelier path streams entries via /image-progress.
                     Click the panel or the Expand button to open the full-history modal. */}
