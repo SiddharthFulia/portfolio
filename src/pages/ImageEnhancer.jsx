@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
-import { Modal, Upload, Tabs, Input, Select, message as antMessage } from 'antd'
+import { Modal, Upload, Tabs, Input, Select, Switch, message as antMessage } from 'antd'
 import {
   UploadOutlined, ExpandAltOutlined, DownloadOutlined,
   CheckOutlined, ReloadOutlined, ThunderboltOutlined,
   AppstoreOutlined, CloudOutlined, DesktopOutlined, DeleteOutlined,
+  LockOutlined,
 } from '@ant-design/icons'
 import {
   enhanceImage, getImageStatus, listEnhancedImages, deleteEnhancedImage, fileToDataUrl,
 } from '../api/ai'
+import VaultGate, { getVaultToken } from '../components/VaultGate'
 
 // localStorage key — persists the in-flight enhancement across refreshes
 const INFLIGHT_KEY = 'sid-imgenh-inflight'
@@ -248,6 +250,8 @@ export default function ImageEnhancer() {
   const [tunings, setTunings] = useState({ steps: 20, denoise: 0.2, cfg: 5.0, width: 1024, height: 1024 })
   const [atelierPrompt, setAtelierPrompt] = useState('')
   const [customModel, setCustomModel] = useState('')   // optional checkpoint override
+  const [saveToVault, setSaveToVault] = useState(false)
+  const [vaultLoginOpen, setVaultLoginOpen] = useState(false)
   const [logsModalOpen, setLogsModalOpen] = useState(false)
   const [working, setWorking] = useState(false)
   const [job, setJob] = useState(null)                    // active or last-finished SQLite row
@@ -346,6 +350,7 @@ export default function ImageEnhancer() {
         // Fine-tunes — BE only persists the relevant ones for the workflow's family
         steps: tunings.steps, denoise: tunings.denoise, cfg: tunings.cfg,
         width: tunings.width, height: tunings.height,
+        vault: saveToVault,
       }
     } else {
       const preset = PRESETS.find(p => p.id === selectedPreset)
@@ -357,7 +362,17 @@ export default function ImageEnhancer() {
         prompt: preset.prompt,
         presetId: preset.id,
         type: PRESET_TYPE[preset.id] || 'fast',
+        vault: saveToVault,
       }
+    }
+
+    // Vault requires a token. If the toggle is on and we don't have one,
+    // prompt for password first — re-submit will run again automatically
+    // since the VaultGate stores the token in localStorage that request.js
+    // picks up on the next call.
+    if (saveToVault && !getVaultToken()) {
+      setVaultLoginOpen(true)
+      return
     }
 
     setError(null); setJob(null); setWorking(true)
@@ -448,6 +463,7 @@ export default function ImageEnhancer() {
                   tunings={tunings} setTunings={setTunings}
                   atelierPrompt={atelierPrompt} setAtelierPrompt={setAtelierPrompt}
                   customModel={customModel} setCustomModel={setCustomModel}
+                  saveToVault={saveToVault} setSaveToVault={setSaveToVault}
                 />
               ),
             },
@@ -465,6 +481,30 @@ export default function ImageEnhancer() {
 
         {/* Full live-log viewer for the current job */}
         <ImageLogModal open={logsModalOpen} onClose={() => setLogsModalOpen(false)} job={job} />
+
+        {/* Inline vault-login modal — only opens when the user tries to save
+            to Vault without a valid token. On successful login, the user can
+            click Run again and the saved token gets included automatically. */}
+        <Modal open={vaultLoginOpen} onCancel={() => setVaultLoginOpen(false)}
+          footer={null} closeIcon={null} centered width={460}
+          styles={{
+            content: { background: 'transparent', padding: 0, boxShadow: 'none' },
+            body: { padding: 0 },
+            mask: { backdropFilter: 'blur(6px)' },
+          }}>
+          <VaultGate label="Save to Vault">
+            <div className="rounded-2xl border border-emerald-500/40 bg-gradient-to-b from-gray-900/90 to-gray-950/80 p-6 text-center">
+              <p className="text-emerald-300 text-sm font-semibold">✓ Signed in</p>
+              <p className="text-gray-400 text-xs mt-1">
+                Close this and click Run — your output will go to the 🔒 Vault library.
+              </p>
+              <button onClick={() => setVaultLoginOpen(false)}
+                className="mt-3 px-4 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-semibold">
+                OK
+              </button>
+            </div>
+          </VaultGate>
+        </Modal>
       </div>
     </div>
   )
@@ -492,6 +532,7 @@ function GenerateSection({
   setExpandedPreset, enhance,
   atelierWorkflow, setAtelierWorkflow, tunings, setTunings,
   atelierPrompt, setAtelierPrompt, customModel, setCustomModel,
+  saveToVault, setSaveToVault,
 }) {
   const isAtelier = engine === 'atelier' || engine === 'local'
   const wf = ATELIER_WORKFLOWS.find(w => w.id === atelierWorkflow) || ATELIER_WORKFLOWS[0]
@@ -819,6 +860,24 @@ function GenerateSection({
             </div>
           </section>
         )}
+
+        {/* ─── Save to Vault toggle ─── */}
+        <div className="mb-3 p-3 rounded-xl border border-gray-800 bg-gray-900/40 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <LockOutlined className={saveToVault ? 'text-cyan-300' : 'text-gray-500'} />
+            <div>
+              <p className="text-xs font-semibold text-gray-200">
+                Save to Vault <span className="text-[10px] text-gray-500 font-normal">(private)</span>
+              </p>
+              <p className="text-[10px] text-gray-500">
+                {saveToVault
+                  ? 'Output stays in the 🔒 Vault library — visible only when logged in'
+                  : 'Default: output goes to the 🌐 Public library, visible to anyone'}
+              </p>
+            </div>
+          </div>
+          <Switch size="small" checked={saveToVault} onChange={setSaveToVault} />
+        </div>
 
         {/* ─── Action ─── */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
