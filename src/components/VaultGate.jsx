@@ -57,37 +57,49 @@ export function VaultLoginPanel({ label = 'Unlock vault', onUnlocked }) {
   }
 
   return (
-    <div className="p-5 sm:p-6 rounded-2xl border border-cyan-500/30 bg-gradient-to-b from-gray-900/95 to-gray-950/90 shadow-2xl shadow-cyan-500/10">
-      <div className="text-center mb-4">
-        <div className="inline-flex w-12 h-12 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 via-fuchsia-400 to-amber-400 text-black mb-2">
-          <LockOutlined className="text-xl" />
+    <div className="relative p-6 sm:p-7 rounded-2xl border border-cyan-500/30 bg-gradient-to-b from-gray-900/95 to-gray-950/95 shadow-[0_30px_70px_-20px_rgba(34,211,238,0.35)] overflow-hidden">
+      {/* Soft animated halo behind the lock — pure cosmetic */}
+      <div aria-hidden className="absolute -top-16 left-1/2 -translate-x-1/2 w-44 h-44 rounded-full bg-gradient-to-br from-cyan-500/20 via-fuchsia-500/15 to-amber-500/15 blur-3xl pointer-events-none" />
+      <div className="relative">
+        <div className="text-center mb-5">
+          <div className="relative inline-flex w-14 h-14 items-center justify-center mb-3">
+            <span aria-hidden className="absolute inset-0 rounded-full bg-gradient-to-br from-cyan-400 via-fuchsia-400 to-amber-400 opacity-90" />
+            <span aria-hidden className="absolute inset-[2px] rounded-full bg-gray-950" />
+            <LockOutlined className="relative text-xl bg-gradient-to-br from-cyan-300 via-fuchsia-300 to-amber-300 bg-clip-text text-transparent" />
+          </div>
+          <h2 className="text-lg sm:text-xl font-bold tracking-tight bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-amber-300 bg-clip-text text-transparent">
+            {label}
+          </h2>
+          <p className="text-[11px] text-gray-500 mt-1.5 leading-relaxed max-w-[34ch] mx-auto">
+            Bypasses the NSFW filter · routes outputs to the private Vault library
+          </p>
         </div>
-        <h2 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-amber-300 bg-clip-text text-transparent">
-          {label}
-        </h2>
-        <p className="text-[11px] text-gray-500 mt-1">
-          Bypasses the NSFW filter and saves your output to Vault.
-        </p>
+        <Input.Password
+          size="large"
+          placeholder="Access phrase"
+          value={attempt}
+          onChange={(e) => { setAttempt(e.target.value); if (error) setError('') }}
+          onPressEnter={submit}
+          status={error ? 'error' : ''}
+          disabled={submitting}
+          autoFocus
+        />
+        {error && (
+          <p className="text-rose-400 text-xs mt-2 text-center font-medium flex items-center justify-center gap-1">
+            <span aria-hidden>✗</span>{error}
+          </p>
+        )}
+        <Button type="primary" size="large" block onClick={submit}
+          disabled={!attempt || submitting} loading={submitting}
+          className="mt-3 bg-gradient-to-r from-cyan-500 to-fuchsia-500 border-0 hover:opacity-90 font-semibold">
+          {submitting ? 'Verifying…' : 'Unlock'}
+        </Button>
+        <div className="mt-4 flex items-center justify-center gap-1.5 text-[10px] text-gray-600">
+          <span aria-hidden className="w-1 h-1 rounded-full bg-gray-700" />
+          <span>Stays unlocked on this device for 90 days</span>
+          <span aria-hidden className="w-1 h-1 rounded-full bg-gray-700" />
+        </div>
       </div>
-      <Input.Password
-        size="large"
-        placeholder="Access phrase"
-        value={attempt}
-        onChange={(e) => { setAttempt(e.target.value); if (error) setError('') }}
-        onPressEnter={submit}
-        status={error ? 'error' : ''}
-        disabled={submitting}
-        autoFocus
-      />
-      {error && <p className="text-rose-400 text-xs mt-2 text-center">{error}</p>}
-      <Button type="primary" size="large" block onClick={submit}
-        disabled={!attempt || submitting} loading={submitting}
-        className="mt-3 bg-gradient-to-r from-cyan-500 to-fuchsia-500 border-0 hover:opacity-90 font-semibold">
-        Unlock
-      </Button>
-      <p className="text-[10px] text-gray-600 mt-3 text-center">
-        Stays logged in on this device for 90 days
-      </p>
     </div>
   )
 }

@@ -87,31 +87,79 @@ function groupedTemplates() {
   }))
 }
 
-// Per-checkpoint default tunings. When the user types a known filename into
-// the custom Model field, the sliders auto-adjust to that model's sweet
-// spot. Hyper / Lightning / Turbo variants need DRAMATICALLY different
-// settings — running them at default SDXL steps/CFG produces noise.
-const CHECKPOINT_DEFAULTS = {
-  // Hyper variants — distilled fast models. Low steps, very low CFG.
-  'realisticVisionV60B1_v51HyperVAE': { steps: 8, cfg: 1.5, denoise: 0.30,
-    note: 'Hyper variant — runs at 8 steps & CFG 1.5. Don\'t change.' },
-  // Pony family — needs CFG 6-7. Add "score_9, score_8_up, score_7_up" prefix to prompts.
-  'ponyDiffusionV6XL_v6StartWithThisOne': { steps: 28, cfg: 7.0, denoise: 0.35,
-    note: 'Pony — start prompts with "score_9, score_8_up, score_7_up, ..."' },
-  'autismmixSDXL_autismmixPony':        { steps: 28, cfg: 6.0, denoise: 0.35,
-    note: 'Pony fork — same "score_9..." prompt convention' },
-  // CyberRealistic — standard SDXL photo-real
-  'cyberrealisticXL_v100':              { steps: 30, cfg: 5.5, denoise: 0.30,
-    note: 'Photo-real SDXL — works great with negative "cartoon, painting, anime"' },
-  // JuggernautXL (already on disk)
-  'Juggernaut-XL_v9_RunDiffusionPhoto_v2': { steps: 25, cfg: 5.0, denoise: 0.25, note: '' },
+// Curated checkpoint catalog. This is the SOLE source of truth the Atelier
+// dropdown shows — no free typing. Each entry knows:
+//   • the on-disk filename (what the worker tells ComfyUI to load)
+//   • short human label + descriptive blurb shown as helper text
+//   • family ('sdxl' | 'sdxl-hyper' | 'pony' | 'flux') — drives prompt hints
+//   • defaults block (steps/cfg/denoise) — applied when user picks it
+//   • a `note` shown under the dropdown so the user knows why each model
+//     needs different tuning. Hyper/Lightning need CFG 1.5; Pony needs CFG 6-7
+//     and the score_9 prefix; SDXL photo-real lives around CFG 5.
+const CHECKPOINTS = [
+  {
+    value: 'Juggernaut-XL_v9_RunDiffusionPhoto_v2.safetensors',
+    label: '🏆 JuggernautXL v9 — Photo-Real',
+    blurb: 'Default. Best all-rounder. Crisp portraits, products, scenes.',
+    family: 'sdxl',
+    defaults: { steps: 25, cfg: 5.0, denoise: 0.25 },
+    note: '',
+  },
+  {
+    value: 'cyberrealisticXL_v100.safetensors',
+    label: '📷 CyberRealistic XL v1',
+    blurb: 'Photo-realistic SDXL. Add negative "cartoon, painting, anime".',
+    family: 'sdxl',
+    defaults: { steps: 30, cfg: 5.5, denoise: 0.30 },
+    note: 'Photo-real SDXL — works great with negative "cartoon, painting, anime".',
+  },
+  {
+    value: 'realisticVisionV60B1_v51HyperVAE.safetensors',
+    label: '⚡ Realistic Vision v6 (Hyper)',
+    blurb: 'Distilled fast variant. 8 steps & CFG 1.5 — much faster.',
+    family: 'sdxl-hyper',
+    defaults: { steps: 8, cfg: 1.5, denoise: 0.30 },
+    note: 'Hyper variant — runs at 8 steps & CFG 1.5. Don\'t change.',
+  },
+  {
+    value: 'ponyDiffusionV6XL_v6StartWithThisOne.safetensors',
+    label: '🐴 Pony Diffusion v6 XL',
+    blurb: 'Stylized. Needs "score_9, score_8_up, score_7_up, …" prefix.',
+    family: 'pony',
+    defaults: { steps: 28, cfg: 7.0, denoise: 0.35 },
+    note: 'Pony — start prompts with "score_9, score_8_up, score_7_up, …" for best quality.',
+  },
+  {
+    value: 'autismmixSDXL_autismmixPony.safetensors',
+    label: '🎨 AutismMix Pony (SDXL)',
+    blurb: 'Pony fork. Same "score_9, score_8_up, …" prompt convention.',
+    family: 'pony',
+    defaults: { steps: 28, cfg: 6.0, denoise: 0.35 },
+    note: 'Pony fork — same "score_9…" prompt convention.',
+  },
+  {
+    value: 'flux1-dev-kontext_fp8_scaled.safetensors',
+    label: '🪄 Flux Kontext (dev fp8)',
+    blurb: 'For Flux Kontext edits. Identity-preserving prompt-edit only.',
+    family: 'flux',
+    defaults: { steps: 20, cfg: 2.5 },
+    note: 'Flux Kontext — use natural-language edit instructions ("change shirt to red, keep face").',
+  },
+]
+
+// Lookup the catalog row for a checkpoint value (with or without extension).
+function checkpointMeta(value) {
+  if (!value) return null
+  const base = value.replace(/\.safetensors$|\.ckpt$/i, '')
+  return CHECKPOINTS.find(c =>
+    c.value === value || c.value.replace(/\.safetensors$|\.ckpt$/i, '') === base
+  ) || null
 }
 
-// Strip extension before lookup so users can paste either with or without ".safetensors"
+// Back-compat: GenerateSection still reads `defaults` per filename.
 function checkpointDefaults(filename) {
-  if (!filename) return null
-  const base = filename.replace(/\.safetensors$|\.ckpt$/i, '')
-  return CHECKPOINT_DEFAULTS[base] || null
+  const m = checkpointMeta(filename)
+  return m ? { ...m.defaults, note: m.note } : null
 }
 
 // Atelier workflow catalog. Each entry knows what inputs it needs (image /
@@ -455,16 +503,23 @@ export default function ImageEnhancer() {
               <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-amber-300 bg-clip-text text-transparent">
                 Image Studio
               </h1>
-              {/* Tiny vault lock — toggles login state. Logged-in users
-                  bypass the NSFW filter and their outputs land in Vault. */}
+              {/* Vault pill — full label + status dot. Clear professional
+                  affordance for the auth state. Logged-in users bypass the
+                  NSFW filter and their outputs land in the Vault library. */}
               <button onClick={() => setVaultLoginOpen(true)} type="button"
-                title={isLoggedIn ? 'Vault unlocked — outputs go to Vault library' : 'Lock — click to unlock vault'}
-                className={`w-8 h-8 rounded-full flex items-center justify-center border transition-all ${
+                title={isLoggedIn ? 'Vault unlocked · click to lock or sign out' : 'Sign in to unlock the private Vault'}
+                className={`group relative inline-flex items-center gap-1.5 sm:gap-2 pl-2 pr-2.5 sm:pl-2.5 sm:pr-3 py-1 rounded-full border text-[11px] font-semibold tracking-wide transition-all overflow-hidden ${
                   isLoggedIn
-                    ? 'bg-emerald-500/20 border-emerald-400/50 text-emerald-300 hover:bg-emerald-500/30'
-                    : 'bg-gray-900/60 border-gray-700 text-gray-400 hover:border-cyan-400/50 hover:text-cyan-300'
+                    ? 'bg-emerald-500/12 border-emerald-400/50 text-emerald-200 shadow-[0_0_18px_-6px_rgba(16,185,129,0.55)] hover:bg-emerald-500/20'
+                    : 'bg-gray-900/70 border-gray-700/80 text-gray-300 hover:border-cyan-400/50 hover:text-cyan-200 hover:bg-gray-900'
                 }`}>
-                <LockOutlined className="text-sm" />
+                <span aria-hidden
+                  className={`w-1.5 h-1.5 rounded-full ${isLoggedIn ? 'bg-emerald-400 animate-pulse' : 'bg-gray-500'}`} />
+                <LockOutlined className="text-[12px]" />
+                <span className="hidden sm:inline">
+                  {isLoggedIn ? 'Vault · Unlocked' : 'Vault · Locked'}
+                </span>
+                <span className="sm:hidden">{isLoggedIn ? 'Vault' : 'Lock'}</span>
               </button>
             </div>
             {/* Engine toggle — Cloud (Gemini, fast) vs Local (5090, free) */}
@@ -498,10 +553,21 @@ export default function ImageEnhancer() {
         <Tabs
           defaultActiveKey="generate"
           size="large"
+          // When user switches to T2I tab, force engine→atelier and pre-select
+          // a t2i workflow so the form is immediately usable.
+          onChange={(key) => {
+            if (key === 't2i') {
+              if (engine !== 'atelier') setEngine('atelier')
+              const cur = ATELIER_WORKFLOWS.find(w => w.id === atelierWorkflow)
+              if (!cur || cur.family !== 't2i') {
+                setAtelierWorkflow(ATELIER_WORKFLOWS.find(w => w.family === 't2i').id)
+              }
+            }
+          }}
           items={[
             {
               key: 'generate',
-              label: <span><ThunderboltOutlined /> Generate</span>,
+              label: <span><ThunderboltOutlined /> Enhance</span>,
               children: (
                 <GenerateSection
                   sourceDataUrl={sourceDataUrl} reset={reset} handleFile={handleFile}
@@ -515,6 +581,27 @@ export default function ImageEnhancer() {
                   atelierPrompt={atelierPrompt} setAtelierPrompt={setAtelierPrompt}
                   customModel={customModel} setCustomModel={setCustomModel}
                   setLogsModalOpen={setLogsModalOpen}
+                />
+              ),
+            },
+            {
+              key: 't2i',
+              label: <span>✨ Text → Image</span>,
+              children: (
+                <GenerateSection
+                  sourceDataUrl={sourceDataUrl} reset={reset} handleFile={handleFile}
+                  resultUrl={resultUrl} status={status} working={working}
+                  engine="atelier"   // Force Atelier — Cloud T2I isn't wired into this lane
+                  job={job} activePreset={activePreset} downloadResult={downloadResult}
+                  error={error}
+                  selectedPreset={selectedPreset} setSelectedPreset={setSelectedPreset}
+                  setExpandedPreset={setExpandedPreset} enhance={enhance}
+                  atelierWorkflow={atelierWorkflow} setAtelierWorkflow={setAtelierWorkflow}
+                  tunings={tunings} setTunings={setTunings}
+                  atelierPrompt={atelierPrompt} setAtelierPrompt={setAtelierPrompt}
+                  customModel={customModel} setCustomModel={setCustomModel}
+                  setLogsModalOpen={setLogsModalOpen}
+                  t2iMode
                 />
               ),
             },
@@ -545,32 +632,39 @@ export default function ImageEnhancer() {
             mask: { backdropFilter: 'blur(6px)', background: 'rgba(0,0,0,0.7)' },
           }}>
           {isLoggedIn ? (
-            <div className="rounded-2xl border border-emerald-500/40 bg-gradient-to-b from-gray-900/95 to-gray-950/90 p-6 text-center shadow-2xl shadow-emerald-500/10">
-              <div className="inline-flex w-12 h-12 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-300 mb-2 text-2xl">✓</div>
-              <p className="text-emerald-300 text-base font-bold">Vault unlocked</p>
-              <p className="text-gray-400 text-xs mt-1 mb-4">
-                Outputs go to 🔒 Vault library · NSFW filter bypassed
-              </p>
-              <div className="space-y-2">
-                <button onClick={() => { setVaultLoginOpen(false); setNsfwBlocked(null) }}
-                  className="w-full px-5 py-2 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-semibold">
-                  Stay unlocked
-                </button>
-                <button onClick={() => {
-                    setVaultToken(null)
-                    setIsLoggedIn(false)
-                    setNsfwBlocked(null)
-                    setVaultLoginOpen(false)
-                    setRefreshKey(k => k + 1)   // force Library re-fetch
-                    antMessage.success('Vault locked — public view restored')
-                  }}
-                  className="w-full px-5 py-2 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/40 text-xs font-semibold flex items-center justify-center gap-1.5">
-                  <LockOutlined /> Lock vault (sign out)
-                </button>
+            <div className="relative rounded-2xl border border-emerald-500/40 bg-gradient-to-b from-gray-900/95 to-gray-950/95 p-6 text-center shadow-[0_30px_70px_-20px_rgba(16,185,129,0.35)] overflow-hidden">
+              {/* Subtle ambient orb behind the title */}
+              <div aria-hidden className="absolute -top-12 left-1/2 -translate-x-1/2 w-40 h-40 rounded-full bg-emerald-500/15 blur-3xl pointer-events-none" />
+              <div className="relative">
+                <div className="inline-flex w-14 h-14 items-center justify-center rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 mb-3 text-3xl shadow-inner">
+                  ✓
+                </div>
+                <p className="text-emerald-200 text-lg font-bold tracking-tight">Vault unlocked</p>
+                <p className="text-gray-400 text-xs mt-1 mb-5 max-w-[34ch] mx-auto leading-relaxed">
+                  Outputs route to <span className="text-emerald-300 font-semibold">🔒 Vault</span> ·
+                  NSFW filter bypassed · Vault items are hidden from public viewers
+                </p>
+                <div className="space-y-2">
+                  <button onClick={() => { setVaultLoginOpen(false); setNsfwBlocked(null) }}
+                    className="w-full px-5 py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-400/50 text-xs font-semibold transition-all">
+                    Stay unlocked
+                  </button>
+                  <button onClick={() => {
+                      setVaultToken(null)
+                      setIsLoggedIn(false)
+                      setNsfwBlocked(null)
+                      setVaultLoginOpen(false)
+                      setRefreshKey(k => k + 1)
+                      antMessage.success('Vault locked — public view restored')
+                    }}
+                    className="w-full px-5 py-2.5 rounded-xl bg-gray-900/70 hover:bg-rose-500/15 text-gray-400 hover:text-rose-300 border border-gray-700/80 hover:border-rose-500/40 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all">
+                    <LockOutlined /> Lock vault & sign out
+                  </button>
+                </div>
+                <p className="text-[10px] text-gray-600 mt-4 leading-snug">
+                  Tokens persist 90 days. Locking removes the token from this browser only.
+                </p>
               </div>
-              <p className="text-[10px] text-gray-600 mt-3">
-                After locking, switch Library to 🌐 Public — your vault items vanish from view.
-              </p>
             </div>
           ) : (
             <>
@@ -608,6 +702,126 @@ function Tuner({ label, value, min, max, step, onChange, fmt }) {
   )
 }
 
+// Shared 3D-tilt handlers. Returns props you can spread on any card-like
+// element. The CSS vars (--tx, --ty, --glx, --gly) drive perspective tilt
+// and a cursor-following glow. Stays inert on touch (no mousemove events).
+function useTilt(maxTiltDeg = 8) {
+  const ref = useRef(null)
+  const onMouseMove = (e) => {
+    const el = ref.current; if (!el) return
+    const rect = el.getBoundingClientRect()
+    const dx = (e.clientX - rect.left) / rect.width - 0.5
+    const dy = (e.clientY - rect.top) / rect.height - 0.5
+    el.style.setProperty('--tx', `${(-dy * maxTiltDeg).toFixed(2)}deg`)
+    el.style.setProperty('--ty', `${( dx * (maxTiltDeg + 2)).toFixed(2)}deg`)
+    el.style.setProperty('--glx', `${((e.clientX - rect.left) / rect.width * 100).toFixed(1)}%`)
+    el.style.setProperty('--gly', `${((e.clientY - rect.top) / rect.height * 100).toFixed(1)}%`)
+  }
+  const onMouseLeave = () => {
+    const el = ref.current; if (!el) return
+    el.style.setProperty('--tx', '0deg')
+    el.style.setProperty('--ty', '0deg')
+  }
+  return { ref, onMouseMove, onMouseLeave }
+}
+
+// 3D-tilt workflow card. Hover the card to get a perspective-warp + neon
+// glow follow-the-cursor effect. Falls back to flat on touch / reduced-motion.
+function WorkflowCard({ workflow: w, active, onSelect }) {
+  const tilt = useTilt(8)
+  // Family → fully-spelled Tailwind classes (JIT can't see interpolated strings)
+  const familyChip = w.family === 'upscale' ? 'bg-emerald-500/15 text-emerald-300'
+    : w.family === 'img2img' ? 'bg-fuchsia-500/15 text-fuchsia-300'
+    : w.family === 't2i'     ? 'bg-amber-500/15 text-amber-300'
+    : 'bg-cyan-500/15 text-cyan-300'
+  return (
+    <button {...tilt} type="button" onClick={onSelect}
+      style={{
+        transform: 'perspective(800px) rotateX(var(--tx, 0deg)) rotateY(var(--ty, 0deg))',
+        transition: 'transform 120ms ease-out, border-color 200ms, box-shadow 200ms',
+      }}
+      className={`relative p-3 rounded-xl text-left border-2 transition-all overflow-hidden group will-change-transform ${
+        active
+          ? 'border-cyan-400/70 bg-cyan-500/10 shadow-lg shadow-cyan-500/20'
+          : 'border-gray-800 bg-gray-900/40 hover:border-gray-700 hover:bg-gray-900'
+      }`}>
+      {/* Cursor-following glow — purely cosmetic, pointer-events-none */}
+      <span aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        style={{
+          background: `radial-gradient(220px at var(--glx, 50%) var(--gly, 50%), rgba(56,189,248,0.18), transparent 65%)`,
+        }} />
+      {active && (
+        <span aria-hidden className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-gradient-to-br from-cyan-400 to-fuchsia-500 flex items-center justify-center text-black shadow-md z-10">
+          <CheckOutlined className="text-[10px] font-bold" />
+        </span>
+      )}
+      <div className="relative">
+        <div className="flex items-baseline justify-between mb-0.5">
+          <span className={`text-xs font-bold ${active ? 'text-white' : 'text-gray-200'}`}>
+            {w.icon} {w.label}
+          </span>
+          <span className="text-[9px] font-mono text-gray-500">{w.eta}</span>
+        </div>
+        <p className={`text-[10px] leading-snug ${active ? 'text-gray-300' : 'text-gray-500'}`}>{w.blurb}</p>
+        <div className="flex gap-1 mt-1.5 text-[9px] flex-wrap">
+          <span className={`px-1.5 py-0.5 rounded uppercase font-mono ${familyChip}`}>{w.family}</span>
+          {w.needsImage && <span className="px-1.5 py-0.5 rounded uppercase font-mono bg-gray-800 text-gray-400">img</span>}
+          {w.needsPrompt && <span className="px-1.5 py-0.5 rounded uppercase font-mono bg-gray-800 text-gray-400">prompt</span>}
+        </div>
+      </div>
+    </button>
+  )
+}
+
+// 3D-tilt Cloud preset card. Same physics as WorkflowCard but laid out with
+// the gradient accent the cloud presets already use.
+function PresetCard({ preset: p, active, onSelect, onExpand }) {
+  const tilt = useTilt(7)
+  return (
+    <button {...tilt} type="button" onClick={onSelect}
+      style={{
+        transform: 'perspective(800px) rotateX(var(--tx, 0deg)) rotateY(var(--ty, 0deg))',
+        transition: 'transform 120ms ease-out, border-color 200ms, box-shadow 200ms',
+      }}
+      className={`relative p-4 rounded-2xl text-left border-2 transition-all overflow-hidden group will-change-transform ${
+        active
+          ? `${p.border.replace('/40', '')} bg-gray-900 shadow-xl ${p.glow}`
+          : 'border-gray-800 bg-gray-900/40 hover:bg-gray-900 hover:border-gray-700'
+      }`}>
+      {/* Cursor-following glow */}
+      <span aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        style={{
+          background: `radial-gradient(260px at var(--glx, 50%) var(--gly, 50%), rgba(255,255,255,0.10), transparent 65%)`,
+        }} />
+      {active && (
+        <div aria-hidden className={`absolute inset-0 pointer-events-none opacity-20 bg-gradient-to-br ${p.accent}`} />
+      )}
+      {active && (
+        <div className={`absolute -top-2 -right-2 w-6 h-6 rounded-full bg-gradient-to-br ${p.accent} flex items-center justify-center text-black shadow-md z-10`}>
+          <CheckOutlined className="text-[10px] font-bold" />
+        </div>
+      )}
+      <div className="relative">
+        <div className="flex items-start justify-between mb-1.5">
+          <span className={`text-sm font-bold ${active ? 'text-white' : 'text-gray-200'}`}>
+            <span className="mr-1.5">{p.icon}</span>{p.name}
+          </span>
+          <span onClick={(e) => { e.stopPropagation(); onExpand() }} role="button" tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); onExpand() } }}
+            className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-gray-700 hover:border-cyan-400 text-gray-400 hover:text-cyan-300 transition-colors cursor-pointer">
+            <ExpandAltOutlined /> Expand
+          </span>
+        </div>
+        <p className={`text-[11px] leading-snug ${active ? 'text-gray-300' : 'text-gray-500'}`}>
+          {p.short}
+        </p>
+      </div>
+    </button>
+  )
+}
+
 function GenerateSection({
   sourceDataUrl, reset, handleFile, resultUrl, status, working, engine, job,
   activePreset, downloadResult, error, selectedPreset, setSelectedPreset,
@@ -615,9 +829,16 @@ function GenerateSection({
   atelierWorkflow, setAtelierWorkflow, tunings, setTunings,
   atelierPrompt, setAtelierPrompt, customModel, setCustomModel,
   setLogsModalOpen,
+  // t2iMode forces an Atelier text→image flow: hides the upload card,
+  // filters the workflow grid to only T2I, and skips the Cloud presets.
+  t2iMode = false,
 }) {
-  const isAtelier = engine === 'atelier' || engine === 'local'
-  const wf = ATELIER_WORKFLOWS.find(w => w.id === atelierWorkflow) || ATELIER_WORKFLOWS[0]
+  const isAtelier = t2iMode || engine === 'atelier' || engine === 'local'
+  // In T2I mode, only show t2i workflows so the user can't pick i2i by mistake.
+  const visibleWorkflows = t2iMode
+    ? ATELIER_WORKFLOWS.filter(w => w.family === 't2i')
+    : ATELIER_WORKFLOWS
+  const wf = ATELIER_WORKFLOWS.find(w => w.id === atelierWorkflow) || visibleWorkflows[0] || ATELIER_WORKFLOWS[0]
   const showSteps = wf.defaults?.steps != null
   const showDenoise = wf.defaults?.denoise != null
   const showCfg = wf.defaults?.cfg != null
@@ -628,7 +849,8 @@ function GenerateSection({
   const defaultModel = wf.checkpoint || 'workflow default'
   return (
     <>
-      <section className="grid sm:grid-cols-2 gap-4 mb-6">
+      <section className={`grid gap-4 mb-6 ${t2iMode ? 'sm:grid-cols-1' : 'sm:grid-cols-2'}`}>
+          {!t2iMode && (
           <div className="rounded-2xl border-2 border-dashed border-gray-800 hover:border-cyan-500/40 transition-colors p-4 bg-gray-900/40">
             <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Source image</p>
             {sourceDataUrl ? (
@@ -652,6 +874,7 @@ function GenerateSection({
               </Upload.Dragger>
             )}
           </div>
+          )}
 
           <div className="rounded-2xl border border-gray-800 p-4 bg-gray-900/40 flex flex-col">
             <div className="flex items-center justify-between mb-2">
@@ -790,35 +1013,15 @@ function GenerateSection({
           // Atelier mode: workflow dropdown + prompt + fine-tunes
           <section className="mb-6 space-y-4">
             <div>
-              <h2 className="text-xs uppercase tracking-wider text-gray-500 mb-2">Workflow</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                {ATELIER_WORKFLOWS.map(w => {
+              <h2 className="text-xs uppercase tracking-wider text-gray-500 mb-2">
+                {t2iMode ? 'Text → Image workflow' : 'Workflow'}
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 [perspective:1200px]">
+                {visibleWorkflows.map(w => {
                   const active = atelierWorkflow === w.id
                   return (
-                    <button key={w.id} type="button" onClick={() => setAtelierWorkflow(w.id)}
-                      className={`p-3 rounded-xl text-left border-2 transition-all ${
-                        active
-                          ? 'border-cyan-400/70 bg-cyan-500/10 shadow-lg shadow-cyan-500/10'
-                          : 'border-gray-800 bg-gray-900/40 hover:border-gray-700 hover:bg-gray-900'
-                      }`}>
-                      <div className="flex items-baseline justify-between mb-0.5">
-                        <span className={`text-xs font-bold ${active ? 'text-white' : 'text-gray-200'}`}>
-                          {w.icon} {w.label}
-                        </span>
-                        <span className="text-[9px] font-mono text-gray-500">{w.eta}</span>
-                      </div>
-                      <p className={`text-[10px] leading-snug ${active ? 'text-gray-300' : 'text-gray-500'}`}>{w.blurb}</p>
-                      <div className="flex gap-1 mt-1.5 text-[9px] flex-wrap">
-                        <span className={`px-1.5 py-0.5 rounded uppercase font-mono ${
-                          w.family === 'upscale' ? 'bg-emerald-500/15 text-emerald-300'
-                          : w.family === 'img2img' ? 'bg-fuchsia-500/15 text-fuchsia-300'
-                          : w.family === 't2i'    ? 'bg-amber-500/15 text-amber-300'
-                          : 'bg-cyan-500/15 text-cyan-300'
-                        }`}>{w.family}</span>
-                        {w.needsImage && <span className="px-1.5 py-0.5 rounded uppercase font-mono bg-gray-800 text-gray-400">img</span>}
-                        {w.needsPrompt && <span className="px-1.5 py-0.5 rounded uppercase font-mono bg-gray-800 text-gray-400">prompt</span>}
-                      </div>
-                    </button>
+                    <WorkflowCard key={w.id} workflow={w} active={active}
+                      onSelect={() => setAtelierWorkflow(w.id)} />
                   )
                 })}
               </div>
@@ -868,30 +1071,56 @@ function GenerateSection({
               </div>
             )}
 
-            {/* Custom model override — for advanced users who want to swap in
-                an alternate SDXL/Flux checkpoint they've dropped into the
-                5090's ComfyUI/models/checkpoints/ folder. Auto-tuning kicks
-                in when a known filename is typed. */}
+            {/* Checkpoint picker — no free typing. The catalog above is the
+                canonical list of models installed on the 5090. Picking one
+                hydrates its sweet-spot tunings (steps / cfg / denoise) and
+                shows a contextual note (Pony score-tags, Hyper-CFG, etc.). */}
             {showCustomModel && (() => {
-              const ckptDefs = checkpointDefaults(customModel)
+              const meta = checkpointMeta(customModel)
+              // Compatible checkpoints for this workflow's family — Flux
+              // Kontext only accepts flux1, the SDXL/Pony pool fits everything
+              // else. Pre-filter so users can't pick wrong → BE 400.
+              const compat = CHECKPOINTS.filter(c =>
+                wf.family === 'edit' ? c.family === 'flux' : c.family !== 'flux'
+              )
               return (
                 <div>
                   <label className="text-[10px] uppercase tracking-wider text-gray-500 block mb-1">
-                    Model (advanced — override default checkpoint)
+                    Checkpoint <span className="text-gray-700 normal-case font-normal">— installed on the 5090</span>
                   </label>
-                  <Input
-                    value={customModel}
-                    onChange={e => setCustomModel(e.target.value)}
-                    placeholder={defaultModel}
+                  <Select
+                    className="w-full"
+                    size="middle"
+                    placeholder={`Default: ${defaultModel}`}
+                    value={customModel || undefined}
                     allowClear
+                    onChange={(v) => setCustomModel(v || '')}
+                    optionLabelProp="label"
+                    options={compat.map(c => ({
+                      value: c.value,
+                      label: c.label,
+                      _blurb: c.blurb,
+                    }))}
+                    optionRender={(opt) => (
+                      <div className="py-0.5">
+                        <div className="text-[12px] font-semibold text-gray-100 leading-tight">
+                          {opt.data.label}
+                        </div>
+                        <div className="text-[10px] text-gray-500 leading-snug mt-0.5">
+                          {opt.data._blurb}
+                        </div>
+                      </div>
+                    )}
                   />
-                  {ckptDefs?.note ? (
+                  {meta ? (
                     <p className="text-[10px] text-cyan-300 mt-1 leading-snug">
-                      💡 Auto-tuned: steps={ckptDefs.steps}, CFG={ckptDefs.cfg}, denoise={ckptDefs.denoise}. {ckptDefs.note}
+                      💡 Auto-tuned: steps={meta.defaults.steps}, CFG={meta.defaults.cfg}
+                      {meta.defaults.denoise != null && `, denoise=${meta.defaults.denoise}`}
+                      . {meta.note || 'Standard SDXL tunings.'}
                     </p>
                   ) : (
                     <p className="text-[10px] text-gray-600 mt-1">
-                      Type a `.safetensors` filename from <span className="font-mono text-gray-400">ComfyUI/models/checkpoints/</span> — leave blank to use {wf.label}'s default.
+                      Leave blank to use {wf.label}'s default checkpoint.
                     </p>
                   )}
                 </div>
@@ -925,44 +1154,16 @@ function GenerateSection({
             )}
           </section>
         ) : (
-          // Cloud mode: existing preset cards
+          // Cloud mode: existing preset cards (now with 3D tilt + glow)
           <section className="mb-6">
             <h2 className="text-xs uppercase tracking-wider text-gray-500 mb-3">Choose a polish</h2>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {PRESETS.map(p => {
-                const active = selectedPreset === p.id
-                return (
-                  <button key={p.id} type="button" onClick={() => setSelectedPreset(p.id)}
-                    className={`relative p-4 rounded-2xl text-left border-2 transition-all overflow-hidden ${
-                      active
-                        ? `${p.border.replace('/40', '')} bg-gray-900 shadow-xl ${p.glow} scale-[1.01]`
-                        : 'border-gray-800 bg-gray-900/40 hover:bg-gray-900 hover:border-gray-700'
-                    }`}>
-                    {active && (
-                      <div aria-hidden className={`absolute inset-0 pointer-events-none opacity-20 bg-gradient-to-br ${p.accent}`} />
-                    )}
-                    {active && (
-                      <div className={`absolute -top-2 -right-2 w-6 h-6 rounded-full bg-gradient-to-br ${p.accent} flex items-center justify-center text-black shadow-md z-10`}>
-                        <CheckOutlined className="text-[10px] font-bold" />
-                      </div>
-                    )}
-                    <div className="relative">
-                      <div className="flex items-start justify-between mb-1.5">
-                        <span className={`text-sm font-bold ${active ? 'text-white' : 'text-gray-200'}`}>
-                          <span className="mr-1.5">{p.icon}</span>{p.name}
-                        </span>
-                        <button onClick={(e) => { e.stopPropagation(); setExpandedPreset(p.id) }}
-                          className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-gray-700 hover:border-cyan-400 text-gray-400 hover:text-cyan-300 transition-colors">
-                          <ExpandAltOutlined /> Expand
-                        </button>
-                      </div>
-                      <p className={`text-[11px] leading-snug ${active ? 'text-gray-300' : 'text-gray-500'}`}>
-                        {p.short}
-                      </p>
-                    </div>
-                  </button>
-                )
-              })}
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 [perspective:1200px]">
+              {PRESETS.map(p => (
+                <PresetCard key={p.id} preset={p}
+                  active={selectedPreset === p.id}
+                  onSelect={() => setSelectedPreset(p.id)}
+                  onExpand={() => setExpandedPreset(p.id)} />
+              ))}
             </div>
           </section>
         )}
