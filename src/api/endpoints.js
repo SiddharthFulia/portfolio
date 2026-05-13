@@ -26,6 +26,8 @@ export const ENDPOINTS = {
   IMAGE_ENHANCE:        '/api/image-enhance',
   IMAGE_ENHANCE_STATUS: '/api/image-enhance/status',
   IMAGE_ENHANCE_LIST:   '/api/image-enhance/list',
+  IMAGE_ENHANCE_BULK:   '/api/image-enhance/bulk',
+  AI_VIDEO_BULK:        '/api/ai-video/bulk',
 
   // Vision
   FACE_ANALYZE: '/api/face-analyze',

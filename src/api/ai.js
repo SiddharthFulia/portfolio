@@ -184,6 +184,35 @@ export async function getImageStatus(imageId) {
   }
 }
 
+// Bulk operations on enhanced images. Action ∈ 'move-to-vault' | 'make-public' | 'delete'.
+// move-to-vault / make-public require a valid Vault token (Authorization header).
+export async function imageBulkAction(action, ids) {
+  try {
+    const data = await post(
+      ENDPOINTS.IMAGE_ENHANCE_BULK,
+      { action, ids },
+      { timeout: 15000 }
+    );
+    return { data: data?.data || data, error: null };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+}
+
+// Same shape for AI videos. Spans inflight jobs + completed videos.
+export async function videoBulkAction(action, ids) {
+  try {
+    const data = await post(
+      ENDPOINTS.AI_VIDEO_BULK,
+      { action, ids },
+      { timeout: 15000 }
+    );
+    return { data: data?.data || data, error: null };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+}
+
 export async function deleteEnhancedImage(imageId) {
   try {
     const data = await del(`${ENDPOINTS.IMAGE_ENHANCE}/${imageId}`, { timeout: 8000 });

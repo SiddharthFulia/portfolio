@@ -8,7 +8,7 @@ import {
 } from '@ant-design/icons'
 import {
   enhanceImage, getImageStatus, listEnhancedImages, deleteEnhancedImage, fileToDataUrl,
-  promptCoach,
+  promptCoach, imageBulkAction,
 } from '../api/ai'
 import { VaultLoginPanel, getVaultToken, setVaultToken } from '../components/VaultGate'
 
@@ -473,6 +473,10 @@ export default function ImageEnhancer() {
   const [atelierWorkflow, setAtelierWorkflow] = useState(ATELIER_WORKFLOWS[0].id)
   const [tunings, setTunings] = useState({ steps: 20, denoise: 0.2, cfg: 5.0, width: 1024, height: 1024 })
   const [atelierPrompt, setAtelierPrompt] = useState('')
+  // Optional negative prompt. Sent to BE as `negativePrompt` and forwarded to
+  // ComfyUI's negative CLIPTextEncode in sdxl-polish / sdxl-t2i / custom-*.
+  // Pony users normally paste their score_4..score_1 baseline here.
+  const [negativePrompt, setNegativePrompt] = useState('')
   const [customModel, setCustomModel] = useState('')   // optional checkpoint override
   // Vault login state: small lock button in the header opens an Antd modal
   // with a password field. Once logged in, all outputs auto-route to the
@@ -487,7 +491,15 @@ export default function ImageEnhancer() {
   // Surfaces sample prompts tuned to the selected checkpoint family + offers
   // an "ask AI" mode that calls /api/ai/prompt-coach to rewrite plain English
   // into a model-tuned prompt.
+  //
+  // Coach state lives HERE (in the page) instead of inside the modal so the
+  // last idea + generated prompt survive close/reopen cycles. Reset is opt-in
+  // (via the "↻ Reset" button inside the modal); switching pages tears the
+  // component down which clears it anyway.
   const [promptHelperOpen, setPromptHelperOpen] = useState(false)
+  const [coachIdea, setCoachIdea] = useState('')
+  const [coachResult, setCoachResult] = useState(null)
+  const [coachError, setCoachError] = useState('')
   const [working, setWorking] = useState(false)
   const [job, setJob] = useState(null)                    // active or last-finished SQLite row
   const [error, setError] = useState(null)
@@ -590,6 +602,7 @@ export default function ImageEnhancer() {
         prompt: atelierPrompt.trim() || wf.label,
         ...(sourceDataUrl ? { dataUrl: sourceDataUrl } : {}),
         ...(customModel.trim() ? { model: customModel.trim() } : {}),
+        ...(negativePrompt.trim() ? { negativePrompt: negativePrompt.trim() } : {}),
         // Fine-tunes — BE only persists the relevant ones for the workflow's family
         steps: tunings.steps, denoise: tunings.denoise, cfg: tunings.cfg,
         width: tunings.width, height: tunings.height,
@@ -733,6 +746,7 @@ export default function ImageEnhancer() {
                   atelierWorkflow={atelierWorkflow} setAtelierWorkflow={setAtelierWorkflow}
                   tunings={tunings} setTunings={setTunings}
                   atelierPrompt={atelierPrompt} setAtelierPrompt={setAtelierPrompt}
+                  negativePrompt={negativePrompt} setNegativePrompt={setNegativePrompt}
                   customModel={customModel} setCustomModel={setCustomModel}
                   setLogsModalOpen={setLogsModalOpen}
                   setPromptHelperOpen={setPromptHelperOpen}
@@ -754,6 +768,7 @@ export default function ImageEnhancer() {
                   atelierWorkflow={atelierWorkflow} setAtelierWorkflow={setAtelierWorkflow}
                   tunings={tunings} setTunings={setTunings}
                   atelierPrompt={atelierPrompt} setAtelierPrompt={setAtelierPrompt}
+                  negativePrompt={negativePrompt} setNegativePrompt={setNegativePrompt}
                   customModel={customModel} setCustomModel={setCustomModel}
                   setLogsModalOpen={setLogsModalOpen}
                   setPromptHelperOpen={setPromptHelperOpen}
@@ -784,13 +799,22 @@ export default function ImageEnhancer() {
           workflow={ATELIER_WORKFLOWS.find(w => w.id === atelierWorkflow)}
           customModel={customModel}
           currentPrompt={atelierPrompt}
-          onApply={(text) => { setAtelierPrompt(text); setPromptHelperOpen(false) }}
+          // Persistent coach state — survives close/reopen
+          idea={coachIdea} setIdea={setCoachIdea}
+          coachResult={coachResult} setCoachResult={setCoachResult}
+          coachError={coachError} setCoachError={setCoachError}
+          onApply={(text, neg) => {
+            setAtelierPrompt(text)
+            if (neg) setNegativePrompt(neg)   // coach gave us a negative too — autofill it
+            setPromptHelperOpen(false)
+          }}
           onAppend={(text) => {
             const next = atelierPrompt.trim()
               ? `${atelierPrompt.trim()}, ${text}`
               : text
             setAtelierPrompt(next)
           }}
+          onApplyNegative={(neg) => setNegativePrompt(neg)}
         />
 
         {/* Vault unlock modal — centered compact card. Opened by the header
@@ -861,6 +885,67 @@ export default function ImageEnhancer() {
 
 // ─── Generator section (extracted so the Tabs structure stays clean) ──
 // Compact slider+number input — used for steps / denoise / cfg / w / h
+// Negative prompt — collapsed by default with a one-click "Pony baseline"
+// shortcut for users on Pony workflows (the score_4…score_1 negative is the
+// single most common reason Pony outputs look noisy). For SDXL we suggest a
+// short photo-real negative.
+function NegativePromptField({ value, onChange, family }) {
+  const [open, setOpen] = useState(!!value)
+  useEffect(() => { if (value) setOpen(true) }, [value])
+
+  const ponyBaseline = 'score_4, score_3, score_2, score_1, worst quality, low quality, blurry, deformed, bad anatomy, watermark, text'
+  const sdxlBaseline = 'low quality, blurry, distorted, plastic skin, oversmoothed, watermark, text, deformed hands'
+  const hyperBaseline = 'blurry, deformed, watermark'
+  const baseline =
+    family === 'pony'        ? ponyBaseline
+    : family === 'sdxl-hyper' ? hyperBaseline
+    : sdxlBaseline
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <button type="button" onClick={() => setOpen(o => !o)}
+          className="text-[10px] uppercase tracking-wider text-rose-300/80 hover:text-rose-300 flex items-center gap-1">
+          <span className={`inline-block transition-transform ${open ? 'rotate-90' : ''}`}>▸</span>
+          Negative prompt {value ? <span className="text-gray-600 normal-case font-normal">· in use</span> : <span className="text-gray-700 normal-case font-normal">· optional</span>}
+        </button>
+        {open && (
+          <div className="flex items-center gap-1.5">
+            <button type="button" onClick={() => onChange(baseline)}
+              className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30">
+              Use {family === 'pony' ? 'Pony' : family === 'sdxl-hyper' ? 'Hyper' : 'SDXL'} baseline
+            </button>
+            {value && (
+              <button type="button" onClick={() => onChange('')}
+                className="text-[10px] text-gray-500 hover:text-gray-300">
+                clear
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      {open && (
+        <>
+          <Input.TextArea
+            value={value} onChange={e => onChange(e.target.value)}
+            autoSize={{ minRows: 2, maxRows: 5 }}
+            placeholder={family === 'pony'
+              ? `Recommended: ${ponyBaseline.slice(0, 80)}…`
+              : 'e.g. "blurry, watermark, deformed hands"'}
+            maxLength={1000}
+            showCount
+            status={value ? '' : ''}
+          />
+          <p className="text-[10px] text-gray-600 mt-1 leading-snug">
+            Forwarded to ComfyUI's negative CLIPTextEncode. Leave blank to use the workflow's built-in default.
+            {family === 'pony' && ' Pony NEEDS this — outputs look noisy without score_4..score_1.'}
+          </p>
+        </>
+      )}
+    </div>
+  )
+}
+
 function Tuner({ label, value, min, max, step, onChange, fmt }) {
   return (
     <label className="block">
@@ -1000,7 +1085,9 @@ function GenerateSection({
   activePreset, downloadResult, error, selectedPreset, setSelectedPreset,
   setExpandedPreset, enhance,
   atelierWorkflow, setAtelierWorkflow, tunings, setTunings,
-  atelierPrompt, setAtelierPrompt, customModel, setCustomModel,
+  atelierPrompt, setAtelierPrompt,
+  negativePrompt, setNegativePrompt,
+  customModel, setCustomModel,
   setLogsModalOpen, setPromptHelperOpen,
   // t2iMode forces an Atelier text→image flow: hides the upload card,
   // filters the workflow grid to only T2I, and skips the Cloud presets.
@@ -1262,6 +1349,18 @@ function GenerateSection({
               )
             })()}
 
+            {/* Negative prompt — only meaningful for SDXL/Pony workflows. Flux
+                Kontext doesn't use negatives, so skip there. Collapsed by
+                default so beginners don't get scared by the extra field; the
+                "show" button reveals it. */}
+            {wf.needsPrompt && wf.family !== 'edit' && (
+              <NegativePromptField
+                value={negativePrompt}
+                onChange={setNegativePrompt}
+                family={resolvePromptFamily(wf, customModel)}
+              />
+            )}
+
             {/* Checkpoint picker — no free typing. The catalog above is the
                 canonical list of models installed on the 5090. Picking one
                 hydrates its sweet-spot tunings (steps / cfg / denoise) and
@@ -1388,8 +1487,14 @@ function ImageLibrary({ refreshKey }) {
   const [data, setData] = useState({ items: [], total: 0, pages: 1, counts: {} })
   const [loading, setLoading] = useState(true)
   const [internalReload, setInternalReload] = useState(0)
+  // Bulk selection state. selectMode toggles the checkbox overlay on each
+  // card; selected is a Set of imageIds. Cleared on tab/filter switch.
+  const [selectMode, setSelectMode] = useState(false)
+  const [selected, setSelected] = useState(() => new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
 
-  useEffect(() => { setPage(1) }, [filter, visibility, refreshKey])
+  useEffect(() => { setPage(1); setSelected(new Set()) }, [filter, visibility, refreshKey])
+  useEffect(() => { if (!selectMode) setSelected(new Set()) }, [selectMode])
 
   useEffect(() => {
     let cancelled = false
@@ -1401,6 +1506,19 @@ function ImageLibrary({ refreshKey }) {
     })
     return () => { cancelled = true }
   }, [filter, visibility, page, refreshKey, internalReload])
+
+  const toggleSelect = (imageId) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(imageId)) next.delete(imageId)
+      else next.add(imageId)
+      return next
+    })
+  }
+  const selectAllOnPage = () => {
+    setSelected(new Set(data.items.map(it => it.imageId)))
+  }
+  const clearSelection = () => setSelected(new Set())
 
   const askDelete = (img) => {
     Modal.confirm({
@@ -1429,6 +1547,54 @@ function ImageLibrary({ refreshKey }) {
     })
   }
 
+  // Single-row vault toggle — wired to the per-card "🔒" / "🌐" button.
+  const setSingleVault = async (img, moveToVault) => {
+    const { error: err } = await imageBulkAction(
+      moveToVault ? 'move-to-vault' : 'make-public',
+      [img.imageId]
+    )
+    if (err) {
+      antMessage.error(err.includes('login') ? 'Unlock the vault first' : `Failed: ${err}`)
+      return
+    }
+    antMessage.success(moveToVault ? 'Moved to Vault' : 'Made public')
+    setInternalReload(n => n + 1)
+  }
+
+  // Bulk action wrapper. Action is one of 'move-to-vault' | 'make-public' | 'delete'.
+  const doBulk = async (action) => {
+    const ids = Array.from(selected)
+    if (!ids.length) { antMessage.warning('Select at least one image'); return }
+    const verb = action === 'delete' ? 'Delete' : action === 'move-to-vault' ? 'Move to Vault' : 'Make public'
+    Modal.confirm({
+      title: `${verb} ${ids.length} image${ids.length === 1 ? '' : 's'}?`,
+      content: action === 'delete' ? (
+        <p className="text-sm text-gray-300">Removes rows + Cloudinary assets. Can't be undone.</p>
+      ) : action === 'move-to-vault' ? (
+        <p className="text-sm text-gray-300">Selected items vanish from the public showcase. Only visible in 🔒 Vault tab.</p>
+      ) : (
+        <p className="text-sm text-gray-300">Selected items become visible to anyone in the 🌐 Public tab.</p>
+      ),
+      okText: verb,
+      okButtonProps: action === 'delete' ? { danger: true } : {},
+      cancelText: 'Cancel',
+      centered: true,
+      onOk: async () => {
+        setBulkBusy(true)
+        const { data: result, error: err } = await imageBulkAction(action, ids)
+        setBulkBusy(false)
+        if (err) {
+          antMessage.error(err.includes('login') ? 'Unlock the vault first' : `Failed: ${err}`)
+          return
+        }
+        antMessage.success(`${verb}: ${result?.affected ?? ids.length} done`)
+        setSelected(new Set())
+        setSelectMode(false)
+        setInternalReload(n => n + 1)
+      },
+    })
+  }
+
   const filters = [
     { v: 'completed',  label: 'Completed',  n: data.counts?.completed },
     { v: 'processing', label: 'Processing', n: data.counts?.processing },
@@ -1438,30 +1604,56 @@ function ImageLibrary({ refreshKey }) {
   ]
 
   const loggedIn = !!getVaultToken()
+  const selCount = selected.size
   return (
     <div className="space-y-4">
       {/* Visibility toggle — Public showcase / Vault (private, requires login).
           Vault chip is hidden entirely when not logged in. */}
-      <div className="flex items-center gap-1 p-1 rounded-full bg-gray-900/60 border border-gray-800 w-fit">
-        <button onClick={() => setVisibility('public')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-all ${
-            visibility === 'public'
-              ? 'bg-gradient-to-r from-cyan-500/30 to-fuchsia-500/30 text-white border border-cyan-400/40'
-              : 'text-gray-400 hover:text-gray-200'
-          }`}>
-          <span className="font-semibold">🌐 Public</span>
-          <span className="hidden sm:inline text-[9px] opacity-60">showcase</span>
-        </button>
-        {loggedIn && (
-          <button onClick={() => setVisibility('vault')}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1 p-1 rounded-full bg-gray-900/60 border border-gray-800 w-fit">
+          <button onClick={() => setVisibility('public')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-all ${
-              visibility === 'vault'
+              visibility === 'public'
                 ? 'bg-gradient-to-r from-cyan-500/30 to-fuchsia-500/30 text-white border border-cyan-400/40'
                 : 'text-gray-400 hover:text-gray-200'
             }`}>
-            <span className="font-semibold">🔒 Vault</span>
-            <span className="hidden sm:inline text-[9px] opacity-60">private</span>
+            <span className="font-semibold">🌐 Public</span>
+            <span className="hidden sm:inline text-[9px] opacity-60">showcase</span>
           </button>
+          {loggedIn && (
+            <button onClick={() => setVisibility('vault')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-all ${
+                visibility === 'vault'
+                  ? 'bg-gradient-to-r from-cyan-500/30 to-fuchsia-500/30 text-white border border-cyan-400/40'
+                  : 'text-gray-400 hover:text-gray-200'
+              }`}>
+              <span className="font-semibold">🔒 Vault</span>
+              <span className="hidden sm:inline text-[9px] opacity-60">private</span>
+            </button>
+          )}
+        </div>
+
+        {/* Select-mode toggle — flip on, then check whichever cards you want
+            and a sticky toolbar pops up at the bottom of the grid. */}
+        <button onClick={() => setSelectMode(s => !s)}
+          className={`px-3 py-1.5 text-xs rounded-full border transition-all ${
+            selectMode
+              ? 'bg-amber-500/20 text-amber-200 border-amber-400/50'
+              : 'bg-gray-900/60 text-gray-400 border-gray-800 hover:border-gray-700 hover:text-gray-200'
+          }`}>
+          {selectMode ? `Selecting (${selCount})` : '☑ Select'}
+        </button>
+        {selectMode && (
+          <>
+            <button onClick={selectAllOnPage}
+              className="px-2 py-1.5 text-[10px] rounded-full bg-gray-900/60 text-gray-400 border border-gray-800 hover:text-gray-200">
+              All on page
+            </button>
+            <button onClick={clearSelection}
+              className="px-2 py-1.5 text-[10px] rounded-full bg-gray-900/60 text-gray-400 border border-gray-800 hover:text-gray-200">
+              Clear
+            </button>
+          </>
         )}
       </div>
 
@@ -1494,21 +1686,71 @@ function ImageLibrary({ refreshKey }) {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {data.items.map(it => <LibraryCard key={it.imageId} image={it} onDelete={askDelete} />)}
+          {data.items.map(it => (
+            <LibraryCard key={it.imageId} image={it} onDelete={askDelete}
+              selectMode={selectMode}
+              checked={selected.has(it.imageId)}
+              onToggleSelect={() => toggleSelect(it.imageId)}
+              loggedIn={loggedIn}
+              onMoveToVault={() => setSingleVault(it, true)}
+              onMakePublic={() => setSingleVault(it, false)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Sticky bulk toolbar — appears when select-mode is on and at least
+          one card is selected. Move/Public actions require vault auth; the
+          BE rejects with 401 if missing. */}
+      {selectMode && selCount > 0 && (
+        <div className="sticky bottom-3 z-30 mx-auto max-w-xl">
+          <div className="rounded-2xl border border-cyan-500/40 bg-gradient-to-r from-gray-900/95 via-gray-950/95 to-gray-900/95 backdrop-blur p-3 shadow-2xl shadow-cyan-500/10 flex items-center justify-between gap-3 flex-wrap">
+            <span className="text-xs text-gray-300">
+              <span className="font-mono text-cyan-300">{selCount}</span> selected
+            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {loggedIn && visibility === 'public' && (
+                <button onClick={() => doBulk('move-to-vault')} disabled={bulkBusy}
+                  className="flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/40 font-semibold disabled:opacity-50">
+                  <LockOutlined /> Move to Vault
+                </button>
+              )}
+              {loggedIn && visibility === 'vault' && (
+                <button onClick={() => doBulk('make-public')} disabled={bulkBusy}
+                  className="flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-500/40 font-semibold disabled:opacity-50">
+                  🌐 Make public
+                </button>
+              )}
+              <button onClick={() => doBulk('delete')} disabled={bulkBusy}
+                className="flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/40 font-semibold disabled:opacity-50">
+                <DeleteOutlined /> Delete
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
   )
 }
 
-function LibraryCard({ image, onDelete }) {
+function LibraryCard({ image, onDelete, selectMode = false, checked = false, onToggleSelect, loggedIn = false, onMoveToVault, onMakePublic }) {
   const url = image.outputUrl || image.sourceUrl
+  const handleClick = (e) => {
+    if (selectMode) { e.preventDefault(); onToggleSelect?.() }
+  }
   return (
-    <div className="group relative aspect-square rounded-xl overflow-hidden border border-gray-800 hover:border-cyan-400/50 transition-all bg-gray-900/40">
-      <a href={url || '#'} target="_blank" rel="noopener" className="block w-full h-full">
+    <div className={`group relative aspect-square rounded-xl overflow-hidden border transition-all bg-gray-900/40 ${
+      checked
+        ? 'border-cyan-400 shadow-lg shadow-cyan-500/30 ring-2 ring-cyan-400/40'
+        : 'border-gray-800 hover:border-cyan-400/50'
+    }`}>
+      <a href={url || '#'} target="_blank" rel="noopener" onClick={handleClick}
+        className={`block w-full h-full ${selectMode ? 'cursor-pointer' : ''}`}>
         {url ? (
           <img src={url} alt={image.prompt}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+            className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${
+              selectMode && !checked ? 'opacity-60' : ''
+            }`} />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-900 to-gray-950">
             <span className="text-3xl opacity-50">
@@ -1517,6 +1759,19 @@ function LibraryCard({ image, onDelete }) {
           </div>
         )}
       </a>
+
+      {/* Selection checkbox — overlay when select-mode is on */}
+      {selectMode && (
+        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleSelect?.() }}
+          className={`absolute top-1.5 right-1.5 w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold transition-all z-20 ${
+            checked
+              ? 'bg-cyan-400 text-black shadow-md'
+              : 'bg-black/70 text-gray-400 border border-white/20 hover:bg-black/90 hover:text-white'
+          }`}>
+          {checked ? <CheckOutlined className="text-[11px]" /> : ''}
+        </button>
+      )}
+
       <div className="pointer-events-none absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-black/60 text-white border border-white/10">
         {image.engine === 'cloud' ? '☁ Gemini' : '🖥 5090'}
       </div>
@@ -1527,13 +1782,33 @@ function LibraryCard({ image, onDelete }) {
           : 'bg-amber-500/80 text-black'
         }`}>{image.status}</div>
       )}
-      {/* Delete button — appears on hover top-right when status === completed */}
-      {onDelete && (
-        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(image) }}
-          title="Delete"
-          className="absolute bottom-1.5 right-1.5 w-7 h-7 flex items-center justify-center rounded-full bg-black/70 hover:bg-rose-600 text-gray-200 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
-          <DeleteOutlined className="text-xs" />
-        </button>
+      {/* Action buttons — appear on hover (or always on touch). Vault toggle
+          only shows when logged in; the right button matches the current
+          visibility (vault tab → "Make public", public tab → "Move to Vault"). */}
+      {!selectMode && (
+        <div className="absolute bottom-1.5 right-1.5 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+          {loggedIn && image.vault === 0 && onMoveToVault && (
+            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onMoveToVault() }}
+              title="Move to Vault (private)"
+              className="w-7 h-7 flex items-center justify-center rounded-full bg-black/70 hover:bg-emerald-600 text-gray-200 hover:text-white">
+              <LockOutlined className="text-xs" />
+            </button>
+          )}
+          {loggedIn && image.vault === 1 && onMakePublic && (
+            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onMakePublic() }}
+              title="Make public"
+              className="w-7 h-7 flex items-center justify-center rounded-full bg-black/70 hover:bg-cyan-600 text-gray-200 hover:text-white text-xs">
+              🌐
+            </button>
+          )}
+          {onDelete && (
+            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(image) }}
+              title="Delete"
+              className="w-7 h-7 flex items-center justify-center rounded-full bg-black/70 hover:bg-rose-600 text-gray-200 hover:text-white">
+              <DeleteOutlined className="text-xs" />
+            </button>
+          )}
+        </div>
       )}
     </div>
   )
@@ -1545,22 +1820,30 @@ function LibraryCard({ image, onDelete }) {
 //   1. Sample prompts — family-filtered, click "Use" to replace or "+" to append
 //   2. ✨ Ask AI — type your idea in plain English, Groq (via /api/ai/prompt-coach)
 //      rewrites it with the right syntax for the selected model family
-function PromptHelperModal({ open, onClose, workflow, customModel, currentPrompt, onApply, onAppend }) {
+function PromptHelperModal({
+  open, onClose, workflow, customModel, currentPrompt, onApply, onAppend, onApplyNegative,
+  // Coach state passed from the parent page so it survives close/reopen.
+  // Falls back to local state when used outside the page (e.g. unit tests).
+  idea: parentIdea, setIdea: setParentIdea,
+  coachResult: parentResult, setCoachResult: setParentResult,
+  coachError: parentError, setCoachError: setParentError,
+}) {
   const family = resolvePromptFamily(workflow, customModel)
   const tip = FAMILY_TIPS[family] || FAMILY_TIPS.sdxl
   const samples = PROMPT_SAMPLES[family] || PROMPT_SAMPLES.sdxl
 
-  const [idea, setIdea] = useState('')
-  const [coachLoading, setCoachLoading] = useState(false)
-  const [coachResult, setCoachResult] = useState(null)
-  const [coachError, setCoachError] = useState('')
+  // Use parent-provided setters if available, otherwise fall back to local.
+  const [localIdea, setLocalIdea] = useState('')
+  const [localResult, setLocalResult] = useState(null)
+  const [localError, setLocalError] = useState('')
+  const idea = setParentIdea ? parentIdea : localIdea
+  const setIdea = setParentIdea || setLocalIdea
+  const coachResult = setParentResult ? parentResult : localResult
+  const setCoachResult = setParentResult || setLocalResult
+  const coachError = setParentError ? parentError : localError
+  const setCoachError = setParentError || setLocalError
 
-  // Reset the coach pane every time the modal reopens so the next user
-  // doesn't see the previous person's idea/result.
-  useEffect(() => {
-    if (!open) return
-    setIdea(''); setCoachResult(null); setCoachError('')
-  }, [open])
+  const [coachLoading, setCoachLoading] = useState(false)
 
   const copy = async (text, label = 'Prompt') => {
     try {
@@ -1612,10 +1895,20 @@ function PromptHelperModal({ open, onClose, workflow, customModel, currentPrompt
             <p className="text-[10px] text-gray-500 leading-snug mt-0.5">{tip.blurb}</p>
           </div>
         </div>
-        <button onClick={onClose}
-          className="text-[10px] uppercase tracking-wider text-gray-500 hover:text-gray-300 px-2 py-1 rounded border border-gray-800 hover:border-gray-700">
-          esc
-        </button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {(idea || coachResult) && (
+            <button
+              onClick={() => { setIdea(''); setCoachResult(null); setCoachError('') }}
+              title="Clear the idea + last result"
+              className="text-[10px] uppercase tracking-wider text-gray-500 hover:text-amber-300 px-2 py-1 rounded border border-gray-800 hover:border-amber-500/50">
+              ↻ Reset
+            </button>
+          )}
+          <button onClick={onClose}
+            className="text-[10px] uppercase tracking-wider text-gray-500 hover:text-gray-300 px-2 py-1 rounded border border-gray-800 hover:border-gray-700">
+            esc
+          </button>
+        </div>
       </div>
 
       {/* ── Body ─────────────────────────────────────────────── */}
@@ -1682,9 +1975,10 @@ function PromptHelperModal({ open, onClose, workflow, customModel, currentPrompt
                       className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700">
                       <CopyOutlined /> Copy
                     </button>
-                    <button onClick={() => onApply(coachResult.prompt)}
+                    <button onClick={() => onApply(coachResult.prompt, coachResult.negative)}
+                      title={coachResult.negative ? 'Apply prompt + negative' : 'Apply prompt'}
                       className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-fuchsia-500/30 hover:bg-fuchsia-500/40 text-fuchsia-200 border border-fuchsia-500/50 font-semibold">
-                      <CheckOutlined /> Use this
+                      <CheckOutlined /> Use {coachResult.negative ? 'both' : 'this'}
                     </button>
                   </div>
                 </div>
@@ -1698,16 +1992,24 @@ function PromptHelperModal({ open, onClose, workflow, customModel, currentPrompt
                     <span className="text-[10px] uppercase tracking-wider text-rose-300 font-semibold">
                       Negative prompt (suggested)
                     </span>
-                    <button onClick={() => copy(coachResult.negative, 'Negative')}
-                      className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700">
-                      <CopyOutlined /> Copy
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => copy(coachResult.negative, 'Negative')}
+                        className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700">
+                        <CopyOutlined /> Copy
+                      </button>
+                      {onApplyNegative && (
+                        <button onClick={() => { onApplyNegative(coachResult.negative); antMessage.success('Negative prompt applied') }}
+                          className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/40 font-semibold">
+                          <CheckOutlined /> Apply
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <p className="text-[11px] text-gray-400 font-mono leading-relaxed whitespace-pre-wrap break-words">
                     {coachResult.negative}
                   </p>
                   <p className="text-[9px] text-gray-600 mt-1.5">
-                    Negative prompts aren't wired into the worker yet — copy for reference, or paste below "NEG:" in your prompt.
+                    Click <span className="text-rose-300 font-semibold">Apply</span> to drop it into the Negative prompt field below the main prompt.
                   </p>
                 </div>
               )}
