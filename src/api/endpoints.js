@@ -9,6 +9,7 @@ export const ENDPOINTS = {
   GROQ: '/api/groq',
   GEMINI: '/api/gemini',
   GEMINI_VISION: '/api/gemini/vision',
+  PROMPT_COACH: '/api/ai/prompt-coach',
   GENERATE_IMAGE: '/api/generate-image',
   IMAGE_EDIT: '/api/image-edit',
   TTS: '/api/tts',

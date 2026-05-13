@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
-import { Modal, Upload, Tabs, Input, Select, Switch, message as antMessage } from 'antd'
+import { Modal, Upload, Tabs, Input, Select, Switch, Tooltip, message as antMessage } from 'antd'
 import {
   UploadOutlined, ExpandAltOutlined, DownloadOutlined,
   CheckOutlined, ReloadOutlined, ThunderboltOutlined,
   AppstoreOutlined, CloudOutlined, DesktopOutlined, DeleteOutlined,
-  LockOutlined,
+  LockOutlined, BulbOutlined, CopyOutlined,
 } from '@ant-design/icons'
 import {
   enhanceImage, getImageStatus, listEnhancedImages, deleteEnhancedImage, fileToDataUrl,
+  promptCoach,
 } from '../api/ai'
 import { VaultLoginPanel, getVaultToken, setVaultToken } from '../components/VaultGate'
 
@@ -160,6 +161,154 @@ function checkpointMeta(value) {
 function checkpointDefaults(filename) {
   const m = checkpointMeta(filename)
   return m ? { ...m.defaults, note: m.note } : null
+}
+
+// Sample prompts for the "💡 Help me write a prompt" modal. Keyed by the
+// resolved family (matches CHECKPOINTS.family + 'flux' for Flux Kontext).
+// Each sample is one click → copies to clipboard or replaces the textarea.
+// Pony samples include their required `neg` because that's part of why Pony
+// trips up first-time users — without the score_4/score_3 negative the
+// outputs look noisy.
+const PROMPT_SAMPLES = {
+  sdxl: [
+    {
+      title: '🪞 Cinematic portrait',
+      tags: ['portrait', 'golden hour'],
+      text: 'cinematic photo of a person near a tall window at golden hour, soft directional light, shallow depth of field on the eyes, 85mm portrait lens, neutral cream wall background, editorial color grade, natural skin texture',
+    },
+    {
+      title: '📦 Product shot — studio',
+      tags: ['product', 'studio'],
+      text: 'studio product photograph on a seamless white background, three-point softbox lighting, ultra-sharp macro detail, commercial advertisement quality, 50mm lens, crisp shadow falloff',
+    },
+    {
+      title: '🏞️ Wide landscape — golden hour',
+      tags: ['landscape'],
+      text: 'wide cinematic landscape, golden hour, dramatic clouds, ultra-detailed terrain, photo-realistic, 35mm anamorphic, deep emerald and amber color grade, atmospheric haze',
+    },
+    {
+      title: '🖤 Black & white film portrait',
+      tags: ['B&W'],
+      text: 'black and white classic film portrait, deep blacks, creamy mid-tones, film grain, ilford hp5 look, timeless 85mm shot, soft window light, neutral background',
+    },
+    {
+      title: '🌙 Hong Kong night cinema',
+      tags: ['cinematic'],
+      text: 'wong kar-wai 1990s hong kong cinema, deep emerald and crimson tones, neon reflections on wet street, soft bloom, 35mm film grain, moody atmosphere, melancholy mood',
+    },
+  ],
+  pony: [
+    {
+      title: '👤 Realistic portrait',
+      tags: ['score_9', 'source_realistic'],
+      neg: 'score_4, score_3, score_2, score_1, worst quality, low quality, blurry, deformed, bad anatomy, watermark, text',
+      text: 'score_9, score_8_up, score_7_up, score_6_up, source_realistic, photorealistic portrait of a person, soft window light, shallow depth of field, 85mm lens, natural skin texture, neutral background, sharp eyes',
+    },
+    {
+      title: '🎨 Anime character',
+      tags: ['source_anime'],
+      neg: 'score_4, score_3, score_2, score_1, worst quality, low quality, blurry, deformed, bad anatomy, watermark, text',
+      text: 'score_9, score_8_up, score_7_up, score_6_up, source_anime, 1girl, solo, long flowing hair, looking at viewer, detailed background, soft lighting, vibrant colors, sharp lineart, expressive eyes',
+    },
+    {
+      title: '🌃 Cinematic scene',
+      tags: ['cinematic'],
+      neg: 'score_4, score_3, score_2, score_1, worst quality, low quality, blurry, deformed, watermark, text',
+      text: 'score_9, score_8_up, score_7_up, source_realistic, cinematic wide shot, neon-lit rainy city street, hong kong cinema, deep emerald and crimson tones, soft bloom, film grain, atmospheric haze',
+    },
+    {
+      title: '🏰 Fantasy illustration',
+      tags: ['source_anime'],
+      neg: 'score_4, score_3, score_2, score_1, worst quality, low quality, blurry, deformed, watermark, text',
+      text: 'score_9, score_8_up, score_7_up, source_anime, fantasy castle on a cliff at sunset, dramatic clouds, glowing windows, detailed stonework, painterly style, rich color palette, atmospheric depth',
+    },
+  ],
+  'sdxl-hyper': [
+    {
+      title: '⚡ Fast portrait',
+      tags: ['8 steps', 'CFG 1.5'],
+      text: 'photoreal portrait, soft window light, 85mm lens, shallow depth of field, natural skin, neutral background',
+    },
+    {
+      title: '⚡ Quick landscape',
+      tags: ['8 steps'],
+      text: 'wide landscape, golden hour, dramatic clouds, 35mm film, cinematic color',
+    },
+    {
+      title: '⚡ Product on white',
+      tags: ['8 steps'],
+      text: 'product photo on white background, three-point lighting, sharp detail, commercial quality',
+    },
+    {
+      title: '⚡ Street scene',
+      tags: ['8 steps'],
+      text: 'rainy neon street at night, cinematic, 35mm, soft bloom, atmospheric',
+    },
+  ],
+  flux: [
+    {
+      title: '🎨 Recolor element',
+      tags: ['recolor'],
+      text: 'change the shirt to red, keep the face, pose, lighting, and background exactly the same',
+    },
+    {
+      title: '✂️ Remove background',
+      tags: ['background'],
+      text: 'replace the background with a clean neutral grey studio backdrop, keep the subject identical — same pose, same lighting on subject',
+    },
+    {
+      title: '👔 Change outfit',
+      tags: ['outfit'],
+      text: 'change the outfit to a black tailored suit, preserve face, pose, body shape, and background, only change the clothing',
+    },
+    {
+      title: '➕ Add element',
+      tags: ['add'],
+      text: 'add a vase of white flowers on the table next to the subject, keep lighting and composition unchanged',
+    },
+    {
+      title: '🌅 Change lighting',
+      tags: ['lighting'],
+      text: 'change the lighting to warm golden hour from camera-left, keep subject identity, pose, and background composition exactly the same',
+    },
+  ],
+}
+
+// Family-specific tips shown at the top of the helper modal. Same knowledge as
+// the BE coach system prompts — surfaced to the user so they understand why
+// the output looks the way it does.
+const FAMILY_TIPS = {
+  sdxl: {
+    label: 'SDXL Photo-Real',
+    blurb: 'Describe like a photo brief: subject, lens, lighting, color grade. Avoid stylization words ("anime", "painting").',
+    cfg: 'Sweet spot: CFG 5–6 · 25–30 steps',
+  },
+  pony: {
+    label: 'Pony Diffusion',
+    blurb: 'MUST start with score tags. Add source_realistic OR source_anime. Booru tags (1girl, solo) work too.',
+    cfg: 'Sweet spot: CFG 6–7 · 28 steps',
+  },
+  'sdxl-hyper': {
+    label: 'SDXL Hyper (distilled)',
+    blurb: 'Keep prompts SHORT — long prompts dilute the signal at low CFG. 15–30 words max.',
+    cfg: 'Sweet spot: CFG 1.5 · 8 steps',
+  },
+  flux: {
+    label: 'Flux Kontext (edit)',
+    blurb: 'Phrase as an EDIT instruction starting with a verb (change/replace/remove). Specify what to preserve.',
+    cfg: 'Sweet spot: CFG 2.5 · 20 steps',
+  },
+}
+
+// Resolve which "family" the prompt coach should target. Honors the user's
+// checkpoint override first (so picking Pony in the dropdown switches the
+// coach to Pony tags even on a generic sdxl-* workflow); falls back to the
+// workflow's own family otherwise.
+function resolvePromptFamily(workflow, customModelValue) {
+  const meta = checkpointMeta(customModelValue)
+  if (meta?.family) return meta.family
+  if (workflow?.family === 'edit') return 'flux'
+  return 'sdxl'
 }
 
 // Atelier workflow catalog. Each entry knows what inputs it needs (image /
@@ -334,6 +483,11 @@ export default function ImageEnhancer() {
   // and opens the login modal so user can unlock + retry.
   const [nsfwBlocked, setNsfwBlocked] = useState(null)
   const [logsModalOpen, setLogsModalOpen] = useState(false)
+  // Prompt helper modal — opens from the 💡 button next to the prompt textarea.
+  // Surfaces sample prompts tuned to the selected checkpoint family + offers
+  // an "ask AI" mode that calls /api/ai/prompt-coach to rewrite plain English
+  // into a model-tuned prompt.
+  const [promptHelperOpen, setPromptHelperOpen] = useState(false)
   const [working, setWorking] = useState(false)
   const [job, setJob] = useState(null)                    // active or last-finished SQLite row
   const [error, setError] = useState(null)
@@ -581,6 +735,7 @@ export default function ImageEnhancer() {
                   atelierPrompt={atelierPrompt} setAtelierPrompt={setAtelierPrompt}
                   customModel={customModel} setCustomModel={setCustomModel}
                   setLogsModalOpen={setLogsModalOpen}
+                  setPromptHelperOpen={setPromptHelperOpen}
                 />
               ),
             },
@@ -601,6 +756,7 @@ export default function ImageEnhancer() {
                   atelierPrompt={atelierPrompt} setAtelierPrompt={setAtelierPrompt}
                   customModel={customModel} setCustomModel={setCustomModel}
                   setLogsModalOpen={setLogsModalOpen}
+                  setPromptHelperOpen={setPromptHelperOpen}
                   t2iMode
                 />
               ),
@@ -619,6 +775,23 @@ export default function ImageEnhancer() {
 
         {/* Full live-log viewer for the current job */}
         <ImageLogModal open={logsModalOpen} onClose={() => setLogsModalOpen(false)} job={job} />
+
+        {/* Prompt helper — samples + AI coach. Reads the current workflow +
+            checkpoint to scope its suggestions to the right family. */}
+        <PromptHelperModal
+          open={promptHelperOpen}
+          onClose={() => setPromptHelperOpen(false)}
+          workflow={ATELIER_WORKFLOWS.find(w => w.id === atelierWorkflow)}
+          customModel={customModel}
+          currentPrompt={atelierPrompt}
+          onApply={(text) => { setAtelierPrompt(text); setPromptHelperOpen(false) }}
+          onAppend={(text) => {
+            const next = atelierPrompt.trim()
+              ? `${atelierPrompt.trim()}, ${text}`
+              : text
+            setAtelierPrompt(next)
+          }}
+        />
 
         {/* Vault unlock modal — centered compact card. Opened by the header
             lock OR auto-triggered when BE returns 401 NSFW_BLOCKED. */}
@@ -828,7 +1001,7 @@ function GenerateSection({
   setExpandedPreset, enhance,
   atelierWorkflow, setAtelierWorkflow, tunings, setTunings,
   atelierPrompt, setAtelierPrompt, customModel, setCustomModel,
-  setLogsModalOpen,
+  setLogsModalOpen, setPromptHelperOpen,
   // t2iMode forces an Atelier text→image flow: hides the upload card,
   // filters the workflow grid to only T2I, and skips the Cloud presets.
   t2iMode = false,
@@ -1029,14 +1202,31 @@ function GenerateSection({
 
             {/* Prompt — required by some workflows. Pick from a template (drops
                 into the textarea) or write your own freely. */}
-            {wf.needsPrompt && (
+            {wf.needsPrompt && (() => {
+              const promptFamily = resolvePromptFamily(wf, customModel)
+              const tip = FAMILY_TIPS[promptFamily]
+              return (
               <div>
                 <div className="flex items-center justify-between gap-2 mb-1">
-                  <label className="text-[10px] uppercase tracking-wider text-gray-500">Prompt</label>
-                  <button type="button" onClick={() => setAtelierPrompt('')}
-                    className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors">
-                    clear
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <label className="text-[10px] uppercase tracking-wider text-gray-500">Prompt</label>
+                    <Tooltip title={`Tuned for ${tip?.label || 'SDXL'} — ${tip?.cfg || ''}`}>
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-gray-800/60 text-gray-400 border border-gray-700/50">
+                        {tip?.label || promptFamily}
+                      </span>
+                    </Tooltip>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button type="button" onClick={() => setPromptHelperOpen?.(true)}
+                      title="Help me write a prompt for this model"
+                      className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-amber-500/40 hover:border-amber-400 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-colors">
+                      <BulbOutlined className="text-[10px]" /> Help me write
+                    </button>
+                    <button type="button" onClick={() => setAtelierPrompt('')}
+                      className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors">
+                      clear
+                    </button>
+                  </div>
                 </div>
                 <Select
                   className="w-full mb-2"
@@ -1066,10 +1256,11 @@ function GenerateSection({
                   showCount
                 />
                 <p className="text-[10px] text-gray-600 mt-1">
-                  Pick a template to autofill — or stack multiple. You can edit freely afterwards.
+                  {tip?.blurb || 'Pick a template to autofill — or stack multiple. You can edit freely afterwards.'}
                 </p>
               </div>
-            )}
+              )
+            })()}
 
             {/* Checkpoint picker — no free typing. The catalog above is the
                 canonical list of models installed on the 5090. Picking one
@@ -1349,6 +1540,262 @@ function LibraryCard({ image, onDelete }) {
 }
 
 // ─── Full live-log viewer for an Atelier image job ──
+// ─── Prompt helper modal ───────────────────────────────────────────
+// Opens from the 💡 button next to the prompt textarea. Two sections:
+//   1. Sample prompts — family-filtered, click "Use" to replace or "+" to append
+//   2. ✨ Ask AI — type your idea in plain English, Groq (via /api/ai/prompt-coach)
+//      rewrites it with the right syntax for the selected model family
+function PromptHelperModal({ open, onClose, workflow, customModel, currentPrompt, onApply, onAppend }) {
+  const family = resolvePromptFamily(workflow, customModel)
+  const tip = FAMILY_TIPS[family] || FAMILY_TIPS.sdxl
+  const samples = PROMPT_SAMPLES[family] || PROMPT_SAMPLES.sdxl
+
+  const [idea, setIdea] = useState('')
+  const [coachLoading, setCoachLoading] = useState(false)
+  const [coachResult, setCoachResult] = useState(null)
+  const [coachError, setCoachError] = useState('')
+
+  // Reset the coach pane every time the modal reopens so the next user
+  // doesn't see the previous person's idea/result.
+  useEffect(() => {
+    if (!open) return
+    setIdea(''); setCoachResult(null); setCoachError('')
+  }, [open])
+
+  const copy = async (text, label = 'Prompt') => {
+    try {
+      await navigator.clipboard.writeText(text)
+      antMessage.success(`${label} copied`)
+    } catch {
+      antMessage.error('Could not copy — your browser blocked clipboard access')
+    }
+  }
+
+  const askCoach = async () => {
+    if (!idea.trim() || idea.trim().length < 3) {
+      setCoachError('Tell the coach what you want (at least 3 chars)')
+      return
+    }
+    setCoachLoading(true); setCoachError(''); setCoachResult(null)
+    const { data, error: err } = await promptCoach({
+      idea: idea.trim(),
+      family,
+      model: customModel || workflow?.checkpoint,
+    })
+    setCoachLoading(false)
+    if (err) { setCoachError(err); return }
+    setCoachResult(data)
+  }
+
+  return (
+    <Modal
+      open={open}
+      onCancel={onClose}
+      footer={null}
+      width={760}
+      centered
+      closeIcon={null}
+      styles={{
+        content: { background: '#0b0f17', padding: 0, borderRadius: 16, border: '1px solid rgba(251,191,36,0.25)', maxWidth: '95vw' },
+        body: { padding: 0 },
+        mask: { backdropFilter: 'blur(6px)' },
+      }}>
+      {/* ── Header ─────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-gray-800/80 bg-gradient-to-r from-amber-500/10 via-fuchsia-500/5 to-transparent">
+        <div className="flex items-center gap-2 min-w-0">
+          <BulbOutlined className="text-amber-400 shrink-0" />
+          <div className="min-w-0">
+            <h3 className="text-xs sm:text-sm font-semibold text-white tracking-wide">
+              Prompt helper
+              <span className="ml-2 text-[10px] font-mono text-amber-300/80">{tip.label}</span>
+            </h3>
+            <p className="text-[10px] text-gray-500 leading-snug mt-0.5">{tip.blurb}</p>
+          </div>
+        </div>
+        <button onClick={onClose}
+          className="text-[10px] uppercase tracking-wider text-gray-500 hover:text-gray-300 px-2 py-1 rounded border border-gray-800 hover:border-gray-700">
+          esc
+        </button>
+      </div>
+
+      {/* ── Body ─────────────────────────────────────────────── */}
+      <div className="max-h-[70vh] overflow-y-auto p-4 sm:p-5 space-y-5">
+        {/* ── Section: AI coach ────────────────────────────── */}
+        <section>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-[10px] uppercase tracking-wider text-fuchsia-300 font-semibold">
+              ✨ Describe what you want
+            </span>
+            <span className="text-[9px] font-mono text-gray-600">powered by Groq · llama-3.3-70b</span>
+          </div>
+          <Input.TextArea
+            value={idea}
+            onChange={(e) => { setIdea(e.target.value); if (coachError) setCoachError('') }}
+            autoSize={{ minRows: 2, maxRows: 5 }}
+            placeholder={
+              family === 'flux'
+                ? 'e.g. "swap the shirt to a navy blazer, keep everything else the same"'
+                : family === 'pony'
+                  ? 'e.g. "anime girl with long silver hair, looking at viewer, soft sunset"'
+                  : 'e.g. "moody portrait of a chef in a smoky kitchen at golden hour"'
+            }
+            disabled={coachLoading}
+            maxLength={500}
+            showCount
+            onPressEnter={(e) => {
+              if (!e.shiftKey) { e.preventDefault(); askCoach() }
+            }}
+          />
+          {coachError && (
+            <p className="text-rose-400 text-xs mt-2">✗ {coachError}</p>
+          )}
+          <div className="flex items-center justify-between gap-2 mt-2">
+            <p className="text-[10px] text-gray-600">
+              Press <span className="font-mono text-gray-400">Enter</span> to ask · Shift+Enter for newline
+            </p>
+            <button onClick={askCoach} disabled={coachLoading || !idea.trim()}
+              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                coachLoading || !idea.trim()
+                  ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-fuchsia-500 to-amber-500 text-black hover:scale-[1.02]'
+              }`}>
+              {coachLoading ? (
+                <>
+                  <span className="w-3 h-3 rounded-full border-2 border-black/30 border-t-black animate-spin" />
+                  Thinking…
+                </>
+              ) : (
+                <>✨ Generate prompt</>
+              )}
+            </button>
+          </div>
+
+          {coachResult && (
+            <div className="mt-3 rounded-xl border border-fuchsia-500/40 bg-gradient-to-b from-fuchsia-500/10 to-transparent p-3 space-y-3">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] uppercase tracking-wider text-fuchsia-300 font-semibold">
+                    Tuned prompt
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => copy(coachResult.prompt)}
+                      className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700">
+                      <CopyOutlined /> Copy
+                    </button>
+                    <button onClick={() => onApply(coachResult.prompt)}
+                      className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-fuchsia-500/30 hover:bg-fuchsia-500/40 text-fuchsia-200 border border-fuchsia-500/50 font-semibold">
+                      <CheckOutlined /> Use this
+                    </button>
+                  </div>
+                </div>
+                <p className="text-[12px] text-gray-200 font-mono leading-relaxed whitespace-pre-wrap break-words">
+                  {coachResult.prompt}
+                </p>
+              </div>
+              {coachResult.negative && (
+                <div className="pt-2 border-t border-fuchsia-500/20">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] uppercase tracking-wider text-rose-300 font-semibold">
+                      Negative prompt (suggested)
+                    </span>
+                    <button onClick={() => copy(coachResult.negative, 'Negative')}
+                      className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700">
+                      <CopyOutlined /> Copy
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-gray-400 font-mono leading-relaxed whitespace-pre-wrap break-words">
+                    {coachResult.negative}
+                  </p>
+                  <p className="text-[9px] text-gray-600 mt-1.5">
+                    Negative prompts aren't wired into the worker yet — copy for reference, or paste below "NEG:" in your prompt.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* ── Divider ───────────────────────────────────────── */}
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center" aria-hidden>
+            <div className="w-full border-t border-gray-800" />
+          </div>
+          <div className="relative flex justify-center">
+            <span className="px-2 bg-[#0b0f17] text-[9px] uppercase tracking-widest text-gray-600">
+              or pick a starter
+            </span>
+          </div>
+        </div>
+
+        {/* ── Section: Samples ─────────────────────────────── */}
+        <section>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] uppercase tracking-wider text-cyan-300 font-semibold">
+              📋 Sample prompts for {tip.label}
+            </span>
+            <span className="text-[9px] font-mono text-gray-600">{samples.length} starter{samples.length === 1 ? '' : 's'}</span>
+          </div>
+          <ul className="space-y-2">
+            {samples.map((s, i) => (
+              <li key={i} className="rounded-xl border border-gray-800 bg-gray-900/40 hover:border-cyan-500/40 transition-colors p-3 group">
+                <div className="flex items-center justify-between mb-1.5 gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-[12px] font-semibold text-gray-100 truncate">{s.title}</span>
+                    <div className="flex gap-1 shrink-0">
+                      {(s.tags || []).map(t => (
+                        <span key={t} className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-gray-800 text-gray-500">
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Tooltip title="Copy to clipboard">
+                      <button onClick={() => copy(s.text)}
+                        className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-full bg-gray-800/70 hover:bg-gray-700 text-gray-400 hover:text-gray-200 border border-gray-700/60">
+                        <CopyOutlined />
+                      </button>
+                    </Tooltip>
+                    {currentPrompt?.trim() && (
+                      <Tooltip title="Append to current prompt (comma-separated)">
+                        <button onClick={() => onAppend(s.text)}
+                          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-full bg-gray-800/70 hover:bg-gray-700 text-gray-400 hover:text-gray-200 border border-gray-700/60">
+                          + add
+                        </button>
+                      </Tooltip>
+                    )}
+                    <button onClick={() => onApply(s.text)}
+                      className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-full bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-500/40 font-semibold">
+                      <CheckOutlined /> Use
+                    </button>
+                  </div>
+                </div>
+                <p className="text-[11px] text-gray-400 font-mono leading-relaxed break-words">
+                  {s.text}
+                </p>
+                {s.neg && (
+                  <details className="mt-2">
+                    <summary className="text-[10px] text-rose-300/80 cursor-pointer hover:text-rose-300">
+                      Negative prompt (recommended for {tip.label})
+                    </summary>
+                    <div className="mt-1 flex items-start gap-2">
+                      <p className="text-[10px] text-gray-500 font-mono leading-relaxed flex-1 break-words">{s.neg}</p>
+                      <button onClick={() => copy(s.neg, 'Negative')}
+                        className="shrink-0 flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-400">
+                        <CopyOutlined />
+                      </button>
+                    </div>
+                  </details>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
+    </Modal>
+  )
+}
+
 function ImageLogModal({ open, onClose, job }) {
   const scrollRef = useRef(null)
   // Auto-scroll to newest line as logs stream in while the modal is open

@@ -291,6 +291,22 @@ export async function summarizeText(text, options = {}) {
   }
 }
 
+// Prompt coach — Image Studio "💡 Help me write a prompt" modal. Sends the
+// user's plain-English idea + the family of the selected checkpoint, gets
+// back a model-tuned prompt (and a negative prompt where applicable).
+export async function promptCoach({ idea, family, model } = {}) {
+  try {
+    const data = await post(
+      ENDPOINTS.PROMPT_COACH,
+      { idea, family: family || 'sdxl', model },
+      { timeout: 30000 }
+    );
+    return { data: data?.data || data, error: null };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+}
+
 export async function sendAI(message, options = {}) {
   try {
     const messages = [{ role: 'user', content: message }];
