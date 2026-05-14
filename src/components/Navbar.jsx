@@ -5,7 +5,7 @@ import sakura from "../assets/sakura.mp3";
 
 const Navbar = () => {
   const { pathname } = useLocation();
-  const isDark = ['/lab', '/learn', '/creative', '/chess', '/science', '/face', '/vision', '/explore', '/ai', '/studio', '/ai-video', '/video'].some(r => pathname.startsWith(r));
+  const isDark = ['/lab', '/learn', '/creative', '/chess', '/science', '/face', '/vision', '/explore', '/ai', '/studio', '/ai-video', '/video', '/image-enhancer', '/enhance', '/lipsync', '/audio', '/cinema'].some(r => pathname.startsWith(r));
 
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
@@ -37,21 +37,26 @@ const Navbar = () => {
     { to: '/contact', label: 'Contact' },
   ];
 
-  // Featured pills — AI stuff first for peak interest
+  // Featured pills — AI studio stuff up front; Science/Explore moved into the More dropdown
+  // so the top bar doesn't overflow with the new Lip Sync / Audio / Cinema lanes.
   const featuredPills = [
-    { to: '/ai', label: 'AI Chat', color: 'from-blue-500 to-cyan-500' },
-    { to: '/ai-video', label: 'AI Video', color: 'from-cyan-500 via-purple-500 to-amber-500' },
-    { to: '/vision', label: 'Vision AI', color: 'from-purple-500 to-pink-600' },
+    { to: '/ai-video',       label: 'AI Video',     color: 'from-cyan-500 via-purple-500 to-amber-500' },
     { to: '/image-enhancer', label: 'Image Studio', color: 'from-cyan-300 via-fuchsia-400 to-amber-300' },
-    { to: '/science', label: 'Science', color: 'from-cyan-500 to-blue-600' },
-    { to: '/explore', label: 'Explore', color: 'from-red-500 to-amber-500' },
+    { to: '/lipsync',        label: 'Lip Sync',     color: 'from-emerald-400 via-cyan-400 to-fuchsia-400' },
+    { to: '/audio',          label: 'Audio',        color: 'from-fuchsia-400 via-amber-400 to-emerald-400' },
+    { to: '/cinema',         label: 'Cinema',       color: 'from-amber-400 via-rose-400 to-fuchsia-400' },
+    { to: '/ai',             label: 'AI Chat',      color: 'from-blue-500 to-cyan-500' },
+    { to: '/vision',         label: 'Vision AI',    color: 'from-purple-500 to-pink-600' },
   ];
 
-  // More dropdown items
+  // More dropdown items — Science/Explore moved here, plus the existing demos
   const moreLinks = [
-    { to: '/lab', label: 'Interactive Lab' },
+    { to: '/science',  label: 'Science · NASA APIs' },
+    { to: '/explore',  label: 'Explore · Public APIs' },
+    { to: '/lab',      label: 'Interactive Lab' },
     { to: '/creative', label: 'Creative UI' },
-    { to: '/learn', label: 'Learn DSA' },
+    { to: '/learn',    label: 'Learn DSA' },
+    { to: '/chess',    label: 'Chess Engine Viz' },
   ];
 
   return (

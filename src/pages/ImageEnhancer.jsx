@@ -361,6 +361,48 @@ const ATELIER_WORKFLOWS = [
     defaults: { steps: 20, cfg: 2.5 },
     eta: '~45s', icon: '🪄',
   },
+  // ─── Tier 1: quality upscale + relight (models on disk)
+  {
+    id: 'supir-upscale', family: 'upscale', label: 'SUPIR · Quality Upscale',
+    blurb: 'Semantic-aware restoration. Best for compressed JPEGs, blurry photos, old scans.',
+    checkpoint: 'SUPIR-v0F.ckpt (+ JuggernautXL base)',
+    needsImage: true, needsPrompt: false,  // prompt optional but improves results
+    defaults: { steps: 25, cfg: 5.0 },
+    eta: '~60s', icon: '✨',
+  },
+  {
+    id: 'iclight-relight', family: 'edit', label: 'IC-Light · Relight',
+    blurb: 'Re-light a portrait. Describe the lighting ("golden hour from left, soft rim"), keep the subject.',
+    checkpoint: 'iclight_sd15_fc + RealisticVision Hyper',
+    needsImage: true, needsPrompt: true,
+    defaults: { steps: 25, cfg: 2.0 },
+    eta: '~25s', icon: '💡',
+  },
+  // ─── Tier 2: Flux family (require download — see HOW_IT_WORKS.md flux2 set)
+  {
+    id: 'flux-dev-t2i', family: 't2i', label: 'Flux Dev · Text → Image',
+    blurb: 'Black Forest Labs Flux.1 [dev]. State-of-the-art photoreal. ⚠ Needs flux1-dev.safetensors (~24 GB).',
+    checkpoint: 'flux1-dev.safetensors',
+    needsImage: false, needsPrompt: true,
+    defaults: { steps: 28, cfg: 3.5, width: 1024, height: 1024 },
+    eta: '~40s', icon: '⚫',
+  },
+  {
+    id: 'flux-schnell', family: 't2i', label: 'Flux Schnell · Fast T2I',
+    blurb: '4-step distilled Flux. Fastest non-SDXL T2I. ⚠ Needs flux1-schnell.safetensors (~12 GB).',
+    checkpoint: 'flux1-schnell.safetensors',
+    needsImage: false, needsPrompt: true,
+    defaults: { steps: 4, cfg: 1.0, width: 1024, height: 1024 },
+    eta: '~8s', icon: '⚡',
+  },
+  {
+    id: 'flux-fill', family: 'edit', label: 'Flux Fill · Inpaint/Outpaint',
+    blurb: 'Flux-based inpaint. Paint a mask on the image (alpha channel) + prompt. ⚠ Needs flux1-fill-dev.safetensors.',
+    checkpoint: 'flux1-fill-dev.safetensors',
+    needsImage: true, needsPrompt: true,
+    defaults: { steps: 25, cfg: 30.0 },
+    eta: '~45s', icon: '🩹',
+  },
   // ─── Custom — bring your own checkpoint, full control on every knob
   {
     id: 'custom-sdxl', family: 'img2img', label: 'Custom (img2img)',

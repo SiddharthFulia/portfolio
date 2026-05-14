@@ -28,6 +28,16 @@ export const ENDPOINTS = {
   IMAGE_ENHANCE_LIST:   '/api/image-enhance/list',
   IMAGE_ENHANCE_BULK:   '/api/image-enhance/bulk',
   AI_VIDEO_BULK:        '/api/ai-video/bulk',
+  // Studio lanes (Tier 3)
+  LIPSYNC:              '/api/lipsync',
+  LIPSYNC_STATUS:       '/api/lipsync/status',
+  LIPSYNC_LIST:         '/api/lipsync/list',
+  AUDIO:                '/api/audio',
+  AUDIO_STATUS:         '/api/audio/status',
+  AUDIO_LIST:           '/api/audio/list',
+  CINEMA:               '/api/cinema',
+  CINEMA_STATUS:        '/api/cinema/status',
+  CINEMA_LIST:          '/api/cinema/list',
 
   // Vision
   FACE_ANALYZE: '/api/face-analyze',

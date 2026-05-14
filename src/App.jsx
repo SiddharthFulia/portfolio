@@ -25,6 +25,9 @@ const ExploreModule = lazy(() => import("./pages/ExploreModule"));
 const AIChat = lazy(() => import("./pages/AIChat"));
 const AIVideo = lazy(() => import("./pages/AIVideo"));
 const ImageEnhancer = lazy(() => import("./pages/ImageEnhancer"));
+const LipSync = lazy(() => import("./pages/LipSync"));
+const AudioStudio = lazy(() => import("./pages/AudioStudio"));
+const Cinema = lazy(() => import("./pages/Cinema"));
 
 /* ── Skeleton building blocks ── */
 const B = "animate-pulse bg-slate-200 rounded";
@@ -174,6 +177,11 @@ const App = () => {
           <Route path='/video'           element={<Suspense fallback={<AIVideoSkeleton />}><PageTransition><AIVideo /></PageTransition></Suspense>} />
           <Route path='/image-enhancer'  element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><ImageEnhancer /></PageTransition></Suspense>} />
           <Route path='/enhance'         element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><ImageEnhancer /></PageTransition></Suspense>} />
+          {/* Tier 3 Studio lanes — Lip Sync / Audio / Cinema */}
+          <Route path='/lipsync'         element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><LipSync /></PageTransition></Suspense>} />
+          <Route path='/audio'           element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><AudioStudio /></PageTransition></Suspense>} />
+          <Route path='/audio-studio'    element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><AudioStudio /></PageTransition></Suspense>} />
+          <Route path='/cinema'          element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><Cinema /></PageTransition></Suspense>} />
         </Routes>
         <ConditionalFooter />
       </Router>

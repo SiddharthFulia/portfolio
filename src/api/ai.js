@@ -320,6 +320,86 @@ export async function summarizeText(text, options = {}) {
   }
 }
 
+// ─── Lip Sync ─────────────────────────────────────────────────
+export async function submitLipsync(payload = {}) {
+  try {
+    const data = await post(ENDPOINTS.LIPSYNC, payload, { timeout: 60000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function getLipsyncStatus(jobId) {
+  try {
+    const data = await get(`${ENDPOINTS.LIPSYNC_STATUS}/${jobId}`, {}, { timeout: 6000 });
+    return { data: data?.data || null, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function listLipsyncJobs({ status = 'completed', visibility = 'public', page = 1, limit = 24 } = {}) {
+  try {
+    const data = await get(ENDPOINTS.LIPSYNC_LIST, { status, visibility, page, limit }, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function deleteLipsync(jobId) {
+  try {
+    const data = await del(`${ENDPOINTS.LIPSYNC}/${jobId}`, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+
+// ─── Audio Studio ─────────────────────────────────────────────
+export async function submitAudio(payload = {}) {
+  try {
+    const data = await post(ENDPOINTS.AUDIO, payload, { timeout: 60000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function getAudioStatus(jobId) {
+  try {
+    const data = await get(`${ENDPOINTS.AUDIO_STATUS}/${jobId}`, {}, { timeout: 6000 });
+    return { data: data?.data || null, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function listAudioJobs({ status = 'completed', kind, visibility = 'public', page = 1, limit = 24 } = {}) {
+  try {
+    const q = { status, visibility, page, limit };
+    if (kind) q.kind = kind;
+    const data = await get(ENDPOINTS.AUDIO_LIST, q, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function deleteAudio(jobId) {
+  try {
+    const data = await del(`${ENDPOINTS.AUDIO}/${jobId}`, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+
+// ─── Cinema ─────────────────────────────────────────────────
+export async function submitCinema(payload = {}) {
+  try {
+    const data = await post(ENDPOINTS.CINEMA, payload, { timeout: 60000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function getCinemaStatus(projectId) {
+  try {
+    const data = await get(`${ENDPOINTS.CINEMA_STATUS}/${projectId}`, {}, { timeout: 6000 });
+    return { data: data?.data || null, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function listCinemaProjects({ status = 'completed', visibility = 'public', page = 1, limit = 24 } = {}) {
+  try {
+    const data = await get(ENDPOINTS.CINEMA_LIST, { status, visibility, page, limit }, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function deleteCinema(projectId) {
+  try {
+    const data = await del(`${ENDPOINTS.CINEMA}/${projectId}`, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+
 // Prompt coach — Image Studio "💡 Help me write a prompt" modal. Sends the
 // user's plain-English idea + the family of the selected checkpoint, gets
 // back a model-tuned prompt (and a negative prompt where applicable).
