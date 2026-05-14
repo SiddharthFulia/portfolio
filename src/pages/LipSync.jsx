@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { Upload, Input, Select, message as antMessage } from 'antd'
-import { UploadOutlined, SoundOutlined, ThunderboltOutlined, ReloadOutlined, DownloadOutlined } from '@ant-design/icons'
+import { UploadOutlined, SoundOutlined, ThunderboltOutlined, ReloadOutlined, DownloadOutlined, CheckOutlined } from '@ant-design/icons'
 import { submitLipsync, getLipsyncStatus, fileToDataUrl } from '../api/ai'
+import { useTilt, TILT_STYLE } from '../components/useTilt'
 
 const MODELS = [
-  { value: 'latentsync', label: 'LatentSync 1.5', blurb: 'Best quality. Open ByteDance model. ~60s for a 10s clip.' },
-  { value: 'musetalk',   label: 'MuseTalk (coming soon)', blurb: 'Faster but lower quality. Wire pending.', disabled: true },
-  { value: 'liveportrait', label: 'LivePortrait (coming soon)', blurb: 'Face-puppeteering from a driver video.', disabled: true },
+  { value: 'latentsync',   label: 'LatentSync 1.5',  blurb: 'Best mouth detail. ByteDance. ~1-3min for a 10s clip on 5090.' },
+  { value: 'musetalk',     label: 'MuseTalk',         blurb: '2× faster than LatentSync. Slightly softer mouth shapes. ~30-60s.' },
+  { value: 'liveportrait', label: 'LivePortrait (puppet)', blurb: 'Driver-video mode — upload a VIDEO instead of audio. The portrait mimics the driver\'s expressions.' },
 ]
 
 export default function LipSync() {
@@ -87,23 +88,34 @@ export default function LipSync() {
         </header>
 
         <section className="grid sm:grid-cols-2 gap-4 mb-6">
-          {/* Source audio */}
+          {/* Source audio — relabelled "driver video" when LivePortrait is picked */}
           <div className="rounded-2xl border-2 border-dashed border-gray-800 hover:border-emerald-500/40 transition-colors p-4 bg-gray-900/40">
-            <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Source audio</p>
+            <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">
+              {model === 'liveportrait' ? 'Driver video' : 'Source audio'}
+            </p>
             {audioDataUrl ? (
               <div className="space-y-2">
-                <audio controls src={audioDataUrl} className="w-full" />
+                {model === 'liveportrait'
+                  ? <video controls src={audioDataUrl} className="w-full max-h-48 rounded-lg" />
+                  : <audio controls src={audioDataUrl} className="w-full" />}
                 <p className="text-[10px] text-gray-600 font-mono truncate">{audioFile?.name}</p>
                 <button onClick={() => { setAudioFile(null); setAudioDataUrl('') }}
                   className="text-[10px] text-rose-400 hover:text-rose-300">✕ Replace</button>
               </div>
             ) : (
               <Upload.Dragger multiple={false} showUploadList={false}
-                accept="audio/*,video/*" beforeUpload={handleAudio}
+                accept={model === 'liveportrait' ? 'video/*' : 'audio/*,video/*'}
+                beforeUpload={handleAudio}
                 style={{ background: 'transparent', borderColor: 'transparent', padding: '20px 0' }}>
                 <UploadOutlined className="text-3xl text-emerald-400 mb-2" />
-                <p className="text-sm text-gray-300">Drop audio or click to upload</p>
-                <p className="text-[10px] text-gray-500 mt-1">mp3 / wav / m4a · max 60s</p>
+                <p className="text-sm text-gray-300">
+                  {model === 'liveportrait'
+                    ? 'Drop driver video — the portrait will mimic its expressions'
+                    : 'Drop audio or click to upload'}
+                </p>
+                <p className="text-[10px] text-gray-500 mt-1">
+                  {model === 'liveportrait' ? 'mp4 / webm · short clip recommended' : 'mp3 / wav / m4a · max 60s'}
+                </p>
               </Upload.Dragger>
             )}
           </div>
@@ -131,17 +143,14 @@ export default function LipSync() {
           </div>
         </section>
 
-        <section className="mb-6 space-y-3">
+        <section className="mb-6 space-y-2">
           <label className="text-[10px] uppercase tracking-wider text-gray-500">Lip-sync model</label>
-          <Select className="w-full" size="middle" value={model} onChange={setModel}
-            options={MODELS} optionLabelProp="label"
-            optionRender={(o) => (
-              <div className={`py-0.5 ${o.data.disabled ? 'opacity-50' : ''}`}>
-                <div className="text-[12px] font-semibold text-gray-100">{o.data.label}</div>
-                <div className="text-[10px] text-gray-500">{o.data.blurb}</div>
-              </div>
-            )}
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 [perspective:1200px]">
+            {MODELS.map(m => (
+              <ModelCard key={m.value} model={m} active={model === m.value}
+                onSelect={() => setModel(m.value)} />
+            ))}
+          </div>
         </section>
 
         {/* Result */}
@@ -201,5 +210,32 @@ export default function LipSync() {
         </div>
       </div>
     </div>
+  )
+}
+
+// 3D tilt card for the lipsync-model picker
+function ModelCard({ model: m, active, onSelect }) {
+  const tilt = useTilt(7)
+  return (
+    <button {...tilt} type="button" onClick={onSelect}
+      style={TILT_STYLE}
+      className={`relative p-3 rounded-xl text-left border-2 transition-all overflow-hidden group will-change-transform ${
+        active
+          ? 'border-emerald-400/70 bg-emerald-500/10 shadow-lg shadow-emerald-500/20'
+          : 'border-gray-800 bg-gray-900/40 hover:border-gray-700 hover:bg-gray-900'
+      }`}>
+      <span aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        style={{ background: `radial-gradient(220px at var(--glx, 50%) var(--gly, 50%), rgba(52,211,153,0.18), transparent 65%)` }} />
+      {active && (
+        <span aria-hidden className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center text-black shadow-md z-10">
+          <CheckOutlined className="text-[10px] font-bold" />
+        </span>
+      )}
+      <div className="relative">
+        <p className={`text-sm font-bold ${active ? 'text-white' : 'text-gray-200'}`}>{m.label}</p>
+        <p className={`text-[10px] mt-0.5 leading-snug ${active ? 'text-gray-300' : 'text-gray-500'}`}>{m.blurb}</p>
+      </div>
+    </button>
   )
 }

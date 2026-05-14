@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Input, Select, Slider, message as antMessage } from 'antd'
-import { VideoCameraOutlined, ThunderboltOutlined, ReloadOutlined, CopyOutlined } from '@ant-design/icons'
+import { VideoCameraOutlined, ThunderboltOutlined, ReloadOutlined, CopyOutlined, BulbOutlined } from '@ant-design/icons'
 import { submitCinema } from '../api/ai'
+import PromptHelper from '../components/PromptHelper'
 
 export default function Cinema() {
   const [masterPrompt, setMasterPrompt] = useState('')
@@ -12,6 +13,10 @@ export default function Cinema() {
   const [working, setWorking] = useState(false)
   const [project, setProject] = useState(null)
   const [error, setError] = useState(null)
+  const [helperOpen, setHelperOpen] = useState(false)
+  const [coachIdea, setCoachIdea] = useState('')
+  const [coachResult, setCoachResult] = useState(null)
+  const [coachError, setCoachError] = useState('')
 
   useEffect(() => { document.title = 'Cinema · Sid' }, [])
 
@@ -53,7 +58,22 @@ export default function Cinema() {
         {/* Master prompt */}
         <section className="mb-6 space-y-4">
           <div>
-            <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">Master prompt</label>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <label className="text-[10px] uppercase tracking-wider text-gray-500">Master prompt</label>
+              <div className="flex items-center gap-1.5">
+                <button type="button" onClick={() => setHelperOpen(true)}
+                  title="AI helper + sample stories"
+                  className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-amber-500/40 hover:border-amber-400 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-colors">
+                  <BulbOutlined className="text-[10px]" /> Help me write
+                </button>
+                {masterPrompt && (
+                  <button type="button" onClick={() => setMasterPrompt('')}
+                    className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors">
+                    clear
+                  </button>
+                )}
+              </div>
+            </div>
             <Input.TextArea value={masterPrompt} onChange={e => setMasterPrompt(e.target.value)}
               autoSize={{ minRows: 3, maxRows: 8 }}
               placeholder='e.g. "A samurai walking through a misty bamboo forest at dawn, finding an abandoned shrine"'
@@ -117,6 +137,16 @@ export default function Cinema() {
             </button>
           </div>
         )}
+
+        <PromptHelper
+          open={helperOpen} onClose={() => setHelperOpen(false)}
+          family="cinema" currentPrompt={masterPrompt}
+          idea={coachIdea} setIdea={setCoachIdea}
+          coachResult={coachResult} setCoachResult={setCoachResult}
+          coachError={coachError} setCoachError={setCoachError}
+          onApply={(text) => { setMasterPrompt(text); setHelperOpen(false) }}
+          onAppend={(text) => setMasterPrompt(masterPrompt.trim() ? `${masterPrompt.trim()} ${text}` : text)}
+        />
 
         {project && Array.isArray(project.shotPrompts) && project.shotPrompts.length > 0 && (
           <section className="rounded-2xl border border-amber-500/30 bg-gray-900/40 p-4 mb-6">

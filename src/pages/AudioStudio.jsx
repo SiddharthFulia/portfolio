@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { Input, Select, Slider, message as antMessage } from 'antd'
-import { CustomerServiceOutlined, ThunderboltOutlined, DownloadOutlined, ReloadOutlined } from '@ant-design/icons'
+import { Input, Select, Slider, Tooltip, message as antMessage } from 'antd'
+import { CustomerServiceOutlined, ThunderboltOutlined, DownloadOutlined, ReloadOutlined, BulbOutlined, CheckOutlined } from '@ant-design/icons'
 import { submitAudio, getAudioStatus } from '../api/ai'
+import PromptHelper from '../components/PromptHelper'
+import { useTilt, TILT_STYLE } from '../components/useTilt'
 
 const KINDS = [
   { value: 'music', label: '🎵 Music', blurb: 'Background tracks, soundtracks, loops. Best for video soundtracks.', defaultModel: 'musicgen' },
@@ -32,6 +34,12 @@ export default function AudioStudio() {
   const [job, setJob] = useState(null)
   const [error, setError] = useState(null)
   const pollTimer = useRef(null)
+  // Prompt helper modal — state lives here so closing + reopening keeps the
+  // last AI-generated prompt + idea
+  const [helperOpen, setHelperOpen] = useState(false)
+  const [coachIdea, setCoachIdea] = useState('')
+  const [coachResult, setCoachResult] = useState(null)
+  const [coachError, setCoachError] = useState('')
 
   useEffect(() => { document.title = 'Audio Studio · Sid' }, [])
   useEffect(() => () => { if (pollTimer.current) clearInterval(pollTimer.current) }, [])
@@ -84,24 +92,14 @@ export default function AudioStudio() {
           </p>
         </header>
 
-        {/* Kind picker */}
+        {/* Kind picker — 3D tilt cards */}
         <section className="mb-6">
           <h2 className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Type</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-            {KINDS.map(k => {
-              const active = kind === k.value
-              return (
-                <button key={k.value} type="button" onClick={() => setKind(k.value)}
-                  className={`p-3 rounded-xl text-left border-2 transition-all ${
-                    active
-                      ? 'border-fuchsia-400/70 bg-fuchsia-500/10 shadow-lg shadow-fuchsia-500/10'
-                      : 'border-gray-800 bg-gray-900/40 hover:border-gray-700 hover:bg-gray-900'
-                  }`}>
-                  <p className={`text-sm font-bold ${active ? 'text-white' : 'text-gray-200'}`}>{k.label}</p>
-                  <p className={`text-[10px] mt-0.5 ${active ? 'text-gray-300' : 'text-gray-500'}`}>{k.blurb}</p>
-                </button>
-              )
-            })}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 [perspective:1200px]">
+            {KINDS.map(k => (
+              <KindCard key={k.value} kind={k} active={kind === k.value}
+                onSelect={() => setKind(k.value)} />
+            ))}
           </div>
         </section>
 
@@ -120,7 +118,24 @@ export default function AudioStudio() {
           </div>
 
           <div>
-            <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">Prompt</label>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <label className="text-[10px] uppercase tracking-wider text-gray-500">
+                {kind === 'tts' ? 'Text to speak' : 'Prompt'}
+              </label>
+              <div className="flex items-center gap-1.5">
+                <button type="button" onClick={() => setHelperOpen(true)}
+                  title="AI prompt helper + sample prompts"
+                  className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-amber-500/40 hover:border-amber-400 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-colors">
+                  <BulbOutlined className="text-[10px]" /> Help me write
+                </button>
+                {prompt && (
+                  <button type="button" onClick={() => setPrompt('')}
+                    className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors">
+                    clear
+                  </button>
+                )}
+              </div>
+            </div>
             <Input.TextArea value={prompt} onChange={e => setPrompt(e.target.value)}
               autoSize={{ minRows: 2, maxRows: 6 }}
               placeholder={
@@ -198,6 +213,43 @@ export default function AudioStudio() {
           </button>
         </div>
       </div>
+
+      <PromptHelper
+        open={helperOpen} onClose={() => setHelperOpen(false)}
+        family={kind} currentPrompt={prompt}
+        idea={coachIdea} setIdea={setCoachIdea}
+        coachResult={coachResult} setCoachResult={setCoachResult}
+        coachError={coachError} setCoachError={setCoachError}
+        onApply={(text) => { setPrompt(text); setHelperOpen(false) }}
+        onAppend={(text) => setPrompt(prompt.trim() ? `${prompt.trim()}, ${text}` : text)}
+      />
     </div>
+  )
+}
+
+// 3D-tilt audio-kind card. Same physics as ImageEnhancer's WorkflowCard.
+function KindCard({ kind: k, active, onSelect }) {
+  const tilt = useTilt(7)
+  return (
+    <button {...tilt} type="button" onClick={onSelect}
+      style={TILT_STYLE}
+      className={`relative p-3 rounded-xl text-left border-2 transition-all overflow-hidden group will-change-transform ${
+        active
+          ? 'border-fuchsia-400/70 bg-fuchsia-500/10 shadow-lg shadow-fuchsia-500/20'
+          : 'border-gray-800 bg-gray-900/40 hover:border-gray-700 hover:bg-gray-900'
+      }`}>
+      <span aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        style={{ background: `radial-gradient(220px at var(--glx, 50%) var(--gly, 50%), rgba(232,121,249,0.18), transparent 65%)` }} />
+      {active && (
+        <span aria-hidden className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-gradient-to-br from-fuchsia-400 to-amber-400 flex items-center justify-center text-black shadow-md z-10">
+          <CheckOutlined className="text-[10px] font-bold" />
+        </span>
+      )}
+      <div className="relative">
+        <p className={`text-sm font-bold ${active ? 'text-white' : 'text-gray-200'}`}>{k.label}</p>
+        <p className={`text-[10px] mt-0.5 leading-snug ${active ? 'text-gray-300' : 'text-gray-500'}`}>{k.blurb}</p>
+      </div>
+    </button>
   )
 }

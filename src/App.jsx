@@ -3,8 +3,9 @@ import { Route, BrowserRouter as Router, Routes, useLocation } from "react-route
 import { ConfigProvider, theme } from "antd";
 import { Footer, Navbar } from "./components";
 import BackToTop from './components/BackToTop';
-import PageTransition from './components/PageTransition';
 import EasterEgg from './components/EasterEgg';
+// PageTransition removed 2026-05 — the fade/slide on every route was the
+// "flashy switch" the user wanted gone. Routes now render directly.
 // VaultGate is now used inline inside each page (only for the "Save to
 // Vault" toggle), not as a page-level gate.
 
@@ -154,34 +155,34 @@ const App = () => {
         <Navbar />
         <Routes>
           <Route path='/' element={<Suspense fallback={<HomeSkeleton />}><Home /></Suspense>} />
-          <Route path='/about' element={<Suspense fallback={<LightPageSkeleton />}><PageTransition><About /></PageTransition></Suspense>} />
-          <Route path='/projects' element={<Suspense fallback={<LightPageSkeleton />}><PageTransition><Projects /></PageTransition></Suspense>} />
-          <Route path='/contact' element={<Suspense fallback={<ContactSkeleton />}><PageTransition><Contact /></PageTransition></Suspense>} />
-          <Route path='/lab' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><Lab /></PageTransition></Suspense>} />
-          <Route path='/learn' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><Learn /></PageTransition></Suspense>} />
-          <Route path='/creative' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><Creative /></PageTransition></Suspense>} />
-          <Route path='/chess' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><ChessViz /></PageTransition></Suspense>} />
-          <Route path='/science' element={<Suspense fallback={<ScienceSkeleton />}><PageTransition><Science /></PageTransition></Suspense>} />
-          <Route path='/science/:module' element={<Suspense fallback={<ScienceModuleSkeleton />}><PageTransition><ScienceModule /></PageTransition></Suspense>} />
-          <Route path='/vision' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><FaceDetection /></PageTransition></Suspense>} />
-          <Route path='/face' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><FaceDetection /></PageTransition></Suspense>} />
-          <Route path='/explore' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><Explore /></PageTransition></Suspense>} />
-          <Route path='/explore/:module' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><ExploreModule /></PageTransition></Suspense>} />
-          <Route path='/ai' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><AIChat /></PageTransition></Suspense>} />
+          <Route path='/about' element={<Suspense fallback={<LightPageSkeleton />}><About /></Suspense>} />
+          <Route path='/projects' element={<Suspense fallback={<LightPageSkeleton />}><Projects /></Suspense>} />
+          <Route path='/contact' element={<Suspense fallback={<ContactSkeleton />}><Contact /></Suspense>} />
+          <Route path='/lab' element={<Suspense fallback={<DarkPageSkeleton />}><Lab /></Suspense>} />
+          <Route path='/learn' element={<Suspense fallback={<DarkPageSkeleton />}><Learn /></Suspense>} />
+          <Route path='/creative' element={<Suspense fallback={<DarkPageSkeleton />}><Creative /></Suspense>} />
+          <Route path='/chess' element={<Suspense fallback={<DarkPageSkeleton />}><ChessViz /></Suspense>} />
+          <Route path='/science' element={<Suspense fallback={<ScienceSkeleton />}><Science /></Suspense>} />
+          <Route path='/science/:module' element={<Suspense fallback={<ScienceModuleSkeleton />}><ScienceModule /></Suspense>} />
+          <Route path='/vision' element={<Suspense fallback={<DarkPageSkeleton />}><FaceDetection /></Suspense>} />
+          <Route path='/face' element={<Suspense fallback={<DarkPageSkeleton />}><FaceDetection /></Suspense>} />
+          <Route path='/explore' element={<Suspense fallback={<DarkPageSkeleton />}><Explore /></Suspense>} />
+          <Route path='/explore/:module' element={<Suspense fallback={<DarkPageSkeleton />}><ExploreModule /></Suspense>} />
+          <Route path='/ai' element={<Suspense fallback={<DarkPageSkeleton />}><AIChat /></Suspense>} />
           {/* /studio merged into /vision — keep alias so old links don't 404 */}
-          <Route path='/studio' element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><FaceDetection /></PageTransition></Suspense>} />
+          <Route path='/studio' element={<Suspense fallback={<DarkPageSkeleton />}><FaceDetection /></Suspense>} />
           {/* AI Video + Image Studio are fully public. Generate / browse / delete
               are all open. Only the "Save to Vault" toggle on the create UI
               prompts for the password (handled inline in each page). */}
-          <Route path='/ai-video'        element={<Suspense fallback={<AIVideoSkeleton />}><PageTransition><AIVideo /></PageTransition></Suspense>} />
-          <Route path='/video'           element={<Suspense fallback={<AIVideoSkeleton />}><PageTransition><AIVideo /></PageTransition></Suspense>} />
-          <Route path='/image-enhancer'  element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><ImageEnhancer /></PageTransition></Suspense>} />
-          <Route path='/enhance'         element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><ImageEnhancer /></PageTransition></Suspense>} />
+          <Route path='/ai-video'        element={<Suspense fallback={<AIVideoSkeleton />}><AIVideo /></Suspense>} />
+          <Route path='/video'           element={<Suspense fallback={<AIVideoSkeleton />}><AIVideo /></Suspense>} />
+          <Route path='/image-enhancer'  element={<Suspense fallback={<DarkPageSkeleton />}><ImageEnhancer /></Suspense>} />
+          <Route path='/enhance'         element={<Suspense fallback={<DarkPageSkeleton />}><ImageEnhancer /></Suspense>} />
           {/* Tier 3 Studio lanes — Lip Sync / Audio / Cinema */}
-          <Route path='/lipsync'         element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><LipSync /></PageTransition></Suspense>} />
-          <Route path='/audio'           element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><AudioStudio /></PageTransition></Suspense>} />
-          <Route path='/audio-studio'    element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><AudioStudio /></PageTransition></Suspense>} />
-          <Route path='/cinema'          element={<Suspense fallback={<DarkPageSkeleton />}><PageTransition><Cinema /></PageTransition></Suspense>} />
+          <Route path='/lipsync'         element={<Suspense fallback={<DarkPageSkeleton />}><LipSync /></Suspense>} />
+          <Route path='/audio'           element={<Suspense fallback={<DarkPageSkeleton />}><AudioStudio /></Suspense>} />
+          <Route path='/audio-studio'    element={<Suspense fallback={<DarkPageSkeleton />}><AudioStudio /></Suspense>} />
+          <Route path='/cinema'          element={<Suspense fallback={<DarkPageSkeleton />}><Cinema /></Suspense>} />
         </Routes>
         <ConditionalFooter />
       </Router>
