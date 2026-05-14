@@ -295,7 +295,7 @@ const FAMILY_TIPS = {
   },
   flux: {
     label: 'Flux Kontext (edit)',
-    blurb: 'Phrase as an EDIT instruction starting with a verb (change/replace/remove). Specify what to preserve.',
+    blurb: 'Phrase as an EDIT instruction starting with a verb (change/replace/remove). Specify what to preserve. No negative prompt — Flux Kontext doesn\'t use one.',
     cfg: 'Sweet spot: CFG 2.5 · 20 steps',
   },
 }
@@ -364,15 +364,17 @@ const ATELIER_WORKFLOWS = [
   // ─── Custom — bring your own checkpoint, full control on every knob
   {
     id: 'custom-sdxl', family: 'img2img', label: 'Custom (img2img)',
-    blurb: 'Bring any SDXL checkpoint. Full freedom on prompt, denoise, CFG, steps.',
+    blurb: 'Any SDXL/Pony checkpoint. Wide denoise range (0.1–1.0) for subtle polish or full reinterpretation.',
     checkpoint: 'Juggernaut-XL_v9_RunDiffusionPhoto_v2.safetensors',
     needsImage: true, needsPrompt: true,
-    defaults: { steps: 22, denoise: 0.40, cfg: 6.0 },
+    // Denoise 0.55 by default — visible variation on first run instead of
+    // "looks identical, did anything happen?". Slide left for polish, right for transform.
+    defaults: { steps: 30, denoise: 0.55, cfg: 6.0 },
     eta: '~30s', icon: '🛠️',
   },
   {
     id: 'custom-t2i', family: 't2i', label: 'Custom (text→image)',
-    blurb: 'Bring any SDXL checkpoint. Pure prompt-driven generation.',
+    blurb: 'Any SDXL/Pony checkpoint. Pure prompt-driven. Auto-tunes sampler for Pony models.',
     checkpoint: 'Juggernaut-XL_v9_RunDiffusionPhoto_v2.safetensors',
     needsImage: false, needsPrompt: true,
     defaults: { steps: 28, cfg: 6.0, width: 1024, height: 1024 },
@@ -689,11 +691,11 @@ export default function ImageEnhancer() {
                 <span className="sm:hidden">{isLoggedIn ? 'Vault' : 'Lock'}</span>
               </button>
             </div>
-            {/* Engine toggle — Cloud (Gemini, fast) vs Local (5090, free) */}
+            {/* Engine toggle — Cloud (Gemini) vs Local Atelier (5090) */}
             <div className="flex items-center gap-1 p-1 rounded-full bg-gray-900/60 border border-gray-800">
               {[
                 { id: 'cloud',   label: 'Cloud',   icon: <CloudOutlined />,   sub: 'Gemini · 10-15s' },
-                { id: 'atelier', label: 'Atelier', icon: <DesktopOutlined />, sub: '5090 · free · 6 workflows' },
+                { id: 'atelier', label: 'Atelier', icon: <DesktopOutlined />, sub: '5090 local · 8 workflows' },
               ].map(opt => (
                 <button key={opt.id} onClick={() => setEngine(opt.id)}
                   disabled={working}
@@ -885,13 +887,18 @@ export default function ImageEnhancer() {
 
 // ─── Generator section (extracted so the Tabs structure stays clean) ──
 // Compact slider+number input — used for steps / denoise / cfg / w / h
-// Negative prompt — collapsed by default with a one-click "Pony baseline"
-// shortcut for users on Pony workflows (the score_4…score_1 negative is the
-// single most common reason Pony outputs look noisy). For SDXL we suggest a
-// short photo-real negative.
-function NegativePromptField({ value, onChange, family }) {
+// Negative prompt — collapsed by default with a one-click family baseline
+// shortcut. When `supported` is false (Flux Kontext), the field is rendered
+// in a disabled greyed-out state with an explanatory note instead of being
+// hidden — keeps the layout stable and teaches the user that this model
+// doesn't accept negatives.
+function NegativePromptField({ value, onChange, family, supported = true }) {
   const [open, setOpen] = useState(!!value)
   useEffect(() => { if (value) setOpen(true) }, [value])
+  // Auto-collapse and clear if the workflow stops supporting negatives mid-flight
+  useEffect(() => {
+    if (!supported && value) onChange('')
+  }, [supported])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const ponyBaseline = 'score_4, score_3, score_2, score_1, worst quality, low quality, blurry, deformed, bad anatomy, watermark, text'
   const sdxlBaseline = 'low quality, blurry, distorted, plastic skin, oversmoothed, watermark, text, deformed hands'
@@ -901,6 +908,28 @@ function NegativePromptField({ value, onChange, family }) {
     : family === 'sdxl-hyper' ? hyperBaseline
     : sdxlBaseline
 
+  // ── Greyed-out unsupported state ───────────────────────────────
+  if (!supported) {
+    return (
+      <Tooltip title="Flux Kontext is a guidance-based edit model — it doesn't use a separate negative prompt. Use clear instructions in the main prompt instead (e.g. 'keep the face, pose, background')." placement="topLeft">
+        <div className="rounded-xl border border-dashed border-gray-800 bg-gray-900/30 p-3 opacity-60 cursor-not-allowed select-none">
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <span className="text-[10px] uppercase tracking-wider text-gray-600 flex items-center gap-1">
+              <span className="text-gray-700">🚫</span>
+              Negative prompt
+              <span className="text-gray-700 normal-case font-normal">· not supported by this model</span>
+            </span>
+            <span className="text-[9px] font-mono text-gray-700">{(FAMILY_TIPS[family] || {}).label || family}</span>
+          </div>
+          <p className="text-[10px] text-gray-700 leading-snug">
+            Flux Kontext steers edits via the positive prompt only. Express what to <em>keep</em> ("preserve the face, pose, background") instead of a separate negative list.
+          </p>
+        </div>
+      </Tooltip>
+    )
+  }
+
+  // ── Supported state ───────────────────────────────────────────
   return (
     <div>
       <div className="flex items-center justify-between gap-2 mb-1">
@@ -934,7 +963,6 @@ function NegativePromptField({ value, onChange, family }) {
               : 'e.g. "blurry, watermark, deformed hands"'}
             maxLength={1000}
             showCount
-            status={value ? '' : ''}
           />
           <p className="text-[10px] text-gray-600 mt-1 leading-snug">
             Forwarded to ComfyUI's negative CLIPTextEncode. Leave blank to use the workflow's built-in default.
@@ -1235,7 +1263,7 @@ function GenerateSection({
                     <p className="text-gray-400 text-xs leading-relaxed max-w-[28ch] mx-auto">
                       Cloud has safety filters around faces and identity-sensitive
                       content. Switch to <span className="text-cyan-300 font-semibold">Local 5090</span> —
-                      no filters, runs free on the GPU, ~30 sec.
+                      no filters, runs on your own GPU, ~30 sec.
                     </p>
                   </div>
                   <div className="flex items-center gap-2 pt-1">
@@ -1349,15 +1377,16 @@ function GenerateSection({
               )
             })()}
 
-            {/* Negative prompt — only meaningful for SDXL/Pony workflows. Flux
-                Kontext doesn't use negatives, so skip there. Collapsed by
-                default so beginners don't get scared by the extra field; the
-                "show" button reveals it. */}
-            {wf.needsPrompt && wf.family !== 'edit' && (
+            {/* Negative prompt — always shown when a prompt workflow is active,
+                but greyed-out + explanatory tooltip when the model doesn't
+                accept negatives (Flux Kontext). Same UX for the upscalers
+                which don't use prompts at all — those hide it entirely. */}
+            {wf.needsPrompt && (
               <NegativePromptField
                 value={negativePrompt}
                 onChange={setNegativePrompt}
                 family={resolvePromptFamily(wf, customModel)}
+                supported={wf.family !== 'edit'}
               />
             )}
 
@@ -1416,6 +1445,36 @@ function GenerateSection({
                 </div>
               )
             })()}
+
+            {/* Variation strength quick-presets — only for img2img custom.
+                Maps to denoise: Subtle 0.25 / Balanced 0.50 / Heavy 0.75 / Wild 1.00.
+                Demystifies what the denoise slider actually does. */}
+            {showDenoise && wf.id === 'custom-sdxl' && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] uppercase tracking-wider text-gray-500">Variation</span>
+                {[
+                  { label: 'Subtle',   v: 0.25, hint: 'small polish, identity preserved' },
+                  { label: 'Balanced', v: 0.50, hint: 'noticeable rework, recognizable' },
+                  { label: 'Heavy',    v: 0.75, hint: 'major redraw, loose reference' },
+                  { label: 'Wild',     v: 1.00, hint: 'fully reimagined, image as noise seed' },
+                ].map(p => {
+                  const active = Math.abs((tunings.denoise || 0) - p.v) < 0.02
+                  return (
+                    <Tooltip key={p.label} title={p.hint}>
+                      <button type="button"
+                        onClick={() => setTunings(t => ({ ...t, denoise: p.v }))}
+                        className={`text-[10px] px-2.5 py-1 rounded-full border transition-all ${
+                          active
+                            ? 'bg-fuchsia-500/30 text-fuchsia-100 border-fuchsia-400/60 shadow-md shadow-fuchsia-500/20'
+                            : 'bg-gray-900/60 text-gray-400 border-gray-800 hover:border-gray-700 hover:text-gray-200'
+                        }`}>
+                        {p.label} <span className="font-mono opacity-60">{p.v.toFixed(2)}</span>
+                      </button>
+                    </Tooltip>
+                  )
+                })}
+              </div>
+            )}
 
             {/* Fine-tunes — show only the ones relevant to this workflow */}
             {(showSteps || showDenoise || showCfg || showWH) && (
@@ -1986,6 +2045,13 @@ function PromptHelperModal({
                   {coachResult.prompt}
                 </p>
               </div>
+              {family === 'flux' && !coachResult.negative && (
+                <div className="pt-2 border-t border-fuchsia-500/20">
+                  <p className="text-[10px] text-gray-500 italic">
+                    🚫 Flux Kontext doesn't use negative prompts. Steer edits via the positive prompt only.
+                  </p>
+                </div>
+              )}
               {coachResult.negative && (
                 <div className="pt-2 border-t border-fuchsia-500/20">
                   <div className="flex items-center justify-between mb-1">
