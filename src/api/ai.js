@@ -400,6 +400,27 @@ export async function deleteCinema(projectId) {
   } catch (err) { return { data: null, error: err.message }; }
 }
 
+// ─── Unified live-log tail (added 2026-05) ────────────────────────
+// Cursor-based — pass the ts of the last log you've seen so the BE only
+// returns new lines. Cheap enough to poll every 1.5s during a job without
+// re-fetching the whole status row.
+//
+//   const { data } = await fetchJobLogs('image', imageId, lastTs)
+//   data.logs       → [{ts, msg}, ...] in chronological order
+//   data.nextSince  → ts to pass as `since` on the next poll
+export async function fetchJobLogs(lane, jobId, sinceTs = 0, limit = 80) {
+  try {
+    const data = await get(
+      `${ENDPOINTS.JOB_LOGS}/${lane}/${jobId}`,
+      { since: sinceTs, limit },
+      { timeout: 6000 }
+    );
+    return { data: data?.data || { logs: [], nextSince: sinceTs }, error: null };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+}
+
 // Prompt coach — Image Studio "💡 Help me write a prompt" modal. Sends the
 // user's plain-English idea + the family of the selected checkpoint, gets
 // back a model-tuned prompt (and a negative prompt where applicable).

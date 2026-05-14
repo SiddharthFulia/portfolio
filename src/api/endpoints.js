@@ -38,6 +38,7 @@ export const ENDPOINTS = {
   CINEMA:               '/api/cinema',
   CINEMA_STATUS:        '/api/cinema/status',
   CINEMA_LIST:          '/api/cinema/list',
+  JOB_LOGS:             '/api/job-logs',   // /:lane/:jobId?since=<ms>&limit=80
 
   // Vision
   FACE_ANALYZE: '/api/face-analyze',

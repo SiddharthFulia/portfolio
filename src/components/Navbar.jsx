@@ -65,22 +65,26 @@ const Navbar = () => {
         <img src={logo} alt='logo' className='w-12 h-12 sm:w-14 sm:h-14 object-contain' />
       </NavLink>
 
-      {/* Desktop nav */}
-      <nav className='hidden lg:flex items-center gap-2 font-medium'>
+      {/* Desktop nav.
+          7 studio pills + 3 primary links + More + Resume is tight at 1024px,
+          so the pills shrink to text-[10px] / px-2 / py-1 below xl, then expand
+          back at xl. flex-wrap is the safety net — if a future addition pushes
+          past the budget, items wrap to a second row instead of clipping. */}
+      <nav className='hidden lg:flex flex-wrap items-center gap-x-1.5 gap-y-1 font-medium max-w-[calc(100%-200px)]'>
         {/* Primary links */}
         {primaryLinks.map(l => (
           <NavLink key={l.to} to={l.to} className={({ isActive }) =>
-            `text-sm px-2 transition-colors ${isActive ? 'text-blue-400' : isDark ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-black'}`}>
+            `text-[12px] xl:text-sm px-1.5 xl:px-2 transition-colors ${isActive ? 'text-blue-400' : isDark ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-black'}`}>
             {l.label}
           </NavLink>
         ))}
 
-        <div className={`w-px h-4 mx-1 ${isDark ? 'bg-gray-700' : 'bg-gray-300'}`} />
+        <div className={`w-px h-4 mx-0.5 xl:mx-1 ${isDark ? 'bg-gray-700' : 'bg-gray-300'}`} />
 
-        {/* Featured pills */}
+        {/* Featured pills — shrink on lg, normal on xl */}
         {featuredPills.map(l => (
           <NavLink key={l.to} to={l.to} className={({ isActive }) =>
-            `text-[11px] px-2.5 py-1.5 rounded-lg font-semibold transition-all ${
+            `text-[10px] xl:text-[11px] px-2 xl:px-2.5 py-1 xl:py-1.5 rounded-lg font-semibold transition-all whitespace-nowrap ${
               isActive
                 ? `text-white bg-gradient-to-r ${l.color} shadow-md`
                 : isDark
@@ -95,7 +99,7 @@ const Navbar = () => {
         <div className="relative">
           <button
             onClick={() => setMoreOpen(o => !o)}
-            className={`text-[11px] px-2.5 py-1.5 rounded-lg font-semibold transition-colors flex items-center gap-1 ${
+            className={`text-[10px] xl:text-[11px] px-2 xl:px-2.5 py-1 xl:py-1.5 rounded-lg font-semibold transition-colors flex items-center gap-1 whitespace-nowrap ${
               moreOpen
                 ? 'text-cyan-400 bg-gray-800'
                 : isDark ? 'text-gray-400 hover:text-white bg-gray-800/80 hover:bg-gray-700' : 'text-gray-600 hover:text-black bg-gray-100 hover:bg-gray-200'
@@ -127,10 +131,10 @@ const Navbar = () => {
           )}
         </div>
 
-        <div className={`w-px h-4 mx-1 ${isDark ? 'bg-gray-700' : 'bg-gray-300'}`} />
+        <div className={`w-px h-4 mx-0.5 xl:mx-1 ${isDark ? 'bg-gray-700' : 'bg-gray-300'}`} />
 
         <a href="/resume.pdf" target="_blank" rel="noreferrer"
-          className="text-[11px] px-3 py-1.5 rounded-lg text-white font-semibold
+          className="text-[10px] xl:text-[11px] px-2 xl:px-3 py-1 xl:py-1.5 rounded-lg text-white font-semibold whitespace-nowrap
                      bg-gradient-to-r from-[#00c6ff] to-[#0072ff]
                      hover:opacity-90 transition-opacity">
           Resume
