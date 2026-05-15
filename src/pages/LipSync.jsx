@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { Upload, Input, Select, message as antMessage } from 'antd'
-import { UploadOutlined, SoundOutlined, ThunderboltOutlined, ReloadOutlined, DownloadOutlined, CheckOutlined } from '@ant-design/icons'
-import { submitLipsync, getLipsyncStatus, fileToDataUrl } from '../api/ai'
+import { UploadOutlined, SoundOutlined, ThunderboltOutlined, ReloadOutlined, DownloadOutlined, CheckOutlined, DeleteOutlined } from '@ant-design/icons'
+import { submitLipsync, getLipsyncStatus, fileToDataUrl, listLipsyncJobs, lipsyncBulkAction } from '../api/ai'
 import { useTilt, TILT_STYLE } from '../components/useTilt'
+import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
 
 const MODELS = [
   { value: 'latentsync',   label: 'LatentSync 1.5',  blurb: 'Best mouth detail. ByteDance. ~1-3min for a 10s clip on 5090.' },
@@ -20,6 +21,7 @@ export default function LipSync() {
   const [job, setJob] = useState(null)
   const [error, setError] = useState(null)
   const pollTimer = useRef(null)
+  const [libraryRefresh, setLibraryRefresh] = useState(0)
 
   useEffect(() => { document.title = 'Lip Sync Studio · Sid' }, [])
   useEffect(() => () => { if (pollTimer.current) clearInterval(pollTimer.current) }, [])
@@ -44,6 +46,7 @@ export default function LipSync() {
       setJob(data)
       if (data.status === 'completed') {
         clearInterval(pollTimer.current); pollTimer.current = null; setWorking(false)
+        setLibraryRefresh(k => k + 1)
       } else if (data.status === 'failed') {
         clearInterval(pollTimer.current); pollTimer.current = null; setWorking(false)
         setError(data.error || 'Lip sync failed')
@@ -208,7 +211,69 @@ export default function LipSync() {
             {working ? 'Working…' : 'Generate lip-sync'}
           </button>
         </div>
+
+        {/* Library — every lipsync you've generated, with bulk delete. */}
+        <StudioLibrary
+          refreshKey={libraryRefresh}
+          title="Your Lip Syncs"
+          listFn={({ status, page, limit }) => listLipsyncJobs({ status, page, limit })}
+          bulkFn={lipsyncBulkAction}
+          getId={(it) => it.jobId}
+          bulkAccent="emerald"
+          renderCard={(it, { selectMode, checked, onToggleSelect, onDelete }) => (
+            <LipsyncCard key={it.jobId} item={it}
+              selectMode={selectMode} checked={checked}
+              onToggleSelect={onToggleSelect} onDelete={onDelete} />
+          )}
+        />
       </div>
+    </div>
+  )
+}
+
+// Library card for a finished (or in-flight) lipsync job
+function LipsyncCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
+  const url = item.outputUrl
+  const handleClick = (e) => {
+    if (selectMode) { e.preventDefault(); onToggleSelect?.() }
+  }
+  return (
+    <div className={`group relative aspect-video rounded-xl overflow-hidden border transition-all bg-gray-900/40 ${
+      checked
+        ? 'border-emerald-400 shadow-lg shadow-emerald-500/30 ring-2 ring-emerald-400/40'
+        : 'border-gray-800 hover:border-emerald-400/50'
+    }`}>
+      <a href={url || '#'} target="_blank" rel="noopener" onClick={handleClick}
+        className={`block w-full h-full ${selectMode ? 'cursor-pointer' : ''}`}>
+        {url ? (
+          <video src={url} muted playsInline preload="metadata"
+            className={`w-full h-full object-cover ${selectMode && !checked ? 'opacity-60' : ''}`} />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-900 to-gray-950">
+            <span className="text-3xl opacity-50">
+              {item.status === 'failed' ? '✗' : item.status === 'processing' ? '⚡' : '⏳'}
+            </span>
+          </div>
+        )}
+      </a>
+      {selectMode && <SelectCheckbox checked={checked} onToggle={onToggleSelect} />}
+      <div className="pointer-events-none absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-black/60 text-white border border-white/10">
+        {item.model || 'lip'}
+      </div>
+      {item.status !== 'completed' && (
+        <div className={`pointer-events-none absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+          item.status === 'failed' ? 'bg-rose-500/80 text-white'
+          : item.status === 'processing' ? 'bg-cyan-500/80 text-white'
+          : 'bg-amber-500/80 text-black'
+        }`}>{item.status}</div>
+      )}
+      {!selectMode && onDelete && (
+        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete() }}
+          title="Delete"
+          className="absolute bottom-1.5 right-1.5 w-7 h-7 flex items-center justify-center rounded-full bg-black/70 hover:bg-rose-600 text-gray-200 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
+          <DeleteOutlined className="text-xs" />
+        </button>
+      )}
     </div>
   )
 }

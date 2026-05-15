@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { Input, Select, Slider, Tooltip, message as antMessage } from 'antd'
-import { CustomerServiceOutlined, ThunderboltOutlined, DownloadOutlined, ReloadOutlined, BulbOutlined, CheckOutlined } from '@ant-design/icons'
-import { submitAudio, getAudioStatus } from '../api/ai'
+import { CustomerServiceOutlined, ThunderboltOutlined, DownloadOutlined, ReloadOutlined, BulbOutlined, CheckOutlined, DeleteOutlined } from '@ant-design/icons'
+import { submitAudio, getAudioStatus, listAudioJobs, audioBulkAction } from '../api/ai'
 import PromptHelper from '../components/PromptHelper'
 import { useTilt, TILT_STYLE } from '../components/useTilt'
+import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
 
 const KINDS = [
   { value: 'music', label: '🎵 Music', blurb: 'Background tracks, soundtracks, loops. Best for video soundtracks.', defaultModel: 'musicgen' },
@@ -40,6 +41,7 @@ export default function AudioStudio() {
   const [coachIdea, setCoachIdea] = useState('')
   const [coachResult, setCoachResult] = useState(null)
   const [coachError, setCoachError] = useState('')
+  const [libraryRefresh, setLibraryRefresh] = useState(0)
 
   useEffect(() => { document.title = 'Audio Studio · Sid' }, [])
   useEffect(() => () => { if (pollTimer.current) clearInterval(pollTimer.current) }, [])
@@ -57,6 +59,7 @@ export default function AudioStudio() {
       setJob(data)
       if (data.status === 'completed') {
         clearInterval(pollTimer.current); pollTimer.current = null; setWorking(false)
+        setLibraryRefresh(k => k + 1)
       } else if (data.status === 'failed') {
         clearInterval(pollTimer.current); pollTimer.current = null; setWorking(false)
         setError(data.error || 'Audio generation failed')
@@ -212,6 +215,20 @@ export default function AudioStudio() {
             {working ? 'Working…' : `Generate ${kindObj?.label.toLowerCase().replace(/[🎵🔊🗣 ]/g, '').trim() || 'audio'}`}
           </button>
         </div>
+
+        <StudioLibrary
+          refreshKey={libraryRefresh}
+          title="Your Audio"
+          listFn={({ status, page, limit }) => listAudioJobs({ status, page, limit })}
+          bulkFn={audioBulkAction}
+          getId={(it) => it.jobId}
+          bulkAccent="fuchsia"
+          renderCard={(it, { selectMode, checked, onToggleSelect, onDelete }) => (
+            <AudioCard key={it.jobId} item={it}
+              selectMode={selectMode} checked={checked}
+              onToggleSelect={onToggleSelect} onDelete={onDelete} />
+          )}
+        />
       </div>
 
       <PromptHelper
@@ -223,6 +240,50 @@ export default function AudioStudio() {
         onApply={(text) => { setPrompt(text); setHelperOpen(false) }}
         onAppend={(text) => setPrompt(prompt.trim() ? `${prompt.trim()}, ${text}` : text)}
       />
+    </div>
+  )
+}
+
+// Library card — audio is rendered as an inline player + metadata
+function AudioCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
+  const handleClick = (e) => { if (selectMode) { e.preventDefault(); onToggleSelect?.() } }
+  const kindIcon = item.kind === 'music' ? '🎵' : item.kind === 'sfx' ? '🔊' : item.kind === 'tts' ? '🗣' : '🎧'
+  return (
+    <div className={`group relative rounded-xl overflow-hidden border transition-all bg-gray-900/40 p-3 ${
+      checked
+        ? 'border-fuchsia-400 shadow-lg shadow-fuchsia-500/30 ring-2 ring-fuchsia-400/40'
+        : 'border-gray-800 hover:border-fuchsia-400/50'
+    }`} onClick={handleClick}>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-base">{kindIcon}</span>
+        <span className="text-[10px] uppercase tracking-wider text-gray-500 font-mono">{item.model}</span>
+        <span className="text-[10px] text-gray-600 ml-auto">{item.duration}s</span>
+      </div>
+      {item.outputUrl ? (
+        <audio src={item.outputUrl} controls className="w-full" onClick={e => e.stopPropagation()} />
+      ) : (
+        <div className="h-10 flex items-center justify-center bg-gradient-to-br from-gray-900 to-gray-950 rounded">
+          <span className="text-2xl opacity-50">
+            {item.status === 'failed' ? '✗' : item.status === 'processing' ? '⚡' : '⏳'}
+          </span>
+        </div>
+      )}
+      <p className="text-[10px] text-gray-500 mt-2 line-clamp-2 leading-snug">{item.prompt}</p>
+      {selectMode && <SelectCheckbox checked={checked} onToggle={onToggleSelect} />}
+      {item.status !== 'completed' && (
+        <div className={`pointer-events-none absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+          item.status === 'failed' ? 'bg-rose-500/80 text-white'
+          : item.status === 'processing' ? 'bg-cyan-500/80 text-white'
+          : 'bg-amber-500/80 text-black'
+        }`}>{item.status}</div>
+      )}
+      {!selectMode && onDelete && (
+        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete() }}
+          title="Delete"
+          className="absolute top-1.5 right-1.5 w-7 h-7 flex items-center justify-center rounded-full bg-black/70 hover:bg-rose-600 text-gray-200 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
+          <DeleteOutlined className="text-xs" />
+        </button>
+      )}
     </div>
   )
 }

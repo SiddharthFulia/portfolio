@@ -32,12 +32,15 @@ export const ENDPOINTS = {
   LIPSYNC:              '/api/lipsync',
   LIPSYNC_STATUS:       '/api/lipsync/status',
   LIPSYNC_LIST:         '/api/lipsync/list',
+  LIPSYNC_BULK:         '/api/lipsync/bulk',
   AUDIO:                '/api/audio',
   AUDIO_STATUS:         '/api/audio/status',
   AUDIO_LIST:           '/api/audio/list',
+  AUDIO_BULK:           '/api/audio/bulk',
   CINEMA:               '/api/cinema',
   CINEMA_STATUS:        '/api/cinema/status',
   CINEMA_LIST:          '/api/cinema/list',
+  CINEMA_BULK:          '/api/cinema/bulk',
   JOB_LOGS:             '/api/job-logs',   // /:lane/:jobId?since=<ms>&limit=80
 
   // Vision

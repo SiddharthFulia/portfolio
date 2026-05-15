@@ -345,6 +345,12 @@ export async function deleteLipsync(jobId) {
     return { data: data?.data || data, error: null };
   } catch (err) { return { data: null, error: err.message }; }
 }
+export async function lipsyncBulkAction(action, ids) {
+  try {
+    const data = await post(ENDPOINTS.LIPSYNC_BULK, { action, ids }, { timeout: 15000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
 
 // ─── Audio Studio ─────────────────────────────────────────────
 export async function submitAudio(payload = {}) {
@@ -373,6 +379,12 @@ export async function deleteAudio(jobId) {
     return { data: data?.data || data, error: null };
   } catch (err) { return { data: null, error: err.message }; }
 }
+export async function audioBulkAction(action, ids) {
+  try {
+    const data = await post(ENDPOINTS.AUDIO_BULK, { action, ids }, { timeout: 15000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
 
 // ─── Cinema ─────────────────────────────────────────────────
 export async function submitCinema(payload = {}) {
@@ -396,6 +408,12 @@ export async function listCinemaProjects({ status = 'completed', visibility = 'p
 export async function deleteCinema(projectId) {
   try {
     const data = await del(`${ENDPOINTS.CINEMA}/${projectId}`, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function cinemaBulkAction(action, ids) {
+  try {
+    const data = await post(ENDPOINTS.CINEMA_BULK, { action, ids }, { timeout: 15000 });
     return { data: data?.data || data, error: null };
   } catch (err) { return { data: null, error: err.message }; }
 }

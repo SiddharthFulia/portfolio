@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Input, Select, Slider, message as antMessage } from 'antd'
-import { VideoCameraOutlined, ThunderboltOutlined, ReloadOutlined, CopyOutlined, BulbOutlined } from '@ant-design/icons'
-import { submitCinema } from '../api/ai'
+import { VideoCameraOutlined, ThunderboltOutlined, ReloadOutlined, CopyOutlined, BulbOutlined, DeleteOutlined } from '@ant-design/icons'
+import { submitCinema, listCinemaProjects, cinemaBulkAction } from '../api/ai'
 import PromptHelper from '../components/PromptHelper'
+import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
 
 export default function Cinema() {
   const [masterPrompt, setMasterPrompt] = useState('')
@@ -17,6 +18,7 @@ export default function Cinema() {
   const [coachIdea, setCoachIdea] = useState('')
   const [coachResult, setCoachResult] = useState(null)
   const [coachError, setCoachError] = useState('')
+  const [libraryRefresh, setLibraryRefresh] = useState(0)
 
   useEffect(() => { document.title = 'Cinema · Sid' }, [])
 
@@ -31,6 +33,7 @@ export default function Cinema() {
     setWorking(false)
     if (err) { setError(err); return }
     setProject(data)
+    setLibraryRefresh(k => k + 1)
     antMessage.success(`Planned ${data.shotCount} shots — review and render below.`)
   }
 
@@ -173,7 +176,55 @@ export default function Cinema() {
             </p>
           </section>
         )}
+
+        <StudioLibrary
+          refreshKey={libraryRefresh}
+          title="Your Cinema projects"
+          listFn={({ status, page, limit }) => listCinemaProjects({ status, page, limit })}
+          bulkFn={cinemaBulkAction}
+          getId={(it) => it.projectId}
+          bulkAccent="amber"
+          statuses={['completed', 'rendering', 'planning', 'failed', 'all']}
+          renderCard={(it, { selectMode, checked, onToggleSelect, onDelete }) => (
+            <CinemaCard key={it.projectId} item={it}
+              selectMode={selectMode} checked={checked}
+              onToggleSelect={onToggleSelect} onDelete={onDelete} />
+          )}
+        />
       </div>
+    </div>
+  )
+}
+
+function CinemaCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
+  const handleClick = (e) => { if (selectMode) { e.preventDefault(); onToggleSelect?.() } }
+  return (
+    <div onClick={handleClick}
+      className={`group relative rounded-xl overflow-hidden border transition-all bg-gray-900/40 p-3 ${
+        checked
+          ? 'border-amber-400 shadow-lg shadow-amber-500/30 ring-2 ring-amber-400/40'
+          : 'border-gray-800 hover:border-amber-400/50'
+      }`}>
+      <div className="flex items-center gap-2 mb-2">
+        <VideoCameraOutlined className="text-amber-400" />
+        <span className="text-[10px] uppercase tracking-wider text-gray-500 font-mono">
+          {item.shotCount} shots · {item.aspectRatio}
+        </span>
+        <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded uppercase font-bold ${
+          item.status === 'completed' ? 'bg-emerald-500/20 text-emerald-300'
+          : item.status === 'failed' ? 'bg-rose-500/20 text-rose-300'
+          : 'bg-amber-500/20 text-amber-300'
+        }`}>{item.status}</span>
+      </div>
+      <p className="text-[11px] text-gray-300 line-clamp-3 leading-snug">{item.masterPrompt}</p>
+      {selectMode && <SelectCheckbox checked={checked} onToggle={onToggleSelect} />}
+      {!selectMode && onDelete && (
+        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete() }}
+          title="Delete"
+          className="absolute top-1.5 right-1.5 w-7 h-7 flex items-center justify-center rounded-full bg-black/70 hover:bg-rose-600 text-gray-200 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
+          <DeleteOutlined className="text-xs" />
+        </button>
+      )}
     </div>
   )
 }
