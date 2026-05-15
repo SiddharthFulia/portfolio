@@ -55,7 +55,7 @@ export default function StudioLibrary({
   const askDelete = (item) => {
     Modal.confirm({
       title: 'Delete this item?',
-      content: <p className="text-sm text-gray-300">Removes the row + Cloudinary asset. Can't be undone.</p>,
+      content: <p className="text-sm text-rose-300 font-medium">⚠ Removes the row + Cloudinary asset. Can't be undone.</p>,
       okText: 'Delete', okButtonProps: { danger: true }, cancelText: 'Keep', centered: true,
       onOk: async () => {
         const { error: err } = await bulkFn('delete', [getId(item)])
@@ -71,7 +71,7 @@ export default function StudioLibrary({
     if (!ids.length) { antMessage.warning('Select at least one item'); return }
     Modal.confirm({
       title: `Delete ${ids.length} item${ids.length === 1 ? '' : 's'}?`,
-      content: <p className="text-sm text-gray-300">Removes rows + Cloudinary assets. Can't be undone.</p>,
+      content: <p className="text-sm text-rose-300 font-medium">⚠ Removes rows + Cloudinary assets. Can't be undone.</p>,
       okText: 'Delete', okButtonProps: { danger: true }, cancelText: 'Cancel', centered: true,
       onOk: async () => {
         setBulkBusy(true)

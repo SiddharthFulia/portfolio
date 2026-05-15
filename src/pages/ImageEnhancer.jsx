@@ -1625,10 +1625,10 @@ function ImageLibrary({ refreshKey }) {
     Modal.confirm({
       title: 'Delete this image?',
       content: (
-        <div className="text-sm text-gray-300">
-          <p className="mb-2 italic line-clamp-2">"{img.prompt?.slice(0, 200)}"</p>
-          <p className="text-xs text-gray-500">
-            Removes the row + Cloudinary asset. Can't be undone.
+        <div className="text-sm text-gray-100">
+          <p className="mb-2 italic line-clamp-2 text-gray-200">"{img.prompt?.slice(0, 200)}"</p>
+          <p className="text-xs text-rose-300 font-medium">
+            ⚠ Removes the row + Cloudinary asset. Can't be undone.
           </p>
         </div>
       ),
@@ -1670,11 +1670,11 @@ function ImageLibrary({ refreshKey }) {
     Modal.confirm({
       title: `${verb} ${ids.length} image${ids.length === 1 ? '' : 's'}?`,
       content: action === 'delete' ? (
-        <p className="text-sm text-gray-300">Removes rows + Cloudinary assets. Can't be undone.</p>
+        <p className="text-sm text-rose-300 font-medium">⚠ Removes rows + Cloudinary assets. Can't be undone.</p>
       ) : action === 'move-to-vault' ? (
-        <p className="text-sm text-gray-300">Selected items vanish from the public showcase. Only visible in 🔒 Vault tab.</p>
+        <p className="text-sm text-gray-100">Selected items vanish from the public showcase. Only visible in 🔒 Vault tab.</p>
       ) : (
-        <p className="text-sm text-gray-300">Selected items become visible to anyone in the 🌐 Public tab.</p>
+        <p className="text-sm text-gray-100">Selected items become visible to anyone in the 🌐 Public tab.</p>
       ),
       okText: verb,
       okButtonProps: action === 'delete' ? { danger: true } : {},
