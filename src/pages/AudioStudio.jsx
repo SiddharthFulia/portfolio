@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { Input, Select, Slider, Tooltip, message as antMessage } from 'antd'
 import { CustomerServiceOutlined, ThunderboltOutlined, DownloadOutlined, ReloadOutlined, BulbOutlined, CheckOutlined, DeleteOutlined } from '@ant-design/icons'
 import { submitAudio, getAudioStatus, listAudioJobs, audioBulkAction } from '../api/ai'
@@ -248,6 +249,10 @@ export default function AudioStudio() {
 function AudioCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
   const handleClick = (e) => { if (selectMode) { e.preventDefault(); onToggleSelect?.() } }
   const kindIcon = item.kind === 'music' ? '🎵' : item.kind === 'sfx' ? '🔊' : item.kind === 'tts' ? '🗣' : '🎧'
+  // Clicking a still-rendering card navigates to /audio/<jobId> for the
+  // full live-log view; completed cards just play in-place (the embedded
+  // <audio> controls handle that without a redirect).
+  const isActive = item.status !== 'completed'
   return (
     <div className={`group relative rounded-xl overflow-hidden border transition-all bg-gray-900/40 p-3 ${
       checked
@@ -261,11 +266,17 @@ function AudioCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
       </div>
       {item.outputUrl ? (
         <audio src={item.outputUrl} controls className="w-full" onClick={e => e.stopPropagation()} />
+      ) : isActive ? (
+        <Link to={`/audio/${encodeURIComponent(item.jobId)}`}
+          onClick={(e) => e.stopPropagation()}
+          className="h-10 flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 to-gray-950 rounded hover:from-fuchsia-900/20 hover:to-gray-950 transition-colors">
+          <span className="text-xs text-fuchsia-300 font-semibold">
+            {item.status === 'processing' ? '⚡ Watch live logs' : '⏳ Open detail'}
+          </span>
+        </Link>
       ) : (
         <div className="h-10 flex items-center justify-center bg-gradient-to-br from-gray-900 to-gray-950 rounded">
-          <span className="text-2xl opacity-50">
-            {item.status === 'failed' ? '✗' : item.status === 'processing' ? '⚡' : '⏳'}
-          </span>
+          <span className="text-2xl opacity-50">✗</span>
         </div>
       )}
       <p className="text-[10px] text-gray-500 mt-2 line-clamp-2 leading-snug">{item.prompt}</p>

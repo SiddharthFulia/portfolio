@@ -27,7 +27,7 @@ const PROVIDERS = [
   {
     id: 'zsky',
     label: 'ZSky AI',
-    desc: 'Hosted • free with sign-in • ~60-90s',
+    desc: 'Hosted • ~60-90s',
     badge: 'Default',
     accent: 'from-sky-500 to-blue-400',
     border: 'border-sky-500/60',
@@ -694,8 +694,26 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
   const cancel = () => {
     if (pollTimer.current) clearInterval(pollTimer.current)
     pollTimer.current = null
-    try { localStorage.removeItem(INFLIGHT_JOB_KEY) } catch {}
-    setLoading(false); setJob(null)
+    // Keep jobId in localStorage so "Watch logs again" + page refresh both
+    // know where to re-attach. We just stop polling; the job is still
+    // running on the worker and will eventually complete.
+    setLoading(false)
+    // job state stays so the Watch-again button can read job.jobId
+  }
+
+  // Re-attach to the inflight job after a Stop-watching. Or hop over to the
+  // dedicated detail page for the full history view — `/ai-video/:videoId`
+  // renders status + complete log feed + back link.
+  const resumeWatching = () => {
+    const jobId = job?.jobId || job?.videoId
+    if (!jobId) return
+    setError(null); setLoading(true)
+    startPolling(jobId)
+  }
+  const openJobDetail = () => {
+    const jobId = job?.jobId || job?.videoId
+    if (!jobId) return
+    navigate(`/ai-video/${encodeURIComponent(jobId)}`)
   }
 
   const copyCaption = () => {
@@ -1080,9 +1098,42 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
                     : undefined
                 }
               />
-              <Button block onClick={cancel} icon={<ReloadOutlined />}>
-                Stop watching (job continues in background)
-              </Button>
+              <div className="grid grid-cols-2 gap-2">
+                <Button onClick={cancel} icon={<PauseOutlined />}>
+                  Stop watching
+                </Button>
+                <Button onClick={openJobDetail} icon={<ExpandAltOutlined />}>
+                  Open detail page
+                </Button>
+              </div>
+              <p className="text-[10px] text-gray-600 text-center">
+                Job continues in the background even after you stop watching.
+              </p>
+            </div>
+          )}
+
+          {/* After Stop-watching: re-attach polling OR open the dedicated
+              detail page. The detail page survives refreshes — useful when
+              the user wants to close this tab and check progress later. */}
+          {!loading && job && !video && !error && (
+            <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/5 p-4 space-y-2">
+              <p className="text-sm text-cyan-200 font-semibold">
+                Job <span className="font-mono">{job.jobId || job.videoId}</span> still running
+              </p>
+              <p className="text-xs text-gray-400 leading-relaxed">
+                You stopped watching but the worker is still rendering. Re-attach the
+                live log feed below, or open the standalone detail page that survives
+                a refresh.
+              </p>
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <Button onClick={resumeWatching} icon={<CaretRightOutlined />} type="primary"
+                  style={{ background: 'linear-gradient(135deg, #06b6d4, #7c3aed)', border: 'none' }}>
+                  Watch logs again
+                </Button>
+                <Button onClick={openJobDetail} icon={<ExpandAltOutlined />}>
+                  Open detail page
+                </Button>
+              </div>
             </div>
           )}
 
@@ -1149,6 +1200,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
 
 // ─── Library tab — paginated, no eager video loads ─────────
 const LibraryCard = ({ video, onClick, onDelete, selectMode, isSelected, onToggleSelect }) => {
+  const navigate = useNavigate()
   const provColor =
     video.provider === 'zsky'  ? 'from-sky-500 to-blue-400' :
     video.provider === 'local' ? 'from-amber-400 via-rose-400 to-fuchsia-500' :
@@ -1156,10 +1208,14 @@ const LibraryCard = ({ video, onClick, onDelete, selectMode, isSelected, onToggl
   const date = new Date(video.createdAt)
   const dateLabel = isNaN(date.getTime()) ? '' : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
   const thumb = thumbFromVideo(resolveVideoUrl(video.videoUrl))
+  const isActive = video.status && video.status !== 'completed'
 
   const handleClick = () => {
-    if (selectMode) onToggleSelect?.(video.videoId)
-    else onClick?.()
+    if (selectMode) { onToggleSelect?.(video.videoId); return }
+    // In-flight / failed → standalone detail page with live logs.
+    // Completed → existing in-page play modal.
+    if (isActive) { navigate(`/ai-video/${encodeURIComponent(video.videoId)}`); return }
+    onClick?.()
   }
 
   return (
@@ -1653,7 +1709,7 @@ const AIVideo = () => {
         <div className="relative max-w-6xl mx-auto px-5 sm:px-6 pt-28 sm:pt-32 pb-8">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gray-800/60 border border-gray-700 backdrop-blur-sm mb-3">
             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-            <span className="text-[11px] uppercase tracking-wider text-gray-300 font-semibold">3 providers • free</span>
+            <span className="text-[11px] uppercase tracking-wider text-gray-300 font-semibold">multi-provider · 5090 powered</span>
           </div>
           <h1 className="font-poppins font-black text-4xl sm:text-5xl md:text-6xl bg-gradient-to-r from-cyan-300 via-purple-300 to-amber-300 bg-clip-text text-transparent leading-tight mb-2">
             AI Video Studio

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { Modal, Upload, Tabs, Input, Select, Switch, Tooltip, message as antMessage } from 'antd'
 import {
   UploadOutlined, ExpandAltOutlined, DownloadOutlined,
@@ -1839,13 +1840,21 @@ function LibraryCard({ image, onDelete, selectMode = false, checked = false, onT
   const handleClick = (e) => {
     if (selectMode) { e.preventDefault(); onToggleSelect?.() }
   }
+  // In-flight / failed images go to the standalone detail page (live logs +
+  // shareable URL + survives refresh). Completed images open the full-size
+  // version in a new tab as before.
+  const isActive = image.status && image.status !== 'completed'
+  const Linker = isActive ? Link : 'a'
+  const linkerProps = isActive
+    ? { to: `/image-enhancer/${encodeURIComponent(image.imageId)}` }
+    : { href: url || '#', target: '_blank', rel: 'noopener' }
   return (
     <div className={`group relative aspect-square rounded-xl overflow-hidden border transition-all bg-gray-900/40 ${
       checked
         ? 'border-cyan-400 shadow-lg shadow-cyan-500/30 ring-2 ring-cyan-400/40'
         : 'border-gray-800 hover:border-cyan-400/50'
     }`}>
-      <a href={url || '#'} target="_blank" rel="noopener" onClick={handleClick}
+      <Linker {...linkerProps} onClick={handleClick}
         className={`block w-full h-full ${selectMode ? 'cursor-pointer' : ''}`}>
         {url ? (
           <img src={url} alt={image.prompt}
@@ -1859,7 +1868,7 @@ function LibraryCard({ image, onDelete, selectMode = false, checked = false, onT
             </span>
           </div>
         )}
-      </a>
+      </Linker>
 
       {/* Selection checkbox — overlay when select-mode is on */}
       {selectMode && (

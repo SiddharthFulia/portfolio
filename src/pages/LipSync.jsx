@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { Upload, Input, Select, message as antMessage } from 'antd'
 import { UploadOutlined, SoundOutlined, ThunderboltOutlined, ReloadOutlined, DownloadOutlined, CheckOutlined, DeleteOutlined } from '@ant-design/icons'
 import { submitLipsync, getLipsyncStatus, fileToDataUrl, listLipsyncJobs, lipsyncBulkAction } from '../api/ai'
@@ -243,13 +244,22 @@ function LipsyncCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
   const handleClick = (e) => {
     if (selectMode) { e.preventDefault(); onToggleSelect?.() }
   }
+  // Completed → open the mp4 in a new tab. In-flight / failed → land on the
+  // detail page so the user can watch logs / read the failure / share the
+  // URL while it's still rendering.
+  const isActive = item.status !== 'completed'
+  const href = isActive ? `/lipsync/${encodeURIComponent(item.jobId)}` : (url || '#')
+  const Linker = isActive ? Link : 'a'
+  const linkerProps = isActive
+    ? { to: href }
+    : { href, target: '_blank', rel: 'noopener' }
   return (
     <div className={`group relative aspect-video rounded-xl overflow-hidden border transition-all bg-gray-900/40 ${
       checked
         ? 'border-emerald-400 shadow-lg shadow-emerald-500/30 ring-2 ring-emerald-400/40'
         : 'border-gray-800 hover:border-emerald-400/50'
     }`}>
-      <a href={url || '#'} target="_blank" rel="noopener" onClick={handleClick}
+      <Linker {...linkerProps} onClick={handleClick}
         className={`block w-full h-full ${selectMode ? 'cursor-pointer' : ''}`}>
         {url ? (
           <video src={url} muted playsInline preload="metadata"
@@ -261,7 +271,7 @@ function LipsyncCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
             </span>
           </div>
         )}
-      </a>
+      </Linker>
       {selectMode && <SelectCheckbox checked={checked} onToggle={onToggleSelect} />}
       <div className="pointer-events-none absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-black/60 text-white border border-white/10">
         {item.model || 'lip'}

@@ -29,6 +29,11 @@ const ImageEnhancer = lazy(() => import("./pages/ImageEnhancer"));
 const LipSync = lazy(() => import("./pages/LipSync"));
 const AudioStudio = lazy(() => import("./pages/AudioStudio"));
 const Cinema = lazy(() => import("./pages/Cinema"));
+const AIVideoDetail = lazy(() => import("./pages/AIVideoDetail"));
+const ImageEnhancerDetail = lazy(() => import("./pages/ImageEnhancerDetail"));
+const LipsyncDetail = lazy(() => import("./pages/LipsyncDetail"));
+const AudioDetail = lazy(() => import("./pages/AudioDetail"));
+const CinemaDetail = lazy(() => import("./pages/CinemaDetail"));
 
 /* ── Skeleton building blocks ── */
 const B = "animate-pulse bg-slate-200 rounded";
@@ -175,14 +180,19 @@ const App = () => {
               are all open. Only the "Save to Vault" toggle on the create UI
               prompts for the password (handled inline in each page). */}
           <Route path='/ai-video'        element={<Suspense fallback={<AIVideoSkeleton />}><AIVideo /></Suspense>} />
+          <Route path='/ai-video/:id'    element={<Suspense fallback={<DarkPageSkeleton />}><AIVideoDetail /></Suspense>} />
           <Route path='/video'           element={<Suspense fallback={<AIVideoSkeleton />}><AIVideo /></Suspense>} />
           <Route path='/image-enhancer'  element={<Suspense fallback={<DarkPageSkeleton />}><ImageEnhancer /></Suspense>} />
+          <Route path='/image-enhancer/:id' element={<Suspense fallback={<DarkPageSkeleton />}><ImageEnhancerDetail /></Suspense>} />
           <Route path='/enhance'         element={<Suspense fallback={<DarkPageSkeleton />}><ImageEnhancer /></Suspense>} />
           {/* Tier 3 Studio lanes — Lip Sync / Audio / Cinema */}
           <Route path='/lipsync'         element={<Suspense fallback={<DarkPageSkeleton />}><LipSync /></Suspense>} />
+          <Route path='/lipsync/:id'     element={<Suspense fallback={<DarkPageSkeleton />}><LipsyncDetail /></Suspense>} />
           <Route path='/audio'           element={<Suspense fallback={<DarkPageSkeleton />}><AudioStudio /></Suspense>} />
+          <Route path='/audio/:id'       element={<Suspense fallback={<DarkPageSkeleton />}><AudioDetail /></Suspense>} />
           <Route path='/audio-studio'    element={<Suspense fallback={<DarkPageSkeleton />}><AudioStudio /></Suspense>} />
           <Route path='/cinema'          element={<Suspense fallback={<DarkPageSkeleton />}><Cinema /></Suspense>} />
+          <Route path='/cinema/:id'      element={<Suspense fallback={<DarkPageSkeleton />}><CinemaDetail /></Suspense>} />
         </Routes>
         <ConditionalFooter />
       </Router>

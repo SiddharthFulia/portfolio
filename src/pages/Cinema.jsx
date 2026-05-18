@@ -229,10 +229,17 @@ export default function Cinema() {
 }
 
 function CinemaCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
-  const handleClick = (e) => { if (selectMode) { e.preventDefault(); onToggleSelect?.() } }
+  const navigate = useNavigate()
+  const handleClick = (e) => {
+    if (selectMode) { e.preventDefault(); onToggleSelect?.(); return }
+    // Anywhere else on the card → open the project detail page so the user
+    // sees the master prompt + planned shots + render buttons in one shot.
+    if (e.target.closest('button')) return
+    navigate(`/cinema/${encodeURIComponent(item.projectId)}`)
+  }
   return (
     <div onClick={handleClick}
-      className={`group relative rounded-xl overflow-hidden border transition-all bg-gray-900/40 p-3 ${
+      className={`group relative rounded-xl overflow-hidden border transition-all bg-gray-900/40 p-3 cursor-pointer ${
         checked
           ? 'border-amber-400 shadow-lg shadow-amber-500/30 ring-2 ring-amber-400/40'
           : 'border-gray-800 hover:border-amber-400/50'

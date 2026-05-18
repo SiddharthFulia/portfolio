@@ -160,6 +160,16 @@ export default function StudioLibrary({
                 className="px-2 py-1 text-[10px] rounded-full bg-gray-900/60 text-gray-400 border border-gray-800 hover:text-gray-200">
                 Clear
               </button>
+              {/* Inline Delete — same row as Select. The sticky-bottom version
+                  forced the user to scroll past every card to reach it; this
+                  one is always visible right where they clicked Select. */}
+              {selCount > 0 && (
+                <button onClick={doBulkDelete} disabled={bulkBusy}
+                  title={`Delete ${selCount} selected`}
+                  className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/40 font-semibold disabled:opacity-50 transition-colors">
+                  <DeleteOutlined /> Delete {selCount}
+                </button>
+              )}
             </>
           )}
         </div>
