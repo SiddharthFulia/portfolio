@@ -17,6 +17,12 @@ export default function LipSync() {
   const [portraitFile, setPortraitFile] = useState(null)
   const [portraitDataUrl, setPortraitDataUrl] = useState('')
   const [model, setModel] = useState('latentsync')
+  // When switching to/from LivePortrait, clear the upload — audio and
+  // video file inputs are mutually incompatible. Otherwise the file from
+  // before the switch silently submits to the new model and breaks.
+  useEffect(() => {
+    setAudioFile(null); setAudioDataUrl('')
+  }, [model])
   const [working, setWorking] = useState(false)
   const [job, setJob] = useState(null)
   const [error, setError] = useState(null)
