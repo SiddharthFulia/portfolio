@@ -1716,7 +1716,7 @@ const AIVideo = () => {
             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
             <span className="text-[11px] uppercase tracking-wider text-gray-300 font-semibold">multi-provider · 5090 powered</span>
           </div>
-          <h1 className="font-poppins font-black text-4xl sm:text-5xl md:text-6xl bg-gradient-to-r from-cyan-300 via-purple-300 to-amber-300 bg-clip-text text-transparent leading-tight mb-2">
+          <h1 className="font-poppins font-black text-3xl sm:text-5xl md:text-6xl bg-gradient-to-r from-cyan-300 via-purple-300 to-amber-300 bg-clip-text text-transparent leading-tight pb-1 mb-2">
             AI Video Studio
           </h1>
           <p className="text-gray-400 text-sm sm:text-base max-w-xl">

@@ -212,7 +212,7 @@ const AIChat = () => {
       <div className="max-w-4xl w-full mx-auto flex flex-col flex-1 px-4 sm:px-6 pt-28 pb-6">
         {/* Header */}
         <div className="mb-4">
-          <h1 className="font-poppins font-black text-4xl md:text-5xl bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-500 bg-clip-text text-transparent">
+          <h1 className="font-poppins font-black text-3xl sm:text-4xl md:text-5xl leading-tight pb-1 bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-500 bg-clip-text text-transparent">
             AI Chat
           </h1>
           <div className="flex flex-wrap items-center gap-3 mt-2">

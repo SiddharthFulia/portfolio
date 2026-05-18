@@ -129,10 +129,12 @@ export default function AudioRecorder({
     )
   }
 
-  // idle
+  // idle — full-width inside its container so it sits cleanly under the
+  // dropzone divider on phones (was inline-width before, which floated and
+  // visually collided with the next section's heading on narrow screens).
   return (
     <button onClick={start}
-      className={`flex items-center justify-center gap-2 ${compact ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm'} font-semibold rounded-lg border border-gray-700 hover:border-gray-500 bg-gray-900/60 hover:bg-gray-900 text-gray-200 transition-colors`}
+      className={`w-full flex items-center justify-center gap-2 ${compact ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm'} font-semibold rounded-lg border border-gray-700 hover:border-gray-500 bg-gray-900/60 hover:bg-gray-900 text-gray-200 transition-colors`}
       style={{ boxShadow: `0 0 0 0 ${accentColor}` }}>
       <AudioOutlined style={{ color: accentColor }} />
       Record audio

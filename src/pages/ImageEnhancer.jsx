@@ -710,10 +710,17 @@ export default function ImageEnhancer() {
     <div className="min-h-screen bg-black text-gray-100 pt-20 pb-16 px-3 sm:px-6">
       <div className="max-w-5xl mx-auto">
         <header className="mb-8">
-          <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
-            <div className="flex items-center gap-2">
-              <ThunderboltOutlined className="text-amber-400 text-xl" />
-              <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-amber-300 bg-clip-text text-transparent">
+          <div className="flex items-start sm:items-center justify-between gap-3 mb-2 flex-wrap">
+            <div className="flex items-center gap-2 min-w-0">
+              <ThunderboltOutlined className="text-amber-400 text-xl shrink-0" />
+              {/* `leading-tight pb-1` — gradient text via bg-clip-text mask
+                  clips letter descenders/ascenders when line-height is too
+                  tight. pb-1 reserves a sliver so the gradient isn't visually
+                  chopped on phone or zoomed-out laptop screens.
+                  `text-xl sm:text-3xl lg:text-4xl` — three-step scale so the
+                  title doesn't crowd the Vault pill + Engine toggle on the
+                  same row at narrow viewports. */}
+              <h1 className="text-xl sm:text-3xl lg:text-4xl font-bold leading-tight pb-1 bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-amber-300 bg-clip-text text-transparent truncate">
                 Image Studio
               </h1>
               {/* Vault pill — full label + status dot. Clear professional

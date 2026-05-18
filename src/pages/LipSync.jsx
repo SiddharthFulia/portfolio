@@ -87,7 +87,7 @@ export default function LipSync() {
         <header className="mb-8">
           <div className="flex items-center gap-2 mb-2">
             <SoundOutlined className="text-emerald-400 text-xl" />
-            <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-emerald-300 via-cyan-400 to-fuchsia-300 bg-clip-text text-transparent">
+            <h1 className="text-2xl sm:text-4xl font-bold leading-tight pb-1 bg-gradient-to-r from-emerald-300 via-cyan-400 to-fuchsia-300 bg-clip-text text-transparent">
               Lip Sync Studio
             </h1>
           </div>
@@ -98,27 +98,31 @@ export default function LipSync() {
           </p>
         </header>
 
-        <section className="grid sm:grid-cols-2 gap-4 mb-6">
+        {/* mb-8 (was mb-6) — gives the recorder button below the dropzone
+            breathing room before the "Lip-sync model" picker. On phones the
+            grid collapses to a single column and the recorder used to sit
+            flush against the next heading. */}
+        <section className="grid sm:grid-cols-2 gap-4 mb-8">
           {/* Source audio — relabelled "driver video" when LivePortrait is picked */}
-          <div className="rounded-2xl border-2 border-dashed border-gray-800 hover:border-emerald-500/40 transition-colors p-4 bg-gray-900/40">
-            <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">
+          <div className="rounded-2xl border-2 border-dashed border-gray-800 hover:border-emerald-500/40 transition-colors p-4 bg-gray-900/40 flex flex-col gap-2">
+            <p className="text-[10px] uppercase tracking-wider text-gray-500">
               {model === 'liveportrait' ? 'Driver video' : 'Source audio'}
             </p>
             {audioDataUrl ? (
               <div className="space-y-2">
                 {model === 'liveportrait'
-                  ? <video controls src={audioDataUrl} className="w-full max-h-48 rounded-lg" />
+                  ? <video controls src={audioDataUrl} className="w-full max-h-[40vh] rounded-lg" />
                   : <audio controls src={audioDataUrl} className="w-full" />}
-                <p className="text-[10px] text-gray-600 font-mono truncate">{audioFile?.name}</p>
+                <p className="text-[10px] text-gray-600 font-mono truncate">{audioFile?.name || 'recorded audio'}</p>
                 <button onClick={() => { setAudioFile(null); setAudioDataUrl('') }}
                   className="text-[10px] text-rose-400 hover:text-rose-300">✕ Replace</button>
               </div>
             ) : (
-              <>
+              <div className="flex flex-col gap-3">
                 <Upload.Dragger multiple={false} showUploadList={false}
                   accept={model === 'liveportrait' ? 'video/*' : 'audio/*,video/*'}
                   beforeUpload={handleAudio}
-                  style={{ background: 'transparent', borderColor: 'transparent', padding: '20px 0' }}>
+                  style={{ background: 'transparent', borderColor: 'transparent', padding: '12px 0' }}>
                   <UploadOutlined className="text-3xl text-emerald-400 mb-2" />
                   <p className="text-sm text-gray-300">
                     {model === 'liveportrait'
@@ -130,19 +134,22 @@ export default function LipSync() {
                   </p>
                 </Upload.Dragger>
                 {/* Mic record — only for audio-driven models. LivePortrait
-                    wants a driver VIDEO, so no record option for it. */}
+                    wants a driver VIDEO, so no record option for it. The
+                    block is wrapped in its own div with extra bottom padding
+                    so the button doesn't visually crowd the next section's
+                    heading on narrow viewports. */}
                 {model !== 'liveportrait' && (
-                  <div className="px-2 pb-2">
-                    <div className="flex items-center gap-2 my-2">
+                  <div className="pt-1">
+                    <div className="flex items-center gap-2 mb-2">
                       <div className="flex-1 h-px bg-gray-800" />
-                      <span className="text-[10px] uppercase tracking-wider text-gray-600">or speak now</span>
+                      <span className="text-[10px] uppercase tracking-wider text-gray-600 whitespace-nowrap">or speak now</span>
                       <div className="flex-1 h-px bg-gray-800" />
                     </div>
                     <AudioRecorder accentColor="#34d399" maxSeconds={60} compact
                       onComplete={(d) => { setAudioDataUrl(d); setAudioFile(null); setError(null) }} />
                   </div>
                 )}
-              </>
+              </div>
             )}
           </div>
 

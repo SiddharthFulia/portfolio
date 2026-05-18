@@ -104,7 +104,7 @@ const FaceDetection = () => {
             <span className="w-2 h-2 rounded-full bg-pink-400 animate-pulse" />
             <span className="text-[11px] uppercase tracking-wider text-gray-300 font-semibold">5 vision tools • 1 page</span>
           </div>
-          <h1 className="font-poppins font-black text-4xl sm:text-5xl md:text-6xl bg-gradient-to-r from-cyan-300 via-purple-300 to-pink-300 bg-clip-text text-transparent leading-tight mb-2">
+          <h1 className="font-poppins font-black text-3xl sm:text-5xl md:text-6xl bg-gradient-to-r from-cyan-300 via-purple-300 to-pink-300 bg-clip-text text-transparent leading-tight pb-1 mb-2">
             Vision AI
           </h1>
           <p className="text-gray-400 text-sm sm:text-base max-w-xl">
