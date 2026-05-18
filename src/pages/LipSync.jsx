@@ -5,6 +5,7 @@ import { UploadOutlined, SoundOutlined, ThunderboltOutlined, ReloadOutlined, Dow
 import { submitLipsync, getLipsyncStatus, fileToDataUrl, listLipsyncJobs, lipsyncBulkAction } from '../api/ai'
 import { useTilt, TILT_STYLE } from '../components/useTilt'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
+import AudioRecorder from '../components/AudioRecorder'
 
 const MODELS = [
   { value: 'latentsync',   label: 'LatentSync 1.5',  blurb: 'Best mouth detail. ByteDance. ~1-3min for a 10s clip on 5090.' },
@@ -113,20 +114,35 @@ export default function LipSync() {
                   className="text-[10px] text-rose-400 hover:text-rose-300">✕ Replace</button>
               </div>
             ) : (
-              <Upload.Dragger multiple={false} showUploadList={false}
-                accept={model === 'liveportrait' ? 'video/*' : 'audio/*,video/*'}
-                beforeUpload={handleAudio}
-                style={{ background: 'transparent', borderColor: 'transparent', padding: '20px 0' }}>
-                <UploadOutlined className="text-3xl text-emerald-400 mb-2" />
-                <p className="text-sm text-gray-300">
-                  {model === 'liveportrait'
-                    ? 'Drop driver video — the portrait will mimic its expressions'
-                    : 'Drop audio or click to upload'}
-                </p>
-                <p className="text-[10px] text-gray-500 mt-1">
-                  {model === 'liveportrait' ? 'mp4 / webm · short clip recommended' : 'mp3 / wav / m4a · max 60s'}
-                </p>
-              </Upload.Dragger>
+              <>
+                <Upload.Dragger multiple={false} showUploadList={false}
+                  accept={model === 'liveportrait' ? 'video/*' : 'audio/*,video/*'}
+                  beforeUpload={handleAudio}
+                  style={{ background: 'transparent', borderColor: 'transparent', padding: '20px 0' }}>
+                  <UploadOutlined className="text-3xl text-emerald-400 mb-2" />
+                  <p className="text-sm text-gray-300">
+                    {model === 'liveportrait'
+                      ? 'Drop driver video — the portrait will mimic its expressions'
+                      : 'Drop audio or click to upload'}
+                  </p>
+                  <p className="text-[10px] text-gray-500 mt-1">
+                    {model === 'liveportrait' ? 'mp4 / webm · short clip recommended' : 'mp3 / wav / m4a · max 60s'}
+                  </p>
+                </Upload.Dragger>
+                {/* Mic record — only for audio-driven models. LivePortrait
+                    wants a driver VIDEO, so no record option for it. */}
+                {model !== 'liveportrait' && (
+                  <div className="px-2 pb-2">
+                    <div className="flex items-center gap-2 my-2">
+                      <div className="flex-1 h-px bg-gray-800" />
+                      <span className="text-[10px] uppercase tracking-wider text-gray-600">or speak now</span>
+                      <div className="flex-1 h-px bg-gray-800" />
+                    </div>
+                    <AudioRecorder accentColor="#34d399" maxSeconds={60} compact
+                      onComplete={(d) => { setAudioDataUrl(d); setAudioFile(null); setError(null) }} />
+                  </div>
+                )}
+              </>
             )}
           </div>
 

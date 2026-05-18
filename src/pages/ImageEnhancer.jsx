@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Modal, Upload, Tabs, Input, Select, Switch, Tooltip, message as antMessage } from 'antd'
+import CameraCapture, { transformImage } from '../components/CameraCapture'
 import {
   UploadOutlined, ExpandAltOutlined, DownloadOutlined,
   CheckOutlined, ReloadOutlined, ThunderboltOutlined,
@@ -783,6 +784,7 @@ export default function ImageEnhancer() {
               children: (
                 <GenerateSection
                   sourceDataUrl={sourceDataUrl} reset={reset} handleFile={handleFile}
+                  setSourceDataUrl={setSourceDataUrl}
                   resultUrl={resultUrl} status={status} working={working} engine={engine}
                   job={job} activePreset={activePreset} downloadResult={downloadResult}
                   error={error}
@@ -804,6 +806,7 @@ export default function ImageEnhancer() {
               children: (
                 <GenerateSection
                   sourceDataUrl={sourceDataUrl} reset={reset} handleFile={handleFile}
+                  setSourceDataUrl={setSourceDataUrl}
                   resultUrl={resultUrl} status={status} working={working}
                   engine="atelier"   // Force Atelier — Cloud T2I isn't wired into this lane
                   job={job} activePreset={activePreset} downloadResult={downloadResult}
@@ -1152,7 +1155,7 @@ function PresetCard({ preset: p, active, onSelect, onExpand }) {
 }
 
 function GenerateSection({
-  sourceDataUrl, reset, handleFile, resultUrl, status, working, engine, job,
+  sourceDataUrl, reset, handleFile, setSourceDataUrl, resultUrl, status, working, engine, job,
   activePreset, downloadResult, error, selectedPreset, setSelectedPreset,
   setExpandedPreset, enhance,
   atelierWorkflow, setAtelierWorkflow, tunings, setTunings,
@@ -1164,6 +1167,27 @@ function GenerateSection({
   // filters the workflow grid to only T2I, and skips the Cloud presets.
   t2iMode = false,
 }) {
+  // Canvas transforms applied to the current sourceDataUrl in-place. Used
+  // by the rotate L/R + mirror buttons that appear when a source image is
+  // loaded. Wraps transformImage() (canvas-based, see CameraCapture.jsx).
+  const applyTransform = async (op) => {
+    if (!sourceDataUrl || !setSourceDataUrl) return
+    try {
+      const next = await transformImage(sourceDataUrl, op)
+      setSourceDataUrl(next)
+    } catch (e) {
+      antMessage.error(`Transform failed: ${e.message}`)
+    }
+  }
+  // Camera snap → drop straight into the same sourceDataUrl slot as upload.
+  // We also clear `sourceFile` (parent state) via reset+set so the BE side
+  // sees a fresh image with no stale filename. Caveat: setSourceDataUrl
+  // alone doesn't clear sourceFile, but it's only used for display in the
+  // current code paths so this is fine.
+  const handleCamera = (dataUrl) => {
+    if (!setSourceDataUrl) return
+    setSourceDataUrl(dataUrl)
+  }
   const isAtelier = t2iMode || engine === 'atelier' || engine === 'local'
   // In T2I mode, only show t2i workflows so the user can't pick i2i by mistake.
   const visibleWorkflows = t2iMode
@@ -1185,24 +1209,64 @@ function GenerateSection({
           <div className="rounded-2xl border-2 border-dashed border-gray-800 hover:border-cyan-500/40 transition-colors p-4 bg-gray-900/40">
             <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Source image</p>
             {sourceDataUrl ? (
-              <div className="relative">
-                <img src={sourceDataUrl} alt="source" className="w-full max-h-72 object-contain rounded-lg" />
-                <button onClick={reset}
-                  className="absolute top-2 right-2 px-2 py-1 text-[10px] rounded-full bg-black/70 hover:bg-rose-600 text-white border border-white/10">
-                  ✕ Replace
-                </button>
+              <div className="space-y-2">
+                <div className="relative">
+                  <img src={sourceDataUrl} alt="source" className="w-full max-h-72 object-contain rounded-lg" />
+                  <button onClick={reset}
+                    className="absolute top-2 right-2 px-2 py-1 text-[10px] rounded-full bg-black/70 hover:bg-rose-600 text-white border border-white/10">
+                    ✕ Replace
+                  </button>
+                </div>
+                {/* Quick canvas transforms: rotate −90° / +90° and horizontal
+                    flip. Each runs on the data URL via transformImage() and
+                    swaps it back into state so the BE receives the rotated
+                    bytes. Visible only when an image is loaded. */}
+                {setSourceDataUrl && (
+                  <div className="flex items-center justify-center gap-1.5 flex-wrap pt-1">
+                    <button onClick={() => applyTransform('rotate-left')}
+                      title="Rotate 90° counter-clockwise"
+                      className="flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-gray-700 hover:border-cyan-500 bg-gray-900/60 hover:bg-cyan-500/10 text-gray-300 hover:text-cyan-200 transition-colors">
+                      ↺ Rotate L
+                    </button>
+                    <button onClick={() => applyTransform('rotate-right')}
+                      title="Rotate 90° clockwise"
+                      className="flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-gray-700 hover:border-cyan-500 bg-gray-900/60 hover:bg-cyan-500/10 text-gray-300 hover:text-cyan-200 transition-colors">
+                      ↻ Rotate R
+                    </button>
+                    <button onClick={() => applyTransform('mirror')}
+                      title="Flip horizontally"
+                      className="flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-gray-700 hover:border-cyan-500 bg-gray-900/60 hover:bg-cyan-500/10 text-gray-300 hover:text-cyan-200 transition-colors">
+                      ⇄ Mirror
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
-              <Upload.Dragger
-                multiple={false}
-                showUploadList={false}
-                accept="image/*"
-                beforeUpload={handleFile}
-                style={{ background: 'transparent', borderColor: 'transparent', padding: '20px 0' }}>
-                <UploadOutlined className="text-3xl text-cyan-400 mb-2" />
-                <p className="text-sm text-gray-300">Drop image or click to upload</p>
-                <p className="text-[10px] text-gray-500 mt-1">JPG / PNG / WEBP · max 8 MB</p>
-              </Upload.Dragger>
+              <div className="space-y-2">
+                <Upload.Dragger
+                  multiple={false}
+                  showUploadList={false}
+                  accept="image/*"
+                  beforeUpload={handleFile}
+                  style={{ background: 'transparent', borderColor: 'transparent', padding: '20px 0' }}>
+                  <UploadOutlined className="text-3xl text-cyan-400 mb-2" />
+                  <p className="text-sm text-gray-300">Drop image or click to upload</p>
+                  <p className="text-[10px] text-gray-500 mt-1">JPG / PNG / WEBP · max 8 MB</p>
+                </Upload.Dragger>
+                {/* Camera capture as an alternative to upload — handy on
+                    phones / laptops where the user wants to shoot a quick
+                    pic instead of digging through files. */}
+                {setSourceDataUrl && (
+                  <>
+                    <div className="flex items-center gap-2 my-1">
+                      <div className="flex-1 h-px bg-gray-800" />
+                      <span className="text-[10px] uppercase tracking-wider text-gray-600">or</span>
+                      <div className="flex-1 h-px bg-gray-800" />
+                    </div>
+                    <CameraCapture accentColor="#22d3ee" onSnap={handleCamera} />
+                  </>
+                )}
+              </div>
             )}
           </div>
           )}

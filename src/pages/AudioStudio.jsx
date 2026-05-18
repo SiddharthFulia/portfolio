@@ -6,6 +6,7 @@ import { submitAudio, getAudioStatus, listAudioJobs, audioBulkAction, transcribe
 import PromptHelper from '../components/PromptHelper'
 import { useTilt, TILT_STYLE } from '../components/useTilt'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
+import AudioRecorder from '../components/AudioRecorder'
 
 const KINDS = [
   { value: 'music', label: '🎵 Music',           blurb: 'Background tracks, soundtracks, loops. Best for video soundtracks.', defaultModel: 'musicgen' },
@@ -241,25 +242,37 @@ export default function AudioStudio() {
             // listens to the audio and returns text.
             <>
               <div>
-                <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">Audio file</label>
+                <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">Audio</label>
                 {sttDataUrl ? (
                   <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-3 space-y-2">
                     <audio src={sttDataUrl} controls className="w-full" />
                     <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500 font-mono">
-                      <span className="truncate">{sttFile?.name || 'audio'}</span>
+                      <span className="truncate">{sttFile?.name || 'recorded audio'}</span>
                       <button onClick={() => { setSttFile(null); setSttDataUrl(''); setSttResult(null) }}
                         className="text-rose-400 hover:text-rose-300">✕ Replace</button>
                     </div>
                   </div>
                 ) : (
-                  <Upload.Dragger multiple={false} showUploadList={false}
-                    accept="audio/*,video/*"
-                    beforeUpload={handleSttUpload}
-                    style={{ background: 'transparent', borderColor: '#374151', padding: '24px 0' }}>
-                    <UploadOutlined className="text-3xl text-fuchsia-400 mb-2" />
-                    <p className="text-sm text-gray-300">Drop audio or click to upload</p>
-                    <p className="text-[10px] text-gray-500 mt-1">mp3 · wav · m4a · ogg · video (audio track) · max 25 MB</p>
-                  </Upload.Dragger>
+                  <div className="space-y-2">
+                    <Upload.Dragger multiple={false} showUploadList={false}
+                      accept="audio/*,video/*"
+                      beforeUpload={handleSttUpload}
+                      style={{ background: 'transparent', borderColor: '#374151', padding: '24px 0' }}>
+                      <UploadOutlined className="text-3xl text-fuchsia-400 mb-2" />
+                      <p className="text-sm text-gray-300">Drop audio or click to upload</p>
+                      <p className="text-[10px] text-gray-500 mt-1">mp3 · wav · m4a · ogg · video (audio track) · max 25 MB</p>
+                    </Upload.Dragger>
+                    {/* Speak directly into the mic as an alternative to upload.
+                        Whisper happily transcribes the webm/opus the recorder
+                        produces — no transcode step needed. */}
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-px bg-gray-800" />
+                      <span className="text-[10px] uppercase tracking-wider text-gray-600">or</span>
+                      <div className="flex-1 h-px bg-gray-800" />
+                    </div>
+                    <AudioRecorder accentColor="#e879f9" maxSeconds={120}
+                      onComplete={(d) => { setSttDataUrl(d); setSttFile(null); setSttResult(null); setError(null) }} />
+                  </div>
                 )}
               </div>
               <div>

@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { Input, Button, Select, Slider, Collapse, Tag, Tooltip } from 'antd'
-import { SendOutlined, RobotOutlined, UserOutlined, CopyOutlined, CheckOutlined, SettingOutlined } from '@ant-design/icons'
+import { Input, Button, Select, Slider, Collapse, Tag, Tooltip, message as antMessage } from 'antd'
+import { SendOutlined, RobotOutlined, UserOutlined, CopyOutlined, CheckOutlined, SettingOutlined, AudioOutlined, StopOutlined, LoadingOutlined } from '@ant-design/icons'
 import ReactMarkdown from 'react-markdown'
-import { checkHealth, sendChat, sendGroq, sendGemini } from '../api/ai'
+import { checkHealth, sendChat, sendGroq, sendGemini, transcribeAudio } from '../api/ai'
 
 const LOCAL_MODELS = [
   { id: 'phi3:mini', label: 'Phi-3 Mini', desc: 'Local, general purpose' },
@@ -90,6 +90,77 @@ const AIChat = () => {
   const [lastTokens, setLastTokens] = useState(null)
   const scrollRef = useRef(null)
   const inputRef = useRef(null)
+
+  // Mic → STT state. ChatGPT-style flow: tap mic, speak, tap again to stop;
+  // we transcribe via /api/stt (Whisper) and drop the text into the input
+  // textarea so the user can review + edit before hitting Send.
+  const [recState, setRecState] = useState('idle')  // idle | recording | transcribing
+  const [recElapsed, setRecElapsed] = useState(0)
+  const recorderRef = useRef(null)
+  const chunksRef = useRef([])
+  const recStreamRef = useRef(null)
+  const recTickRef = useRef(null)
+  const recStartedRef = useRef(0)
+
+  useEffect(() => () => {
+    if (recTickRef.current) clearInterval(recTickRef.current)
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+      try { recorderRef.current.stop() } catch {}
+    }
+    recStreamRef.current?.getTracks().forEach(t => t.stop())
+  }, [])
+
+  const stopRecording = () => {
+    if (recTickRef.current) { clearInterval(recTickRef.current); recTickRef.current = null }
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+      try { recorderRef.current.stop() } catch {}
+    }
+  }
+
+  const handleMic = async () => {
+    if (recState === 'recording') { stopRecording(); return }
+    if (recState !== 'idle') return
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      recStreamRef.current = stream
+      const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus' : ''
+      const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined)
+      chunksRef.current = []
+      mr.ondataavailable = e => { if (e.data?.size) chunksRef.current.push(e.data) }
+      mr.onstop = async () => {
+        const blob = new Blob(chunksRef.current, { type: mr.mimeType || 'audio/webm' })
+        recStreamRef.current?.getTracks().forEach(t => t.stop())
+        recStreamRef.current = null
+        setRecState('transcribing')
+        // Blob → data URL → /api/stt
+        const reader = new FileReader()
+        reader.onloadend = async () => {
+          const { data, error: err } = await transcribeAudio({ dataUrl: reader.result })
+          setRecState('idle')
+          if (err) { antMessage.error(`Transcribe failed: ${err}`); return }
+          const text = (data?.text || '').trim()
+          if (!text) { antMessage.warning('Empty transcript — try again, speak closer to the mic'); return }
+          // Append to whatever is already in the input so users can chain
+          // dictate-then-edit cycles.
+          setInput(prev => prev.trim() ? `${prev.trim()} ${text}` : text)
+          inputRef.current?.focus()
+        }
+        reader.readAsDataURL(blob)
+      }
+      recorderRef.current = mr
+      mr.start(100)
+      recStartedRef.current = Date.now()
+      setRecElapsed(0); setRecState('recording')
+      recTickRef.current = setInterval(() => {
+        const e = Math.floor((Date.now() - recStartedRef.current) / 1000)
+        setRecElapsed(e)
+        if (e >= 60) stopRecording()   // safety cap
+      }, 250)
+    } catch (e) {
+      antMessage.error(`Could not access mic: ${e.message}`)
+    }
+  }
 
   useEffect(() => {
     const check = () => checkHealth().then(r => setStatus(r.online ? 'online' : 'offline'))
@@ -284,19 +355,44 @@ const AIChat = () => {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKey}
-            placeholder={status === 'offline' ? 'Server is offline...' : 'Type a message... (Shift+Enter for newline)'}
-            disabled={status === 'offline'}
+            placeholder={
+              recState === 'recording'    ? `🎙 Recording… ${recElapsed}s · tap mic again to stop`
+              : recState === 'transcribing' ? 'Transcribing…'
+              : status === 'offline'         ? 'Server is offline...'
+              : 'Type or tap the mic… (Shift+Enter for newline)'
+            }
+            disabled={status === 'offline' || recState !== 'idle'}
             autoSize={{ minRows: 1, maxRows: 4 }}
             className="flex-1"
             size="large"
           />
+          {/* Mic — ChatGPT-style dictation. Tap → speak → tap → transcript
+              lands in the input box. User can then edit and Send. */}
+          <Tooltip title={
+            recState === 'recording'    ? 'Stop recording'
+            : recState === 'transcribing' ? 'Transcribing your speech…'
+            : 'Speak instead of typing'
+          }>
+            <Button
+              size="large"
+              danger={recState === 'recording'}
+              icon={
+                recState === 'recording'    ? <StopOutlined />
+                : recState === 'transcribing' ? <LoadingOutlined spin />
+                : <AudioOutlined />
+              }
+              onClick={handleMic}
+              disabled={status === 'offline' || recState === 'transcribing'}
+              style={{ height: 'auto', minHeight: 40 }}
+            />
+          </Tooltip>
           <Tooltip title="Send (Enter)">
             <Button
               type="primary"
               size="large"
               icon={<SendOutlined />}
               onClick={handleSend}
-              disabled={!input.trim() || sending || status === 'offline'}
+              disabled={!input.trim() || sending || status === 'offline' || recState !== 'idle'}
               style={{ height: 'auto', minHeight: 40 }}
             />
           </Tooltip>
