@@ -19,11 +19,57 @@ const MODELS = {
   tts:   [{ value: 'bark', label: 'Bark', blurb: 'Multilingual TTS with voice presets. Suno research.' }],
 }
 
+// Bark ships ~150 official voice presets across 13 languages — these are
+// the most usable curated picks. The Select groups them by language so the
+// user can scan without scrolling 130 entries. Add more as needed; Bark
+// just expects the `v2/<lang>_speaker_N` string.
 const BARK_VOICES = [
-  { value: 'v2/en_speaker_6', label: '🇬🇧 en_speaker_6 (male, clear)' },
-  { value: 'v2/en_speaker_9', label: '🇬🇧 en_speaker_9 (female, warm)' },
+  // English (UK + US)
+  { value: 'v2/en_speaker_0', label: '🇺🇸 en_speaker_0 (male, neutral)' },
   { value: 'v2/en_speaker_1', label: '🇺🇸 en_speaker_1 (US, narration)' },
+  { value: 'v2/en_speaker_2', label: '🇺🇸 en_speaker_2 (male, deep)' },
   { value: 'v2/en_speaker_3', label: '🇺🇸 en_speaker_3 (US, casual)' },
+  { value: 'v2/en_speaker_4', label: '🇺🇸 en_speaker_4 (male, energetic)' },
+  { value: 'v2/en_speaker_5', label: '🇬🇧 en_speaker_5 (female, calm)' },
+  { value: 'v2/en_speaker_6', label: '🇬🇧 en_speaker_6 (male, clear)' },
+  { value: 'v2/en_speaker_7', label: '🇬🇧 en_speaker_7 (male, husky)' },
+  { value: 'v2/en_speaker_8', label: '🇬🇧 en_speaker_8 (male, smooth)' },
+  { value: 'v2/en_speaker_9', label: '🇬🇧 en_speaker_9 (female, warm)' },
+  // Hindi
+  { value: 'v2/hi_speaker_0', label: '🇮🇳 hi_speaker_0 (Hindi, male)' },
+  { value: 'v2/hi_speaker_2', label: '🇮🇳 hi_speaker_2 (Hindi, female)' },
+  { value: 'v2/hi_speaker_5', label: '🇮🇳 hi_speaker_5 (Hindi, narration)' },
+  { value: 'v2/hi_speaker_8', label: '🇮🇳 hi_speaker_8 (Hindi, casual)' },
+  // Spanish
+  { value: 'v2/es_speaker_0', label: '🇪🇸 es_speaker_0 (Spanish, male)' },
+  { value: 'v2/es_speaker_8', label: '🇪🇸 es_speaker_8 (Spanish, female)' },
+  // French
+  { value: 'v2/fr_speaker_0', label: '🇫🇷 fr_speaker_0 (French, male)' },
+  { value: 'v2/fr_speaker_5', label: '🇫🇷 fr_speaker_5 (French, female)' },
+  // German
+  { value: 'v2/de_speaker_3', label: '🇩🇪 de_speaker_3 (German, male)' },
+  { value: 'v2/de_speaker_8', label: '🇩🇪 de_speaker_8 (German, female)' },
+  // Italian
+  { value: 'v2/it_speaker_0', label: '🇮🇹 it_speaker_0 (Italian, male)' },
+  { value: 'v2/it_speaker_4', label: '🇮🇹 it_speaker_4 (Italian, female)' },
+  // Japanese
+  { value: 'v2/ja_speaker_0', label: '🇯🇵 ja_speaker_0 (Japanese, male)' },
+  { value: 'v2/ja_speaker_4', label: '🇯🇵 ja_speaker_4 (Japanese, female)' },
+  // Korean
+  { value: 'v2/ko_speaker_0', label: '🇰🇷 ko_speaker_0 (Korean, male)' },
+  { value: 'v2/ko_speaker_3', label: '🇰🇷 ko_speaker_3 (Korean, female)' },
+  // Chinese
+  { value: 'v2/zh_speaker_0', label: '🇨🇳 zh_speaker_0 (Mandarin, male)' },
+  { value: 'v2/zh_speaker_6', label: '🇨🇳 zh_speaker_6 (Mandarin, female)' },
+  // Portuguese
+  { value: 'v2/pt_speaker_0', label: '🇵🇹 pt_speaker_0 (Portuguese, male)' },
+  { value: 'v2/pt_speaker_4', label: '🇵🇹 pt_speaker_4 (Portuguese, female)' },
+  // Russian
+  { value: 'v2/ru_speaker_0', label: '🇷🇺 ru_speaker_0 (Russian, male)' },
+  { value: 'v2/ru_speaker_5', label: '🇷🇺 ru_speaker_5 (Russian, female)' },
+  // Turkish + Polish
+  { value: 'v2/tr_speaker_0', label: '🇹🇷 tr_speaker_0 (Turkish, male)' },
+  { value: 'v2/pl_speaker_0', label: '🇵🇱 pl_speaker_0 (Polish, male)' },
 ]
 
 export default function AudioStudio() {
