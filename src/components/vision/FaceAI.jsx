@@ -79,6 +79,7 @@ const FaceAI = () => {
   const [isPaused, setIsPaused] = useState(false)
   const [showLandmarks, setShowLandmarks] = useState(true)
   const [showBox, setShowBox] = useState(true)
+  const [showAge, setShowAge] = useState(true)
   const [faceData, setFaceData] = useState(null)
   const [noFace, setNoFace] = useState(false)
   const [moodHistory, setMoodHistory] = useState([])
@@ -142,7 +143,8 @@ const FaceAI = () => {
           if (mood) setMoodHistory(prev => [...prev, { mood, confidence: d.faces[0].moodConfidence || 0 }].slice(-10))
         } else { setFaceData(d); setNoFace(true) }
       }).catch(() => setNoFace(true)).finally(() => { pendingRef.current = false })
-    }, 200)
+    }, 100)   // 100 ms → up to 10 fps. pendingRef guard skips ticks while a
+              // request is in flight, so effective fps is min(10, 1000/processMs).
     return () => clearInterval(intervalRef.current)
   }, [isPaused, serviceOnline])
 
@@ -263,6 +265,7 @@ const FaceAI = () => {
           <ToggleBtn active={!isPaused} onClick={() => setIsPaused(p => !p)} label={isPaused ? 'Resume' : 'Pause'} />
           <ToggleBtn active={showLandmarks} onClick={() => setShowLandmarks(l => !l)} label="Landmarks" />
           <ToggleBtn active={showBox} onClick={() => setShowBox(b => !b)} label="Box" />
+          <ToggleBtn active={showAge} onClick={() => setShowAge(a => !a)} label="Age" />
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#888', padding: '6px 10px', background: '#0d0d2b', borderRadius: 8, border: '1px solid #ffffff10' }}>
             <span style={{ color: '#b388ff', fontWeight: 600 }}>{fps}</span> FPS
           </div>
@@ -298,6 +301,27 @@ const FaceAI = () => {
           </div>
           <div style={{ fontSize: 10, color: '#555', marginTop: 4 }}>Last {moodHistory.length} readings</div>
         </GlassCard>
+
+        {showAge && (
+          <GlassCard title="Age (heuristic)">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: 32 }}>🎂</span>
+              <div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: '#b388ff', lineHeight: 1 }}>
+                  {face?.age?.band || '—'}
+                </div>
+                <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
+                  {face?.age?.estimate ? `~${face.age.estimate} yrs · ${face.age.method || 'heuristic'}` : 'Waiting...'}
+                </div>
+              </div>
+            </div>
+            <div style={{ fontSize: 10, color: '#555', marginTop: 8, lineHeight: 1.5 }}>
+              Estimated from face proportions (landmark geometry). ML-based age
+              detection (DeepFace) is planned — band-only output for now to keep
+              the UI honest about precision.
+            </div>
+          </GlassCard>
+        )}
 
         <GlassCard title="Face Angle">
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>

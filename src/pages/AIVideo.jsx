@@ -759,8 +759,11 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
                     <div aria-hidden className={`absolute inset-0 pointer-events-none opacity-30 bg-gradient-to-br ${p.accent} mix-blend-overlay`} />
                   )}
                   {active && (
-                    <div className={`absolute -top-2 -right-2 w-6 h-6 rounded-full bg-gradient-to-br ${p.accent} flex items-center justify-center text-black shadow-md z-10`}>
-                      <CheckOutlined className="text-[10px] font-bold" />
+                    /* Was -top-2 -right-2 — the card has overflow-hidden so
+                       the badge was being clipped at the corner. Position
+                       inside the card instead. */
+                    <div className={`absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-gradient-to-br ${p.accent} flex items-center justify-center text-black shadow-md z-10`}>
+                      <CheckOutlined className="text-[9px] font-bold" />
                     </div>
                   )}
                   <div className="relative flex items-start justify-between gap-1 mb-1">
@@ -869,12 +872,14 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
             </div>
           ) : (
             <>
-              <div className="flex items-center justify-between gap-2 mb-2">
+              {/* flex-wrap so the Help button drops below the label on narrow
+                  screens instead of overflowing the row. */}
+              <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
                 <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-wider">2 — Describe your video</p>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <button type="button" onClick={() => setHelperOpen(true)}
                     title="AI prompt helper + sample prompts"
-                    className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-amber-500/40 hover:border-amber-400 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-colors">
+                    className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-amber-500/40 hover:border-amber-400 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-colors whitespace-nowrap">
                     <BulbOutlined className="text-[10px]" /> Help me write
                   </button>
                   {prompt && (

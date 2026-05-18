@@ -79,18 +79,20 @@ export default function Cinema() {
         {/* Master prompt */}
         <section className="mb-6 space-y-4">
           <div>
-            <div className="flex items-center justify-between gap-2 mb-1">
+            {/* flex-wrap so on narrow screens the action buttons drop to a
+                new line below the label instead of overflowing. */}
+            <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
               <label className="text-[10px] uppercase tracking-wider text-gray-500">Master prompt</label>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <button type="button" onClick={() => setHelperOpen(true)}
                   title="AI helper + sample stories"
-                  className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-amber-500/40 hover:border-amber-400 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-colors">
+                  className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-amber-500/40 hover:border-amber-400 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-colors whitespace-nowrap">
                   <BulbOutlined className="text-[10px]" /> Help me write
                 </button>
                 {masterPrompt.trim() && (
                   <button type="button" onClick={() => sendToAIVideo(masterPrompt)}
                     title="Skip planning — render this prompt directly in AI Video (5090 Optimized · Balanced · with music)"
-                    className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-cyan-500/40 hover:border-cyan-400 bg-gradient-to-r from-cyan-500/15 to-fuchsia-500/15 hover:from-cyan-500/25 hover:to-fuchsia-500/25 text-cyan-200 transition-colors">
+                    className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-cyan-500/40 hover:border-cyan-400 bg-gradient-to-r from-cyan-500/15 to-fuchsia-500/15 hover:from-cyan-500/25 hover:to-fuchsia-500/25 text-cyan-200 transition-colors whitespace-nowrap">
                     <SendOutlined className="text-[10px]" /> Render in AI Video
                   </button>
                 )}

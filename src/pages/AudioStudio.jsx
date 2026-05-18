@@ -1,23 +1,45 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { Input, Select, Slider, Tooltip, message as antMessage } from 'antd'
-import { CustomerServiceOutlined, ThunderboltOutlined, DownloadOutlined, ReloadOutlined, BulbOutlined, CheckOutlined, DeleteOutlined } from '@ant-design/icons'
-import { submitAudio, getAudioStatus, listAudioJobs, audioBulkAction } from '../api/ai'
+import { Input, Select, Slider, Tooltip, Upload, message as antMessage } from 'antd'
+import { CustomerServiceOutlined, ThunderboltOutlined, DownloadOutlined, ReloadOutlined, BulbOutlined, CheckOutlined, DeleteOutlined, UploadOutlined, CopyOutlined } from '@ant-design/icons'
+import { submitAudio, getAudioStatus, listAudioJobs, audioBulkAction, transcribeAudio, fileToDataUrl } from '../api/ai'
 import PromptHelper from '../components/PromptHelper'
 import { useTilt, TILT_STYLE } from '../components/useTilt'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
 
 const KINDS = [
-  { value: 'music', label: '🎵 Music', blurb: 'Background tracks, soundtracks, loops. Best for video soundtracks.', defaultModel: 'musicgen' },
-  { value: 'sfx',   label: '🔊 SFX / Ambience', blurb: 'One-shot effects, foley, drones, ambient textures.', defaultModel: 'stable-audio' },
-  { value: 'tts',   label: '🗣 Text → Speech', blurb: 'Voice cloning + multilingual TTS (Bark).', defaultModel: 'bark' },
+  { value: 'music', label: '🎵 Music',           blurb: 'Background tracks, soundtracks, loops. Best for video soundtracks.', defaultModel: 'musicgen' },
+  { value: 'sfx',   label: '🔊 SFX / Ambience', blurb: 'One-shot effects, foley, drones, ambient textures.',                  defaultModel: 'stable-audio' },
+  { value: 'tts',   label: '🗣 Text → Speech',  blurb: 'Voice cloning + multilingual TTS (Bark).',                            defaultModel: 'bark' },
+  { value: 'stt',   label: '✍️ Speech → Text',   blurb: 'Upload audio → transcript. Whisper-large-v3, 99 languages, auto-detect.', defaultModel: 'whisper' },
 ]
 
 const MODELS = {
   music: [{ value: 'musicgen', label: 'MusicGen Small', blurb: 'Meta MusicGen — fast, music-tuned. Up to 30s.' }],
   sfx:   [{ value: 'stable-audio', label: 'Stable Audio Open 1.0', blurb: 'Stability AI — best for non-music SFX up to 47s.' }],
   tts:   [{ value: 'bark', label: 'Bark', blurb: 'Multilingual TTS with voice presets. Suno research.' }],
+  stt:   [{ value: 'whisper', label: 'Whisper large-v3', blurb: 'OpenAI Whisper via HF Inference. Auto-detect 99 languages.' }],
 }
+
+// Optional language hint for Whisper. Empty string = auto-detect (Whisper
+// gets this right ~95% of the time for clips ≥10s).
+const STT_LANGUAGES = [
+  { value: '',   label: 'Auto-detect' },
+  { value: 'en', label: '🇬🇧 English' },
+  { value: 'hi', label: '🇮🇳 Hindi' },
+  { value: 'es', label: '🇪🇸 Spanish' },
+  { value: 'fr', label: '🇫🇷 French' },
+  { value: 'de', label: '🇩🇪 German' },
+  { value: 'it', label: '🇮🇹 Italian' },
+  { value: 'ja', label: '🇯🇵 Japanese' },
+  { value: 'ko', label: '🇰🇷 Korean' },
+  { value: 'zh', label: '🇨🇳 Chinese' },
+  { value: 'pt', label: '🇵🇹 Portuguese' },
+  { value: 'ru', label: '🇷🇺 Russian' },
+  { value: 'ar', label: '🇸🇦 Arabic' },
+  { value: 'tr', label: '🇹🇷 Turkish' },
+  { value: 'nl', label: '🇳🇱 Dutch' },
+]
 
 // Bark ships ~150 official voice presets across 13 languages — these are
 // the most usable curated picks. The Select groups them by language so the
@@ -82,6 +104,13 @@ export default function AudioStudio() {
   const [job, setJob] = useState(null)
   const [error, setError] = useState(null)
   const pollTimer = useRef(null)
+  // STT-specific state (only used when kind === 'stt'). Keeps the form
+  // simple — we don't reuse `prompt` for the file since transcription
+  // doesn't take a prompt at all.
+  const [sttFile, setSttFile] = useState(null)
+  const [sttDataUrl, setSttDataUrl] = useState('')
+  const [sttLanguage, setSttLanguage] = useState('')
+  const [sttResult, setSttResult] = useState(null)
   // Prompt helper modal — state lives here so closing + reopening keeps the
   // last AI-generated prompt + idea
   const [helperOpen, setHelperOpen] = useState(false)
@@ -115,6 +144,21 @@ export default function AudioStudio() {
   }
 
   const generate = async () => {
+    // STT path: synchronous round-trip to /api/stt → HF Whisper → transcript.
+    // No worker, no polling, no DB row. Just upload and read the result.
+    if (kind === 'stt') {
+      if (!sttDataUrl) { setError('Upload an audio file first'); return }
+      setError(null); setJob(null); setSttResult(null); setWorking(true)
+      const { data, error: err } = await transcribeAudio({
+        dataUrl: sttDataUrl, language: sttLanguage,
+      })
+      setWorking(false)
+      if (err) { setError(err); return }
+      setSttResult(data)
+      antMessage.success('Transcript ready')
+      return
+    }
+
     if (!prompt.trim()) { setError('Add a prompt'); return }
     setError(null); setJob(null); setWorking(true)
     const payload = { kind, model, prompt: prompt.trim(), duration }
@@ -123,6 +167,28 @@ export default function AudioStudio() {
     if (err) { setWorking(false); setError(err); return }
     setJob(data)
     startPolling(data.jobId)
+  }
+
+  // Audio file → data URL for the STT path. Whisper accepts any common
+  // codec; we cap at 25 MB to match the BE's HF Inference limit.
+  const handleSttUpload = async (file) => {
+    if (!file) return false
+    if (file.size > 25 * 1024 * 1024) {
+      antMessage.error('Audio too large (max 25 MB)')
+      return false
+    }
+    try {
+      const d = await fileToDataUrl(file)
+      setSttFile(file); setSttDataUrl(d); setError(null); setSttResult(null)
+    } catch {
+      antMessage.error('Could not read audio file')
+    }
+    return false   // don't auto-POST via antd
+  }
+
+  const copyTranscript = async () => {
+    if (!sttResult?.text) return
+    try { await navigator.clipboard.writeText(sttResult.text); antMessage.success('Copied') } catch {}
   }
 
   const kindObj = KINDS.find(k => k.value === kind)
@@ -142,10 +208,12 @@ export default function AudioStudio() {
           </p>
         </header>
 
-        {/* Kind picker — 3D tilt cards */}
+        {/* Kind picker — 3D tilt cards. 4 kinds now (music/sfx/tts/stt) so
+            use 4-col on sm+ to keep the row tight; falls back to 2-col + 1-col
+            on smaller breakpoints. */}
         <section className="mb-6">
           <h2 className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Type</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 [perspective:1200px]">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 [perspective:1200px]">
             {KINDS.map(k => (
               <KindCard key={k.value} kind={k} active={kind === k.value}
                 onSelect={() => setKind(k.value)} />
@@ -167,56 +235,125 @@ export default function AudioStudio() {
             />
           </div>
 
-          <div>
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <label className="text-[10px] uppercase tracking-wider text-gray-500">
-                {kind === 'tts' ? 'Text to speak' : 'Prompt'}
-              </label>
-              <div className="flex items-center gap-1.5">
-                <button type="button" onClick={() => setHelperOpen(true)}
-                  title="AI prompt helper + sample prompts"
-                  className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-amber-500/40 hover:border-amber-400 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-colors">
-                  <BulbOutlined className="text-[10px]" /> Help me write
-                </button>
-                {prompt && (
-                  <button type="button" onClick={() => setPrompt('')}
-                    className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors">
-                    clear
-                  </button>
+          {kind === 'stt' ? (
+            // Speech-to-Text form: file upload + optional language hint.
+            // No prompt, no duration slider, no voice picker — Whisper just
+            // listens to the audio and returns text.
+            <>
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">Audio file</label>
+                {sttDataUrl ? (
+                  <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-3 space-y-2">
+                    <audio src={sttDataUrl} controls className="w-full" />
+                    <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500 font-mono">
+                      <span className="truncate">{sttFile?.name || 'audio'}</span>
+                      <button onClick={() => { setSttFile(null); setSttDataUrl(''); setSttResult(null) }}
+                        className="text-rose-400 hover:text-rose-300">✕ Replace</button>
+                    </div>
+                  </div>
+                ) : (
+                  <Upload.Dragger multiple={false} showUploadList={false}
+                    accept="audio/*,video/*"
+                    beforeUpload={handleSttUpload}
+                    style={{ background: 'transparent', borderColor: '#374151', padding: '24px 0' }}>
+                    <UploadOutlined className="text-3xl text-fuchsia-400 mb-2" />
+                    <p className="text-sm text-gray-300">Drop audio or click to upload</p>
+                    <p className="text-[10px] text-gray-500 mt-1">mp3 · wav · m4a · ogg · video (audio track) · max 25 MB</p>
+                  </Upload.Dragger>
                 )}
               </div>
-            </div>
-            <Input.TextArea value={prompt} onChange={e => setPrompt(e.target.value)}
-              autoSize={{ minRows: 2, maxRows: 6 }}
-              placeholder={
-                kind === 'music' ? 'e.g. "upbeat synthwave with driving bass and warm pads"'
-                : kind === 'sfx' ? 'e.g. "thunderclap echoing in a cathedral, low rumble fade-out"'
-                : 'Hi, this is what I want you to say in this voice.'
-              }
-              maxLength={2000} showCount
-            />
-          </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">Language hint</label>
+                <Select className="w-full" value={sttLanguage} onChange={setSttLanguage} options={STT_LANGUAGES} />
+                <p className="text-[10px] text-gray-600 mt-1">
+                  Auto-detect works well for clips ≥10s. Set a hint for short / mixed-language clips.
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <label className="text-[10px] uppercase tracking-wider text-gray-500">
+                    {kind === 'tts' ? 'Text to speak' : 'Prompt'}
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <button type="button" onClick={() => setHelperOpen(true)}
+                      title="AI prompt helper + sample prompts"
+                      className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-amber-500/40 hover:border-amber-400 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-colors">
+                      <BulbOutlined className="text-[10px]" /> Help me write
+                    </button>
+                    {prompt && (
+                      <button type="button" onClick={() => setPrompt('')}
+                        className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors">
+                        clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <Input.TextArea value={prompt} onChange={e => setPrompt(e.target.value)}
+                  autoSize={{ minRows: 2, maxRows: 6 }}
+                  placeholder={
+                    kind === 'music' ? 'e.g. "upbeat synthwave with driving bass and warm pads"'
+                    : kind === 'sfx' ? 'e.g. "thunderclap echoing in a cathedral, low rumble fade-out"'
+                    : 'Hi, this is what I want you to say in this voice.'
+                  }
+                  maxLength={2000} showCount
+                />
+              </div>
 
-          <div>
-            <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">
-              Duration · <span className="text-fuchsia-300 font-mono">{duration}s</span>
-            </label>
-            <Slider min={kind === 'tts' ? 1 : 3} max={kind === 'sfx' ? 47 : kind === 'music' ? 30 : 20}
-              value={duration} onChange={setDuration} />
-          </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">
+                  Duration · <span className="text-fuchsia-300 font-mono">{duration}s</span>
+                </label>
+                <Slider min={kind === 'tts' ? 1 : 3} max={kind === 'sfx' ? 47 : kind === 'music' ? 30 : 20}
+                  value={duration} onChange={setDuration} />
+              </div>
 
-          {kind === 'tts' && (
-            <div>
-              <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">Voice</label>
-              <Select className="w-full" value={voice} onChange={setVoice} options={BARK_VOICES} />
-            </div>
+              {kind === 'tts' && (
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">Voice</label>
+                  <Select className="w-full" value={voice} onChange={setVoice} options={BARK_VOICES} />
+                </div>
+              )}
+            </>
           )}
         </section>
 
         {/* Output */}
         <section className="rounded-2xl border border-gray-800 p-4 bg-gray-900/40 mb-6">
           <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Output</p>
-          {job?.outputUrl ? (
+          {/* STT result — synchronous, no job row */}
+          {kind === 'stt' && sttResult ? (
+            <>
+              <div className="rounded-lg bg-black/40 border border-gray-800 p-3 mb-3 max-h-72 overflow-y-auto">
+                <p className="text-sm text-gray-100 leading-relaxed whitespace-pre-wrap">{sttResult.text || '(empty)'}</p>
+              </div>
+              {Array.isArray(sttResult.chunks) && sttResult.chunks.length > 0 && (
+                <details className="mb-3">
+                  <summary className="text-[10px] uppercase tracking-wider text-gray-500 cursor-pointer hover:text-gray-300">
+                    Timestamps · {sttResult.chunks.length} segments
+                  </summary>
+                  <ul className="mt-2 space-y-0.5 max-h-40 overflow-y-auto bg-black/30 rounded p-2">
+                    {sttResult.chunks.map((c, i) => (
+                      <li key={i} className="text-[10px] font-mono text-gray-400">
+                        <span className="text-fuchsia-300">[{(c.timestamp?.[0] ?? 0).toFixed(1)}s → {(c.timestamp?.[1] ?? 0).toFixed(1)}s]</span> {c.text}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <span className="text-[10px] text-gray-500 font-mono">
+                  {sttResult.model} · {sttResult.elapsedMs}ms
+                </span>
+                <button onClick={copyTranscript}
+                  className="flex items-center gap-1 text-xs px-3 py-1 rounded-lg bg-fuchsia-500/20 hover:bg-fuchsia-500/30 text-fuchsia-300 border border-fuchsia-500/40">
+                  <CopyOutlined /> Copy transcript
+                </button>
+              </div>
+            </>
+          ) : job?.outputUrl ? (
             <>
               <audio src={job.outputUrl} controls className="w-full" />
               <div className="mt-3 flex items-center justify-between">
@@ -252,15 +389,25 @@ export default function AudioStudio() {
         </section>
 
         <div className="flex justify-end">
-          <button onClick={generate} disabled={working || !prompt.trim()}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all ${
-              working || !prompt.trim()
-                ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
-                : 'bg-gradient-to-r from-fuchsia-400 to-amber-400 text-black hover:scale-[1.02]'
-            }`}>
-            <ThunderboltOutlined />
-            {working ? 'Working…' : `Generate ${kindObj?.label.toLowerCase().replace(/[🎵🔊🗣 ]/g, '').trim() || 'audio'}`}
-          </button>
+          {(() => {
+            const disabled = working || (kind === 'stt' ? !sttDataUrl : !prompt.trim())
+            const label = working
+              ? 'Working…'
+              : kind === 'stt'
+                ? 'Transcribe'
+                : `Generate ${kindObj?.label.toLowerCase().replace(/[🎵🔊🗣✍️ ]/g, '').trim() || 'audio'}`
+            return (
+              <button onClick={generate} disabled={disabled}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all ${
+                  disabled
+                    ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-fuchsia-400 to-amber-400 text-black hover:scale-[1.02]'
+                }`}>
+                <ThunderboltOutlined />
+                {label}
+              </button>
+            )
+          })()}
         </div>
 
         <StudioLibrary

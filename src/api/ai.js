@@ -359,6 +359,15 @@ export async function submitAudio(payload = {}) {
     return { data: data?.data || data, error: null };
   } catch (err) { return { data: null, error: err.message }; }
 }
+
+// Speech-to-Text — synchronous, returns transcript directly. Whisper via HF
+// Inference. dataUrl: 'data:audio/...;base64,…', language: optional ISO-639-1.
+export async function transcribeAudio({ dataUrl, language = '' } = {}) {
+  try {
+    const data = await post(ENDPOINTS.STT, { dataUrl, language }, { timeout: 120000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
 export async function getAudioStatus(jobId) {
   try {
     const data = await get(`${ENDPOINTS.AUDIO_STATUS}/${jobId}`, {}, { timeout: 6000 });
