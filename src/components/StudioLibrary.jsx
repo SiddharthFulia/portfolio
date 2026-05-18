@@ -1,6 +1,24 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Modal, message as antMessage } from 'antd'
 import { DeleteOutlined, CheckOutlined, AppstoreOutlined, ReloadOutlined } from '@ant-design/icons'
+
+// Cheap structural compare: same length, same id order, same status per item.
+// Used so the library doesn't repaint card by card when polling returns the
+// exact same data. Caller's `getId` would be ideal but happens BEFORE that
+// runs, so we sniff common id fields (jobId / projectId / videoId / id).
+function _itemKey(it) { return it?.jobId || it?.projectId || it?.videoId || it?.id || '' }
+function sameList(a, b) {
+  if (!a || !b) return false
+  if (a.total !== b.total || a.page !== b.page) return false
+  const ai = a.items || [], bi = b.items || []
+  if (ai.length !== bi.length) return false
+  for (let i = 0; i < ai.length; i++) {
+    if (_itemKey(ai[i]) !== _itemKey(bi[i])) return false
+    if ((ai[i]?.status || '') !== (bi[i]?.status || '')) return false
+    if ((ai[i]?.outputUrl || '') !== (bi[i]?.outputUrl || '')) return false
+  }
+  return true
+}
 
 // Reusable library + bulk-delete component for Lip Sync / Audio / Cinema.
 // Same UX as the image-enhance library but lane-agnostic.
@@ -28,19 +46,37 @@ export default function StudioLibrary({
   const [bulkBusy, setBulkBusy] = useState(false)
   const [internalReload, setInternalReload] = useState(0)
 
+  // Keep listFn out of the effect's dep array — parents (LipSync, Audio, Cinema)
+  // pass an inline arrow fn, so its reference flips every render. While a job
+  // polls every 2s, the parent re-renders → new listFn ref → refetch → skeleton
+  // → cards flicker even though nothing changed. Mirror listFn in a ref so the
+  // effect always calls the latest fn but the effect itself only re-runs on
+  // intentional triggers (filter, page, refreshKey, internalReload).
+  const listFnRef = useRef(listFn)
+  useEffect(() => { listFnRef.current = listFn }, [listFn])
+
   useEffect(() => { setPage(1); setSelected(new Set()) }, [filter, refreshKey])
   useEffect(() => { if (!selectMode) setSelected(new Set()) }, [selectMode])
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    listFn({ status: filter, page, limit: 24 }).then(({ data: result }) => {
+    // Only show the skeleton on the very first fetch (when no items yet).
+    // Subsequent silent refetches keep existing cards on screen and just swap
+    // them when the data actually differs — no flash, no flicker.
+    setLoading(prev => (data.items.length === 0 ? true : prev))
+    listFnRef.current({ status: filter, page, limit: 24 }).then(({ data: result }) => {
       if (cancelled) return
-      if (result) setData(result)
+      if (result) {
+        // Shallow-diff: if the items array is logically identical (same ids in
+        // same order with same status), keep the existing reference so React
+        // skips re-rendering child cards. Cuts unnecessary repaints on every
+        // 2-second poll tick.
+        setData(prev => sameList(prev, result) ? prev : result)
+      }
       setLoading(false)
     })
     return () => { cancelled = true }
-  }, [filter, page, refreshKey, internalReload, listFn])
+  }, [filter, page, refreshKey, internalReload])
 
   const toggleSelect = (id) => {
     setSelected(prev => {

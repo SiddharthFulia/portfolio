@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Input, Select, Slider, message as antMessage } from 'antd'
-import { VideoCameraOutlined, ThunderboltOutlined, ReloadOutlined, CopyOutlined, BulbOutlined, DeleteOutlined } from '@ant-design/icons'
+import { VideoCameraOutlined, ThunderboltOutlined, ReloadOutlined, CopyOutlined, BulbOutlined, DeleteOutlined, SendOutlined } from '@ant-design/icons'
 import { submitCinema, listCinemaProjects, cinemaBulkAction } from '../api/ai'
 import PromptHelper from '../components/PromptHelper'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
 
 export default function Cinema() {
+  const navigate = useNavigate()
   const [masterPrompt, setMasterPrompt] = useState('')
   const [shotCount, setShotCount] = useState(4)
   const [durationPerShot, setDurationPerShot] = useState(5)
@@ -41,6 +43,22 @@ export default function Cinema() {
     try { await navigator.clipboard.writeText(text); antMessage.success('Copied') } catch {}
   }
 
+  // Hand a prompt off to /ai-video preselecting the 5090 Optimized lane in
+  // Balanced mode (Wan 2.2 5B, 14 steps, ~60s). Background music is enabled
+  // by default so the video lands ready-to-share. The destination page reads
+  // these query args on mount, prefills the form, and scrubs them from the
+  // URL so reloading doesn't re-apply.
+  const sendToAIVideo = (text) => {
+    if (!text || !text.trim()) return
+    const qs = new URLSearchParams({
+      prompt: text.trim(),
+      provider: 'optimized',
+      mode: 'balanced',
+      music: '1',
+    }).toString()
+    navigate(`/ai-video?${qs}`)
+  }
+
   return (
     <div className="min-h-screen bg-black text-gray-100 pt-20 pb-16 px-3 sm:px-6">
       <div className="max-w-5xl mx-auto">
@@ -69,6 +87,13 @@ export default function Cinema() {
                   className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-amber-500/40 hover:border-amber-400 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-colors">
                   <BulbOutlined className="text-[10px]" /> Help me write
                 </button>
+                {masterPrompt.trim() && (
+                  <button type="button" onClick={() => sendToAIVideo(masterPrompt)}
+                    title="Skip planning — render this prompt directly in AI Video (5090 Optimized · Balanced · with music)"
+                    className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-cyan-500/40 hover:border-cyan-400 bg-gradient-to-r from-cyan-500/15 to-fuchsia-500/15 hover:from-cyan-500/25 hover:to-fuchsia-500/25 text-cyan-200 transition-colors">
+                    <SendOutlined className="text-[10px]" /> Render in AI Video
+                  </button>
+                )}
                 {masterPrompt && (
                   <button type="button" onClick={() => setMasterPrompt('')}
                     className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors">
@@ -160,12 +185,19 @@ export default function Cinema() {
             <ol className="space-y-2">
               {project.shotPrompts.map((p, i) => (
                 <li key={i} className="rounded-lg border border-gray-800 bg-black/40 p-3 hover:border-amber-500/40 transition-colors">
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center justify-between mb-1 gap-2 flex-wrap">
                     <span className="text-[10px] font-mono text-amber-400 font-bold">SHOT {i + 1}</span>
-                    <button onClick={() => copy(p)}
-                      className="text-[10px] flex items-center gap-1 px-2 py-0.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-300">
-                      <CopyOutlined /> Copy
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => copy(p)}
+                        className="text-[10px] flex items-center gap-1 px-2 py-0.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-300">
+                        <CopyOutlined /> Copy
+                      </button>
+                      <button onClick={() => sendToAIVideo(p)}
+                        title="Paste into AI Video, 5090 Optimized · Balanced, with background music"
+                        className="text-[10px] flex items-center gap-1 px-2 py-0.5 rounded bg-gradient-to-r from-cyan-500/20 to-fuchsia-500/20 hover:from-cyan-500/30 hover:to-fuchsia-500/30 text-cyan-200 border border-cyan-500/40">
+                        <SendOutlined /> Render
+                      </button>
+                    </div>
                   </div>
                   <p className="text-[11px] text-gray-300 font-mono leading-relaxed">{p}</p>
                 </li>

@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Input, Button, Select, Switch, Tabs, Modal, Upload, message as antMessage } from 'antd'
 import {
   VideoCameraOutlined, ThunderboltOutlined, CopyOutlined, CheckOutlined,
   DownloadOutlined, ReloadOutlined, LinkOutlined, InfoCircleOutlined, AppstoreOutlined,
   PlayCircleOutlined, LeftOutlined, RightOutlined, ExpandAltOutlined, PauseOutlined,
-  CaretRightOutlined,
+  CaretRightOutlined, BulbOutlined,
 } from '@ant-design/icons'
 import {
   generateVideo, getJobStatus, getTodayVideo, getVideoProviders, listVideos, deleteVideo,
@@ -12,6 +13,7 @@ import {
 } from '../api/ai'
 import { UploadOutlined } from '@ant-design/icons'
 import { DeleteOutlined } from '@ant-design/icons'
+import PromptHelper from '../components/PromptHelper'
 
 const BE_URL = import.meta.env.VITE_BE_URL || 'http://localhost:4001'
 
@@ -470,6 +472,8 @@ const Skeleton = ({ jobId, status, job, paused = false, onTogglePause }) => {
 
 // ─── Generate tab ─────────────────────────────────────────
 const GenerateTab = ({ today, setToday, onJobCompleted }) => {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [prompt, setPrompt] = useState('')
   const [provider, setProvider] = useState('zsky')
   const [model, setModel] = useState('ltx-video')
@@ -485,6 +489,13 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
   const [withMusic, setWithMusic] = useState(false)
   const [musicPrompt, setMusicPrompt] = useState('')
 
+  // Prompt helper modal — same Groq coach the other lanes use (Cinema, Audio).
+  // State lives here so the user can close + reopen without losing context.
+  const [helperOpen, setHelperOpen] = useState(false)
+  const [coachIdea, setCoachIdea] = useState('')
+  const [coachResult, setCoachResult] = useState(null)
+  const [coachError, setCoachError] = useState('')
+
   const [loading, setLoading] = useState(false)
   const [job, setJob] = useState(null)
   const [video, setVideo] = useState(null)
@@ -499,6 +510,32 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
   // without needing to recreate the timer when the user toggles.
   const pausedRef = useRef(false)
   useEffect(() => { pausedRef.current = logsPaused }, [logsPaused])
+
+  // Cinema → AI Video hand-off. When the user clicks "Render in AI Video" in
+  // /cinema we redirect with ?prompt=...&provider=optimized&mode=balanced&music=1.
+  // Apply those once on mount, then scrub the URL so a manual refresh doesn't
+  // re-apply (otherwise the user's later tweaks to provider/prompt would be
+  // silently overwritten on every reload).
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    if (!params.toString()) return
+    const qPrompt   = params.get('prompt')
+    const qProvider = params.get('provider')
+    const qMode     = params.get('mode')
+    const qMusic    = params.get('music')
+    const qMusicPrompt = params.get('musicPrompt')
+    if (qPrompt) setPrompt(qPrompt)
+    if (qProvider && ['zsky', 'local', 'optimized'].includes(qProvider)) setProvider(qProvider)
+    if (qMode && ['preview', 'balanced', 'quality'].includes(qMode)) setOptimizedMode(qMode)
+    if (qMusic === '1' || qMusic === 'true') setWithMusic(true)
+    if (qMusicPrompt) setMusicPrompt(qMusicPrompt)
+    if (qPrompt || qProvider) {
+      antMessage.success('Prompt loaded — review and hit Generate Video')
+    }
+    // Strip query string so future refreshes don't re-trigger the prefill.
+    navigate(location.pathname, { replace: true })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Upload a local file → BE → Cloudinary → set imageUrl to the returned URL.
   // Cloudinary auto-converts HEIC, WEBP, BMP, etc. to JPG when delivered, so any
@@ -678,6 +715,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
   const isPolicy = error && /safety filter|flagged|rephrasing|prompt was/i.test(error)
 
   return (
+    <>
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
       {/* Form */}
       <div className="lg:col-span-3 space-y-5">
@@ -796,9 +834,6 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
                     placeholder="e.g. 'cinematic orchestral build, slow cellos, hopeful' — leave blank to auto-derive from the video prompt"
                     maxLength={400}
                   />
-                  <p className="text-[10px] text-gray-500">
-                    First time will download the MusicGen model (~6 GB) on the 5090.
-                  </p>
                 </div>
               )}
             </div>
@@ -816,7 +851,22 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
             </div>
           ) : (
             <>
-              <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-wider mb-2">2 — Describe your video</p>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-wider">2 — Describe your video</p>
+                <div className="flex items-center gap-1.5">
+                  <button type="button" onClick={() => setHelperOpen(true)}
+                    title="AI prompt helper + sample prompts"
+                    className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-amber-500/40 hover:border-amber-400 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-colors">
+                    <BulbOutlined className="text-[10px]" /> Help me write
+                  </button>
+                  {prompt && (
+                    <button type="button" onClick={() => setPrompt('')}
+                      className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors">
+                      clear
+                    </button>
+                  )}
+                </div>
+              </div>
               <Input.TextArea value={prompt} onChange={e => setPrompt(e.target.value)}
                 placeholder="a cat dancing"
                 autoSize={{ minRows: 3, maxRows: 6 }} maxLength={400} showCount />
@@ -1083,6 +1133,17 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
         </div>
       </div>
     </div>
+
+    <PromptHelper
+      open={helperOpen} onClose={() => setHelperOpen(false)}
+      family="video" currentPrompt={prompt}
+      idea={coachIdea} setIdea={setCoachIdea}
+      coachResult={coachResult} setCoachResult={setCoachResult}
+      coachError={coachError} setCoachError={setCoachError}
+      onApply={(text) => { setPrompt(text); setHelperOpen(false) }}
+      onAppend={(text) => setPrompt(prompt.trim() ? `${prompt.trim()}, ${text}` : text)}
+    />
+    </>
   )
 }
 

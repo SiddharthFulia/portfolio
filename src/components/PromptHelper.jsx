@@ -32,6 +32,11 @@ export const FAMILY_TIPS = {
     blurb: 'A single sentence describing the WHOLE story. Groq will split this into N shot prompts. Mention the subject, the setting, and one clear arc.',
     cfg: '',
   },
+  video: {
+    label: 'Video · AI clip',
+    blurb: 'One short clip — subject, motion, lighting, camera. Keep it sensory and short (15-40 words). Avoid abstract words.',
+    cfg: '',
+  },
 }
 
 export const PROMPT_SAMPLES = {
@@ -80,6 +85,20 @@ export const PROMPT_SAMPLES = {
       text: 'A detective walks through neon-lit rainy streets of a cyberpunk city at night, follows a lead into an underground bar, confronts a mysterious figure.' },
     { title: '🌅 Surfer story', tags: ['cinematic'],
       text: 'A surfer paddles out at sunrise, catches the perfect wave through a barrel of spray, emerges into golden light, paddles back smiling.' },
+  ],
+  video: [
+    { title: '🐱 Dancing cat', tags: ['cute'],
+      text: 'a fluffy orange cat dancing on hardwood floor, golden afternoon light, shallow depth of field, playful slow motion' },
+    { title: '🌊 Ocean waves', tags: ['nature'],
+      text: 'ocean waves crashing onto rocky shore at sunset, warm golden light, slow motion, cinematic drone shot' },
+    { title: '🌸 Cherry blossoms', tags: ['serene'],
+      text: 'pink cherry blossom petals drifting through still air, soft pastel light, shallow depth of field, gentle breeze' },
+    { title: '🚀 Spaceship liftoff', tags: ['sci-fi'],
+      text: 'a sleek spaceship lifting off a desert launchpad at dawn, orange flame trails, dust kicking up, low-angle dramatic shot' },
+    { title: '🦋 Butterfly close-up', tags: ['macro'],
+      text: 'a blue butterfly landing on a wildflower, macro lens, slow wing flutter, soft morning light, blurred meadow background' },
+    { title: '🌧️ Rainy window', tags: ['atmospheric'],
+      text: 'rain droplets running down a window pane, blurred city lights behind, cozy shallow focus, evening mood' },
   ],
 }
 
@@ -179,6 +198,7 @@ export default function PromptHelper({
               : family === 'sfx' ? 'e.g. "rainy cyberpunk alley at 3 AM"'
               : family === 'tts' ? 'e.g. "calm explainer voice intro"'
               : family === 'cinema' ? 'e.g. "samurai finds an abandoned shrine in misty bamboo"'
+              : family === 'video' ? 'e.g. "a cat dancing on a wooden floor at sunset"'
               : 'describe what you want in plain English'
             }
             disabled={coachLoading} maxLength={500} showCount
