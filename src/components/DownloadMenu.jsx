@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Dropdown, Button, message as antMessage, Tooltip } from 'antd'
+import { Dropdown, Button, Tooltip } from 'antd'
+import notify from '../utils/notify'
 import {
   DownloadOutlined, FileTextOutlined, FileExcelOutlined,
   FilePdfOutlined, FileMarkdownOutlined, FileZipOutlined,
@@ -279,9 +280,10 @@ export default function DownloadMenu({ content, messageId, model }) {
         })
         triggerDownload(blob, `${baseName}.pdf`)
       }
-      antMessage.success(`Downloaded ${key.toUpperCase()}`)
+      const labels = { xlsx: 'Excel file', csv: 'CSV file', json: 'JSON file', md: 'Markdown file', pdf: 'PDF document' }
+      notify.success(`${labels[key] || key.toUpperCase()} saved to your downloads folder`, { title: 'Download ready' })
     } catch (e) {
-      antMessage.error(e.message || 'Download failed')
+      notify.error(e.message || 'Download failed')
     } finally {
       setBusy(false)
     }

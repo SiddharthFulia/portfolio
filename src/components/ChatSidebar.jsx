@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Modal, Input, Select, Dropdown, Tooltip, message as antMessage } from 'antd'
+import { Modal, Input, Select, Dropdown, Tooltip } from 'antd'
+import notify from '../utils/notify'
 import {
   PlusOutlined, DeleteOutlined, MessageOutlined, ReloadOutlined,
   CheckOutlined, MenuOutlined, CloseOutlined, MoreOutlined,
@@ -144,7 +145,7 @@ export default function ChatSidebar({ refreshKey = 0, onNewChat, isOpenMobile, o
     const cur = items.find(x => x.chatId === chatId)
     if (cur && cur.title === title) return  // no-op
     const { error: err } = await updateConversation(chatId, { title })
-    if (err) { antMessage.error(err); return }
+    if (err) { notify.error(err); return }
     setItems(prev => prev.map(x => x.chatId === chatId ? { ...x, title } : x))
   }
   const togglePin = async (c) => {
@@ -152,7 +153,7 @@ export default function ChatSidebar({ refreshKey = 0, onNewChat, isOpenMobile, o
     setItems(prev => prev.map(x => x.chatId === c.chatId ? { ...x, pinned: next } : x))
     const { error: err } = await updateConversation(c.chatId, { pinned: next })
     if (err) {
-      antMessage.error(err)
+      notify.error(err)
       setItems(prev => prev.map(x => x.chatId === c.chatId ? { ...x, pinned: c.pinned } : x))
     }
   }
@@ -163,8 +164,8 @@ export default function ChatSidebar({ refreshKey = 0, onNewChat, isOpenMobile, o
       okText: 'Delete', okButtonProps: { danger: true }, cancelText: 'Cancel', centered: true,
       onOk: async () => {
         const { error: err } = await deleteConversation(c.chatId)
-        if (err) { antMessage.error(err); return }
-        antMessage.success('Deleted')
+        if (err) { notify.error(err); return }
+        notify.success(`"${(c.title || 'chat').slice(0, 32)}" removed`, { title: 'Chat deleted' })
         setItems(prev => prev.filter(x => x.chatId !== c.chatId))
         if (activeId === c.chatId) navigate('/ai')
       },
@@ -173,15 +174,15 @@ export default function ChatSidebar({ refreshKey = 0, onNewChat, isOpenMobile, o
 
   const bulkDelete = () => {
     const ids = [...selected]
-    if (!ids.length) { antMessage.warning('Pick at least one chat'); return }
+    if (!ids.length) { notify.info('Pick at least one chat'); return }
     Modal.confirm({
       title: `Delete ${ids.length} chat${ids.length === 1 ? '' : 's'}?`,
       content: <p className="text-sm text-rose-300 font-medium">⚠ Removes the conversation + all messages. Can't be undone.</p>,
       okText: 'Delete', okButtonProps: { danger: true }, cancelText: 'Cancel', centered: true,
       onOk: async () => {
         const { data, error: err } = await conversationsBulkAction('delete', ids)
-        if (err) { antMessage.error(err); return }
-        antMessage.success(`Deleted ${data?.affected ?? ids.length}`)
+        if (err) { notify.error(err); return }
+        notify.success(`Removed ${data?.affected ?? ids.length} conversations + all their messages`, { title: 'Bulk delete done' })
         setSelected(new Set())
         setSelectMode(false)
         setInternalRefresh(n => n + 1)

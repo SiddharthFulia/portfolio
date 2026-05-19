@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
-import { Input, Button, Tooltip, Upload, message as antMessage } from 'antd'
+import { Input, Button, Tooltip, Upload } from 'antd'
 import {
   SendOutlined, AudioOutlined, StopOutlined, LoadingOutlined,
   PictureOutlined, FileTextOutlined, CloseOutlined,
 } from '@ant-design/icons'
 import { fileToDataUrl, transcribeAudio } from '../api/ai'
+import notify from '../utils/notify'
 
 // Composer for AI Chat — textarea + mic + image upload + document upload.
 //
@@ -81,15 +82,19 @@ export default function ChatInput({
         streamRef.current?.getTracks().forEach(t => t.stop())
         streamRef.current = null
         setRecState('transcribing')
+        // Sticky toast while Whisper runs; swap to success/error on the
+        // same key so the user sees one card transition cleanly.
+        notify.loading('Whisper transcribing your voice…', { title: 'Transcribing', key: 'stt' })
         const reader = new FileReader()
         reader.onloadend = async () => {
           const { data, error: err } = await transcribeAudio({ dataUrl: reader.result })
           setRecState('idle')
-          if (err) { antMessage.error(`Transcribe failed: ${err}`); return }
+          if (err) { notify.error(`Transcribe failed: ${err}`, { key: 'stt' }); return }
           const t = (data?.text || '').trim()
-          if (!t) { antMessage.warning('Empty transcript — speak closer to the mic'); return }
+          if (!t) { notify.info('Empty transcript — speak closer to the mic', { key: 'stt' }); return }
           setText(prev => prev.trim() ? `${prev.trim()} ${t}` : t)
           taRef.current?.focus?.()
+          notify.success(`Added ${t.length} chars to your message`, { title: 'Voice captured', key: 'stt' })
         }
         reader.readAsDataURL(blob)
       }
@@ -102,7 +107,7 @@ export default function ChatInput({
         setRecElapsed(e)
         if (e >= 60) stopRec()
       }, 250)
-    } catch (e) { antMessage.error(`Mic error: ${e.message}`) }
+    } catch (e) { notify.error(`Mic error: ${e.message}`) }
   }
 
   const handleImage = async (file) => {
@@ -110,7 +115,7 @@ export default function ChatInput({
     // 20 MB cap — phone photos can be ~10-15 MB at full quality; HEIC is
     // usually smaller. We give headroom for iPhone burst-mode shots.
     if (file.size > 20 * 1024 * 1024) {
-      antMessage.error('Image too large (max 20 MB)')
+      notify.error('Image too large (max 20 MB)')
       return false
     }
     // Sniff support: image/* MIME OR known phone extensions. Some
@@ -120,20 +125,21 @@ export default function ChatInput({
     const okMime = (file.type || '').startsWith('image/')
     const okExt = /\.(jpg|jpeg|png|gif|webp|bmp|heic|heif|avif|tiff?|svg)$/i.test(name)
     if (!okMime && !okExt) {
-      antMessage.warning('Pick an image file (.jpg .jpeg .png .heic .heif .webp .gif etc.)')
+      notify.info('Pick an image file (.jpg .jpeg .png .heic .heif .webp .gif etc.)')
       return false
     }
     try {
       const d = await fileToDataUrl(file)
       setImage({ dataUrl: d, name: file.name })
-    } catch { antMessage.error('Could not read image') }
+      notify.success(`${file.name} ready · ${(file.size / 1024 / 1024).toFixed(1)} MB`, { title: 'Image attached' })
+    } catch { notify.error('Could not read image') }
     return false
   }
 
   const handleDoc = async (file) => {
     if (!file) return false
     if (file.size > 4 * 1024 * 1024) {
-      antMessage.error('Document too large (max 4 MB of plain text)')
+      notify.error('Document too large (max 4 MB of plain text)')
       return false
     }
     const name = (file.name || '').toLowerCase()
@@ -141,14 +147,14 @@ export default function ChatInput({
     // read fine as text. PDF / Word still need server-side extraction.
     const extractable = /\.(txt|md|markdown|json|jsonl|csv|tsv|log|html|htm|xml|yaml|yml|ini|conf|cfg|sql|py|js|jsx|ts|tsx|sh|bash|zsh|go|rb|rs|java|c|cpp|h|hpp|cs|swift|kt|php|toml|env)$/i.test(name)
     if (!extractable) {
-      antMessage.warning('Text-based docs only for now (.txt .md .json .csv .log .html .xml .yaml .py .js .ts etc.). PDF / Word support coming.')
+      notify.info('Text-based docs only for now (.txt .md .json .csv .log .html .xml .yaml .py .js .ts etc.). PDF / Word support coming.')
       return false
     }
     try {
       const text = await file.text()
       setDoc({ name: file.name, text })
-      antMessage.success(`Attached: ${file.name}`)
-    } catch { antMessage.error('Could not read document') }
+      notify.success(`${file.name} attached · ${(text.length / 1024).toFixed(1)} KB`, { title: 'Document ready' })
+    } catch { notify.error('Could not read document') }
     return false
   }
 

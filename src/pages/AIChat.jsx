@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Select, Tag, Tooltip, message as antMessage, Button, Popover, Slider, InputNumber, Modal } from 'antd'
+import { Select, Tag, Tooltip, Button, Popover, Slider, InputNumber, Modal } from 'antd'
+import notify from '../utils/notify'
 import {
   RobotOutlined, UserOutlined, CopyOutlined, CheckOutlined, MenuOutlined,
   ThunderboltOutlined, CloudOutlined, DesktopOutlined, GoogleOutlined,
@@ -184,7 +185,7 @@ const AIChat = () => {
     getConversation(chatId).then(({ data, error: err }) => {
       if (cancelled) return
       if (err || !data) {
-        antMessage.error(err || 'Conversation not found')
+        notify.error(err || 'Conversation not found')
         navigate('/ai')
         return
       }
@@ -244,7 +245,7 @@ const AIChat = () => {
       provider: startProvider,
     })
     if (err || !data?.chatId) {
-      antMessage.error(err || 'Could not create chat')
+      notify.error(err || 'Could not create chat')
       return
     }
     setSidebarRefresh(n => n + 1)
@@ -260,7 +261,7 @@ const AIChat = () => {
     if (m !== undefined) patch.maxTokens   = m
     if (!Object.keys(patch).length) return
     const { error: err } = await updateConversation(chatId, patch)
-    if (err) antMessage.error(err)
+    if (err) notify.error(err)
   }
 
   // Total chars in the live (non-compacted) conversation — drives the
@@ -303,7 +304,7 @@ const AIChat = () => {
   const onCompact = () => {
     if (!chatId) return
     if (liveCharStats.count <= 6) {
-      antMessage.info('Chat is still short — nothing to compact yet')
+      notify.info('Chat is still short — nothing to compact yet')
       return
     }
     const willCompact = Math.max(0, liveCharStats.count - 4)
@@ -361,16 +362,16 @@ const AIChat = () => {
         setCompacting(true)
         const { data, error: err } = await compactConversationApi(chatId, { keepLastN, mode: 'auto' })
         if (err) {
-          setCompacting(false); antMessage.error(err); return
+          setCompacting(false); notify.error(err); return
         }
         // Local path → poll worker → finalize. Cloud path → already done.
         try {
           if (data?.mode === 'local' && data.jobId) {
-            antMessage.loading({ content: `Summarising on ${data.model || 'Studio Pro'}…`, key: 'compact', duration: 0 })
+            notify.loading(`${data.model || 'Studio Pro'} is summarising your earlier messages…`, { title: 'Compacting locally', key: 'compact' })
             const fin = await waitForCompactJob(data.jobId, keepLastN)
-            antMessage.success({ content: `Compacted ${fin?.compacted ?? 0} messages on ${data.model || 'Studio Pro'}`, key: 'compact' })
+            notify.success(`Compressed ${fin?.compacted ?? 0} messages into one summary · model ${data.model || 'Studio Pro'}`, { title: '🜲 Chat compacted', key: 'compact' })
           } else {
-            antMessage.success(`Compacted ${data?.compacted ?? 0} messages (cloud)`)
+            notify.success(`Compressed ${data?.compacted ?? 0} messages via cloud fallback (5090 was offline)`, { title: '🜲 Chat compacted' })
           }
           const { data: refreshed } = await getConversation(chatId)
           if (refreshed) {
@@ -378,7 +379,7 @@ const AIChat = () => {
             setSidebarRefresh(n => n + 1)
           }
         } catch (compactErr) {
-          antMessage.error({ content: compactErr.message, key: 'compact' })
+          notify.error(compactErr.message, { title: 'Compact failed', key: 'compact' })
         } finally {
           setCompacting(false)
         }
@@ -397,7 +398,7 @@ const AIChat = () => {
         if (attempts > 5) {
           clearInterval(pollRef.current); pollRef.current = null
           setSending(false)
-          antMessage.error(err)
+          notify.error(err)
         }
         return
       }
@@ -418,12 +419,12 @@ const AIChat = () => {
           ? { ...m, content: `⚠ ${data.error || 'Failed'}`, _pending: false, _failed: true }
           : m))
         setSending(false)
-        antMessage.error(data.error || 'Generation failed')
+        notify.error(data.error || 'Generation failed')
       }
       if (attempts > 600) {  // ~10min @ 1s
         clearInterval(pollRef.current); pollRef.current = null
         setSending(false)
-        antMessage.warning('Timed out waiting — chat may still complete in the background')
+        notify.info('Timed out waiting — chat may still complete in the background')
       }
     }, 1500)
   }
@@ -433,8 +434,8 @@ const AIChat = () => {
   // still append to the local messages array but DON'T hit the BE
   // conversation store — that's 5090-only for MVP. (Phase 2 can unify.)
   const handleSubmit = async ({ content, imageDataUrl, docName, docText }) => {
-    if (!chatId) { antMessage.warning('Open or create a chat first'); return }
-    if (!model) { antMessage.warning('Pick a model first'); return }
+    if (!chatId) { notify.info('Open or create a chat first'); return }
+    if (!model) { notify.info('Pick a model first'); return }
     setSending(true)
 
     // Optimistic user message
@@ -465,7 +466,7 @@ const AIChat = () => {
       setMessages(prev => prev.map(m => m.messageId === tempAsstId
         ? { ...m, content: `⚠ ${err}`, _pending: false, _failed: true } : m))
       setSending(false)
-      antMessage.error(err)
+      notify.error(err)
       return
     }
     // Replace optimistic user-msg id with the real one + real Cloudinary
