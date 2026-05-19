@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
-import { Input, Button, Tooltip, Upload } from 'antd'
+import { Input, Button, Tooltip, Upload, Dropdown } from 'antd'
 import {
   SendOutlined, AudioOutlined, StopOutlined, LoadingOutlined,
   PictureOutlined, FileTextOutlined, CloseOutlined,
+  BgColorsOutlined, CaretDownOutlined,
 } from '@ant-design/icons'
 import { fileToDataUrl, transcribeAudio } from '../api/ai'
 import notify from '../utils/notify'
@@ -24,12 +25,30 @@ import notify from '../utils/notify'
 // PDF parsing happens server-side in a future iteration. For MVP, we
 // only support text-extractable formats (.txt / .md / .json / .csv).
 
+// Curated image-gen models — kept in sync with the BE catalog. Keeping
+// this list local means the chip dropdown is self-contained and doesn't
+// need to round-trip to the BE on first render.
+const IMAGE_GEN_MODELS = [
+  { id: '@cf/black-forest-labs/flux-1-schnell',         label: 'Flux Schnell',     hint: '⚡ Fast' },
+  { id: '@cf/bytedance/stable-diffusion-xl-lightning',  label: 'SDXL Lightning',   hint: 'Sharp · 5 steps' },
+  { id: '@cf/stabilityai/stable-diffusion-xl-base-1.0', label: 'SDXL Base',        hint: '🎨 Best detail' },
+  { id: '@cf/lykon/dreamshaper-8-lcm',                  label: 'Dreamshaper',      hint: '✨ Stylized' },
+]
+
 export default function ChatInput({
   disabled = false, sending = false,
   placeholder = 'Message…',
   acceptsVision = false,
   onSubmit,
   onAttachmentsChange,        // ({ hasImage, hasDoc }) — lets parent react
+  // Inline image-gen chip. When the parent wires these props, a small
+  // 🎨 Image toggle appears in the input row. Pressing it flips the
+  // per-conversation imageGenEnabled flag on the BE. Clicking the
+  // caret next to it opens a model dropdown.
+  imageGenEnabled = false,
+  imageGenModel = null,
+  onToggleImageGen,           // (next: boolean) — required if chip should appear
+  onChangeImageGenModel,      // (modelId: string)
 }) {
   const [text, setText] = useState('')
   const [image, setImage] = useState(null)   // { dataUrl, name }
@@ -219,6 +238,65 @@ export default function ChatInput({
           variant="borderless"
           className="flex-1"
         />
+
+        {/* Image-gen chip — toggles per-conversation imageGenEnabled
+            inline. When on, the model is allowed to emit a
+            ```generate-image fence and the BE renders via the chosen
+            Cloudflare model. The caret opens a small dropdown to swap
+            models. Both halves come from the parent so the chip stays
+            in sync with the Tune popover. */}
+        {onToggleImageGen && (
+          <div className="hidden sm:inline-flex items-stretch rounded-full overflow-hidden border transition-colors shrink-0"
+            style={{
+              borderColor: imageGenEnabled ? 'rgba(168, 85, 247, 0.55)' : 'rgba(75, 85, 99, 0.5)',
+              background:  imageGenEnabled ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.16), rgba(236, 72, 153, 0.10))' : 'rgba(17, 24, 39, 0.6)',
+            }}>
+            <Tooltip title={imageGenEnabled
+              ? `Image generation ON · ${IMAGE_GEN_MODELS.find(m => m.id === imageGenModel)?.label || 'Flux Schnell'}`
+              : 'Click to let the chat draw images'}>
+              <button
+                type="button"
+                onClick={() => onToggleImageGen(!imageGenEnabled)}
+                disabled={disabled || sending}
+                className={`inline-flex items-center gap-1.5 px-2.5 text-[11px] font-bold transition-colors ${
+                  imageGenEnabled
+                    ? 'text-white hover:text-fuchsia-100'
+                    : 'text-gray-400 hover:text-gray-200'
+                }`}>
+                <BgColorsOutlined className={imageGenEnabled ? 'text-fuchsia-300' : ''} />
+                <span>{imageGenEnabled
+                  ? (IMAGE_GEN_MODELS.find(m => m.id === imageGenModel)?.label || 'Image')
+                  : 'Image'
+                }</span>
+              </button>
+            </Tooltip>
+            {imageGenEnabled && (
+              <Dropdown
+                trigger={['click']}
+                placement="topRight"
+                menu={{
+                  items: IMAGE_GEN_MODELS.map(m => ({
+                    key: m.id,
+                    label: (
+                      <div className="leading-tight py-0.5 min-w-[180px]">
+                        <div className="text-xs font-semibold">{m.label}</div>
+                        <div className="text-[10px] text-gray-500">{m.hint}</div>
+                      </div>
+                    ),
+                  })),
+                  selectable: true,
+                  selectedKeys: [imageGenModel || '@cf/black-forest-labs/flux-1-schnell'],
+                  onClick: ({ key }) => onChangeImageGenModel?.(key),
+                }}>
+                <button type="button"
+                  onClick={(e) => e.stopPropagation()}
+                  className="px-1.5 border-l border-fuchsia-500/30 text-fuchsia-200 hover:text-white text-[10px]">
+                  <CaretDownOutlined />
+                </button>
+              </Dropdown>
+            )}
+          </div>
+        )}
 
         {/* Image upload — only when vision model is active. accept= is
             wide on purpose: iPhone HEIC, Android JPEG, all standard

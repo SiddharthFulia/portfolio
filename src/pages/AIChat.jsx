@@ -703,6 +703,15 @@ const AIChat = () => {
                 acceptsVision={acceptsVision}
                 onSubmit={handleSubmit}
                 onAttachmentsChange={({ hasImage }) => setHasImageAttached(hasImage)}
+                imageGenEnabled={imageGenEnabled}
+                imageGenModel={imageGenModel}
+                onToggleImageGen={(on) => {
+                  setImageGenEnabled(on)
+                  const seed = (on && !imageGenModel) ? '@cf/black-forest-labs/flux-1-schnell' : imageGenModel
+                  if (on && !imageGenModel) setImageGenModel(seed)
+                  saveOverride({ imageGenEnabled: on, imageGenModel: seed })
+                }}
+                onChangeImageGenModel={(v) => { setImageGenModel(v); saveOverride({ imageGenModel: v }) }}
               />
               <p className="text-[9px] text-gray-600 mt-1.5 px-1">
                 {provider === '5090'
