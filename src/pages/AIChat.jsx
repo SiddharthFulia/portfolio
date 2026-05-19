@@ -13,6 +13,7 @@ import ReactMarkdown from 'react-markdown'
 import ChatSidebar from '../components/ChatSidebar'
 import ChatInput from '../components/ChatInput'
 import DownloadMenu from '../components/DownloadMenu'
+import MessageImage from '../components/MessageImage'
 import {
   listLocalModels, createConversation, getConversation, sendChatMessage,
   getChatJobStatus, updateConversation,
@@ -920,8 +921,11 @@ function MessageBubble({ msg }) {
             : 'bg-gray-900/80 border border-gray-800 text-gray-100'
       }`}>
         {msg.imageUrl && (
-          <img src={msg.imageUrl} alt=""
-            className="max-h-64 max-w-full rounded-lg mb-2 border border-gray-700 object-contain" />
+          <MessageImage
+            src={msg.imageUrl}
+            messageId={msg.messageId}
+            prompt={msg.imagePrompt || msg.docName || ''}
+          />
         )}
         {msg._pending ? (
           <div className="flex items-center gap-2 py-1">
