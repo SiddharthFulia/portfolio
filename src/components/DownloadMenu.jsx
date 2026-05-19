@@ -6,19 +6,18 @@ import {
 } from '@ant-design/icons'
 import { ENDPOINTS } from '../api/endpoints'
 
-// DownloadMenu — sits next to an assistant message and lets the user
-// save it in whichever format is most useful.
+// DownloadMenu — only appears on assistant messages that contain
+// downloadable structured content (a table, a JSON row-array, CSV).
+// Plain prose replies get a Copy button only (rendered by the parent).
 //
-// Detection strategy (cheap, runs on every render but a single message
-// is short):
-//   ```json …```  → parse; if it's a row-array, offer Excel/CSV/JSON;
-//                    otherwise JSON/MD/PDF
-//   ```csv …```   → CSV/Excel/MD/PDF
-//   markdown |  | table → parse to rows → CSV/Excel/MD/PDF
-//   no structure → MD/PDF
+// Detection:
+//   ```json …```  → row-array → Excel/CSV/JSON; otherwise nothing
+//   ```csv …```   → CSV/Excel/JSON
+//   markdown |  | table → parse to rows → CSV/Excel/JSON
+//   no structure → null (component renders nothing)
 //
-// JSON / CSV / Markdown are blob-downloaded client-side (zero BE hop).
-// Excel + PDF call /api/export which generates the file server-side.
+// JSON / CSV are blob-downloaded client-side (zero BE hop).
+// Excel calls /api/export which generates the file server-side via SheetJS.
 
 const BE_URL = (import.meta.env.VITE_BE_URL || 'http://localhost:4001').replace(/\/$/, '')
 
@@ -161,20 +160,22 @@ export default function DownloadMenu({ content, messageId, model }) {
   const detected = useMemo(() => detectStructured(content), [content])
   const baseName = `chat-${(messageId || Date.now()).toString().slice(-8)}`
 
-  // Build the list of formats based on what we detected.
+  // Skip the button entirely on plain-text replies — those just need a
+  // Copy action, which the parent renders separately. Keeps the reply
+  // box clean and avoids surfacing "Save this reply" on every message.
+  if (detected.kind === 'text') return null
+
+  // Build the list of formats based on what we detected — only the ones
+  // that actually make sense as file downloads.
   const items = useMemo(() => {
     const list = []
     if (detected.kind === 'rows') {
-      list.push({ key: 'xlsx', icon: <FileExcelOutlined style={{ color: '#16a34a' }} />, label: 'Excel (.xlsx)', hint: `${detected.rows.length} rows` })
+      list.push({ key: 'xlsx', icon: <FileExcelOutlined style={{ color: '#16a34a' }} />, label: `Excel (.xlsx) · ${detected.rows.length} rows` })
       list.push({ key: 'csv',  icon: <FileZipOutlined  style={{ color: '#60a5fa' }} />, label: 'CSV (.csv)' })
       list.push({ key: 'json', icon: <FileTextOutlined style={{ color: '#f59e0b' }} />, label: 'JSON (.json)' })
-      list.push({ type: 'divider' })
     } else if (detected.kind === 'json') {
       list.push({ key: 'json', icon: <FileTextOutlined style={{ color: '#f59e0b' }} />, label: 'JSON (.json)' })
-      list.push({ type: 'divider' })
     }
-    list.push({ key: 'md',  icon: <FileMarkdownOutlined style={{ color: '#9ca3af' }} />, label: 'Markdown (.md)' })
-    list.push({ key: 'pdf', icon: <FilePdfOutlined      style={{ color: '#ef4444' }} />, label: 'PDF (.pdf)' })
     return list
   }, [detected])
 

@@ -559,8 +559,11 @@ const AIChat = () => {
             </div>
           </header>
 
-          {/* Messages area */}
-          <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 sm:px-5 py-4 space-y-3">
+          {/* Messages area — overflow-x-hidden so a wide code block /
+              long URL inside a single message never produces a page-
+              wide horizontal scrollbar (code blocks have their own
+              inner scroll, the chat itself stays purely vertical). */}
+          <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden px-3 sm:px-5 py-4 space-y-3">
             {!chatId ? (
               <WelcomeHero
                 provider={provider} localModels={localModels} localOnline={localOnline}
@@ -763,6 +766,32 @@ function HelpCard({ icon, title, body }) {
   )
 }
 
+// One-tap copy on every assistant reply. Swaps to a ✓ for 1.5s so the
+// user gets clear feedback without an antd-toast overlay.
+function CopyReplyButton({ text }) {
+  const [done, setDone] = useState(false)
+  const handle = async () => {
+    try {
+      await navigator.clipboard.writeText(text || '')
+      setDone(true); setTimeout(() => setDone(false), 1500)
+    } catch {}
+  }
+  return (
+    <Tooltip title={done ? 'Copied' : 'Copy reply'}>
+      <button
+        onClick={handle}
+        className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-md border transition-colors ${
+          done
+            ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
+            : 'border-gray-700 bg-gray-900/60 hover:bg-gray-800 text-gray-300 hover:text-white'
+        }`}>
+        {done ? <CheckOutlined /> : <CopyOutlined />}
+        <span className="hidden sm:inline">{done ? 'Copied' : 'Copy'}</span>
+      </button>
+    </Tooltip>
+  )
+}
+
 // ─── Single message bubble ──────────────────────────────────
 function MessageBubble({ msg }) {
   const isUser = msg.role === 'user'
@@ -773,7 +802,7 @@ function MessageBubble({ msg }) {
           <RobotOutlined />
         </div>
       )}
-      <div className={`max-w-[88%] sm:max-w-[78%] rounded-2xl px-3 sm:px-4 py-2.5 ${
+      <div className={`max-w-[88%] sm:max-w-[78%] min-w-0 break-words rounded-2xl px-3 sm:px-4 py-2.5 overflow-hidden ${
         isUser
           ? 'bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-cyan-500/30 text-gray-100'
           : msg._failed
@@ -781,7 +810,8 @@ function MessageBubble({ msg }) {
             : 'bg-gray-900/80 border border-gray-800 text-gray-100'
       }`}>
         {msg.imageUrl && (
-          <img src={msg.imageUrl} alt="" className="max-h-64 rounded-lg mb-2 border border-gray-700" />
+          <img src={msg.imageUrl} alt=""
+            className="max-h-64 max-w-full rounded-lg mb-2 border border-gray-700 object-contain" />
         )}
         {msg._pending ? (
           <div className="flex items-center gap-2 py-1">
@@ -797,13 +827,19 @@ function MessageBubble({ msg }) {
         )}
         {!isUser && !msg._pending && (
           <div className="mt-2 pt-2 border-t border-gray-800 flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-2 text-[10px] text-gray-500 font-mono flex-wrap">
-              {msg.model && <span>{msg.model}</span>}
+            <div className="flex items-center gap-2 text-[10px] text-gray-500 font-mono flex-wrap min-w-0">
+              {msg.model && <span className="truncate max-w-[160px]">{msg.model}</span>}
               {msg.elapsedMs && <span>· {(msg.elapsedMs / 1000).toFixed(1)}s</span>}
               {msg.tokensOut && <span>· {msg.tokensOut} tok</span>}
             </div>
             {msg.content && !msg._failed && (
-              <DownloadMenu content={msg.content} messageId={msg.messageId} model={msg.model} />
+              <div className="flex items-center gap-1.5 shrink-0">
+                <CopyReplyButton text={msg.content} />
+                {/* Download only appears when the reply has structured
+                    data (table / JSON rows). For plain prose, the
+                    component renders nothing — Copy is enough. */}
+                <DownloadMenu content={msg.content} messageId={msg.messageId} model={msg.model} />
+              </div>
             )}
           </div>
         )}
