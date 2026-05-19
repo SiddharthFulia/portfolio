@@ -306,24 +306,41 @@ const AIChat = () => {
       antMessage.info('Chat is still short — nothing to compact yet')
       return
     }
+    const willCompact = Math.max(0, liveCharStats.count - 4)
     Modal.confirm({
-      title: 'Compact this chat?',
+      title: <span className="text-white font-bold">Compact this chat?</span>,
+      icon: null,
       content: (
-        <div className="text-sm text-gray-300 space-y-2">
-          <p>
-            We'll summarize the earlier {Math.max(0, liveCharStats.count - 4)} messages into a
-            single system note and keep the last 4 as-is. The model stays fast and the
-            full thread is preserved (older messages are hidden, not deleted).
+        <div className="text-sm space-y-3 pt-1">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="p-2.5 rounded-lg bg-fuchsia-500/10 border border-fuchsia-500/30">
+              <div className="text-[10px] uppercase tracking-wider text-fuchsia-300 font-bold">Will compact</div>
+              <div className="text-xl font-black text-white">{willCompact}</div>
+              <div className="text-[10px] text-fuchsia-200/70">older messages</div>
+            </div>
+            <div className="p-2.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30">
+              <div className="text-[10px] uppercase tracking-wider text-cyan-300 font-bold">Will keep</div>
+              <div className="text-xl font-black text-white">4</div>
+              <div className="text-[10px] text-cyan-200/70">latest as-is</div>
+            </div>
+          </div>
+          <p className="text-[12px] text-gray-200 leading-relaxed">
+            Summarised into one system note so the model stays fast.
+            Nothing is deleted — older messages are just hidden from the prompt.
           </p>
-          <p className="text-[11px] text-emerald-300">
-            🔒 Runs on your <span className="font-semibold">⚡ Studio Pro</span> when online —
-            your chat stays private. Falls back to cloud only if 5090 is offline.
-          </p>
+          <div className="text-[11px] text-emerald-200 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-2.5 py-2 flex items-start gap-2">
+            <span className="text-base leading-none">🔒</span>
+            <span>
+              Runs on your <span className="font-bold text-white">⚡ Studio Pro</span> when online —
+              chat stays private. Falls back to cloud only if 5090 is offline.
+            </span>
+          </div>
         </div>
       ),
       okText: 'Compact',
       cancelText: 'Cancel',
       centered: true,
+      width: 440,
       onOk: async () => {
         const keepLastN = 4
         setCompacting(true)
@@ -375,6 +392,7 @@ const AIChat = () => {
         setMessages(prev => prev.map(m => m.messageId === optimisticAssistantId
           ? { ...m, content: data.reply, model: data.model, provider: data.provider,
               tokensIn: data.tokensIn, tokensOut: data.tokensOut, elapsedMs: data.elapsedMs,
+              imageUrl: data.imageUrl || m.imageUrl || null,
               jobId, _pending: false }
           : m))
         setSending(false)
