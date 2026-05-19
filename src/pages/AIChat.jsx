@@ -390,7 +390,7 @@ const AIChat = () => {
                 }}
                 style={{ flex: 1, minWidth: 240 }}
                 placeholder={provider === '5090'
-                  ? (localModels.length ? 'Pick a model' : 'No 5090 models — install via E:\\Siddharth\\local-gpu-worker\\install_ollama_models.ps1')
+                  ? (localModels.length ? 'Pick a model' : 'No 5090 models available right now — try a cloud provider')
                   : 'Pick a model'}
                 disabled={!availableModels.length}
                 popupMatchSelectWidth={false}
@@ -450,8 +450,8 @@ const AIChat = () => {
               />
               <p className="text-[9px] text-gray-600 mt-1.5 px-1">
                 {provider === '5090'
-                  ? `Running on the RTX 5090 · ${model || 'no model'}. Each turn loads + unloads to keep VRAM free.`
-                  : `Cloud · ${model || 'no model'} · history kept locally, not persisted on the BE for cloud providers (5090 only).`}
+                  ? `Running on the RTX 5090 · ${model || 'no model'} · responses are private to this device`
+                  : `Cloud · ${model || 'no model'}`}
               </p>
             </div>
           )}
@@ -514,14 +514,12 @@ function WelcomeHero({ provider, localModels, localOnline, onPickProvider, onNew
           </div>
           {!localOnline && (
             <p className="text-[11px] text-rose-300 leading-snug mb-2">
-              ⚠ The 5090 worker isn't reporting in. Start <code className="px-1 py-0.5 bg-black/50 rounded font-mono text-rose-200">beast.py</code> on the home box.
+              ⚠ The personal 5090 lane is taking a break right now — try a cloud provider above.
             </p>
           )}
           {localOnline && localModels.length === 0 && (
             <p className="text-[11px] text-amber-300 leading-snug mb-2">
-              No Ollama models installed yet. Run{' '}
-              <code className="px-1 py-0.5 bg-black/50 rounded font-mono text-amber-200">install_ollama_models.ps1</code>{' '}
-              on the 5090 to pull the curated set.
+              No local models loaded yet — try a cloud provider above.
             </p>
           )}
           {localModels.length > 0 && (
