@@ -308,28 +308,37 @@ const AIChat = () => {
     }
     const willCompact = Math.max(0, liveCharStats.count - 4)
     Modal.confirm({
-      title: <span className="text-white font-bold">Compact this chat?</span>,
+      title: <span className="text-white font-bold text-base">Compact this chat?</span>,
       icon: null,
+      // Force the modal itself dark so all the light-on-dark text below
+      // is readable. AntD's default white background eats white text.
+      styles: {
+        content: { background: '#0a0a0e', border: '1px solid rgba(75, 85, 99, 0.5)', boxShadow: '0 20px 60px rgba(0, 0, 0, 0.6)' },
+        header:  { background: 'transparent', borderBottom: '1px solid rgba(55, 65, 81, 0.6)', paddingBottom: 12 },
+        body:    { background: 'transparent', color: '#e5e7eb', paddingTop: 16 },
+        footer:  { background: 'transparent', borderTop: '1px solid rgba(55, 65, 81, 0.6)', paddingTop: 12 },
+        mask:    { background: 'rgba(0, 0, 0, 0.7)' },
+      },
       content: (
-        <div className="text-sm space-y-3 pt-1">
+        <div className="text-sm space-y-3">
           <div className="grid grid-cols-2 gap-2">
-            <div className="p-2.5 rounded-lg bg-fuchsia-500/10 border border-fuchsia-500/30">
+            <div className="p-3 rounded-lg bg-fuchsia-500/15 border border-fuchsia-500/40">
               <div className="text-[10px] uppercase tracking-wider text-fuchsia-300 font-bold">Will compact</div>
-              <div className="text-xl font-black text-white">{willCompact}</div>
-              <div className="text-[10px] text-fuchsia-200/70">older messages</div>
+              <div className="text-2xl font-black text-white leading-tight">{willCompact}</div>
+              <div className="text-[10px] text-fuchsia-200">older messages</div>
             </div>
-            <div className="p-2.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30">
+            <div className="p-3 rounded-lg bg-cyan-500/15 border border-cyan-500/40">
               <div className="text-[10px] uppercase tracking-wider text-cyan-300 font-bold">Will keep</div>
-              <div className="text-xl font-black text-white">4</div>
-              <div className="text-[10px] text-cyan-200/70">latest as-is</div>
+              <div className="text-2xl font-black text-white leading-tight">4</div>
+              <div className="text-[10px] text-cyan-200">latest as-is</div>
             </div>
           </div>
-          <p className="text-[12px] text-gray-200 leading-relaxed">
+          <p className="text-[13px] text-gray-100 leading-relaxed">
             Summarised into one system note so the model stays fast.
             Nothing is deleted — older messages are just hidden from the prompt.
           </p>
-          <div className="text-[11px] text-emerald-200 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-2.5 py-2 flex items-start gap-2">
-            <span className="text-base leading-none">🔒</span>
+          <div className="text-[12px] text-emerald-100 bg-emerald-500/15 border border-emerald-500/40 rounded-lg px-3 py-2.5 flex items-start gap-2">
+            <span className="text-lg leading-none">🔒</span>
             <span>
               Runs on your <span className="font-bold text-white">⚡ Studio Pro</span> when online —
               chat stays private. Falls back to cloud only if 5090 is offline.
@@ -338,9 +347,15 @@ const AIChat = () => {
         </div>
       ),
       okText: 'Compact',
+      okButtonProps: {
+        style: { background: 'linear-gradient(135deg, #06b6d4, #7c3aed, #f59e0b)', border: 'none', fontWeight: 700 },
+      },
       cancelText: 'Cancel',
+      cancelButtonProps: {
+        style: { background: 'transparent', borderColor: 'rgba(75, 85, 99, 0.6)', color: '#e5e7eb' },
+      },
       centered: true,
-      width: 440,
+      width: 460,
       onOk: async () => {
         const keepLastN = 4
         setCompacting(true)
