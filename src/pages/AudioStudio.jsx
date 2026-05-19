@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Input, Select, Slider, Tooltip, Upload, message as antMessage } from 'antd'
-import { CustomerServiceOutlined, ThunderboltOutlined, DownloadOutlined, ReloadOutlined, BulbOutlined, CheckOutlined, DeleteOutlined, UploadOutlined, CopyOutlined } from '@ant-design/icons'
+import { CustomerServiceOutlined, ThunderboltOutlined, DownloadOutlined, ReloadOutlined, BulbOutlined, CheckOutlined, DeleteOutlined, UploadOutlined, CopyOutlined, SyncOutlined } from '@ant-design/icons'
 import { submitAudio, getAudioStatus, listAudioJobs, audioBulkAction, transcribeAudio, fileToDataUrl } from '../api/ai'
 import PromptHelper from '../components/PromptHelper'
 import { useTilt, TILT_STYLE } from '../components/useTilt'
@@ -330,7 +330,9 @@ export default function AudioStudio() {
                     <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500 font-mono">
                       <span className="truncate">{sttFile?.name || 'uploaded song'}</span>
                       <button onClick={() => { setSttFile(null); setSttDataUrl(''); setSepResult(null) }}
-                        className="text-rose-400 hover:text-rose-300">✕ Replace</button>
+                        className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-rose-500/40 hover:border-rose-400 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 transition-colors">
+                        <SyncOutlined className="text-[9px]" /> Replace
+                      </button>
                     </div>
                   </div>
                 ) : (
@@ -402,7 +404,9 @@ export default function AudioStudio() {
                     <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500 font-mono">
                       <span className="truncate">{sttFile?.name || 'recorded audio'}</span>
                       <button onClick={() => { setSttFile(null); setSttDataUrl(''); setSttResult(null) }}
-                        className="text-rose-400 hover:text-rose-300">✕ Replace</button>
+                        className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-rose-500/40 hover:border-rose-400 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 transition-colors">
+                        <SyncOutlined className="text-[9px]" /> Replace
+                      </button>
                     </div>
                   </div>
                 ) : (
@@ -666,6 +670,11 @@ function AudioCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
   // full live-log view; completed cards just play in-place (the embedded
   // <audio> controls handle that without a redirect).
   const isActive = item.status !== 'completed'
+  // BE already JSON-parses stems for getAudioStatus, but the list endpoint
+  // returns raw rows — `stems` is still a string. Inflate here.
+  const stemsObj = item.stems
+    ? (typeof item.stems === 'string' ? (() => { try { return JSON.parse(item.stems) } catch { return null } })() : item.stems)
+    : null
   return (
     <div className={`group relative rounded-xl overflow-hidden border transition-all bg-gray-900/40 p-3 ${
       checked
@@ -675,9 +684,41 @@ function AudioCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
       <div className="flex items-center gap-2 mb-2">
         <span className="text-base">{kindIcon}</span>
         <span className="text-[10px] uppercase tracking-wider text-gray-500 font-mono">{item.model}</span>
-        <span className="text-[10px] text-gray-600 ml-auto">{item.duration}s</span>
+        <span className="text-[10px] text-gray-600 ml-auto">
+          {item.kind === 'separate' && stemsObj ? `${Object.keys(stemsObj).filter(k => k !== 'lyrics').length} stems`
+           : item.kind === 'stt' && item.transcript ? `${item.transcript.length} ch`
+           : item.duration ? `${item.duration}s`
+           : ''}
+        </span>
       </div>
-      {item.outputUrl ? (
+      {/* Stem-split completed cards: 4 colour-coded mini players inline */}
+      {item.kind === 'separate' && stemsObj ? (
+        <div className="grid grid-cols-2 gap-1.5" onClick={e => e.stopPropagation()}>
+          {[
+            { key: 'vocals', label: '🎤', tint: 'border-fuchsia-500/40' },
+            { key: 'drums',  label: '🥁', tint: 'border-amber-500/40' },
+            { key: 'bass',   label: '🎸', tint: 'border-emerald-500/40' },
+            { key: 'other',  label: '🎹', tint: 'border-cyan-500/40' },
+          ].map(s => stemsObj[s.key] ? (
+            <div key={s.key} className={`rounded-md border ${s.tint} p-1 bg-black/30`}>
+              <div className="flex items-center gap-1 mb-0.5">
+                <span className="text-[10px]">{s.label}</span>
+                <span className="text-[9px] uppercase text-gray-500 font-semibold">{s.key}</span>
+              </div>
+              <audio src={stemsObj[s.key]} controls className="w-full h-6" preload="none"
+                style={{ height: '24px' }} />
+            </div>
+          ) : null)}
+        </div>
+      ) :
+      /* STT completed cards: show the transcript snippet inline */
+      item.kind === 'stt' && item.transcript ? (
+        <div className="rounded-md border border-gray-800 bg-black/40 p-2 text-[11px] text-gray-200 leading-snug line-clamp-3"
+          onClick={e => e.stopPropagation()}>
+          {item.transcript}
+        </div>
+      ) :
+      item.outputUrl ? (
         <audio src={item.outputUrl} controls className="w-full" onClick={e => e.stopPropagation()} />
       ) : isActive ? (
         <Link to={`/audio/${encodeURIComponent(item.jobId)}`}
@@ -692,7 +733,15 @@ function AudioCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
           <span className="text-2xl opacity-50">✗</span>
         </div>
       )}
-      <p className="text-[10px] text-gray-500 mt-2 line-clamp-2 leading-snug">{item.prompt}</p>
+      {/* Lyrics teaser line on stem-split cards */}
+      {item.kind === 'separate' && stemsObj?.lyrics && (
+        <p className="text-[10px] text-fuchsia-300/70 mt-2 line-clamp-2 leading-snug italic">
+          📝 {stemsObj.lyrics.slice(0, 100)}{stemsObj.lyrics.length > 100 ? '…' : ''}
+        </p>
+      )}
+      {!(item.kind === 'separate' || item.kind === 'stt') && (
+        <p className="text-[10px] text-gray-500 mt-2 line-clamp-2 leading-snug">{item.prompt}</p>
+      )}
       {selectMode && <SelectCheckbox checked={checked} onToggle={onToggleSelect} />}
       {item.status !== 'completed' && (
         <div className={`pointer-events-none absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${

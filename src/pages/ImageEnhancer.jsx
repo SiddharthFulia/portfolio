@@ -6,7 +6,7 @@ import {
   UploadOutlined, ExpandAltOutlined, DownloadOutlined,
   CheckOutlined, ReloadOutlined, ThunderboltOutlined,
   AppstoreOutlined, CloudOutlined, DesktopOutlined, DeleteOutlined,
-  LockOutlined, BulbOutlined, CopyOutlined,
+  LockOutlined, BulbOutlined, CopyOutlined, SyncOutlined,
 } from '@ant-design/icons'
 import {
   enhanceImage, getImageStatus, listEnhancedImages, deleteEnhancedImage, fileToDataUrl,
@@ -1220,8 +1220,8 @@ function GenerateSection({
                 <div className="relative">
                   <img src={sourceDataUrl} alt="source" className="w-full max-h-72 object-contain rounded-lg" />
                   <button onClick={reset}
-                    className="absolute top-2 right-2 px-2 py-1 text-[10px] rounded-full bg-black/70 hover:bg-rose-600 text-white border border-white/10">
-                    ✕ Replace
+                    className="absolute top-2 right-2 inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full bg-black/70 hover:bg-rose-600 text-gray-200 hover:text-white border border-white/10 transition-colors">
+                    <SyncOutlined className="text-[9px]" /> Replace
                   </button>
                 </div>
                 {/* Quick canvas transforms: rotate −90° / +90° and horizontal

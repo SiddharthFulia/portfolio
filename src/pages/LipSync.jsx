@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Upload, Input, Select, message as antMessage } from 'antd'
-import { UploadOutlined, SoundOutlined, ThunderboltOutlined, ReloadOutlined, DownloadOutlined, CheckOutlined, DeleteOutlined } from '@ant-design/icons'
+import { UploadOutlined, SoundOutlined, ThunderboltOutlined, ReloadOutlined, DownloadOutlined, CheckOutlined, DeleteOutlined, SyncOutlined } from '@ant-design/icons'
 import { submitLipsync, getLipsyncStatus, fileToDataUrl, listLipsyncJobs, lipsyncBulkAction } from '../api/ai'
 import { useTilt, TILT_STYLE } from '../components/useTilt'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
@@ -113,9 +113,13 @@ export default function LipSync() {
                 {model === 'liveportrait'
                   ? <video controls src={audioDataUrl} className="w-full max-h-[40vh] rounded-lg" />
                   : <audio controls src={audioDataUrl} className="w-full" />}
-                <p className="text-[10px] text-gray-600 font-mono truncate">{audioFile?.name || 'recorded audio'}</p>
-                <button onClick={() => { setAudioFile(null); setAudioDataUrl('') }}
-                  className="text-[10px] text-rose-400 hover:text-rose-300">✕ Replace</button>
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <span className="text-[10px] text-gray-600 font-mono truncate">{audioFile?.name || 'recorded audio'}</span>
+                  <button onClick={() => { setAudioFile(null); setAudioDataUrl('') }}
+                    className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-rose-500/40 hover:border-rose-400 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 transition-colors">
+                    <SyncOutlined className="text-[9px]" /> Replace
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="flex flex-col gap-3">
@@ -160,8 +164,8 @@ export default function LipSync() {
               <div className="relative">
                 <img src={portraitDataUrl} alt="portrait" className="w-full max-h-72 object-contain rounded-lg" />
                 <button onClick={() => { setPortraitFile(null); setPortraitDataUrl('') }}
-                  className="absolute top-2 right-2 px-2 py-1 text-[10px] rounded-full bg-black/70 hover:bg-rose-600 text-white">
-                  ✕ Replace
+                  className="absolute top-2 right-2 inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full bg-black/70 hover:bg-rose-600 text-gray-200 hover:text-white border border-white/10 transition-colors">
+                  <SyncOutlined className="text-[9px]" /> Replace
                 </button>
               </div>
             ) : (

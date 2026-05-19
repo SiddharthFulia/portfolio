@@ -157,16 +157,21 @@ export default function JobDetailPage({
     : completedAt ? 100 : null
 
   return (
-    <div className="min-h-screen bg-black text-gray-100 pt-20 pb-16 px-3 sm:px-6">
+    /* pt-28 (was pt-20) — the global Navbar is `fixed` and ~80px tall.
+       Old padding put the Back button right under the navbar, clipping
+       it on phones + producing a "where's the button" moment on desktop. */
+    <div className="min-h-screen bg-black text-gray-100 pt-28 pb-16 px-3 sm:px-6">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <header className="mb-6">
+          {/* Pill-style back button with hover affordance — was inline
+              text only which felt unfinished. */}
           <button onClick={() => navigate(backTo)}
-            className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-gray-500 hover:text-gray-300 mb-3 transition-colors">
-            <ArrowLeftOutlined /> Back to {title} library
+            className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider px-3 py-1.5 rounded-full border border-gray-800 hover:border-cyan-500/50 bg-gray-900/60 hover:bg-cyan-500/10 text-gray-400 hover:text-cyan-200 mb-4 transition-all">
+            <ArrowLeftOutlined className="text-[10px]" /> Back to {title}
           </button>
           <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
-            <h1 className={`text-2xl sm:text-3xl font-bold ${accentClass}`}>
+            <h1 className={`text-2xl sm:text-3xl font-bold leading-tight pb-1 ${accentClass}`}>
               {title}
             </h1>
             <span className={`px-3 py-1 rounded-full border text-[11px] font-semibold uppercase tracking-wider flex items-center gap-1.5 ${tone}`}>
