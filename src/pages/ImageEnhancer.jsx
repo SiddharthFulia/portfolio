@@ -524,6 +524,10 @@ export default function ImageEnhancer() {
   // Pony users normally paste their score_4..score_1 baseline here.
   const [negativePrompt, setNegativePrompt] = useState('')
   const [customModel, setCustomModel] = useState('')   // optional checkpoint override
+  // Family filter for the Atelier workflow grid — quick way to narrow
+  // the list to Image→Image / Text→Image / Both / Upscale. Persists
+  // across re-renders. Default 'all' shows everything.
+  const [familyFilter, setFamilyFilter] = useState('all')
   // Vault login state: small lock button in the header opens an Antd modal
   // with a password field. Once logged in, all outputs auto-route to the
   // private Vault library AND the NSFW filter is bypassed server-side.
@@ -804,6 +808,7 @@ export default function ImageEnhancer() {
                   customModel={customModel} setCustomModel={setCustomModel}
                   setLogsModalOpen={setLogsModalOpen}
                   setPromptHelperOpen={setPromptHelperOpen}
+                  familyFilter={familyFilter} setFamilyFilter={setFamilyFilter}
                 />
               ),
             },
@@ -1173,6 +1178,11 @@ function GenerateSection({
   // t2iMode forces an Atelier text→image flow: hides the upload card,
   // filters the workflow grid to only T2I, and skips the Cloud presets.
   t2iMode = false,
+  // familyFilter scopes the workflow grid to a category — passed down
+  // from the parent so the chip + grid stay in sync. Optional; null /
+  // 'all' shows everything. Values: 'img2img' | 't2i' | 'both' | 'upscale'.
+  familyFilter: familyFilterProp = 'all',
+  setFamilyFilter,
 }) {
   // Canvas transforms applied to the current sourceDataUrl in-place. Used
   // by the rotate L/R + mirror buttons that appear when a source image is
@@ -1196,10 +1206,24 @@ function GenerateSection({
     setSourceDataUrl(dataUrl)
   }
   const isAtelier = t2iMode || engine === 'atelier' || engine === 'local'
-  // In T2I mode, only show t2i workflows so the user can't pick i2i by mistake.
+  // Family filter chip — sits above the workflow grid. 'all' shows
+  // everything; the explicit values narrow to a single family. Hidden
+  // when the page is already locked to t2iMode (the filter would be
+  // redundant there). Lives on the parent so it survives re-renders.
+  const familyFilter = familyFilterProp ?? 'all'
+  // In T2I mode, only show t2i workflows. Otherwise apply the family
+  // filter — 'all' means no filtering.
   const visibleWorkflows = t2iMode
     ? ATELIER_WORKFLOWS.filter(w => w.family === 't2i')
-    : ATELIER_WORKFLOWS
+    : (familyFilter === 'all'
+        ? ATELIER_WORKFLOWS
+        : ATELIER_WORKFLOWS.filter(w => {
+            if (familyFilter === 'img2img') return w.family === 'img2img' || w.family === 'edit'
+            if (familyFilter === 't2i')     return w.family === 't2i'
+            if (familyFilter === 'both')    return w.family === 'img2img' || w.family === 't2i'
+            if (familyFilter === 'upscale') return w.family === 'upscale'
+            return true
+          }))
   const wf = ATELIER_WORKFLOWS.find(w => w.id === atelierWorkflow) || visibleWorkflows[0] || ATELIER_WORKFLOWS[0]
   const showSteps = wf.defaults?.steps != null
   const showDenoise = wf.defaults?.denoise != null
@@ -1415,11 +1439,42 @@ function GenerateSection({
           // Atelier mode: workflow dropdown + prompt + fine-tunes
           <section className="mb-6 space-y-4">
             <div>
-              <h2 className="text-xs uppercase tracking-wider text-gray-500 mb-2">
-                {t2iMode ? 'Text → Image workflow' : 'Workflow'}
-              </h2>
+              <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                <h2 className="text-xs uppercase tracking-wider text-gray-500">
+                  {t2iMode ? 'Text → Image workflow' : 'Workflow'}
+                </h2>
+                {/* Family filter chips — quick categorisation of the
+                    workflow list. Hidden in t2iMode (already filtered). */}
+                {!t2iMode && setFamilyFilter && (
+                  <div className="inline-flex items-center gap-1 p-0.5 rounded-full bg-gray-900/60 border border-gray-800">
+                    {[
+                      { id: 'all',     label: 'All' },
+                      { id: 'img2img', label: '🖼 Image → Image' },
+                      { id: 't2i',     label: '✍ Text → Image' },
+                      { id: 'both',    label: '↔ Both' },
+                      { id: 'upscale', label: '⤴ Upscale' },
+                    ].map(c => {
+                      const active = familyFilterProp === c.id
+                      return (
+                        <button key={c.id} onClick={() => setFamilyFilter(c.id)}
+                          className={`text-[10px] font-semibold px-2.5 py-1 rounded-full transition-colors whitespace-nowrap ${
+                            active
+                              ? 'bg-gradient-to-r from-cyan-500 to-fuchsia-500 text-white shadow-sm'
+                              : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/60'
+                          }`}>
+                          {c.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 [perspective:1200px]">
-                {visibleWorkflows.map(w => {
+                {visibleWorkflows.length === 0 ? (
+                  <div className="col-span-full text-center text-xs text-gray-500 py-6 border border-dashed border-gray-800 rounded-xl">
+                    No workflows in this category — pick another filter above.
+                  </div>
+                ) : visibleWorkflows.map(w => {
                   const active = atelierWorkflow === w.id
                   return (
                     <WorkflowCard key={w.id} workflow={w} active={active}
