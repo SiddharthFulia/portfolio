@@ -549,14 +549,33 @@ export async function getChatJobStatus(jobId) {
 }
 
 // Compress older messages in a chat into a single system summary so the
-// model stays fast as the thread gets long. Returns { compacted, kept,
-// summaryMessage }.
-export async function compactConversationApi(chatId, { keepLastN = 4 } = {}) {
+// model stays fast as the thread gets long.
+//
+// Two response shapes:
+//   { mode: 'local',  jobId, model, kept, toCompact }
+//     → FE should poll /chat/status/:jobId and then call
+//       finalizeCompactApi(chatId, { jobId, keepLastN }).
+//   { mode: 'cloud', compacted, kept, summaryMessage }
+//     → Done synchronously (Groq fallback when no 5090 model is online).
+export async function compactConversationApi(chatId, { keepLastN = 4, mode = 'auto' } = {}) {
   try {
     const data = await post(
       `${ENDPOINTS.CHAT_CONVERSATIONS}/${encodeURIComponent(chatId)}/compact`,
-      { keepLastN },
+      { keepLastN, mode },
       { timeout: 60000 }
+    );
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+
+// Second half of the local compact flow. Called once the chat_job
+// produced by compactConversationApi reaches status='completed'.
+export async function finalizeCompactApi(chatId, { jobId, keepLastN = 4 } = {}) {
+  try {
+    const data = await post(
+      `${ENDPOINTS.CHAT_CONVERSATIONS}/${encodeURIComponent(chatId)}/compact/finalize`,
+      { jobId, keepLastN },
+      { timeout: 15000 }
     );
     return { data: data?.data || data, error: null };
   } catch (err) { return { data: null, error: err.message }; }
