@@ -1,38 +1,88 @@
-import { useState, useEffect, useRef } from 'react'
-import { Input, Button, Select, Slider, Collapse, Tag, Tooltip, message as antMessage } from 'antd'
-import { SendOutlined, RobotOutlined, UserOutlined, CopyOutlined, CheckOutlined, SettingOutlined, AudioOutlined, StopOutlined, LoadingOutlined } from '@ant-design/icons'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { Select, Tag, Tooltip, message as antMessage, Button } from 'antd'
+import {
+  RobotOutlined, UserOutlined, CopyOutlined, CheckOutlined, MenuOutlined,
+  ThunderboltOutlined, CloudOutlined, DesktopOutlined, GoogleOutlined,
+  PictureOutlined, FileTextOutlined,
+} from '@ant-design/icons'
 import ReactMarkdown from 'react-markdown'
-import { checkHealth, sendChat, sendGroq, sendGemini, transcribeAudio } from '../api/ai'
+import ChatSidebar from '../components/ChatSidebar'
+import ChatInput from '../components/ChatInput'
+import {
+  sendChat, sendGroq, sendGemini,
+  listLocalModels, createConversation, getConversation, sendChatMessage,
+  getChatJobStatus, updateConversation,
+} from '../api/ai'
 
-const LOCAL_MODELS = [
-  { id: 'phi3:mini', label: 'Phi-3 Mini', desc: 'Local, general purpose' },
-  { id: 'llama3.2:1b', label: 'Llama 3.2 1B', desc: 'Local, fast' },
-  { id: 'deepseek-coder:1.3b', label: 'DeepSeek Coder', desc: 'Local, code' },
+// ─── Provider catalog ────────────────────────────────────────────────
+// Tabs across the top of the chat. Each provider has a curated model
+// list with a "best for X" hint so users don't have to guess. The 5090
+// list is hydrated dynamically from `/api/chat/local-models`.
+
+const PROVIDERS = [
+  { id: '5090',          label: '🖥 5090 Beast', icon: <DesktopOutlined />, blurb: 'Local on the RTX 5090 — private, multimodal, free',                accent: 'from-amber-400 via-rose-400 to-fuchsia-500' },
+  { id: 'cloud-groq',    label: '⚡ Groq Cloud',  icon: <ThunderboltOutlined />, blurb: 'Hosted · sub-second tokens · Llama / GPT-OSS',               accent: 'from-cyan-400 to-blue-500' },
+  { id: 'cloud-gemini',  label: '✨ Gemini',      icon: <GoogleOutlined />, blurb: 'Google · multimodal · fast + free tier',                          accent: 'from-blue-400 via-fuchsia-400 to-pink-400' },
+  { id: 'oracle-ollama', label: '☁ Oracle Ollama', icon: <CloudOutlined />, blurb: 'Tiny models on the BE (Phi-3 / Llama 1B) — fallback only',        accent: 'from-emerald-400 to-cyan-400' },
 ]
 
 const GROQ_MODELS = [
-  { id: 'llama-3.1-8b', label: 'Llama 3.1 8B', desc: 'Fastest' },
-  { id: 'llama-3.3-70b', label: 'Llama 3.3 70B', desc: 'Best quality' },
-  { id: 'gpt-oss-120b', label: 'GPT-OSS 120B', desc: 'Most powerful' },
+  { id: 'llama-3.1-8b',  name: 'Llama 3.1 8B',  best: 'Fastest replies' },
+  { id: 'llama-3.3-70b', name: 'Llama 3.3 70B', best: 'Best quality reasoning' },
+  { id: 'gpt-oss-120b',  name: 'GPT-OSS 120B',  best: 'Most powerful, slowest' },
 ]
-
 const GEMINI_MODELS = [
-  { id: 'gemini-flash', label: 'Gemini 2.0 Flash', desc: 'Fast, free' },
-  { id: 'gemini-flash-lite', label: 'Flash Lite', desc: 'Ultra light' },
-  { id: 'gemini-pro', label: 'Gemini 1.5 Pro', desc: 'Best quality' },
+  { id: 'gemini-flash',      name: 'Gemini 2.0 Flash',      best: 'Fast multimodal' },
+  { id: 'gemini-flash-lite', name: 'Gemini Flash Lite',     best: 'Ultra light' },
+  { id: 'gemini-pro',        name: 'Gemini 1.5 Pro',        best: 'Long-context reasoning' },
+]
+const ORACLE_MODELS = [
+  { id: 'phi3:mini',            name: 'Phi-3 Mini',     best: 'Small, general purpose' },
+  { id: 'llama3.2:1b',          name: 'Llama 3.2 1B',   best: 'Fast tiny model' },
+  { id: 'deepseek-coder:1.3b',  name: 'DeepSeek Coder', best: 'Code (tiny)' },
 ]
 
+// One-liner "what to use for what" — drives the welcoming empty state.
+const ROLE_HINTS = {
+  'qwen2.5:32b-instruct-q4_K_M':       'Best open text · everyday reasoning',
+  'qwen2.5:14b-instruct-q4_K_M':       'Faster everyday chat',
+  'qwen2.5-coder:32b-instruct-q4_K_M': 'Best open code generator',
+  'qwen2.5-coder:14b-instruct-q4_K_M': 'Faster code generation',
+  'qwen2.5vl:32b':                      'Top vision · OCR, charts, screenshots',
+  'qwen2.5vl:7b':                       'Vision · efficient',
+  'llama3.2-vision:11b':                'Meta vision (alt)',
+  'llama3.2-vision:90b':                'Top vision · slow',
+  'phi4:14b':                           'Math + STEM punches above weight',
+  'gemma2:27b-instruct-q4_K_M':         'Google Gemma · alt reasoning',
+  'mistral-small:24b-instruct-q4_K_M':  'Mistral · function calling',
+  'llama3.3:70b-instruct-q4_K_M':       'Llama 3.3 · smartest (slow)',
+  'llava:34b-v1.6-q4_K_M':              'Classic vision · screenshots',
+  'minicpm-v:8b':                       'Efficient vision · phone-class',
+  'bge-m3':                              'Embeddings (not for chat)',
+}
+
+const isVisionModel = (id = '') => /vision|vl|llava|minicpm-v|bakllava/i.test(id)
+const isCodeModel = (id = '') => /coder/i.test(id)
+const isEmbeddingModel = (id = '') => /embed|bge-/i.test(id)
+
+const fmtBytes = (b) => {
+  if (!b) return ''
+  if (b < 1024) return `${b} B`
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(0)} KB`
+  if (b < 1024 * 1024 * 1024) return `${(b / 1024 / 1024).toFixed(0)} MB`
+  return `${(b / 1024 / 1024 / 1024).toFixed(1)} GB`
+}
+
+// ─── Markdown renderer (preserved from previous AIChat) ─────────────
 const CodeBlock = ({ children, className }) => {
   const [copied, setCopied] = useState(false)
   const code = String(children).replace(/\n$/, '')
   const lang = className?.replace('language-', '') || ''
-
   const copy = () => {
     navigator.clipboard.writeText(code)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    setCopied(true); setTimeout(() => setCopied(false), 2000)
   }
-
   return (
     <div className="relative my-2 rounded-lg overflow-hidden border border-gray-700">
       <div className="flex items-center justify-between px-3 py-1.5 bg-gray-800/80 border-b border-gray-700">
@@ -45,366 +95,533 @@ const CodeBlock = ({ children, className }) => {
     </div>
   )
 }
-
 const InlineCode = ({ children }) => (
   <code className="px-1.5 py-0.5 bg-gray-800 text-cyan-400 text-xs rounded font-mono">{children}</code>
 )
-
 const MarkdownMessage = ({ content }) => (
-  <ReactMarkdown
-    components={{
-      code: ({ inline, className, children }) =>
-        inline ? <InlineCode>{children}</InlineCode> : <CodeBlock className={className}>{children}</CodeBlock>,
-      p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-      ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
-      ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
-      li: ({ children }) => <li className="text-sm">{children}</li>,
-      h1: ({ children }) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
-      h2: ({ children }) => <h2 className="text-base font-bold mb-2">{children}</h2>,
-      h3: ({ children }) => <h3 className="text-sm font-bold mb-1">{children}</h3>,
-      strong: ({ children }) => <strong className="font-bold text-white">{children}</strong>,
-      em: ({ children }) => <em className="italic text-gray-300">{children}</em>,
-      blockquote: ({ children }) => <blockquote className="border-l-2 border-cyan-500 pl-3 my-2 text-gray-400 italic">{children}</blockquote>,
-      a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">{children}</a>,
-      table: ({ children }) => <div className="overflow-x-auto my-2"><table className="min-w-full text-xs border border-gray-700">{children}</table></div>,
-      th: ({ children }) => <th className="px-2 py-1 bg-gray-800 border border-gray-700 text-left font-semibold">{children}</th>,
-      td: ({ children }) => <td className="px-2 py-1 border border-gray-700">{children}</td>,
-      hr: () => <hr className="my-3 border-gray-700" />,
-    }}
-  >
-    {content}
-  </ReactMarkdown>
+  <ReactMarkdown components={{
+    code: ({ inline, className, children }) =>
+      inline ? <InlineCode>{children}</InlineCode> : <CodeBlock className={className}>{children}</CodeBlock>,
+    p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+    ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
+    ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
+    li: ({ children }) => <li className="text-sm">{children}</li>,
+    h1: ({ children }) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
+    h2: ({ children }) => <h2 className="text-base font-bold mb-2">{children}</h2>,
+    h3: ({ children }) => <h3 className="text-sm font-bold mb-1">{children}</h3>,
+    strong: ({ children }) => <strong className="font-bold text-white">{children}</strong>,
+    em: ({ children }) => <em className="italic text-gray-300">{children}</em>,
+    blockquote: ({ children }) => <blockquote className="border-l-2 border-cyan-500 pl-3 my-2 text-gray-400 italic">{children}</blockquote>,
+    a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">{children}</a>,
+    table: ({ children }) => <div className="overflow-x-auto my-2"><table className="min-w-full text-xs border border-gray-700">{children}</table></div>,
+    th: ({ children }) => <th className="px-2 py-1 bg-gray-800 border border-gray-700 text-left font-semibold">{children}</th>,
+    td: ({ children }) => <td className="px-2 py-1 border border-gray-700">{children}</td>,
+    hr: () => <hr className="my-3 border-gray-700" />,
+  }}>{content}</ReactMarkdown>
 )
 
+// ─── Page ────────────────────────────────────────────────────────────
 const AIChat = () => {
+  const navigate = useNavigate()
+  const { chatId } = useParams()
+
+  const [provider, setProvider] = useState('5090')
+  const [model, setModel] = useState('')
+  const [localModels, setLocalModels] = useState([])
+  const [localOnline, setLocalOnline] = useState(null)
+
+  const [conversation, setConversation] = useState(null)
   const [messages, setMessages] = useState([])
-  const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
-  const [status, setStatus] = useState('checking')
-  const [provider, setProvider] = useState('groq') // 'local' | 'groq'
-  const [model, setModel] = useState('llama-3.1-8b')
-  const [system, setSystem] = useState('')
-  const [temperature, setTemperature] = useState(0.7)
-  const [maxTokens, setMaxTokens] = useState(200)
-  const [lastMs, setLastMs] = useState(null)
-  const [lastTokens, setLastTokens] = useState(null)
+  const [sidebarRefresh, setSidebarRefresh] = useState(0)
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+
+  const pollRef = useRef(null)
   const scrollRef = useRef(null)
-  const inputRef = useRef(null)
 
-  // Mic → STT state. ChatGPT-style flow: tap mic, speak, tap again to stop;
-  // we transcribe via /api/stt (Whisper) and drop the text into the input
-  // textarea so the user can review + edit before hitting Send.
-  const [recState, setRecState] = useState('idle')  // idle | recording | transcribing
-  const [recElapsed, setRecElapsed] = useState(0)
-  const recorderRef = useRef(null)
-  const chunksRef = useRef([])
-  const recStreamRef = useRef(null)
-  const recTickRef = useRef(null)
-  const recStartedRef = useRef(0)
+  useEffect(() => { document.title = chatId ? `Chat · ${chatId.slice(0,8)} · Sid` : 'AI Chat · Sid' }, [chatId])
 
-  useEffect(() => () => {
-    if (recTickRef.current) clearInterval(recTickRef.current)
-    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
-      try { recorderRef.current.stop() } catch {}
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-    recStreamRef.current?.getTracks().forEach(t => t.stop())
+  }, [messages.length])
+
+  // Fetch installed 5090 Ollama models on mount + every 30s while on 5090 tab
+  useEffect(() => {
+    let cancelled = false
+    const tick = async () => {
+      const { data } = await listLocalModels()
+      if (cancelled) return
+      const models = data?.models || []
+      setLocalModels(models)
+      setLocalOnline(!!data?.online)
+    }
+    tick()
+    const id = setInterval(tick, 30000)
+    return () => { cancelled = true; clearInterval(id) }
   }, [])
 
-  const stopRecording = () => {
-    if (recTickRef.current) { clearInterval(recTickRef.current); recTickRef.current = null }
-    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
-      try { recorderRef.current.stop() } catch {}
-    }
-  }
-
-  const handleMic = async () => {
-    if (recState === 'recording') { stopRecording(); return }
-    if (recState !== 'idle') return
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      recStreamRef.current = stream
-      const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus' : ''
-      const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined)
-      chunksRef.current = []
-      mr.ondataavailable = e => { if (e.data?.size) chunksRef.current.push(e.data) }
-      mr.onstop = async () => {
-        const blob = new Blob(chunksRef.current, { type: mr.mimeType || 'audio/webm' })
-        recStreamRef.current?.getTracks().forEach(t => t.stop())
-        recStreamRef.current = null
-        setRecState('transcribing')
-        // Blob → data URL → /api/stt
-        const reader = new FileReader()
-        reader.onloadend = async () => {
-          const { data, error: err } = await transcribeAudio({ dataUrl: reader.result })
-          setRecState('idle')
-          if (err) { antMessage.error(`Transcribe failed: ${err}`); return }
-          const text = (data?.text || '').trim()
-          if (!text) { antMessage.warning('Empty transcript — try again, speak closer to the mic'); return }
-          // Append to whatever is already in the input so users can chain
-          // dictate-then-edit cycles.
-          setInput(prev => prev.trim() ? `${prev.trim()} ${text}` : text)
-          inputRef.current?.focus()
-        }
-        reader.readAsDataURL(blob)
+  // Load conversation when chatId changes
+  useEffect(() => {
+    if (!chatId) { setConversation(null); setMessages([]); return }
+    let cancelled = false
+    getConversation(chatId).then(({ data, error: err }) => {
+      if (cancelled) return
+      if (err || !data) {
+        antMessage.error(err || 'Conversation not found')
+        navigate('/ai')
+        return
       }
-      recorderRef.current = mr
-      mr.start(100)
-      recStartedRef.current = Date.now()
-      setRecElapsed(0); setRecState('recording')
-      recTickRef.current = setInterval(() => {
-        const e = Math.floor((Date.now() - recStartedRef.current) / 1000)
-        setRecElapsed(e)
-        if (e >= 60) stopRecording()   // safety cap
-      }, 250)
-    } catch (e) {
-      antMessage.error(`Could not access mic: ${e.message}`)
+      setConversation(data)
+      setMessages(data.messages || [])
+      if (data.provider) setProvider(data.provider)
+      if (data.model) setModel(data.model)
+    })
+    return () => { cancelled = true }
+  }, [chatId, navigate])
+
+  // Model list per provider
+  const availableModels = useMemo(() => {
+    if (provider === '5090') {
+      return localModels
+        .filter(m => !isEmbeddingModel(m.name))
+        .map(m => ({
+          id: m.name,
+          name: m.name.replace(/-instruct-q4_K_M$/, '').replace(/:[\w-]+$/, m.name.match(/:[\w-]+$/)?.[0] || ''),
+          best: ROLE_HINTS[m.name] || (isVisionModel(m.name) ? 'Vision' : isCodeModel(m.name) ? 'Code' : 'Chat'),
+          size: m.size,
+          isVision: isVisionModel(m.name),
+          isCode: isCodeModel(m.name),
+        }))
     }
+    if (provider === 'cloud-groq') return GROQ_MODELS
+    if (provider === 'cloud-gemini') return GEMINI_MODELS
+    if (provider === 'oracle-ollama') return ORACLE_MODELS
+    return []
+  }, [provider, localModels])
+
+  // Default model when provider changes or list arrives
+  useEffect(() => {
+    if (!availableModels.length) { setModel(''); return }
+    if (model && availableModels.some(m => m.id === model)) return  // keep user's choice
+    setModel(availableModels[0].id)
+  }, [availableModels, model])
+
+  const selectedModelMeta = availableModels.find(m => m.id === model)
+  const acceptsVision = provider === '5090' ? !!selectedModelMeta?.isVision : provider === 'cloud-gemini'
+
+  // New chat button — create conversation + navigate
+  const handleNewChat = async () => {
+    const { data, error: err } = await createConversation({
+      title: 'New chat', model, provider,
+    })
+    if (err || !data?.chatId) {
+      antMessage.error(err || 'Could not create chat')
+      return
+    }
+    setSidebarRefresh(n => n + 1)
+    navigate(`/ai/${encodeURIComponent(data.chatId)}`)
   }
 
-  useEffect(() => {
-    const check = () => checkHealth().then(r => setStatus(r.online ? 'online' : 'offline'))
-    check()
-    const iv = setInterval(check, 30000)
-    return () => clearInterval(iv)
-  }, [])
+  // Helper: poll a chat job until status terminal, then append assistant
+  const pollChatJob = (jobId, optimisticAssistantId) => {
+    if (pollRef.current) clearInterval(pollRef.current)
+    let attempts = 0
+    pollRef.current = setInterval(async () => {
+      attempts += 1
+      const { data, error: err } = await getChatJobStatus(jobId)
+      if (err) {
+        if (attempts > 5) {
+          clearInterval(pollRef.current); pollRef.current = null
+          setSending(false)
+          antMessage.error(err)
+        }
+        return
+      }
+      if (!data) return
+      if (data.status === 'completed') {
+        clearInterval(pollRef.current); pollRef.current = null
+        setMessages(prev => prev.map(m => m.messageId === optimisticAssistantId
+          ? { ...m, content: data.reply, model: data.model, provider: data.provider,
+              tokensIn: data.tokensIn, tokensOut: data.tokensOut, elapsedMs: data.elapsedMs,
+              jobId, _pending: false }
+          : m))
+        setSending(false)
+        setSidebarRefresh(n => n + 1)
+      } else if (data.status === 'failed') {
+        clearInterval(pollRef.current); pollRef.current = null
+        setMessages(prev => prev.map(m => m.messageId === optimisticAssistantId
+          ? { ...m, content: `⚠ ${data.error || 'Failed'}`, _pending: false, _failed: true }
+          : m))
+        setSending(false)
+        antMessage.error(data.error || 'Generation failed')
+      }
+      if (attempts > 600) {  // ~10min @ 1s
+        clearInterval(pollRef.current); pollRef.current = null
+        setSending(false)
+        antMessage.warning('Timed out waiting — chat may still complete in the background')
+      }
+    }, 1500)
+  }
 
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
-  }, [messages])
-
-  const handleSend = async () => {
-    const text = input.trim()
-    if (!text || sending) return
-
-    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    setMessages(prev => [...prev, { role: 'user', content: text, time }])
-    setInput('')
+  // Send — handles both 5090 (async via /api/chat/conversations/:id/messages)
+  // AND cloud (sync via /api/groq, /api/gemini, /api/chat). Cloud paths
+  // still append to the local messages array but DON'T hit the BE
+  // conversation store — that's 5090-only for MVP. (Phase 2 can unify.)
+  const handleSubmit = async ({ content, imageDataUrl, docName, docText }) => {
+    if (!chatId) { antMessage.warning('Open or create a chat first'); return }
+    if (!model) { antMessage.warning('Pick a model first'); return }
     setSending(true)
 
-    const history = messages.map(m => ({ role: m.role, content: m.content }))
-    const t0 = Date.now()
+    // Optimistic user message
+    const tempUserId = `tmp_u_${Date.now()}`
+    const userMsg = {
+      messageId: tempUserId, chatId, role: 'user',
+      content: docText ? `${content}\n\n📎 ${docName} (${(docText.length / 1024).toFixed(1)} KB attached)` : content,
+      imageUrl: imageDataUrl ? imageDataUrl : null,  // local preview only — BE returns the Cloudinary URL
+      docName, createdAt: new Date().toISOString(), _pending: false,
+    }
+    const tempAsstId = `tmp_a_${Date.now()}`
+    const asstMsg = {
+      messageId: tempAsstId, chatId, role: 'assistant',
+      content: '', model, provider,
+      createdAt: new Date().toISOString(), _pending: true,
+    }
+    setMessages(prev => [...prev, userMsg, asstMsg])
 
-    const sendFn = provider === 'groq' ? sendGroq : provider === 'gemini' ? sendGemini : sendChat
-    const { data, error } = await sendFn(text, { history, model, context: 'general', system, maxTokens, temperature })
-
-    setLastMs(Date.now() - t0)
-    setLastTokens(data?.tokens || null)
-
-    setMessages(prev => [...prev, {
-      role: 'assistant',
-      content: data?.reply || error || 'No response',
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isError: !!error,
-    }])
-    setSending(false)
-    inputRef.current?.focus()
+    // For 5090: go through the conversation-aware endpoint (persists +
+    // queues + worker callback appends assistant message). For cloud:
+    // sync HTTP call, no persistence yet — MVP.
+    if (provider === '5090') {
+      const { data, error: err } = await sendChatMessage(chatId, {
+        content, model, provider,
+        imageDataUrl, docName, docText,
+      })
+      if (err) {
+        setMessages(prev => prev.map(m => m.messageId === tempAsstId
+          ? { ...m, content: `⚠ ${err}`, _pending: false, _failed: true } : m))
+        setSending(false)
+        antMessage.error(err)
+        return
+      }
+      // Replace the optimistic user-msg id with the real one
+      setMessages(prev => prev.map(m => m.messageId === tempUserId
+        ? { ...m, messageId: data.userMessage.messageId, imageUrl: data.userMessage.imageUrl }
+        : m))
+      pollChatJob(data.jobId, tempAsstId)
+    } else {
+      // Cloud sync path. Reuse the existing sendChat/sendGroq/sendGemini helpers.
+      const history = messages.filter(m => !m._pending).map(m => ({ role: m.role, content: m.content }))
+      let result, err
+      try {
+        if (provider === 'cloud-groq') {
+          ({ data: result, error: err } = await sendGroq(content, { history, model }))
+        } else if (provider === 'cloud-gemini') {
+          ({ data: result, error: err } = await sendGemini(content, { history, model }))
+        } else {  // oracle-ollama
+          ({ data: result, error: err } = await sendChat(content, { history, model }))
+        }
+      } catch (e) { err = e.message }
+      if (err) {
+        setMessages(prev => prev.map(m => m.messageId === tempAsstId
+          ? { ...m, content: `⚠ ${err}`, _pending: false, _failed: true } : m))
+        setSending(false)
+        antMessage.error(err)
+        return
+      }
+      const reply = result?.reply || result?.message || result?.content || JSON.stringify(result)
+      setMessages(prev => prev.map(m => m.messageId === tempAsstId
+        ? { ...m, content: reply, _pending: false } : m))
+      setSending(false)
+    }
   }
 
-  const handleKey = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
-  }
-
-  const clearChat = () => { setMessages([]); setLastMs(null); setLastTokens(null) }
-
+  // ─── Render ─────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex flex-col">
-      <div className="max-w-4xl w-full mx-auto flex flex-col flex-1 px-4 sm:px-6 pt-28 pb-6">
-        {/* Header */}
-        <div className="mb-4">
-          <h1 className="font-poppins font-black text-3xl sm:text-4xl md:text-5xl leading-tight pb-1 bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-500 bg-clip-text text-transparent">
-            AI Chat
-          </h1>
-          <div className="flex flex-wrap items-center gap-3 mt-2">
-            <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${status === 'online' ? 'bg-green-500' : status === 'offline' ? 'bg-red-500' : 'bg-gray-600 animate-pulse'}`} />
-              <span className="text-xs text-gray-500">{status === 'online' ? 'Ollama connected' : status === 'offline' ? 'Server offline' : 'Connecting...'}</span>
-            </div>
-            <Tag color={provider === 'groq' ? 'purple' : provider === 'gemini' ? 'blue' : 'cyan'}>
-              {provider === 'groq' ? 'Groq' : provider === 'gemini' ? 'Gemini' : 'Local'}: {(provider === 'groq' ? GROQ_MODELS : provider === 'gemini' ? GEMINI_MODELS : LOCAL_MODELS).find(m => m.id === model)?.label}
-            </Tag>
-            {lastMs && <span className="text-xs text-gray-600 font-mono">{lastMs}ms</span>}
-            {lastTokens && <span className="text-xs text-gray-600 font-mono">{lastTokens} tok</span>}
-          </div>
-        </div>
-
-        {/* Settings */}
-        <Collapse
-          ghost
-          size="small"
-          className="mb-3"
-          items={[{
-            key: '1',
-            label: <span className="text-xs text-gray-500"><SettingOutlined /> Settings</span>,
-            children: (
-              <div className="space-y-3 pb-2">
-                <div>
-                  <label className="text-xs text-gray-400 mb-1 block">Provider</label>
-                  <div className="flex gap-2 mb-2">
-                    <Button size="small" type={provider === 'groq' ? 'primary' : 'default'}
-                      onClick={() => { setProvider('groq'); setModel('llama-3.1-8b') }}
-                      style={provider === 'groq' ? { background: '#7c3aed' } : {}}>
-                      Groq
-                    </Button>
-                    <Button size="small" type={provider === 'gemini' ? 'primary' : 'default'}
-                      onClick={() => { setProvider('gemini'); setModel('gemini-flash') }}
-                      style={provider === 'gemini' ? { background: '#4285f4' } : {}}>
-                      Gemini
-                    </Button>
-                    <Button size="small" type={provider === 'local' ? 'primary' : 'default'}
-                      onClick={() => { setProvider('local'); setModel('phi3:mini') }}>
-                      Ollama
-                    </Button>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs text-gray-400 mb-1 block">Model</label>
-                  <Select value={model} onChange={setModel} size="small" style={{ width: '100%' }}
-                    options={(provider === 'groq' ? GROQ_MODELS : provider === 'gemini' ? GEMINI_MODELS : LOCAL_MODELS).map(m => ({ value: m.id, label: `${m.label} — ${m.desc}` }))} />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-400 mb-1 block">System Prompt</label>
-                  <Input value={system} onChange={e => setSystem(e.target.value)} size="small"
-                    placeholder="e.g. You are a helpful coding assistant" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs text-gray-400">Temperature: {temperature}</label>
-                    <Slider min={0} max={2} step={0.1} value={temperature} onChange={setTemperature} />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-400">Max Tokens: {maxTokens}</label>
-                    <Slider min={50} max={2000} step={50} value={maxTokens} onChange={setMaxTokens} />
-                  </div>
-                </div>
-              </div>
-            ),
-          }]}
+    <div className="min-h-screen bg-black text-gray-100 pt-20">
+      <div className="flex">
+        <ChatSidebar
+          refreshKey={sidebarRefresh}
+          onNewChat={handleNewChat}
+          isOpenMobile={mobileSidebarOpen}
+          onCloseMobile={() => setMobileSidebarOpen(false)}
         />
 
-        {/* Messages */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-4 mb-4 min-h-0" style={{ maxHeight: 'calc(100vh - 380px)' }}>
-          {messages.length === 0 && (
-            <div className="flex-1 flex items-center justify-center py-20">
-              <div className="text-center">
-                <RobotOutlined style={{ fontSize: 48, color: '#374151' }} />
-                <p className="text-gray-500 text-sm mt-4">Ask me anything</p>
-                <div className="flex flex-wrap gap-2 justify-center mt-4">
-                  {['Explain React hooks', 'Write a Python sort', 'What is TCP/IP?', 'Integrate x²'].map(q => (
-                    <button key={q} onClick={() => { setInput(q); inputRef.current?.focus() }}
-                      className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-400 text-xs rounded-lg transition-colors">
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {messages.map((m, i) => (
-            <div key={i} className={`flex gap-3 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              {m.role === 'assistant' && (
-                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-cyan-600 to-purple-600 flex items-center justify-center shrink-0 mt-1">
-                  <RobotOutlined style={{ fontSize: 14, color: '#fff' }} />
-                </div>
-              )}
-              <div className={`max-w-[85%] ${
-                m.role === 'user'
-                  ? 'bg-cyan-600 text-white px-4 py-3 rounded-2xl rounded-br-md'
-                  : m.isError
-                    ? 'bg-red-900/30 border border-red-800/40 text-red-300 px-4 py-3 rounded-2xl rounded-bl-md'
-                    : 'bg-gray-800/80 text-gray-200 px-4 py-3 rounded-2xl rounded-bl-md'
-              }`}>
-                {m.role === 'user' ? (
-                  <p className="text-sm whitespace-pre-wrap">{m.content}</p>
-                ) : (
-                  <div className="text-sm leading-relaxed prose-invert">
-                    <MarkdownMessage content={m.content} />
-                  </div>
-                )}
-                <p className={`text-[10px] mt-1.5 ${m.role === 'user' ? 'text-cyan-200' : 'text-gray-600'}`}>{m.time}</p>
-              </div>
-              {m.role === 'user' && (
-                <div className="w-7 h-7 rounded-full bg-cyan-600 flex items-center justify-center shrink-0 mt-1">
-                  <UserOutlined style={{ fontSize: 14, color: '#fff' }} />
-                </div>
+        <main className="flex-1 min-w-0 flex flex-col min-h-[calc(100vh-5rem)] max-h-[calc(100vh-5rem)]">
+          {/* Header: provider tabs + model picker */}
+          <header className="border-b border-gray-800 bg-gray-950/50 backdrop-blur-md px-3 sm:px-5 py-3">
+            <div className="flex items-center gap-2 mb-2">
+              <button onClick={() => setMobileSidebarOpen(true)}
+                className="lg:hidden w-9 h-9 inline-flex items-center justify-center rounded-lg bg-gray-900 hover:bg-gray-800 text-gray-300">
+                <MenuOutlined />
+              </button>
+              <h1 className="font-poppins font-black text-xl sm:text-2xl leading-tight pb-0.5 bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-500 bg-clip-text text-transparent">
+                {conversation?.title || 'AI Chat'}
+              </h1>
+              {provider === '5090' && (
+                <span className={`hidden sm:inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full border ${
+                  localOnline
+                    ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/40'
+                    : 'bg-rose-500/10 text-rose-300 border-rose-500/40'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${localOnline ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
+                  {localOnline ? '5090 online' : '5090 offline'}
+                </span>
               )}
             </div>
-          ))}
 
-          {sending && (
-            <div className="flex gap-3 justify-start">
-              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-cyan-600 to-purple-600 flex items-center justify-center shrink-0">
-                <RobotOutlined style={{ fontSize: 14, color: '#fff' }} />
+            {/* Provider tabs */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+              {PROVIDERS.map(p => {
+                const active = provider === p.id
+                return (
+                  <button key={p.id} onClick={() => setProvider(p.id)}
+                    className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all border ${
+                      active
+                        ? `text-white bg-gradient-to-r ${p.accent} border-transparent shadow-md`
+                        : 'bg-gray-900/60 text-gray-400 border-gray-800 hover:border-gray-700 hover:text-gray-200'
+                    }`}>
+                    {p.icon} {p.label}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Model picker for the current provider */}
+            <div className="mt-2 flex items-center gap-2 flex-wrap">
+              <Select size="middle"
+                value={model || undefined}
+                onChange={(v) => {
+                  setModel(v)
+                  if (chatId) updateConversation(chatId, { model: v, provider })
+                }}
+                style={{ flex: 1, minWidth: 240 }}
+                placeholder={provider === '5090'
+                  ? (localModels.length ? 'Pick a model' : 'No 5090 models — install via E:\\Siddharth\\local-gpu-worker\\install_ollama_models.ps1')
+                  : 'Pick a model'}
+                disabled={!availableModels.length}
+                popupMatchSelectWidth={false}
+                options={availableModels.map(m => ({
+                  value: m.id,
+                  label: (
+                    <div className="leading-tight py-0.5 pr-2">
+                      <div className="text-sm flex items-center gap-2">
+                        <span>{m.name}</span>
+                        {m.isVision && <Tag color="purple" style={{ margin: 0, fontSize: 9 }}>vision</Tag>}
+                        {m.isCode && <Tag color="green" style={{ margin: 0, fontSize: 9 }}>code</Tag>}
+                      </div>
+                      <div className="text-[10px] text-gray-500">
+                        {m.best}{m.size ? ` · ${fmtBytes(m.size)}` : ''}
+                      </div>
+                    </div>
+                  ),
+                }))}
+              />
+              {selectedModelMeta && (
+                <span className="text-[10px] text-gray-500 italic">
+                  {selectedModelMeta.best}
+                </span>
+              )}
+            </div>
+          </header>
+
+          {/* Messages area */}
+          <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 sm:px-5 py-4 space-y-3">
+            {!chatId ? (
+              <WelcomeHero
+                provider={provider} localModels={localModels} localOnline={localOnline}
+                onPickProvider={setProvider} onNewChat={handleNewChat}
+              />
+            ) : messages.length === 0 ? (
+              <div className="text-center text-gray-500 py-12 text-sm">
+                Start the conversation — type below or tap 🎙 to speak.
               </div>
-              <div className="bg-gray-800/80 rounded-2xl rounded-bl-md px-4 py-3">
-                <div className="flex gap-1.5">
-                  {[0, 150, 300].map(d => (
-                    <div key={d} className="w-2 h-2 rounded-full bg-gray-600 animate-bounce" style={{ animationDelay: `${d}ms` }} />
-                  ))}
-                </div>
-              </div>
+            ) : (
+              messages.map(m => <MessageBubble key={m.messageId} msg={m} />)
+            )}
+          </div>
+
+          {/* Composer */}
+          {chatId && (
+            <div className="border-t border-gray-800 bg-gray-950/60 backdrop-blur-md px-3 sm:px-5 py-3">
+              <ChatInput
+                disabled={!model || sending}
+                sending={sending}
+                placeholder={
+                  acceptsVision
+                    ? 'Ask anything — drop an image with 📷, a doc with 📄, or speak with 🎙'
+                    : 'Ask anything — attach a doc with 📄 or speak with 🎙'
+                }
+                acceptsVision={acceptsVision}
+                onSubmit={handleSubmit}
+              />
+              <p className="text-[9px] text-gray-600 mt-1.5 px-1">
+                {provider === '5090'
+                  ? `Running on the RTX 5090 · ${model || 'no model'}. Each turn loads + unloads to keep VRAM free.`
+                  : `Cloud · ${model || 'no model'} · history kept locally, not persisted on the BE for cloud providers (5090 only).`}
+              </p>
             </div>
           )}
-        </div>
-
-        {/* Input */}
-        <div className="flex gap-2 items-end">
-          <Input.TextArea
-            ref={inputRef}
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKey}
-            placeholder={
-              recState === 'recording'    ? `🎙 Recording… ${recElapsed}s · tap mic again to stop`
-              : recState === 'transcribing' ? 'Transcribing…'
-              : status === 'offline'         ? 'Server is offline...'
-              : 'Type or tap the mic… (Shift+Enter for newline)'
-            }
-            disabled={status === 'offline' || recState !== 'idle'}
-            autoSize={{ minRows: 1, maxRows: 4 }}
-            className="flex-1"
-            size="large"
-          />
-          {/* Mic — ChatGPT-style dictation. Tap → speak → tap → transcript
-              lands in the input box. User can then edit and Send. */}
-          <Tooltip title={
-            recState === 'recording'    ? 'Stop recording'
-            : recState === 'transcribing' ? 'Transcribing your speech…'
-            : 'Speak instead of typing'
-          }>
-            <Button
-              size="large"
-              danger={recState === 'recording'}
-              icon={
-                recState === 'recording'    ? <StopOutlined />
-                : recState === 'transcribing' ? <LoadingOutlined spin />
-                : <AudioOutlined />
-              }
-              onClick={handleMic}
-              disabled={status === 'offline' || recState === 'transcribing'}
-              style={{ height: 'auto', minHeight: 40 }}
-            />
-          </Tooltip>
-          <Tooltip title="Send (Enter)">
-            <Button
-              type="primary"
-              size="large"
-              icon={<SendOutlined />}
-              onClick={handleSend}
-              disabled={!input.trim() || sending || status === 'offline' || recState !== 'idle'}
-              style={{ height: 'auto', minHeight: 40 }}
-            />
-          </Tooltip>
-          {messages.length > 0 && (
-            <Tooltip title="Clear chat">
-              <Button size="large" onClick={clearChat} style={{ height: 'auto', minHeight: 40 }}>
-                Clear
-              </Button>
-            </Tooltip>
-          )}
-        </div>
+        </main>
       </div>
+    </div>
+  )
+}
+
+// ─── Welcoming empty state ──────────────────────────────────
+function WelcomeHero({ provider, localModels, localOnline, onPickProvider, onNewChat }) {
+  return (
+    <div className="max-w-3xl mx-auto py-6 sm:py-12 px-2">
+      <div className="text-center mb-8">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r from-cyan-500/20 via-purple-500/20 to-amber-500/20 border border-cyan-500/30 text-[10px] uppercase tracking-wider text-cyan-200 font-semibold mb-3">
+          <RobotOutlined /> AI Chat · 4 providers
+        </div>
+        <h2 className="text-2xl sm:text-4xl font-black leading-tight pb-1 bg-gradient-to-r from-cyan-300 via-purple-300 to-amber-300 bg-clip-text text-transparent">
+          Pick a brain and start a conversation
+        </h2>
+        <p className="text-gray-400 text-sm mt-2 max-w-xl mx-auto">
+          Switch between cloud providers and the 5090 Beast on the fly. Each chat saves automatically — find them in the sidebar.
+        </p>
+      </div>
+
+      {/* Provider grid — 3D tilt feel via translateY hover */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+        {PROVIDERS.map(p => {
+          const active = provider === p.id
+          return (
+            <button key={p.id} onClick={() => onPickProvider(p.id)}
+              className={`relative p-4 rounded-2xl border-2 text-left transition-all overflow-hidden ${
+                active
+                  ? 'border-cyan-400/60 bg-gray-900 shadow-xl shadow-cyan-500/10 scale-[1.02]'
+                  : 'border-gray-800 bg-gray-900/40 hover:bg-gray-900 hover:border-gray-700 hover:-translate-y-0.5'
+              }`}>
+              <div aria-hidden className={`absolute inset-0 pointer-events-none opacity-25 bg-gradient-to-br ${p.accent} mix-blend-overlay`} />
+              <div className="relative">
+                <div className="flex items-center justify-between mb-1">
+                  <span className={`text-sm font-bold ${active ? 'text-white' : 'text-gray-200'}`}>{p.label}</span>
+                  {active && <CheckOutlined className="text-cyan-300" />}
+                </div>
+                <p className="text-[11px] text-gray-400 leading-snug">{p.blurb}</p>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* 5090 lane status panel */}
+      {provider === '5090' && (
+        <div className="rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/5 via-rose-500/5 to-fuchsia-500/5 p-4 mb-6">
+          <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+            <h3 className="text-sm font-bold bg-gradient-to-r from-amber-300 via-rose-300 to-fuchsia-300 bg-clip-text text-transparent">
+              🖥 5090 Beast — {localOnline ? 'online' : 'offline'}
+            </h3>
+            <span className="text-[10px] font-mono text-gray-500">
+              {localModels.length} model{localModels.length === 1 ? '' : 's'} installed
+            </span>
+          </div>
+          {!localOnline && (
+            <p className="text-[11px] text-rose-300 leading-snug mb-2">
+              ⚠ The 5090 worker isn't reporting in. Start <code className="px-1 py-0.5 bg-black/50 rounded font-mono text-rose-200">beast.py</code> on the home box.
+            </p>
+          )}
+          {localOnline && localModels.length === 0 && (
+            <p className="text-[11px] text-amber-300 leading-snug mb-2">
+              No Ollama models installed yet. Run{' '}
+              <code className="px-1 py-0.5 bg-black/50 rounded font-mono text-amber-200">install_ollama_models.ps1</code>{' '}
+              on the 5090 to pull the curated set.
+            </p>
+          )}
+          {localModels.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {localModels.slice(0, 8).map(m => (
+                <span key={m.name} className="text-[10px] px-2 py-0.5 rounded-full bg-gray-900/80 border border-gray-700 text-gray-300 font-mono">
+                  {m.name}
+                </span>
+              ))}
+              {localModels.length > 8 && (
+                <span className="text-[10px] text-gray-500">+ {localModels.length - 8} more…</span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* CTA */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 justify-center">
+        <Button type="primary" size="large" icon={<RobotOutlined />} onClick={onNewChat}
+          style={{ background: 'linear-gradient(135deg, #06b6d4, #7c3aed, #f59e0b)', border: 'none', fontWeight: 700 }}
+          className="!h-12">
+          Start a new chat
+        </Button>
+      </div>
+
+      {/* Helper grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-8">
+        <HelpCard icon="🎙" title="Speak it" body="Tap the mic in the input row — Whisper transcribes your voice straight into the prompt." />
+        <HelpCard icon="📷" title="Attach an image" body="Vision models on 5090 (Qwen2.5-VL, Llama Vision) + Gemini accept images for OCR, charts, screenshots." />
+        <HelpCard icon="📄" title="Drop a document" body="Plain text, markdown, JSON, CSV, logs — gets embedded into your message for analysis." />
+      </div>
+    </div>
+  )
+}
+
+function HelpCard({ icon, title, body }) {
+  return (
+    <div className="p-3 rounded-xl border border-gray-800 bg-gray-900/40 hover:border-gray-700 hover:-translate-y-0.5 transition-all">
+      <div className="text-2xl mb-1">{icon}</div>
+      <div className="text-xs font-semibold text-gray-200 mb-1">{title}</div>
+      <p className="text-[11px] text-gray-500 leading-relaxed">{body}</p>
+    </div>
+  )
+}
+
+// ─── Single message bubble ──────────────────────────────────
+function MessageBubble({ msg }) {
+  const isUser = msg.role === 'user'
+  return (
+    <div className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
+      {!isUser && (
+        <div className="w-8 h-8 shrink-0 rounded-full bg-gradient-to-br from-cyan-500 via-blue-500 to-purple-500 flex items-center justify-center text-white shadow-md">
+          <RobotOutlined />
+        </div>
+      )}
+      <div className={`max-w-[88%] sm:max-w-[78%] rounded-2xl px-3 sm:px-4 py-2.5 ${
+        isUser
+          ? 'bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-cyan-500/30 text-gray-100'
+          : msg._failed
+            ? 'bg-rose-500/10 border border-rose-500/30 text-rose-200'
+            : 'bg-gray-900/80 border border-gray-800 text-gray-100'
+      }`}>
+        {msg.imageUrl && (
+          <img src={msg.imageUrl} alt="" className="max-h-64 rounded-lg mb-2 border border-gray-700" />
+        )}
+        {msg._pending ? (
+          <div className="flex items-center gap-2 py-1">
+            {[0, 150, 300].map(d => (
+              <span key={d} className="w-2 h-2 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: `${d}ms` }} />
+            ))}
+            <span className="text-[10px] text-gray-500 ml-1">{msg.model || 'thinking'}…</span>
+          </div>
+        ) : (
+          <div className="text-sm leading-relaxed">
+            {isUser ? <p className="whitespace-pre-wrap">{msg.content}</p> : <MarkdownMessage content={msg.content || ''} />}
+          </div>
+        )}
+        {!isUser && !msg._pending && (msg.model || msg.elapsedMs) && (
+          <div className="mt-2 pt-2 border-t border-gray-800 flex items-center gap-2 text-[10px] text-gray-500 font-mono flex-wrap">
+            {msg.model && <span>{msg.model}</span>}
+            {msg.elapsedMs && <span>· {(msg.elapsedMs / 1000).toFixed(1)}s</span>}
+            {msg.tokensOut && <span>· {msg.tokensOut} tok</span>}
+          </div>
+        )}
+      </div>
+      {isUser && (
+        <div className="w-8 h-8 shrink-0 rounded-full bg-gradient-to-br from-amber-400 to-rose-500 flex items-center justify-center text-white shadow-md">
+          <UserOutlined />
+        </div>
+      )}
     </div>
   )
 }

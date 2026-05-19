@@ -1,4 +1,4 @@
-import { get, post, del } from './request';
+import { get, post, del, patch } from './request';
 import { ENDPOINTS } from './endpoints';
 
 export async function checkHealth() {
@@ -478,4 +478,72 @@ export async function sendAI(message, options = {}) {
   } catch (err) {
     return { data: null, error: err.message };
   }
+}
+
+// ─── AI Chat conversations (5090 / cloud) ─────────────────────────────
+// Conversation-aware multi-turn chat. Each chat lives at /ai/<chatId>.
+
+export async function listLocalModels() {
+  try {
+    const data = await get(ENDPOINTS.CHAT_LOCAL_MODELS, {}, { timeout: 6000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+
+export async function createConversation(payload = {}) {
+  try {
+    const data = await post(ENDPOINTS.CHAT_CONVERSATIONS, payload, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+
+export async function listConversations({ archived = 0, page = 1, limit = 50 } = {}) {
+  try {
+    const data = await get(ENDPOINTS.CHAT_CONVERSATIONS, { archived, page, limit }, { timeout: 6000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+
+export async function getConversation(chatId) {
+  try {
+    const data = await get(`${ENDPOINTS.CHAT_CONVERSATIONS}/${encodeURIComponent(chatId)}`, {}, { timeout: 6000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+
+export async function updateConversation(chatId, patchBody) {
+  try {
+    const data = await patch(`${ENDPOINTS.CHAT_CONVERSATIONS}/${encodeURIComponent(chatId)}`, patchBody, { timeout: 6000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+
+export async function deleteConversation(chatId) {
+  try {
+    const data = await del(`${ENDPOINTS.CHAT_CONVERSATIONS}/${encodeURIComponent(chatId)}`, { timeout: 6000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+
+export async function conversationsBulkAction(action, ids) {
+  try {
+    const data = await post(`${ENDPOINTS.CHAT_CONVERSATIONS}/bulk`, { action, ids }, { timeout: 10000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+
+// POST a user message to a conversation. Returns { userMessage, jobId, status, model }.
+export async function sendChatMessage(chatId, payload) {
+  try {
+    const data = await post(`${ENDPOINTS.CHAT_CONVERSATIONS}/${encodeURIComponent(chatId)}/messages`, payload, { timeout: 60000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+
+// Poll a single chat-inference job (returns status + reply when done).
+export async function getChatJobStatus(jobId) {
+  try {
+    const data = await get(`${ENDPOINTS.CHAT_STATUS}/${encodeURIComponent(jobId)}`, {}, { timeout: 6000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
 }

@@ -38,6 +38,9 @@ export const ENDPOINTS = {
   AUDIO_LIST:           '/api/audio/list',
   AUDIO_BULK:           '/api/audio/bulk',
   STT:                  '/api/stt',                // Speech-to-Text (Whisper / HF)
+  CHAT_CONVERSATIONS:   '/api/chat/conversations',
+  CHAT_STATUS:          '/api/chat/status',        // /:jobId
+  CHAT_LOCAL_MODELS:    '/api/chat/local-models',
   CINEMA:               '/api/cinema',
   CINEMA_STATUS:        '/api/cinema/status',
   CINEMA_LIST:          '/api/cinema/list',

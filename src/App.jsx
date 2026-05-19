@@ -174,6 +174,7 @@ const App = () => {
           <Route path='/explore' element={<Suspense fallback={<DarkPageSkeleton />}><Explore /></Suspense>} />
           <Route path='/explore/:module' element={<Suspense fallback={<DarkPageSkeleton />}><ExploreModule /></Suspense>} />
           <Route path='/ai' element={<Suspense fallback={<DarkPageSkeleton />}><AIChat /></Suspense>} />
+          <Route path='/ai/:chatId' element={<Suspense fallback={<DarkPageSkeleton />}><AIChat /></Suspense>} />
           {/* /studio merged into /vision — keep alias so old links don't 404 */}
           <Route path='/studio' element={<Suspense fallback={<DarkPageSkeleton />}><FaceDetection /></Suspense>} />
           {/* AI Video + Image Studio are fully public. Generate / browse / delete
