@@ -107,8 +107,20 @@ export default function ChatInput({
 
   const handleImage = async (file) => {
     if (!file) return false
-    if (file.size > 8 * 1024 * 1024) {
-      antMessage.error('Image too large (max 8 MB)')
+    // 20 MB cap — phone photos can be ~10-15 MB at full quality; HEIC is
+    // usually smaller. We give headroom for iPhone burst-mode shots.
+    if (file.size > 20 * 1024 * 1024) {
+      antMessage.error('Image too large (max 20 MB)')
+      return false
+    }
+    // Sniff support: image/* MIME OR known phone extensions. Some
+    // browsers report HEIC as application/octet-stream so we check the
+    // file extension as a fallback.
+    const name = (file.name || '').toLowerCase()
+    const okMime = (file.type || '').startsWith('image/')
+    const okExt = /\.(jpg|jpeg|png|gif|webp|bmp|heic|heif|avif|tiff?|svg)$/i.test(name)
+    if (!okMime && !okExt) {
+      antMessage.warning('Pick an image file (.jpg .jpeg .png .heic .heif .webp .gif etc.)')
       return false
     }
     try {
@@ -125,9 +137,11 @@ export default function ChatInput({
       return false
     }
     const name = (file.name || '').toLowerCase()
-    const extractable = /\.(txt|md|json|csv|log|html|xml|yaml|yml)$/i.test(name)
+    // Widened: tsv + markdown variants + python/js/etc source files all
+    // read fine as text. PDF / Word still need server-side extraction.
+    const extractable = /\.(txt|md|markdown|json|jsonl|csv|tsv|log|html|htm|xml|yaml|yml|ini|conf|cfg|sql|py|js|jsx|ts|tsx|sh|bash|zsh|go|rb|rs|java|c|cpp|h|hpp|cs|swift|kt|php|toml|env)$/i.test(name)
     if (!extractable) {
-      antMessage.warning('Only text-based docs for now (.txt .md .json .csv .log .html .xml .yaml). PDF / Word support coming.')
+      antMessage.warning('Text-based docs only for now (.txt .md .json .csv .log .html .xml .yaml .py .js .ts etc.). PDF / Word support coming.')
       return false
     }
     try {
@@ -200,19 +214,28 @@ export default function ChatInput({
           className="flex-1"
         />
 
-        {/* Image upload — only when vision model is active */}
+        {/* Image upload — only when vision model is active. accept= is
+            wide on purpose: iPhone HEIC, Android JPEG, all standard
+            web image types. Some Android pickers honour `capture` so
+            the camera shortcut appears alongside the gallery. */}
         {acceptsVision && (
-          <Tooltip title="Attach image (vision input)">
-            <Upload accept="image/*" showUploadList={false} beforeUpload={handleImage}>
+          <Tooltip title="Attach image (jpg · png · heic · webp · gif · …)">
+            <Upload
+              accept="image/*,.jpg,.jpeg,.png,.heic,.heif,.webp,.gif,.bmp,.avif,.tif,.tiff"
+              showUploadList={false}
+              beforeUpload={handleImage}>
               <Button shape="circle" type="text" icon={<PictureOutlined />}
                 disabled={recState !== 'idle' || sending} />
             </Upload>
           </Tooltip>
         )}
 
-        {/* Document upload — any chat */}
-        <Tooltip title="Attach a text document (.txt .md .json .csv …)">
-          <Upload accept=".txt,.md,.json,.csv,.log,.html,.xml,.yaml,.yml" showUploadList={false}
+        {/* Document upload — any chat. Wider list so code files +
+            config + tsv land too. */}
+        <Tooltip title="Attach a text doc (.txt .md .json .csv .py .js .log …)">
+          <Upload
+            accept=".txt,.md,.markdown,.json,.jsonl,.csv,.tsv,.log,.html,.htm,.xml,.yaml,.yml,.ini,.conf,.cfg,.sql,.py,.js,.jsx,.ts,.tsx,.sh,.bash,.zsh,.go,.rb,.rs,.java,.c,.cpp,.h,.hpp,.cs,.swift,.kt,.php,.toml,.env"
+            showUploadList={false}
             beforeUpload={handleDoc}>
             <Button shape="circle" type="text" icon={<FileTextOutlined />}
               disabled={recState !== 'idle' || sending} />
