@@ -28,6 +28,58 @@ const stripCodeFence = (src, lang) => {
   return m ? m[1].trim() : null
 }
 
+// Pull any code fence body — language tag optional. Used to detect
+// TSV / pipe / whitespace-aligned tables when the model wraps the data
+// in a plain ``` block without a `csv` or `json` tag (which is what
+// most models do when they say "here's the data you can paste into
+// Excel"). Returns an array of fence bodies, in order.
+const extractAllCodeFences = (src) => {
+  const re = /```[^\n]*\n([\s\S]*?)```/g
+  const out = []
+  let m
+  while ((m = re.exec(src)) !== null) out.push(m[1])
+  return out
+}
+
+// Sniff a tab-separated or whitespace-aligned table inside a plain
+// code fence. Two heuristics, in order:
+//   1) every non-blank row has the same number of TABs (≥1) — TSV
+//   2) every non-blank row has ≥1 "2+ spaces" gap and the same gap
+//      count — whitespace-aligned table (what the Groq sample used)
+// Returns an array of objects keyed by the header row, or null.
+const parseLooseTable = (text) => {
+  const lines = text.split(/\r?\n/).map(l => l.replace(/\s+$/, '')).filter(l => l.length > 0)
+  if (lines.length < 2) return null
+
+  // (1) TSV — tabs as separators
+  const tabCounts = lines.map(l => (l.match(/\t/g) || []).length)
+  if (tabCounts[0] >= 1 && tabCounts.every(c => c === tabCounts[0])) {
+    const header = lines[0].split('\t').map(s => s.trim())
+    return lines.slice(1).map(l => {
+      const cells = l.split('\t')
+      const obj = {}
+      header.forEach((h, i) => { obj[h || `col${i + 1}`] = (cells[i] ?? '').trim() })
+      return obj
+    })
+  }
+
+  // (2) Whitespace-aligned — split on runs of 2+ spaces. Needs every
+  //     row to land on the same column count; otherwise we'd be
+  //     guessing at human prose.
+  const wsSplit = (l) => l.split(/ {2,}|\t+/).map(s => s.trim()).filter(s => s.length > 0)
+  const wsRows = lines.map(wsSplit)
+  const cols = wsRows[0].length
+  if (cols >= 2 && wsRows.every(r => r.length === cols)) {
+    const header = wsRows[0]
+    return wsRows.slice(1).map(cells => {
+      const obj = {}
+      header.forEach((h, i) => { obj[h || `col${i + 1}`] = cells[i] ?? '' })
+      return obj
+    })
+  }
+  return null
+}
+
 // Parse a markdown table → array of objects. Returns null if no table.
 const parseMarkdownTable = (src) => {
   const lines = src.split(/\r?\n/)
@@ -113,6 +165,22 @@ const detectStructured = (content) => {
   // Bare markdown table anywhere in the content
   const tableRows = parseMarkdownTable(content)
   if (tableRows && tableRows.length) return { kind: 'rows', rows: tableRows, source: 'markdown-table' }
+  // Loose code-fence tables — model dumped TSV / whitespace-aligned data
+  // inside a plain ``` block (the "paste into Excel" pattern). Walk all
+  // fences in the reply and pick the first one that parses cleanly.
+  for (const body of extractAllCodeFences(content)) {
+    const looseRows = parseLooseTable(body)
+    if (looseRows && looseRows.length) {
+      return { kind: 'rows', rows: looseRows, source: 'code-fence-tsv' }
+    }
+    // Sometimes the body is bare CSV without the `csv` tag
+    if (body.includes(',') && body.split(/\r?\n/).filter(Boolean).length >= 2) {
+      const csvRows = parseCsvText(body)
+      if (csvRows && csvRows.length && Object.keys(csvRows[0]).length >= 2) {
+        return { kind: 'rows', rows: csvRows, source: 'code-fence-csv' }
+      }
+    }
+  }
   // Fallback — just text
   return { kind: 'text' }
 }
