@@ -19,11 +19,14 @@ import {
 // list with a "best for X" hint so users don't have to guess. The 5090
 // list is hydrated dynamically from `/api/chat/local-models`.
 
+// id keys are stable for the BE; labels are visitor-facing. The local
+// runtime gets a premium-sounding name — visitors should perceive it
+// as a powerful feature, not "running on someone's PC".
 const PROVIDERS = [
-  { id: '5090',          label: '🖥 5090 Beast', icon: <DesktopOutlined />, blurb: 'Local on the RTX 5090 — private, multimodal, free',                accent: 'from-amber-400 via-rose-400 to-fuchsia-500' },
-  { id: 'cloud-groq',    label: '⚡ Groq Cloud',  icon: <ThunderboltOutlined />, blurb: 'Hosted · sub-second tokens · Llama / GPT-OSS',               accent: 'from-cyan-400 to-blue-500' },
-  { id: 'cloud-gemini',  label: '✨ Gemini',      icon: <GoogleOutlined />, blurb: 'Google · multimodal · fast + free tier',                          accent: 'from-blue-400 via-fuchsia-400 to-pink-400' },
-  { id: 'oracle-ollama', label: '☁ Oracle Ollama', icon: <CloudOutlined />, blurb: 'Tiny models on the BE (Phi-3 / Llama 1B) — fallback only',        accent: 'from-emerald-400 to-cyan-400' },
+  { id: '5090',          label: '⚡ Studio Pro',     icon: <ThunderboltOutlined />, blurb: 'Premium · private · multimodal',                      accent: 'from-amber-400 via-rose-400 to-fuchsia-500' },
+  { id: 'cloud-groq',    label: '☁ Groq Cloud',     icon: <CloudOutlined />,      blurb: 'Hosted · sub-second tokens · Llama / GPT-OSS',         accent: 'from-cyan-400 to-blue-500' },
+  { id: 'cloud-gemini',  label: '✨ Gemini',         icon: <GoogleOutlined />,    blurb: 'Google · multimodal · fast + free tier',               accent: 'from-blue-400 via-fuchsia-400 to-pink-400' },
+  { id: 'oracle-ollama', label: '🛟 Standby',         icon: <DesktopOutlined />,  blurb: 'Lightweight fallback when other lanes are busy',       accent: 'from-emerald-400 to-cyan-400' },
 ]
 
 const GROQ_MODELS = [
@@ -134,6 +137,10 @@ const AIChat = () => {
   const [sending, setSending] = useState(false)
   const [sidebarRefresh, setSidebarRefresh] = useState(0)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  // Tracks live attachment state from <ChatInput>. When the user has
+  // an image staged but the selected model can't see images, we grey
+  // out non-vision options + show a "switch to" suggestion banner.
+  const [hasImageAttached, setHasImageAttached] = useState(false)
 
   const pollRef = useRef(null)
   const scrollRef = useRef(null)
@@ -211,10 +218,20 @@ const AIChat = () => {
   const selectedModelMeta = availableModels.find(m => m.id === model)
   const acceptsVision = provider === '5090' ? !!selectedModelMeta?.isVision : provider === 'cloud-gemini'
 
-  // New chat button — create conversation + navigate
+  // New chat button — always starts on Studio Pro with the first
+  // available local model. Users can switch provider/model per-message
+  // afterwards, but new chats land on the premium lane by default.
   const handleNewChat = async () => {
+    const startProvider = '5090'
+    const firstLocal = localModels
+      .filter(m => !isEmbeddingModel(m.name))[0]?.name || null
+    // Switch the UI immediately so the model picker hydrates correctly
+    setProvider(startProvider)
+    if (firstLocal) setModel(firstLocal)
     const { data, error: err } = await createConversation({
-      title: 'New chat', model, provider,
+      title: 'New chat',
+      model: firstLocal,
+      provider: startProvider,
     })
     if (err || !data?.chatId) {
       antMessage.error(err || 'Could not create chat')
@@ -358,7 +375,7 @@ const AIChat = () => {
                     : 'bg-rose-500/10 text-rose-300 border-rose-500/40'
                 }`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${localOnline ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
-                  {localOnline ? '5090 online' : '5090 offline'}
+                  {localOnline ? 'Studio Pro online' : 'Studio Pro offline'}
                 </span>
               )}
             </div>
@@ -380,7 +397,10 @@ const AIChat = () => {
               })}
             </div>
 
-            {/* Model picker for the current provider */}
+            {/* Model picker for the current provider.
+                When an image is attached, non-vision options are
+                rendered disabled with a "vision needed" hint so the
+                user knows exactly which models will see the image. */}
             <div className="mt-2 flex items-center gap-2 flex-wrap">
               <Select size="middle"
                 value={model || undefined}
@@ -394,21 +414,32 @@ const AIChat = () => {
                   : 'Pick a model'}
                 disabled={!availableModels.length}
                 popupMatchSelectWidth={false}
-                options={availableModels.map(m => ({
-                  value: m.id,
-                  label: (
-                    <div className="leading-tight py-0.5 pr-2">
-                      <div className="text-sm flex items-center gap-2">
-                        <span>{m.name}</span>
-                        {m.isVision && <Tag color="purple" style={{ margin: 0, fontSize: 9 }}>vision</Tag>}
-                        {m.isCode && <Tag color="green" style={{ margin: 0, fontSize: 9 }}>code</Tag>}
+                options={availableModels.map(m => {
+                  // For cloud-gemini every model is multimodal — treat
+                  // as vision-capable. For 5090 we read the isVision
+                  // flag derived from the model id. For Groq /
+                  // oracle-ollama we don't have any vision models so
+                  // they all get disabled when an image is attached.
+                  const providerHasVision = provider === 'cloud-gemini' || !!m.isVision
+                  const disabledByImage = hasImageAttached && !providerHasVision
+                  return {
+                    value: m.id,
+                    disabled: disabledByImage,
+                    label: (
+                      <div className={`leading-tight py-0.5 pr-2 ${disabledByImage ? 'opacity-50' : ''}`}>
+                        <div className="text-sm flex items-center gap-2">
+                          <span>{m.name}</span>
+                          {m.isVision && <Tag color="purple" style={{ margin: 0, fontSize: 9 }}>vision</Tag>}
+                          {m.isCode && <Tag color="green" style={{ margin: 0, fontSize: 9 }}>code</Tag>}
+                          {disabledByImage && <Tag color="default" style={{ margin: 0, fontSize: 9 }}>image not supported</Tag>}
+                        </div>
+                        <div className="text-[10px] text-gray-500">
+                          {m.best}{m.size ? ` · ${fmtBytes(m.size)}` : ''}
+                        </div>
                       </div>
-                      <div className="text-[10px] text-gray-500">
-                        {m.best}{m.size ? ` · ${fmtBytes(m.size)}` : ''}
-                      </div>
-                    </div>
-                  ),
-                }))}
+                    ),
+                  }
+                })}
               />
               {selectedModelMeta && (
                 <span className="text-[10px] text-gray-500 italic">
@@ -437,6 +468,20 @@ const AIChat = () => {
           {/* Composer */}
           {chatId && (
             <div className="border-t border-gray-800 bg-gray-950/60 backdrop-blur-md px-3 sm:px-5 py-3">
+              {/* Vision-mode hint — fires when an image is staged but
+                  the current model can't see it. Surfaces the available
+                  vision models so the user can switch in one click. */}
+              {hasImageAttached && !acceptsVision && (
+                <VisionSwitchHint
+                  provider={provider}
+                  available5090Vision={availableModels.filter(m => m.isVision)}
+                  onSwitchProvider={(p) => setProvider(p)}
+                  onSwitchModel={(m) => {
+                    setModel(m)
+                    if (chatId) updateConversation(chatId, { model: m, provider })
+                  }}
+                />
+              )}
               <ChatInput
                 disabled={!model || sending}
                 sending={sending}
@@ -447,10 +492,11 @@ const AIChat = () => {
                 }
                 acceptsVision={acceptsVision}
                 onSubmit={handleSubmit}
+                onAttachmentsChange={({ hasImage }) => setHasImageAttached(hasImage)}
               />
               <p className="text-[9px] text-gray-600 mt-1.5 px-1">
                 {provider === '5090'
-                  ? `Running on the RTX 5090 · ${model || 'no model'} · responses are private to this device`
+                  ? `Studio Pro · ${model || 'no model'} · responses stay private`
                   : `Cloud · ${model || 'no model'}`}
               </p>
             </div>
@@ -473,7 +519,7 @@ function WelcomeHero({ provider, localModels, localOnline, onPickProvider, onNew
           Pick a brain and start a conversation
         </h2>
         <p className="text-gray-400 text-sm mt-2 max-w-xl mx-auto">
-          Switch between cloud providers and the 5090 Beast on the fly. Each chat saves automatically — find them in the sidebar.
+          Switch between providers on the fly. Each chat saves automatically — find them in the sidebar.
         </p>
       </div>
 
@@ -506,7 +552,7 @@ function WelcomeHero({ provider, localModels, localOnline, onPickProvider, onNew
         <div className="rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/5 via-rose-500/5 to-fuchsia-500/5 p-4 mb-6">
           <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
             <h3 className="text-sm font-bold bg-gradient-to-r from-amber-300 via-rose-300 to-fuchsia-300 bg-clip-text text-transparent">
-              🖥 5090 Beast — {localOnline ? 'online' : 'offline'}
+              ⚡ Studio Pro — {localOnline ? 'online' : 'offline'}
             </h3>
             <span className="text-[10px] font-mono text-gray-500">
               {localModels.length} model{localModels.length === 1 ? '' : 's'} installed
@@ -551,6 +597,47 @@ function WelcomeHero({ provider, localModels, localOnline, onPickProvider, onNew
         <HelpCard icon="🎙" title="Speak it" body="Tap the mic in the input row — Whisper transcribes your voice straight into the prompt." />
         <HelpCard icon="📷" title="Attach an image" body="Vision models on 5090 (Qwen2.5-VL, Llama Vision) + Gemini accept images for OCR, charts, screenshots." />
         <HelpCard icon="📄" title="Drop a document" body="Plain text, markdown, JSON, CSV, logs — gets embedded into your message for analysis." />
+      </div>
+    </div>
+  )
+}
+
+// Inline banner shown above the composer when the user attaches an
+// image but the current model can't process it. Suggests:
+//   • for 5090: switch model to the first vision-capable one we have
+//   • for cloud-groq / oracle-ollama: switch provider to Gemini or Studio Pro
+function VisionSwitchHint({ provider, available5090Vision, onSwitchProvider, onSwitchModel }) {
+  const has5090Vision = available5090Vision.length > 0
+  return (
+    <div className="mb-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 flex items-start gap-3 flex-wrap">
+      <span className="text-lg leading-none">🖼</span>
+      <div className="flex-1 min-w-0">
+        <p className="text-[11px] text-amber-200 font-semibold">
+          This model can't see images.
+        </p>
+        <p className="text-[10px] text-amber-300/80 leading-snug mt-0.5">
+          Switch to a vision-capable model so the image gets used.
+        </p>
+        <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+          {provider === '5090' && has5090Vision && available5090Vision.slice(0, 3).map(m => (
+            <button key={m.id} onClick={() => onSwitchModel(m.id)}
+              className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-amber-400/50 bg-amber-500/15 hover:bg-amber-500/25 text-amber-100 hover:text-white transition-colors">
+              <CheckOutlined className="text-[9px]" /> {m.name}
+            </button>
+          ))}
+          {provider !== 'cloud-gemini' && (
+            <button onClick={() => onSwitchProvider('cloud-gemini')}
+              className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-blue-400/50 bg-blue-500/15 hover:bg-blue-500/25 text-blue-100 hover:text-white transition-colors">
+              ✨ Use Gemini
+            </button>
+          )}
+          {provider !== '5090' && has5090Vision && (
+            <button onClick={() => onSwitchProvider('5090')}
+              className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-fuchsia-400/50 bg-fuchsia-500/15 hover:bg-fuchsia-500/25 text-fuchsia-100 hover:text-white transition-colors">
+              ⚡ Studio Pro vision
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )

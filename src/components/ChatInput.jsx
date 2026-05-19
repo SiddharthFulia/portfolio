@@ -28,11 +28,18 @@ export default function ChatInput({
   placeholder = 'Message…',
   acceptsVision = false,
   onSubmit,
+  onAttachmentsChange,        // ({ hasImage, hasDoc }) — lets parent react
 }) {
   const [text, setText] = useState('')
   const [image, setImage] = useState(null)   // { dataUrl, name }
   const [doc, setDoc] = useState(null)       // { name, text }
   const taRef = useRef(null)
+
+  // Notify parent whenever an attachment is added / removed so it can
+  // grey out non-vision models, show switch suggestions, etc.
+  useEffect(() => {
+    onAttachmentsChange?.({ hasImage: !!image, hasDoc: !!doc })
+  }, [image, doc, onAttachmentsChange])
 
   // Mic / STT state
   const [recState, setRecState] = useState('idle')   // idle | recording | transcribing
