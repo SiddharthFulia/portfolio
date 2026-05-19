@@ -112,6 +112,10 @@ export default function AudioStudio() {
   const [sttDataUrl, setSttDataUrl] = useState('')
   const [sttLanguage, setSttLanguage] = useState('')
   const [sttResult, setSttResult] = useState(null)
+  // Provider: 'cloud' = synchronous via /api/stt (Whisper-small et al.,
+  // sub-2s), '5090' = async via /api/audio queue (Whisper-large-v3 on the
+  // 5090, ~5-15s but local + private + best quality).
+  const [sttProvider, setSttProvider] = useState('cloud')
   // Prompt helper modal — state lives here so closing + reopening keeps the
   // last AI-generated prompt + idea
   const [helperOpen, setHelperOpen] = useState(false)
@@ -136,6 +140,19 @@ export default function AudioStudio() {
       setJob(data)
       if (data.status === 'completed') {
         clearInterval(pollTimer.current); pollTimer.current = null; setWorking(false)
+        // STT jobs return text in `transcript`, not a URL. Promote it
+        // into sttResult so the existing transcript renderer picks it up.
+        if (data.kind === 'stt' && typeof data.transcript === 'string') {
+          setSttResult({
+            text: data.transcript,
+            chunks: [],
+            model: data.model || 'whisper-large-v3',
+            elapsedMs: data.completedAt && data.createdAt
+              ? new Date(data.completedAt) - new Date(data.createdAt) : null,
+            provider: '5090',
+          })
+          antMessage.success('Transcript ready')
+        }
         setLibraryRefresh(k => k + 1)
       } else if (data.status === 'failed') {
         clearInterval(pollTimer.current); pollTimer.current = null; setWorking(false)
@@ -145,18 +162,39 @@ export default function AudioStudio() {
   }
 
   const generate = async () => {
-    // STT path: synchronous round-trip to /api/stt → HF Whisper → transcript.
-    // No worker, no polling, no DB row. Just upload and read the result.
+    // STT path branches by provider:
+    //   • 'cloud' → POST /api/stt — synchronous, sub-2s, smaller Whisper
+    //   • '5090'  → POST /api/audio with kind=stt — async via queue,
+    //               Whisper-large-v3 locally, ~5-15s. Polls /audio/status
+    //               until transcript appears in the job row.
     if (kind === 'stt') {
       if (!sttDataUrl) { setError('Upload an audio file first'); return }
       setError(null); setJob(null); setSttResult(null); setWorking(true)
-      const { data, error: err } = await transcribeAudio({
-        dataUrl: sttDataUrl, language: sttLanguage,
+
+      if (sttProvider === 'cloud') {
+        const { data, error: err } = await transcribeAudio({
+          dataUrl: sttDataUrl, language: sttLanguage,
+        })
+        setWorking(false)
+        if (err) { setError(err); return }
+        setSttResult(data)
+        antMessage.success('Transcript ready')
+        return
+      }
+
+      // 5090 path: submitAudio({ kind: 'stt', audioDataUrl, language })
+      // → returns a jobId. We piggy-back on the existing audio job polling
+      // (startPolling) but treat the response's `transcript` field as the
+      // result instead of `outputUrl`.
+      const { data, error: err } = await submitAudio({
+        kind: 'stt',
+        model: 'whisper-large-v3',
+        audioDataUrl: sttDataUrl,
+        language: sttLanguage,
       })
-      setWorking(false)
-      if (err) { setError(err); return }
-      setSttResult(data)
-      antMessage.success('Transcript ready')
+      if (err) { setWorking(false); setError(err); return }
+      setJob(data)
+      startPolling(data.jobId)
       return
     }
 
@@ -241,6 +279,36 @@ export default function AudioStudio() {
             // No prompt, no duration slider, no voice picker — Whisper just
             // listens to the audio and returns text.
             <>
+              {/* Provider toggle — cloud (fast, smaller model) vs 5090
+                  (slower, Whisper-large-v3, fully local). We deliberately
+                  don't name the cloud provider — keeps the brand neutral. */}
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">Engine</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'cloud', label: '☁ Cloud',     desc: 'Fast · sub-2s · Whisper auto-fallback',   accent: 'from-cyan-400 to-blue-500' },
+                    { id: '5090',  label: '🖥 5090 Beast', desc: 'Local · ~5-15s · Whisper-large-v3 quality', accent: 'from-amber-400 via-rose-400 to-fuchsia-500' },
+                  ].map(p => {
+                    const active = sttProvider === p.id
+                    return (
+                      <button key={p.id} type="button" onClick={() => setSttProvider(p.id)}
+                        className={`p-2.5 rounded-lg border text-left transition-all ${
+                          active
+                            ? `border-fuchsia-400/60 bg-gradient-to-br ${p.accent} bg-opacity-10 shadow-md`
+                            : 'border-gray-800 bg-gray-900/40 hover:border-gray-700 hover:bg-gray-900'
+                        }`}>
+                        <div className={`text-xs font-semibold ${active ? 'text-white' : 'text-gray-200'}`}>{p.label}</div>
+                        <div className={`text-[10px] leading-snug mt-0.5 ${active ? 'text-white/70' : 'text-gray-500'}`}>{p.desc}</div>
+                      </button>
+                    )
+                  })}
+                </div>
+                {sttProvider === '5090' && (
+                  <p className="text-[10px] text-gray-600 mt-1.5 leading-snug">
+                    Runs on Sid's RTX 5090 — beast.py must be online. First call downloads ~3 GB once.
+                  </p>
+                )}
+              </div>
               <div>
                 <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">Audio</label>
                 {sttDataUrl ? (
