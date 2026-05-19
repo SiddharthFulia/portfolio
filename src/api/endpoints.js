@@ -46,6 +46,7 @@ export const ENDPOINTS = {
   CINEMA_LIST:          '/api/cinema/list',
   CINEMA_BULK:          '/api/cinema/bulk',
   JOB_LOGS:             '/api/job-logs',   // /:lane/:jobId?since=<ms>&limit=80
+  EXPORT:               '/api/export',     // POST { format, rows|content, title, filename }
 
   // Vision
   FACE_ANALYZE: '/api/face-analyze',

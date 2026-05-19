@@ -547,3 +547,17 @@ export async function getChatJobStatus(jobId) {
     return { data: data?.data || data, error: null };
   } catch (err) { return { data: null, error: err.message }; }
 }
+
+// Compress older messages in a chat into a single system summary so the
+// model stays fast as the thread gets long. Returns { compacted, kept,
+// summaryMessage }.
+export async function compactConversationApi(chatId, { keepLastN = 4 } = {}) {
+  try {
+    const data = await post(
+      `${ENDPOINTS.CHAT_CONVERSATIONS}/${encodeURIComponent(chatId)}/compact`,
+      { keepLastN },
+      { timeout: 60000 }
+    );
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
