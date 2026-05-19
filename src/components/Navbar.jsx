@@ -5,7 +5,7 @@ import sakura from "../assets/sakura.mp3";
 
 const Navbar = () => {
   const { pathname } = useLocation();
-  const isDark = ['/lab', '/learn', '/creative', '/chess', '/science', '/face', '/vision', '/explore', '/ai', '/studio', '/ai-video', '/video', '/image-enhancer', '/enhance', '/lipsync', '/audio', '/cinema'].some(r => pathname.startsWith(r));
+  const isDark = ['/lab', '/learn', '/creative', '/chess', '/science', '/face', '/vision', '/explore', '/ai', '/studio', '/ai-video', '/video', '/image-enhancer', '/enhance', '/transform', '/img2img', '/lipsync', '/audio', '/cinema'].some(r => pathname.startsWith(r));
 
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
@@ -42,6 +42,7 @@ const Navbar = () => {
   const featuredPills = [
     { to: '/ai-video',       label: 'AI Video',     color: 'from-cyan-500 via-purple-500 to-amber-500' },
     { to: '/image-enhancer', label: 'Image Studio', color: 'from-cyan-300 via-fuchsia-400 to-amber-300' },
+    { to: '/transform',      label: 'Image → Image', color: 'from-fuchsia-400 via-violet-400 to-cyan-400' },
     { to: '/lipsync',        label: 'Lip Sync',     color: 'from-emerald-400 via-cyan-400 to-fuchsia-400' },
     { to: '/audio',          label: 'Audio',        color: 'from-fuchsia-400 via-amber-400 to-emerald-400' },
     { to: '/cinema',         label: 'Cinema',       color: 'from-amber-400 via-rose-400 to-fuchsia-400' },

@@ -26,6 +26,7 @@ const ExploreModule = lazy(() => import("./pages/ExploreModule"));
 const AIChat = lazy(() => import("./pages/AIChat"));
 const AIVideo = lazy(() => import("./pages/AIVideo"));
 const ImageEnhancer = lazy(() => import("./pages/ImageEnhancer"));
+const ImageTransform = lazy(() => import("./pages/ImageTransform"));
 const LipSync = lazy(() => import("./pages/LipSync"));
 const AudioStudio = lazy(() => import("./pages/AudioStudio"));
 const Cinema = lazy(() => import("./pages/Cinema"));
@@ -186,6 +187,8 @@ const App = () => {
           <Route path='/image-enhancer'  element={<Suspense fallback={<DarkPageSkeleton />}><ImageEnhancer /></Suspense>} />
           <Route path='/image-enhancer/:id' element={<Suspense fallback={<DarkPageSkeleton />}><ImageEnhancerDetail /></Suspense>} />
           <Route path='/enhance'         element={<Suspense fallback={<DarkPageSkeleton />}><ImageEnhancer /></Suspense>} />
+          <Route path='/transform'       element={<Suspense fallback={<DarkPageSkeleton />}><ImageTransform /></Suspense>} />
+          <Route path='/img2img'         element={<Suspense fallback={<DarkPageSkeleton />}><ImageTransform /></Suspense>} />
           {/* Tier 3 Studio lanes — Lip Sync / Audio / Cinema */}
           <Route path='/lipsync'         element={<Suspense fallback={<DarkPageSkeleton />}><LipSync /></Suspense>} />
           <Route path='/lipsync/:id'     element={<Suspense fallback={<DarkPageSkeleton />}><LipsyncDetail /></Suspense>} />
