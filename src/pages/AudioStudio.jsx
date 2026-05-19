@@ -9,17 +9,19 @@ import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
 import AudioRecorder from '../components/AudioRecorder'
 
 const KINDS = [
-  { value: 'music', label: '🎵 Music',           blurb: 'Background tracks, soundtracks, loops. Best for video soundtracks.', defaultModel: 'musicgen' },
-  { value: 'sfx',   label: '🔊 SFX / Ambience', blurb: 'One-shot effects, foley, drones, ambient textures.',                  defaultModel: 'stable-audio' },
-  { value: 'tts',   label: '🗣 Text → Speech',  blurb: 'Voice cloning + multilingual TTS (Bark).',                            defaultModel: 'bark' },
-  { value: 'stt',   label: '✍️ Speech → Text',   blurb: 'Upload audio → transcript. Whisper-large-v3, 99 languages, auto-detect.', defaultModel: 'whisper' },
+  { value: 'music',    label: '🎵 Music',           blurb: 'Background tracks, soundtracks, loops. Best for video soundtracks.',  defaultModel: 'musicgen' },
+  { value: 'sfx',      label: '🔊 SFX / Ambience', blurb: 'One-shot effects, foley, drones, ambient textures.',                   defaultModel: 'stable-audio' },
+  { value: 'tts',      label: '🗣 Text → Speech',  blurb: 'Voice cloning + multilingual TTS (Bark).',                             defaultModel: 'bark' },
+  { value: 'stt',      label: '✍️ Speech → Text',  blurb: 'Upload audio → transcript. Whisper, 99 languages, auto-detect.',      defaultModel: 'whisper' },
+  { value: 'separate', label: '🎚 Stem Split',      blurb: 'Split a song into vocals / drums / bass / other. Demucs on 5090.',    defaultModel: 'htdemucs' },
 ]
 
 const MODELS = {
-  music: [{ value: 'musicgen', label: 'MusicGen Small', blurb: 'Meta MusicGen — fast, music-tuned. Up to 30s.' }],
-  sfx:   [{ value: 'stable-audio', label: 'Stable Audio Open 1.0', blurb: 'Stability AI — best for non-music SFX up to 47s.' }],
-  tts:   [{ value: 'bark', label: 'Bark', blurb: 'Multilingual TTS with voice presets. Suno research.' }],
-  stt:   [{ value: 'whisper', label: 'Whisper large-v3', blurb: 'OpenAI Whisper via HF Inference. Auto-detect 99 languages.' }],
+  music:    [{ value: 'musicgen',          label: 'MusicGen Small',         blurb: 'Meta MusicGen — fast, music-tuned. Up to 30s.' }],
+  sfx:      [{ value: 'stable-audio',      label: 'Stable Audio Open 1.0', blurb: 'Stability AI — best for non-music SFX up to 47s.' }],
+  tts:      [{ value: 'bark',              label: 'Bark',                  blurb: 'Multilingual TTS with voice presets. Suno research.' }],
+  stt:      [{ value: 'whisper',           label: 'Whisper large-v3',      blurb: 'Whisper transcription. Auto-detect 99 languages.' }],
+  separate: [{ value: 'htdemucs',          label: 'Demucs (htdemucs)',     blurb: 'SOTA 4-stem separator. Splits vocals / drums / bass / other.' }],
 }
 
 // Optional language hint for Whisper. Empty string = auto-detect (Whisper
@@ -116,6 +118,11 @@ export default function AudioStudio() {
   // sub-2s), '5090' = async via /api/audio queue (Whisper-large-v3 on the
   // 5090, ~5-15s but local + private + best quality).
   const [sttProvider, setSttProvider] = useState('cloud')
+  // Stem-separation state (only used when kind === 'separate'). Reuses
+  // sttFile/sttDataUrl for the upload (same input shape), but renders a
+  // separate result panel built around the 4 stem URLs + lyrics.
+  const [sepWithLyrics, setSepWithLyrics] = useState(true)
+  const [sepResult, setSepResult] = useState(null)
   // Prompt helper modal — state lives here so closing + reopening keeps the
   // last AI-generated prompt + idea
   const [helperOpen, setHelperOpen] = useState(false)
@@ -152,6 +159,16 @@ export default function AudioStudio() {
             provider: '5090',
           })
           antMessage.success('Transcript ready')
+        }
+        // Stem-separation jobs return a `stems` object — promote to sepResult.
+        if (data.kind === 'separate' && data.stems && typeof data.stems === 'object') {
+          setSepResult({
+            stems: data.stems,
+            model: data.model || 'htdemucs',
+            elapsedMs: data.completedAt && data.createdAt
+              ? new Date(data.completedAt) - new Date(data.createdAt) : null,
+          })
+          antMessage.success('Stems ready')
         }
         setLibraryRefresh(k => k + 1)
       } else if (data.status === 'failed') {
@@ -191,6 +208,25 @@ export default function AudioStudio() {
         model: 'whisper-large-v3',
         audioDataUrl: sttDataUrl,
         language: sttLanguage,
+      })
+      if (err) { setWorking(false); setError(err); return }
+      setJob(data)
+      startPolling(data.jobId)
+      return
+    }
+
+    // Stem separation — async, runs Demucs on 5090. Reuses sttDataUrl as
+    // the input slot (same audio upload UI) and polls the audio job until
+    // `stems` is set. Always uses 5090 — no cloud demucs API on the free
+    // tier worth wiring.
+    if (kind === 'separate') {
+      if (!sttDataUrl) { setError('Upload a song first'); return }
+      setError(null); setJob(null); setSepResult(null); setWorking(true)
+      const { data, error: err } = await submitAudio({
+        kind: 'separate',
+        model: 'htdemucs',
+        audioDataUrl: sttDataUrl,
+        withLyrics: sepWithLyrics,
       })
       if (err) { setWorking(false); setError(err); return }
       setJob(data)
@@ -252,7 +288,7 @@ export default function AudioStudio() {
             on smaller breakpoints. */}
         <section className="mb-6">
           <h2 className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Type</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 [perspective:1200px]">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 [perspective:1200px]">
             {KINDS.map(k => (
               <KindCard key={k.value} kind={k} active={kind === k.value}
                 onSelect={() => setKind(k.value)} />
@@ -274,7 +310,49 @@ export default function AudioStudio() {
             />
           </div>
 
-          {kind === 'stt' ? (
+          {kind === 'separate' ? (
+            // Stem-separation form: upload song + optional lyrics toggle.
+            // Always runs on the 5090 (Demucs needs the GPU); no cloud
+            // alternative wired up.
+            <>
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">Song</label>
+                {sttDataUrl ? (
+                  <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-3 space-y-2">
+                    <audio src={sttDataUrl} controls className="w-full" />
+                    <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500 font-mono">
+                      <span className="truncate">{sttFile?.name || 'uploaded song'}</span>
+                      <button onClick={() => { setSttFile(null); setSttDataUrl(''); setSepResult(null) }}
+                        className="text-rose-400 hover:text-rose-300">✕ Replace</button>
+                    </div>
+                  </div>
+                ) : (
+                  <Upload.Dragger multiple={false} showUploadList={false}
+                    accept="audio/*"
+                    beforeUpload={handleSttUpload}
+                    style={{ background: 'transparent', borderColor: '#374151', padding: '24px 0' }}>
+                    <UploadOutlined className="text-3xl text-fuchsia-400 mb-2" />
+                    <p className="text-sm text-gray-300">Drop a song or click to upload</p>
+                    <p className="text-[10px] text-gray-500 mt-1">mp3 · wav · m4a · max 25 MB · runs on 5090</p>
+                  </Upload.Dragger>
+                )}
+              </div>
+              <label className="flex items-center justify-between gap-2 p-3 rounded-lg border border-gray-800 bg-gray-900/40 cursor-pointer">
+                <span className="flex items-center gap-2">
+                  <span className="text-base">🎤</span>
+                  <span className="text-xs font-semibold text-gray-200">Transcribe vocals → lyrics</span>
+                  <span className="text-[10px] text-gray-500">+10-20s · Whisper on the vocals stem</span>
+                </span>
+                <input type="checkbox" checked={sepWithLyrics} onChange={e => setSepWithLyrics(e.target.checked)}
+                  className="w-4 h-4 accent-fuchsia-500" />
+              </label>
+              <p className="text-[10px] text-gray-600 leading-snug">
+                Demucs splits the song into 4 audio stems: vocals, drums, bass, and everything else.
+                Each comes back as a separate playable / downloadable file. Runs on Sid's RTX 5090 —
+                beast.py must be online. First call downloads ~80 MB once.
+              </p>
+            </>
+          ) : kind === 'stt' ? (
             // Speech-to-Text form: file upload + optional language hint.
             // No prompt, no duration slider, no voice picker — Whisper just
             // listens to the audio and returns text.
@@ -404,8 +482,54 @@ export default function AudioStudio() {
         {/* Output */}
         <section className="rounded-2xl border border-gray-800 p-4 bg-gray-900/40 mb-6">
           <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Output</p>
-          {/* STT result — synchronous, no job row */}
-          {kind === 'stt' && sttResult ? (
+          {/* Stem-separation result — 4 audio players + optional lyrics */}
+          {kind === 'separate' && sepResult ? (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+                {[
+                  { key: 'vocals', label: '🎤 Vocals', tint: 'border-fuchsia-500/40 bg-fuchsia-500/5' },
+                  { key: 'drums',  label: '🥁 Drums',  tint: 'border-amber-500/40 bg-amber-500/5' },
+                  { key: 'bass',   label: '🎸 Bass',   tint: 'border-emerald-500/40 bg-emerald-500/5' },
+                  { key: 'other',  label: '🎹 Other',  tint: 'border-cyan-500/40 bg-cyan-500/5' },
+                ].map(s => (
+                  <div key={s.key} className={`rounded-lg border p-3 ${s.tint}`}>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <span className="text-xs font-semibold text-gray-100">{s.label}</span>
+                      {sepResult.stems?.[s.key] && (
+                        <a href={sepResult.stems[s.key]} download
+                          className="text-[10px] flex items-center gap-1 px-2 py-0.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-300">
+                          <DownloadOutlined /> Save
+                        </a>
+                      )}
+                    </div>
+                    {sepResult.stems?.[s.key] ? (
+                      <audio src={sepResult.stems[s.key]} controls className="w-full" />
+                    ) : (
+                      <p className="text-[10px] text-gray-500">not produced</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {sepResult.stems?.lyrics ? (
+                <details className="rounded-lg border border-gray-800 bg-black/40 p-3 mb-3">
+                  <summary className="text-xs font-semibold text-fuchsia-300 cursor-pointer">
+                    📝 Lyrics (Whisper on vocals stem)
+                  </summary>
+                  <p className="mt-2 text-sm text-gray-100 leading-relaxed whitespace-pre-wrap">
+                    {sepResult.stems.lyrics}
+                  </p>
+                </details>
+              ) : sepWithLyrics ? (
+                <p className="text-[10px] text-gray-500 mb-3">⚠ Lyrics transcription was requested but came back empty.</p>
+              ) : null}
+              <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500 font-mono">
+                <span>{sepResult.model}{sepResult.elapsedMs ? ` · ${(sepResult.elapsedMs/1000).toFixed(1)}s` : ''}</span>
+                <span>{job?.jobId}</span>
+              </div>
+            </>
+          ) :
+          /* STT result — synchronous, no job row */
+          kind === 'stt' && sttResult ? (
             <>
               <div className="rounded-lg bg-black/40 border border-gray-800 p-3 mb-3 max-h-72 overflow-y-auto">
                 <p className="text-sm text-gray-100 leading-relaxed whitespace-pre-wrap">{sttResult.text || '(empty)'}</p>
@@ -471,12 +595,15 @@ export default function AudioStudio() {
 
         <div className="flex justify-end">
           {(() => {
-            const disabled = working || (kind === 'stt' ? !sttDataUrl : !prompt.trim())
+            const audioRequired = kind === 'stt' || kind === 'separate'
+            const disabled = working || (audioRequired ? !sttDataUrl : !prompt.trim())
             const label = working
               ? 'Working…'
               : kind === 'stt'
                 ? 'Transcribe'
-                : `Generate ${kindObj?.label.toLowerCase().replace(/[🎵🔊🗣✍️ ]/g, '').trim() || 'audio'}`
+                : kind === 'separate'
+                  ? 'Split stems'
+                  : `Generate ${kindObj?.label.toLowerCase().replace(/[🎵🔊🗣✍️🎚 ]/g, '').trim() || 'audio'}`
             return (
               <button onClick={generate} disabled={disabled}
                 className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all ${
@@ -522,7 +649,12 @@ export default function AudioStudio() {
 // Library card — audio is rendered as an inline player + metadata
 function AudioCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
   const handleClick = (e) => { if (selectMode) { e.preventDefault(); onToggleSelect?.() } }
-  const kindIcon = item.kind === 'music' ? '🎵' : item.kind === 'sfx' ? '🔊' : item.kind === 'tts' ? '🗣' : '🎧'
+  const kindIcon = item.kind === 'music' ? '🎵'
+    : item.kind === 'sfx' ? '🔊'
+    : item.kind === 'tts' ? '🗣'
+    : item.kind === 'stt' ? '✍️'
+    : item.kind === 'separate' ? '🎚'
+    : '🎧'
   // Clicking a still-rendering card navigates to /audio/<jobId> for the
   // full live-log view; completed cards just play in-place (the embedded
   // <audio> controls handle that without a redirect).
