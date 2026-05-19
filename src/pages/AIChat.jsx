@@ -10,7 +10,6 @@ import ReactMarkdown from 'react-markdown'
 import ChatSidebar from '../components/ChatSidebar'
 import ChatInput from '../components/ChatInput'
 import {
-  sendChat, sendGroq, sendGemini,
   listLocalModels, createConversation, getConversation, sendChatMessage,
   getChatJobStatus, updateConversation,
 } from '../api/ai'
@@ -291,49 +290,41 @@ const AIChat = () => {
     }
     setMessages(prev => [...prev, userMsg, asstMsg])
 
-    // For 5090: go through the conversation-aware endpoint (persists +
-    // queues + worker callback appends assistant message). For cloud:
-    // sync HTTP call, no persistence yet — MVP.
-    if (provider === '5090') {
-      const { data, error: err } = await sendChatMessage(chatId, {
-        content, model, provider,
-        imageDataUrl, docName, docText,
-      })
-      if (err) {
-        setMessages(prev => prev.map(m => m.messageId === tempAsstId
-          ? { ...m, content: `⚠ ${err}`, _pending: false, _failed: true } : m))
-        setSending(false)
-        antMessage.error(err)
-        return
-      }
-      // Replace the optimistic user-msg id with the real one
+    // Unified call — BE handles both async (5090 → queue + poll) and
+    // sync (cloud → inline reply) paths, picking by `provider`. We
+    // always persist to chat_messages regardless of provider so the
+    // sidebar shows every chat with full history.
+    const { data, error: err } = await sendChatMessage(chatId, {
+      content, model, provider,
+      imageDataUrl, docName, docText,
+    })
+    if (err) {
+      setMessages(prev => prev.map(m => m.messageId === tempAsstId
+        ? { ...m, content: `⚠ ${err}`, _pending: false, _failed: true } : m))
+      setSending(false)
+      antMessage.error(err)
+      return
+    }
+    // Replace optimistic user-msg id with the real one + real Cloudinary
+    // imageUrl if BE persisted one.
+    if (data.userMessage) {
       setMessages(prev => prev.map(m => m.messageId === tempUserId
         ? { ...m, messageId: data.userMessage.messageId, imageUrl: data.userMessage.imageUrl }
         : m))
+    }
+
+    if (data.assistantMessage) {
+      // Cloud sync path — BE already produced and persisted the reply.
+      setMessages(prev => prev.map(m => m.messageId === tempAsstId
+        ? { ...data.assistantMessage, _pending: false } : m))
+      setSending(false)
+      setSidebarRefresh(n => n + 1)
+    } else if (data.jobId) {
+      // 5090 async path — poll until worker callback fires.
       pollChatJob(data.jobId, tempAsstId)
     } else {
-      // Cloud sync path. Reuse the existing sendChat/sendGroq/sendGemini helpers.
-      const history = messages.filter(m => !m._pending).map(m => ({ role: m.role, content: m.content }))
-      let result, err
-      try {
-        if (provider === 'cloud-groq') {
-          ({ data: result, error: err } = await sendGroq(content, { history, model }))
-        } else if (provider === 'cloud-gemini') {
-          ({ data: result, error: err } = await sendGemini(content, { history, model }))
-        } else {  // oracle-ollama
-          ({ data: result, error: err } = await sendChat(content, { history, model }))
-        }
-      } catch (e) { err = e.message }
-      if (err) {
-        setMessages(prev => prev.map(m => m.messageId === tempAsstId
-          ? { ...m, content: `⚠ ${err}`, _pending: false, _failed: true } : m))
-        setSending(false)
-        antMessage.error(err)
-        return
-      }
-      const reply = result?.reply || result?.message || result?.content || JSON.stringify(result)
       setMessages(prev => prev.map(m => m.messageId === tempAsstId
-        ? { ...m, content: reply, _pending: false } : m))
+        ? { ...m, content: '⚠ Unexpected server response', _pending: false, _failed: true } : m))
       setSending(false)
     }
   }
