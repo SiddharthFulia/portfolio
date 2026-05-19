@@ -244,19 +244,21 @@ export default function AudioStudio() {
     startPolling(data.jobId)
   }
 
-  // Audio file → data URL for the STT path. Whisper accepts any common
-  // codec; we cap at 25 MB to match the BE's HF Inference limit.
+  // Audio (or video — Stem Split lane) → data URL. STT path is capped at
+  // 25 MB because HF Whisper Inference rejects larger; Stem Split allows
+  // up to 100 MB so users can drop full music videos / 3-minute mp4s.
   const handleSttUpload = async (file) => {
     if (!file) return false
-    if (file.size > 25 * 1024 * 1024) {
-      antMessage.error('Audio too large (max 25 MB)')
+    const cap = kind === 'separate' ? 100 * 1024 * 1024 : 25 * 1024 * 1024
+    if (file.size > cap) {
+      antMessage.error(`File too large (max ${Math.round(cap / 1024 / 1024)} MB)`)
       return false
     }
     try {
       const d = await fileToDataUrl(file)
-      setSttFile(file); setSttDataUrl(d); setError(null); setSttResult(null)
+      setSttFile(file); setSttDataUrl(d); setError(null); setSttResult(null); setSepResult(null)
     } catch {
-      antMessage.error('Could not read audio file')
+      antMessage.error('Could not read file')
     }
     return false   // don't auto-POST via antd
   }
@@ -319,7 +321,12 @@ export default function AudioStudio() {
                 <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">Song</label>
                 {sttDataUrl ? (
                   <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-3 space-y-2">
-                    <audio src={sttDataUrl} controls className="w-full" />
+                    {/* Show as <video> if we got a video file, else <audio>.
+                        Sniffing by file.type is good enough — the worker
+                        does proper magic-byte detection downstream. */}
+                    {sttFile?.type?.startsWith('video/')
+                      ? <video src={sttDataUrl} controls className="w-full max-h-48 rounded-lg" />
+                      : <audio src={sttDataUrl} controls className="w-full" />}
                     <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500 font-mono">
                       <span className="truncate">{sttFile?.name || 'uploaded song'}</span>
                       <button onClick={() => { setSttFile(null); setSttDataUrl(''); setSepResult(null) }}
@@ -328,12 +335,12 @@ export default function AudioStudio() {
                   </div>
                 ) : (
                   <Upload.Dragger multiple={false} showUploadList={false}
-                    accept="audio/*"
+                    accept="audio/*,video/*"
                     beforeUpload={handleSttUpload}
                     style={{ background: 'transparent', borderColor: '#374151', padding: '24px 0' }}>
                     <UploadOutlined className="text-3xl text-fuchsia-400 mb-2" />
-                    <p className="text-sm text-gray-300">Drop a song or click to upload</p>
-                    <p className="text-[10px] text-gray-500 mt-1">mp3 · wav · m4a · max 25 MB · runs on 5090</p>
+                    <p className="text-sm text-gray-300">Drop a song or music video</p>
+                    <p className="text-[10px] text-gray-500 mt-1">mp3 · wav · m4a · mp4 · webm · max 100 MB · audio track auto-extracted from video · runs on 5090</p>
                   </Upload.Dragger>
                 )}
               </div>

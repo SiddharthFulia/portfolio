@@ -829,8 +829,8 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
                 })}
               </div>
               <p className="text-[10px] text-gray-600">
-                Optimized lane uses distilled checkpoints, lower frame counts, and cache acceleration where supported.
-                Steps / resolution / duration are auto-tuned per mode — override below if you want.
+                Mode picks the model + step count for you (the "speed" knobs).
+                Duration / resolution / aspect ratio stay yours — set them below.
               </p>
             </div>
           )}
