@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Select, Tag, Tooltip, Button, Popover, Slider, InputNumber, Modal } from 'antd'
+import { Select, Tag, Tooltip, Button, Popover, Slider, InputNumber, Modal, Switch } from 'antd'
 import notify from '../utils/notify'
+import ChatLogo from '../components/ChatLogo'
 import {
-  RobotOutlined, UserOutlined, CopyOutlined, CheckOutlined, MenuOutlined,
+  UserOutlined, CopyOutlined, CheckOutlined, MenuOutlined,
   ThunderboltOutlined, CloudOutlined, DesktopOutlined, GoogleOutlined,
   PictureOutlined, FileTextOutlined, SettingOutlined, MergeCellsOutlined,
   ExperimentOutlined,
@@ -150,6 +151,10 @@ const AIChat = () => {
   const [temperature, setTemperature] = useState(null)
   const [maxTokens, setMaxTokens] = useState(null)
   const [compacting, setCompacting] = useState(false)
+  // Image generation per-conversation toggle + model. Off by default so
+  // visitors don't burn Cloudflare quota on accidental "draw" matches.
+  const [imageGenEnabled, setImageGenEnabled] = useState(false)
+  const [imageGenModel, setImageGenModel] = useState(null)
 
   const pollRef = useRef(null)
   const scrollRef = useRef(null)
@@ -195,6 +200,8 @@ const AIChat = () => {
       if (data.model) setModel(data.model)
       setTemperature(typeof data.temperature === 'number' ? data.temperature : null)
       setMaxTokens(Number.isInteger(data.maxTokens) ? data.maxTokens : null)
+      setImageGenEnabled(!!data.imageGenEnabled)
+      setImageGenModel(data.imageGenModel || null)
     })
     return () => { cancelled = true }
   }, [chatId, navigate])
@@ -252,13 +259,16 @@ const AIChat = () => {
     navigate(`/ai/${encodeURIComponent(data.chatId)}`)
   }
 
-  // Persist temperature / maxTokens back to the conversation on change.
-  // Passes `null` to clear back to model-default.
-  const saveOverride = async ({ temperature: t = undefined, maxTokens: m = undefined } = {}) => {
+  // Persist any popover-controlled setting back to the conversation.
+  // Supports temperature, maxTokens, imageGenEnabled, imageGenModel.
+  // Pass `null` to clear back to model-default.
+  const saveOverride = async (patchInput = {}) => {
     if (!chatId) return
     const patch = {}
-    if (t !== undefined) patch.temperature = t
-    if (m !== undefined) patch.maxTokens   = m
+    if ('temperature'      in patchInput) patch.temperature      = patchInput.temperature
+    if ('maxTokens'        in patchInput) patch.maxTokens        = patchInput.maxTokens
+    if ('imageGenEnabled'  in patchInput) patch.imageGenEnabled  = patchInput.imageGenEnabled ? 1 : 0
+    if ('imageGenModel'    in patchInput) patch.imageGenModel    = patchInput.imageGenModel
     if (!Object.keys(patch).length) return
     const { error: err } = await updateConversation(chatId, patch)
     if (err) notify.error(err)
@@ -546,19 +556,29 @@ const AIChat = () => {
                       <GenerationSettings
                         temperature={temperature}
                         maxTokens={maxTokens}
+                        imageGenEnabled={imageGenEnabled}
+                        imageGenModel={imageGenModel}
                         onChangeTemperature={(v) => { setTemperature(v); saveOverride({ temperature: v }) }}
                         onChangeMaxTokens={(v) => { setMaxTokens(v); saveOverride({ maxTokens: v }) }}
+                        onChangeImageGen={(on) => {
+                          setImageGenEnabled(on)
+                          // First-time opt-in → seed with Flux Schnell so the picker isn't empty.
+                          const seed = (on && !imageGenModel) ? '@cf/black-forest-labs/flux-1-schnell' : imageGenModel
+                          if (on && !imageGenModel) setImageGenModel(seed)
+                          saveOverride({ imageGenEnabled: on, imageGenModel: seed })
+                        }}
+                        onChangeImageGenModel={(v) => { setImageGenModel(v); saveOverride({ imageGenModel: v }) }}
                       />
                     }>
-                    <Tooltip title="Generation settings — temperature + max tokens">
+                    <Tooltip title="Tune: temperature, max tokens, image generation">
                       <Button
                         size="small"
                         icon={<SettingOutlined />}
                         className={`!border-gray-700 !bg-gray-900/60 hover:!bg-gray-800 !text-gray-200 ${
-                          (temperature !== null || maxTokens !== null) ? '!border-cyan-500/40 !text-cyan-200' : ''
+                          (temperature !== null || maxTokens !== null || imageGenEnabled) ? '!border-cyan-500/40 !text-cyan-200' : ''
                         }`}>
                         <span className="hidden sm:inline">
-                          {(temperature !== null || maxTokens !== null) ? 'Tuned' : 'Tune'}
+                          {(temperature !== null || maxTokens !== null || imageGenEnabled) ? 'Tuned' : 'Tune'}
                         </span>
                       </Button>
                     </Tooltip>
@@ -702,8 +722,11 @@ function WelcomeHero({ provider, localModels, localOnline, onPickProvider, onNew
   return (
     <div className="max-w-3xl mx-auto py-6 sm:py-12 px-2">
       <div className="text-center mb-8">
+        <div className="flex justify-center mb-3">
+          <ChatLogo size={56} glow />
+        </div>
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r from-cyan-500/20 via-purple-500/20 to-amber-500/20 border border-cyan-500/30 text-[10px] uppercase tracking-wider text-cyan-200 font-semibold mb-3">
-          <RobotOutlined /> AI Chat · 4 providers
+          AI Chat · 4 providers
         </div>
         <h2 className="text-2xl sm:text-4xl font-black leading-tight pb-1 bg-gradient-to-r from-cyan-300 via-purple-300 to-amber-300 bg-clip-text text-transparent">
           Pick a brain and start a conversation
@@ -775,8 +798,9 @@ function WelcomeHero({ provider, localModels, localOnline, onPickProvider, onNew
 
       {/* CTA */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 justify-center">
-        <Button type="primary" size="large" icon={<RobotOutlined />} onClick={onNewChat}
-          style={{ background: 'linear-gradient(135deg, #06b6d4, #7c3aed, #f59e0b)', border: 'none', fontWeight: 700 }}
+        <Button type="primary" size="large" onClick={onNewChat}
+          icon={<span className="inline-flex items-center"><ChatLogo size={18} /></span>}
+          style={{ background: 'linear-gradient(135deg, #06b6d4, #7c3aed, #f59e0b)', border: 'none', fontWeight: 700, paddingLeft: 14 }}
           className="!h-12">
           Start a new chat
         </Button>
@@ -875,8 +899,8 @@ function MessageBubble({ msg }) {
   return (
     <div className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
       {!isUser && (
-        <div className="w-8 h-8 shrink-0 rounded-full bg-gradient-to-br from-cyan-500 via-blue-500 to-purple-500 flex items-center justify-center text-white shadow-md">
-          <RobotOutlined />
+        <div className="shrink-0 mt-0.5">
+          <ChatLogo size={32} />
         </div>
       )}
       <div className={`max-w-[88%] sm:max-w-[78%] min-w-0 break-words rounded-2xl px-3 sm:px-4 py-2.5 overflow-hidden ${
@@ -930,17 +954,30 @@ function MessageBubble({ msg }) {
   )
 }
 
+// Curated image-gen models (Cloudflare Workers AI). Default = Flux
+// Schnell — 4 steps, fast, good quality, generous free tier.
+const IMAGE_MODELS = [
+  { id: '@cf/black-forest-labs/flux-1-schnell',                name: 'Flux Schnell',         hint: '⚡ Fast · 4 steps · default' },
+  { id: '@cf/bytedance/stable-diffusion-xl-lightning',         name: 'SDXL Lightning',       hint: 'Sharp · 5 steps' },
+  { id: '@cf/stabilityai/stable-diffusion-xl-base-1.0',        name: 'SDXL Base 1.0',        hint: '🎨 Highest detail · slower' },
+  { id: '@cf/lykon/dreamshaper-8-lcm',                          name: 'Dreamshaper 8 LCM',    hint: '✨ Stylized · 4 steps' },
+]
+
 // ─── Generation settings popover ───────────────────────────
-// Optional per-conversation overrides for temperature + max-tokens. Both
-// are nullable — null means "use the model's default" and the BE skips
-// the param entirely. Power users can tweak; everyone else ignores it.
-function GenerationSettings({ temperature, maxTokens, onChangeTemperature, onChangeMaxTokens }) {
+// Per-conversation overrides — temperature, max tokens, and image-gen.
+// Each setting is independent and persists on change. Defaults are
+// optimised for each model; toggling stuff is purely opt-in.
+function GenerationSettings({
+  temperature, maxTokens, imageGenEnabled, imageGenModel,
+  onChangeTemperature, onChangeMaxTokens, onChangeImageGen, onChangeImageGenModel,
+}) {
   const tempIsSet = temperature !== null && temperature !== undefined
   const tokIsSet  = maxTokens !== null && maxTokens !== undefined
   const tempVal = tempIsSet ? temperature : 0.7
   const tokVal  = tokIsSet  ? maxTokens   : 1024
+  const imgModel = imageGenModel || '@cf/black-forest-labs/flux-1-schnell'
   return (
-    <div className="w-72 p-2 text-gray-200">
+    <div className="w-80 p-2 text-gray-200">
       <div className="text-xs font-semibold mb-1.5 flex items-center gap-1.5">
         <ExperimentOutlined className="text-cyan-300" /> Generation settings
       </div>
@@ -1002,6 +1039,58 @@ function GenerationSettings({ temperature, maxTokens, onChangeTemperature, onCha
             </button>
           )}
         </div>
+      </div>
+
+      {/* Image generation — opt-in. When OFF the model is told not to
+          attempt image generation, and no Cloudflare call is made even
+          if the model emits a marker. When ON the user picks the
+          Cloudflare model that runs the actual render. */}
+      <div className="mt-3 pt-3 border-t border-gray-800">
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-[11px] font-semibold text-gray-300">
+            🎨 Image generation <span className="text-gray-600">— allow "draw / make an image"</span>
+          </label>
+          <Switch
+            size="small"
+            checked={!!imageGenEnabled}
+            onChange={(v) => onChangeImageGen?.(v)}
+          />
+        </div>
+        {imageGenEnabled ? (
+          <>
+            <div className="flex items-center justify-between mb-1 mt-2">
+              <label className="text-[11px] text-gray-400">Render with</label>
+              <span className="text-[10px] font-mono text-cyan-300">
+                {IMAGE_MODELS.find(m => m.id === imgModel)?.name || 'custom'}
+              </span>
+            </div>
+            <Select
+              size="small"
+              value={imgModel}
+              onChange={(v) => onChangeImageGenModel?.(v)}
+              className="w-full"
+              popupMatchSelectWidth={false}
+              options={IMAGE_MODELS.map(m => ({
+                value: m.id,
+                label: (
+                  <div className="leading-tight py-0.5">
+                    <div className="text-xs font-semibold text-gray-100">{m.name}</div>
+                    <div className="text-[10px] text-gray-500">{m.hint}</div>
+                  </div>
+                ),
+              }))}
+            />
+            <p className="text-[10px] text-gray-500 mt-1.5 leading-snug">
+              When on, asking the chat for an image triggers a real render via
+              Cloudflare AI — typically 3–8s, free tier.
+            </p>
+          </>
+        ) : (
+          <p className="text-[10px] text-gray-600 mt-1 leading-snug">
+            Off: the chat will reply with text only. Toggle on to let it draw / paint /
+            render images inline.
+          </p>
+        )}
       </div>
 
       {(tempIsSet || tokIsSet) && (
