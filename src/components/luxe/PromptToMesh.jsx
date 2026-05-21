@@ -23,6 +23,7 @@ import { useGLTF, PresentationControls, Environment } from '@react-three/drei'
 import * as THREE from 'three'
 import { submitMeshJob, getMeshStatus } from '../../api/ai'
 import notify from '../../utils/notify'
+import JobLogsAgentPlan from '../JobLogsAgentPlan'
 
 const HISTORY_KEY = 'sid:mesh:history'
 const POLL_MS     = 1500
@@ -244,16 +245,6 @@ export default function PromptToMesh() {
 
   return (
     <div className="space-y-3">
-      {/* 5090 worker note */}
-      <div className="luxe-card p-3 border border-amber-500/30 bg-amber-500/[0.04] flex items-start gap-3">
-        <span className="text-xl leading-none mt-0.5">🔥</span>
-        <p className="text-[12.5px] text-amber-100/85 leading-relaxed">
-          Generation runs on your home GPU. Up to ~60s per mesh. If the
-          worker is offline you'll see a queue-stuck error; switch back
-          to the Groq tab for instant results.
-        </p>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         {/* 3D stage */}
         <div className="lg:col-span-3 luxe-card overflow-hidden">
@@ -314,7 +305,7 @@ export default function PromptToMesh() {
 
             {/* Model picker */}
             <div className="mt-3">
-              <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-300 mb-1.5 block">
                 Model
               </label>
               <div className="grid grid-cols-2 gap-1.5">
@@ -326,11 +317,11 @@ export default function PromptToMesh() {
                       : 'border-gray-800 bg-gray-900/40 hover:border-gray-700'
                   }`}>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-white">Shap-E</span>
-                    <span className="text-[9px] uppercase tracking-wider text-gray-500">Solid</span>
+                    <span className="text-sm font-semibold text-white">Shap-E</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-300">Solid</span>
                   </div>
-                  <div className="text-[10px] text-gray-400 mt-0.5">
-                    Pure text → 3D · ~30-60s · abstract-friendly
+                  <div className="text-[11.5px] text-gray-200 mt-1 leading-snug">
+                    Pure text → 3D · ~30–60s · abstract-friendly
                   </div>
                 </button>
                 <button type="button" onClick={() => setModel('tripo')}
@@ -341,11 +332,11 @@ export default function PromptToMesh() {
                       : 'border-gray-800 bg-gray-900/40 hover:border-gray-700'
                   }`}>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-white">TripoSR</span>
-                    <span className="text-[9px] uppercase tracking-wider text-fuchsia-300">🔥 Beast</span>
+                    <span className="text-sm font-semibold text-white">TripoSR</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-fuchsia-300">🔥 Beast</span>
                   </div>
-                  <div className="text-[10px] text-gray-400 mt-0.5">
-                    Flux image → 3D · ~10-15s · better fidelity
+                  <div className="text-[11.5px] text-gray-200 mt-1 leading-snug">
+                    Flux image → 3D · ~10–15s · better fidelity
                   </div>
                 </button>
               </div>
@@ -357,10 +348,10 @@ export default function PromptToMesh() {
             {model === 'shap-e' && (
               <div className="mt-3">
                 <div className="flex items-center justify-between mb-1">
-                  <label className="text-[10px] uppercase tracking-wider text-gray-500">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-300">
                     Steps · quality vs speed
                   </label>
-                  <span className="text-[10px] font-mono text-gray-400">{steps}</span>
+                  <span className="text-xs font-mono text-amber-300">{steps}</span>
                 </div>
                 <input
                   type="range" min={16} max={64} step={1}
@@ -372,7 +363,7 @@ export default function PromptToMesh() {
             )}
 
             <div className="flex items-center justify-between mt-3 gap-2">
-              <span className="text-[10px] text-gray-500">
+              <span className="text-[11px] text-gray-400">
                 Enter to generate · Shift+Enter for newline
               </span>
               <button
@@ -383,6 +374,17 @@ export default function PromptToMesh() {
               </button>
             </div>
           </div>
+
+          {/* Live logs — appears once a job is queued, stays after completion */}
+          {jobId && (
+            <JobLogsAgentPlan
+              lane="mesh"
+              jobId={jobId}
+              status={status}
+              progressMessage={progressMessage}
+              error={error}
+            />
+          )}
 
           {/* Sample prompts when idle */}
           {!isWorking && !glbUrl && (

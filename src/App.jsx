@@ -4,6 +4,7 @@ import { ConfigProvider, theme } from "antd";
 import { Footer, Navbar } from "./components";
 import BackToTop from './components/BackToTop';
 import EasterEgg from './components/EasterEgg';
+import RouteErrorBoundary from './components/RouteErrorBoundary';
 // PageTransition removed 2026-05 — the fade/slide on every route was the
 // "flashy switch" the user wanted gone. Routes now render directly.
 // VaultGate is now used inline inside each page (only for the "Save to
@@ -184,9 +185,9 @@ const App = () => {
           <Route path='/ai-video'        element={<Suspense fallback={<AIVideoSkeleton />}><AIVideo /></Suspense>} />
           <Route path='/ai-video/:id'    element={<Suspense fallback={<DarkPageSkeleton />}><AIVideoDetail /></Suspense>} />
           <Route path='/video'           element={<Suspense fallback={<AIVideoSkeleton />}><AIVideo /></Suspense>} />
-          <Route path='/image-enhancer'  element={<Suspense fallback={<DarkPageSkeleton />}><ImageEnhancer /></Suspense>} />
-          <Route path='/image-enhancer/:id' element={<Suspense fallback={<DarkPageSkeleton />}><ImageEnhancerDetail /></Suspense>} />
-          <Route path='/enhance'         element={<Suspense fallback={<DarkPageSkeleton />}><ImageEnhancer /></Suspense>} />
+          <Route path='/image-enhancer'  element={<RouteErrorBoundary><Suspense fallback={<DarkPageSkeleton />}><ImageEnhancer /></Suspense></RouteErrorBoundary>} />
+          <Route path='/image-enhancer/:id' element={<RouteErrorBoundary><Suspense fallback={<DarkPageSkeleton />}><ImageEnhancerDetail /></Suspense></RouteErrorBoundary>} />
+          <Route path='/enhance'         element={<RouteErrorBoundary><Suspense fallback={<DarkPageSkeleton />}><ImageEnhancer /></Suspense></RouteErrorBoundary>} />
           <Route path='/ai-studio'       element={<Suspense fallback={<DarkPageSkeleton />}><AIStudio /></Suspense>} />
           <Route path='/3d'              element={<Suspense fallback={<DarkPageSkeleton />}><Dragon3D /></Suspense>} />
           <Route path='/dragon'          element={<Suspense fallback={<DarkPageSkeleton />}><Dragon3D /></Suspense>} />

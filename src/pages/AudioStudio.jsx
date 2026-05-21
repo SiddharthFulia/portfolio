@@ -9,20 +9,45 @@ import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
 import AudioRecorder from '../components/AudioRecorder'
 
 const KINDS = [
-  { value: 'music',    label: '🎵 Music',           blurb: 'Background tracks, soundtracks, loops. Best for video soundtracks.',  defaultModel: 'musicgen' },
-  { value: 'sfx',      label: '🔊 SFX / Ambience', blurb: 'One-shot effects, foley, drones, ambient textures.',                   defaultModel: 'stable-audio' },
-  { value: 'tts',      label: '🗣 Text → Speech',  blurb: 'Voice cloning + multilingual TTS (Bark).',                             defaultModel: 'bark' },
-  { value: 'stt',      label: '✍️ Speech → Text',  blurb: 'Upload audio → transcript. Whisper, 99 languages, auto-detect.',      defaultModel: 'whisper' },
-  { value: 'separate', label: '🎚 Stem Split',      blurb: 'Split a song into vocals / drums / bass / other. Demucs on 5090.',    defaultModel: 'htdemucs' },
+  { value: 'music',        label: '🎵 Music',            blurb: 'Background tracks, soundtracks, loops. Best for video soundtracks.',  defaultModel: 'musicgen' },
+  { value: 'sfx',          label: '🔊 SFX / Ambience',   blurb: 'One-shot effects, foley, drones, ambient textures.',                   defaultModel: 'stable-audio' },
+  { value: 'tts',          label: '🗣 Text → Speech',    blurb: 'Voice cloning + multilingual TTS (Bark).',                             defaultModel: 'bark' },
+  { value: 'stt',          label: '✍️ Speech → Text',    blurb: 'Upload audio → transcript. Whisper, 99 languages, auto-detect.',      defaultModel: 'whisper' },
+  { value: 'separate',     label: '🎚 Stem Split',       blurb: 'Split a song into vocals / drums / bass / other. Demucs on 5090.',    defaultModel: 'htdemucs' },
+  { value: 'voice-clone',  label: '🎤 Voice Clone',      blurb: 'Upload a 6-30s clip + text → speech in that voice (XTTS-v2, 5090).',  defaultModel: 'xtts-v2' },
+  { value: 'voice-sing',   label: '🎶 Cloned Singing',   blurb: 'Voice clone rides a melody track to sing your lyrics (XTTS+RVC).',     defaultModel: 'xtts-v2+rvc' },
 ]
 
 const MODELS = {
-  music:    [{ value: 'musicgen',          label: 'MusicGen Small',         blurb: 'Meta MusicGen — fast, music-tuned. Up to 30s.' }],
-  sfx:      [{ value: 'stable-audio',      label: 'Stable Audio Open 1.0', blurb: 'Stability AI — best for non-music SFX up to 47s.' }],
-  tts:      [{ value: 'bark',              label: 'Bark',                  blurb: 'Multilingual TTS with voice presets. Suno research.' }],
-  stt:      [{ value: 'whisper',           label: 'Whisper large-v3',      blurb: 'Whisper transcription. Auto-detect 99 languages.' }],
-  separate: [{ value: 'htdemucs',          label: 'Demucs (htdemucs)',     blurb: 'SOTA 4-stem separator. Splits vocals / drums / bass / other.' }],
+  music:       [{ value: 'musicgen',     label: 'MusicGen Small',        blurb: 'Meta MusicGen — fast, music-tuned. Up to 30s.' }],
+  sfx:         [{ value: 'stable-audio', label: 'Stable Audio Open 1.0', blurb: 'Stability AI — best for non-music SFX up to 47s.' }],
+  tts:         [{ value: 'bark',         label: 'Bark',                  blurb: 'Multilingual TTS with voice presets. Suno research.' }],
+  stt:         [{ value: 'whisper',      label: 'Whisper large-v3',      blurb: 'Whisper transcription. Auto-detect 99 languages.' }],
+  separate:    [{ value: 'htdemucs',     label: 'Demucs (htdemucs)',     blurb: 'SOTA 4-stem separator. Splits vocals / drums / bass / other.' }],
+  'voice-clone': [{ value: 'xtts-v2',      label: 'XTTS-v2',               blurb: 'Coqui XTTS-v2 — 16-language voice clone from a single 6-30s reference clip.' }],
+  'voice-sing':  [{ value: 'xtts-v2+rvc',  label: 'XTTS-v2 + RVC',         blurb: 'XTTS speech driven through RVC against your melody track. Falls back to flat speech if no melody.' }],
 }
+
+// Languages XTTS-v2 supports. Selected at submit time so the synth doesn't
+// guess the wrong phoneme set for the user's lyrics.
+const XTTS_LANGUAGES = [
+  { value: 'en', label: '🇬🇧 English' },
+  { value: 'hi', label: '🇮🇳 Hindi' },
+  { value: 'es', label: '🇪🇸 Spanish' },
+  { value: 'fr', label: '🇫🇷 French' },
+  { value: 'de', label: '🇩🇪 German' },
+  { value: 'it', label: '🇮🇹 Italian' },
+  { value: 'pt', label: '🇵🇹 Portuguese' },
+  { value: 'pl', label: '🇵🇱 Polish' },
+  { value: 'tr', label: '🇹🇷 Turkish' },
+  { value: 'ru', label: '🇷🇺 Russian' },
+  { value: 'nl', label: '🇳🇱 Dutch' },
+  { value: 'cs', label: '🇨🇿 Czech' },
+  { value: 'ar', label: '🇸🇦 Arabic' },
+  { value: 'zh-cn', label: '🇨🇳 Chinese' },
+  { value: 'ja', label: '🇯🇵 Japanese' },
+  { value: 'ko', label: '🇰🇷 Korean' },
+]
 
 // Optional language hint for Whisper. Empty string = auto-detect (Whisper
 // gets this right ~95% of the time for clips ≥10s).
@@ -123,6 +148,16 @@ export default function AudioStudio() {
   // separate result panel built around the 4 stem URLs + lyrics.
   const [sepWithLyrics, setSepWithLyrics] = useState(true)
   const [sepResult, setSepResult] = useState(null)
+  // Voice-clone state (kind === 'voice-clone' | 'voice-sing'). vcRef* is the
+  // target-voice reference clip (6-30s clean speech), vcMelody* is the
+  // optional sung/hummed melody for voice-sing. vcLanguage maps directly
+  // to XTTS-v2's language code. vcConsent is the rights-attestation gate.
+  const [vcRefFile, setVcRefFile] = useState(null)
+  const [vcRefDataUrl, setVcRefDataUrl] = useState('')
+  const [vcMelodyFile, setVcMelodyFile] = useState(null)
+  const [vcMelodyDataUrl, setVcMelodyDataUrl] = useState('')
+  const [vcLanguage, setVcLanguage] = useState('en')
+  const [vcConsent, setVcConsent] = useState(false)
   // Prompt helper modal — state lives here so closing + reopening keeps the
   // last AI-generated prompt + idea
   const [helperOpen, setHelperOpen] = useState(false)
@@ -234,6 +269,26 @@ export default function AudioStudio() {
       return
     }
 
+    // Voice-clone branches — both kinds share state. voice-sing optionally
+    // ships a melody clip too; absence falls through to flat XTTS speech.
+    if (kind === 'voice-clone' || kind === 'voice-sing') {
+      if (!vcRefDataUrl)   { setError('Upload a 6-30s reference clip of the target voice'); return }
+      if (!prompt.trim())  { setError(kind === 'voice-sing' ? 'Add the lyrics to sing' : 'Add the text to speak'); return }
+      if (!vcConsent)      { setError('Confirm you have the right to use this voice'); return }
+      setError(null); setJob(null); setWorking(true)
+      const payload = {
+        kind, model,
+        prompt: prompt.trim(),
+        referenceAudioDataUrl: vcRefDataUrl,
+        ...(kind === 'voice-sing' && vcMelodyDataUrl ? { melodyAudioDataUrl: vcMelodyDataUrl } : {}),
+      }
+      const { data, error: err } = await submitAudio(payload)
+      if (err) { setWorking(false); setError(err); return }
+      setJob(data)
+      startPolling(data.jobId)
+      return
+    }
+
     if (!prompt.trim()) { setError('Add a prompt'); return }
     setError(null); setJob(null); setWorking(true)
     const payload = { kind, model, prompt: prompt.trim(), duration }
@@ -242,6 +297,28 @@ export default function AudioStudio() {
     if (err) { setWorking(false); setError(err); return }
     setJob(data)
     startPolling(data.jobId)
+  }
+
+  // Voice-clone uploads — separate slots from sttFile so the user can swap
+  // between kinds without losing state. 8 MB cap on each (XTTS reference
+  // clips are typically <1 MB; melody tracks rarely exceed a few MB).
+  const handleVcRefUpload = async (file) => {
+    if (!file) return false
+    if (file.size > 8 * 1024 * 1024) { antMessage.error('Reference clip too large (max 8 MB)'); return false }
+    try {
+      const d = await fileToDataUrl(file)
+      setVcRefFile(file); setVcRefDataUrl(d); setError(null)
+    } catch { antMessage.error('Could not read file') }
+    return false
+  }
+  const handleVcMelodyUpload = async (file) => {
+    if (!file) return false
+    if (file.size > 16 * 1024 * 1024) { antMessage.error('Melody clip too large (max 16 MB)'); return false }
+    try {
+      const d = await fileToDataUrl(file)
+      setVcMelodyFile(file); setVcMelodyDataUrl(d); setError(null)
+    } catch { antMessage.error('Could not read file') }
+    return false
   }
 
   // Audio (or video — Stem Split lane) → data URL. STT path is capped at
@@ -440,6 +517,115 @@ export default function AudioStudio() {
                 </p>
               </div>
             </>
+          ) : (kind === 'voice-clone' || kind === 'voice-sing') ? (
+            // Voice-clone form — reference clip upload + lyrics + language +
+            // (for voice-sing) optional melody track + consent gate.
+            <>
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">
+                  Reference voice clip · 6–30s of clean speech
+                </label>
+                {vcRefDataUrl ? (
+                  <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-3 space-y-2">
+                    <audio src={vcRefDataUrl} controls className="w-full" />
+                    <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500 font-mono">
+                      <span className="truncate">{vcRefFile?.name || 'recorded clip'}</span>
+                      <button onClick={() => { setVcRefFile(null); setVcRefDataUrl('') }}
+                        className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-rose-500/40 hover:border-rose-400 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 transition-colors">
+                        <SyncOutlined className="text-[9px]" /> Replace
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Upload.Dragger multiple={false} showUploadList={false}
+                      accept="audio/*"
+                      beforeUpload={handleVcRefUpload}
+                      style={{ background: 'transparent', borderColor: '#374151', padding: '24px 0' }}>
+                      <UploadOutlined className="text-3xl text-fuchsia-400 mb-2" />
+                      <p className="text-sm text-gray-300">Drop a reference clip or click to upload</p>
+                      <p className="text-[10px] text-gray-500 mt-1">mp3 · wav · m4a · ogg · max 8 MB · 6–30s ideal</p>
+                    </Upload.Dragger>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-px bg-gray-800" />
+                      <span className="text-[10px] uppercase tracking-wider text-gray-600">or record</span>
+                      <div className="flex-1 h-px bg-gray-800" />
+                    </div>
+                    <AudioRecorder accentColor="#e879f9" maxSeconds={30}
+                      onComplete={(d) => { setVcRefDataUrl(d); setVcRefFile(null); setError(null) }} />
+                  </div>
+                )}
+              </div>
+
+              {kind === 'voice-sing' && (
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">
+                    Melody track <span className="text-gray-600 normal-case font-normal">(optional · falls back to flat speech if empty)</span>
+                  </label>
+                  {vcMelodyDataUrl ? (
+                    <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-3 space-y-2">
+                      <audio src={vcMelodyDataUrl} controls className="w-full" />
+                      <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500 font-mono">
+                        <span className="truncate">{vcMelodyFile?.name || 'hummed melody'}</span>
+                        <button onClick={() => { setVcMelodyFile(null); setVcMelodyDataUrl('') }}
+                          className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-rose-500/40 hover:border-rose-400 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 transition-colors">
+                          <SyncOutlined className="text-[9px]" /> Replace
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Upload.Dragger multiple={false} showUploadList={false}
+                        accept="audio/*"
+                        beforeUpload={handleVcMelodyUpload}
+                        style={{ background: 'transparent', borderColor: '#374151', padding: '16px 0' }}>
+                        <UploadOutlined className="text-2xl text-amber-400 mb-1" />
+                        <p className="text-xs text-gray-300">Upload a hummed / sung melody (max 16 MB)</p>
+                      </Upload.Dragger>
+                      <AudioRecorder accentColor="#fbbf24" maxSeconds={60}
+                        onComplete={(d) => { setVcMelodyDataUrl(d); setVcMelodyFile(null); setError(null) }} />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <label className="text-[10px] uppercase tracking-wider text-gray-500">
+                    {kind === 'voice-sing' ? 'Lyrics' : 'Text to speak'}
+                  </label>
+                  {prompt && (
+                    <button type="button" onClick={() => setPrompt('')}
+                      className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors">clear</button>
+                  )}
+                </div>
+                <Input.TextArea value={prompt} onChange={e => setPrompt(e.target.value)}
+                  autoSize={{ minRows: 3, maxRows: 10 }}
+                  placeholder={kind === 'voice-sing'
+                    ? 'Lyrics, line by line. Hindi / English / Spanish / 13 more.'
+                    : 'The text you want spoken in the cloned voice.'}
+                  maxLength={2000} showCount
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">Language</label>
+                <Select className="w-full" value={vcLanguage} onChange={setVcLanguage} options={XTTS_LANGUAGES} />
+                <p className="text-[10px] text-gray-600 mt-1">
+                  Pick the language of the lyrics — XTTS chooses the phoneme set from this.
+                </p>
+              </div>
+
+              <label className="flex items-start gap-2 p-3 rounded-lg border border-amber-500/30 bg-amber-500/[0.04] cursor-pointer">
+                <input type="checkbox" checked={vcConsent}
+                  onChange={e => setVcConsent(e.target.checked)}
+                  className="mt-0.5 accent-amber-400" />
+                <span className="text-[11px] text-amber-100/85 leading-relaxed">
+                  I confirm I have the right to use this voice (my own, a consenting subject, or a licensed/public-domain source).
+                  No real-person impersonation of public figures.
+                </span>
+              </label>
+            </>
           ) : (
             <>
               <div>
@@ -607,14 +793,22 @@ export default function AudioStudio() {
         <div className="flex justify-end">
           {(() => {
             const audioRequired = kind === 'stt' || kind === 'separate'
-            const disabled = working || (audioRequired ? !sttDataUrl : !prompt.trim())
+            const isVoiceClone = kind === 'voice-clone' || kind === 'voice-sing'
+            const disabled = working
+              || (audioRequired ? !sttDataUrl
+                  : isVoiceClone ? (!vcRefDataUrl || !prompt.trim() || !vcConsent)
+                  : !prompt.trim())
             const label = working
               ? 'Working…'
               : kind === 'stt'
                 ? 'Transcribe'
                 : kind === 'separate'
                   ? 'Split stems'
-                  : `Generate ${kindObj?.label.toLowerCase().replace(/[🎵🔊🗣✍️🎚 ]/g, '').trim() || 'audio'}`
+                  : kind === 'voice-clone'
+                    ? 'Clone voice'
+                    : kind === 'voice-sing'
+                      ? 'Generate singing'
+                      : `Generate ${kindObj?.label.toLowerCase().replace(/[🎵🔊🗣✍️🎚🎤🎶 ]/g, '').trim() || 'audio'}`
             return (
               <button onClick={generate} disabled={disabled}
                 className={`luxe-btn luxe-btn-primary ${
@@ -665,6 +859,8 @@ function AudioCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
     : item.kind === 'tts' ? '🗣'
     : item.kind === 'stt' ? '✍️'
     : item.kind === 'separate' ? '🎚'
+    : item.kind === 'voice-clone' ? '🎤'
+    : item.kind === 'voice-sing' ? '🎶'
     : '🎧'
   // Clicking a still-rendering card navigates to /audio/<jobId> for the
   // full live-log view; completed cards just play in-place (the embedded
