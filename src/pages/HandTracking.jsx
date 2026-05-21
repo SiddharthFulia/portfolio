@@ -5,7 +5,6 @@ import {
   EyeOutlined, HighlightOutlined, AimOutlined, ClearOutlined,
 } from '@ant-design/icons'
 import notify from '../utils/notify'
-import AmbientBlobs from '../components/luxe/AmbientBlobs'
 
 // Hand-tracking page. MediaPipe HandLandmarker runs in WebAssembly on
 // the user's machine — no BE round-trip, ~30-60fps on modern hardware.
@@ -547,8 +546,7 @@ export default function HandTracking() {
     // overflow-x-hidden defensively prevents any overlong row (chips,
     // status pill, gesture chip) from forcing a horizontal scrollbar
     // on narrow phones.
-    <div className="min-h-screen luxe-stage text-gray-100 pt-20 sm:pt-24 pb-12 overflow-x-hidden">
-      <AmbientBlobs variant="default" />
+    <div className="min-h-screen bg-black text-gray-100 pt-20 sm:pt-24 pb-12 overflow-x-hidden">
       <div className="relative max-w-5xl mx-auto px-3 sm:px-6">
         {/* Hero — mobile-tuned: shorter pill text, smaller H1 + body on
             phone, no horizontal overflow. */}

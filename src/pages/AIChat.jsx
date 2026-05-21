@@ -14,9 +14,7 @@ import ChatSidebar from '../components/ChatSidebar'
 import ChatInput from '../components/ChatInput'
 import DownloadMenu from '../components/DownloadMenu'
 import MessageImage from '../components/MessageImage'
-import AmbientBlobs from '../components/luxe/AmbientBlobs'
 import AnimatedAIChat from '../components/luxe/AnimatedAIChat'
-import AuroraShader from '../components/luxe/AuroraShader'
 import {
   listLocalModels, createConversation, getConversation, sendChatMessage,
   getChatJobStatus, updateConversation,
@@ -540,9 +538,8 @@ const AIChat = () => {
 
   // ─── Render ─────────────────────────────────────────────
   return (
-    <div className="min-h-screen luxe-stage text-gray-100 pt-20 relative">
-      <AmbientBlobs variant="subtle" />
-      <div className="relative flex">
+    <div className="min-h-screen bg-black text-gray-100 pt-20">
+      <div className="flex">
         <ChatSidebar
           refreshKey={sidebarRefresh}
           onNewChat={handleNewChat}
@@ -774,9 +771,8 @@ const AIChat = () => {
 // ─── Welcoming empty state ──────────────────────────────────
 function WelcomeHero({ provider, localModels, localOnline, onPickProvider, onNewChat }) {
   return (
-    <div className="relative max-w-3xl mx-auto py-6 sm:py-12 px-2">
-      <AuroraShader intensity={0.4} zIndex={0} className="opacity-25 rounded-3xl" />
-      <div className="relative z-10 text-center mb-8">
+    <div className="max-w-3xl mx-auto py-6 sm:py-12 px-2">
+      <div className="text-center mb-8">
         <div className="flex justify-center mb-3">
           <ChatLogo size={56} glow />
         </div>

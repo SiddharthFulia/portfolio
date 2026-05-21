@@ -1,5 +1,4 @@
 import { useState, lazy, Suspense } from 'react'
-import AuroraShader from '../components/luxe/AuroraShader'
 
 const FaceAI = lazy(() => import('../components/vision/FaceAI'))
 const ImageEdit = lazy(() => import('../components/vision/ImageEdit'))
@@ -95,7 +94,6 @@ const FaceDetection = () => {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <AuroraShader fixed intensity={0.6} zIndex={0} className="opacity-30" />
       {/* Hero */}
       <div className="relative z-10 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-cyan-900/20 via-purple-900/10 to-pink-900/20 pointer-events-none" />
