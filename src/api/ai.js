@@ -710,3 +710,20 @@ export async function finalizeCompactApi(chatId, { jobId, keepLastN = 4 } = {}) 
     return { data: data?.data || data, error: null };
   } catch (err) { return { data: null, error: err.message }; }
 }
+
+// ─── Live chess matches (online challenge mode) ───────────────────
+export async function chessCreateMatch(body = {}) { try { const data = await post(ENDPOINTS.CHESS_MATCHES, body, { timeout: 8000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+export async function chessJoinMatch(id, body = {}) { try { const data = await post(`${ENDPOINTS.CHESS_MATCHES}/${id}/join`, body, { timeout: 8000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+export async function chessGetMatch(id) { try { const data = await get(`${ENDPOINTS.CHESS_MATCHES}/${id}`, {}, { timeout: 6000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+export async function chessMatchMove(id, body) { try { const data = await post(`${ENDPOINTS.CHESS_MATCHES}/${id}/move`, body, { timeout: 6000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+export async function chessResignMatch(id, body) { try { const data = await post(`${ENDPOINTS.CHESS_MATCHES}/${id}/resign`, body, { timeout: 6000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+
+// ─── Vault-gated admin dashboard ──────────────────────────────────
+// All five endpoints sit behind requireVault on the BE. The Authorization
+// header is auto-attached by request.js when sid-vault-token is in
+// localStorage. The /settings page polls server/db/queues/workers every 5s.
+export async function adminServerStats() { try { const data = await get(ENDPOINTS.ADMIN_SERVER_STATS, {}, { timeout: 6000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+export async function adminDbStats() { try { const data = await get(ENDPOINTS.ADMIN_DB_STATS, {}, { timeout: 8000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+export async function adminQueueStats() { try { const data = await get(ENDPOINTS.ADMIN_QUEUES, {}, { timeout: 6000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+export async function adminWorkers() { try { const data = await get(ENDPOINTS.ADMIN_WORKERS, {}, { timeout: 6000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+export async function adminPurgeQueue(queue) { try { const data = await post(ENDPOINTS.ADMIN_PURGE_QUEUE, { queue }, { timeout: 8000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }

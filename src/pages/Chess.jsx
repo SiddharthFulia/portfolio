@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Modal, Input } from 'antd'
 import { Chess } from 'chess.js'
 import 'chessground/assets/chessground.base.css'
@@ -20,7 +21,7 @@ import SavedGames       from '../components/chess/SavedGames'
 import PgnDatabaseLoader from '../components/chess/PgnDatabase'
 import {
   chessBestMove, chessAnalyze, chessPlay, chessEngineStatus,
-  chessSaveGame, chessLoadGame,
+  chessSaveGame, chessLoadGame, chessCreateMatch,
 } from '../api/ai'
 
 // /chess — Stockfish-backed analysis board. chess.js owns the move state,
@@ -36,6 +37,7 @@ const fmtScore = (s) => {
 }
 
 export default function ChessPage() {
+  const navigate = useNavigate()
   // Chess.js instance — single source of truth for moves. Lives in a ref
   // so we don't recreate it on every React render.
   const chessRef = useRef(new Chess())
@@ -313,6 +315,23 @@ export default function ChessPage() {
     }
   }
 
+  // "🎯 Challenge a friend" — creates a fresh online match on the BE,
+  // stashes the creator's session token (so this tab can post moves as
+  // White), and navigates to the live match page. The opponent joins
+  // by opening the same share URL and clicking 'Join as Black'.
+  const onChallenge = async () => {
+    setStatus({ kind: 'thinking', text: 'Creating match…' })
+    const { data, error: err } = await chessCreateMatch({ whiteName: 'You' })
+    if (err || !data?.matchId) {
+      setStatus({ kind: 'error', text: err || 'Could not create match' })
+      return
+    }
+    try {
+      sessionStorage.setItem(`sid-chess-session-${data.matchId}`, data.whiteSession || '')
+    } catch {}
+    navigate(`/chess/m/${data.matchId}`)
+  }
+
   // Open the Save-game modal pre-filled with a sensible default name.
   // Actual API call happens in confirmSaveGame() once user confirms.
   const openSaveModal = () => {
@@ -523,6 +542,7 @@ export default function ChessPage() {
               onUndo={undoMove} onFlip={flipBoard}
               onReset={resetBoard} onCopyPgn={copyPgn}
               onSave={openSaveModal}
+              onChallenge={onChallenge}
             />
 
             <FenImport
@@ -706,7 +726,7 @@ function ModeBar({ engineMode, setEngineMode, playerColor, setPlayerColor, engin
 }
 
 // ── Status + action buttons row ──
-function StatusBar({ status, thinking, isGameOver, gameOverReason, onUndo, onFlip, onReset, onCopyPgn, onSave }) {
+function StatusBar({ status, thinking, isGameOver, gameOverReason, onUndo, onFlip, onReset, onCopyPgn, onSave, onChallenge }) {
   return (
     <div className="luxe-card p-3 flex items-center justify-between gap-2 flex-wrap">
       <span className={`text-xs font-mono ${
@@ -739,6 +759,12 @@ function StatusBar({ status, thinking, isGameOver, gameOverReason, onUndo, onFli
           className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20">
           💾 Save game
         </button>
+        {onChallenge && (
+          <button onClick={onChallenge}
+            className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-300 hover:bg-fuchsia-500/20">
+            🎯 Challenge
+          </button>
+        )}
       </div>
     </div>
   )

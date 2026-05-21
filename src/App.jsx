@@ -48,6 +48,7 @@ const Learn = lazyWithReload(() => import("./pages/Learn"));
 const Creative = lazyWithReload(() => import("./pages/Creative"));
 const ChessViz = lazyWithReload(() => import("./pages/ChessViz"));
 const ChessPage = lazyWithReload(() => import("./pages/Chess"));
+const ChessLive = lazyWithReload(() => import("./pages/ChessLive"));
 const Science = lazyWithReload(() => import("./pages/Science"));
 const ScienceModule = lazyWithReload(() => import("./pages/ScienceModule"));
 const FaceDetection = lazyWithReload(() => import("./pages/FaceDetection"));
@@ -59,6 +60,7 @@ const ImageEnhancer = lazyWithReload(() => import("./pages/ImageEnhancer"));
 const AIStudio = lazyWithReload(() => import("./pages/AIStudio"));
 const Dragon3D = lazyWithReload(() => import("./pages/Dragon3D"));
 const Deepfake = lazyWithReload(() => import("./pages/Deepfake"));
+const Settings = lazyWithReload(() => import("./pages/Settings"));
 const Runner = lazyWithReload(() => import("./pages/Runner"));
 const SummarizerPage = lazyWithReload(() => import("./pages/SummarizerPage"));
 const HandTracking = lazyWithReload(() => import("./pages/HandTracking"));
@@ -233,6 +235,7 @@ const App = () => {
               triage during deploy. */}
           <Route path='/chess'         element={<Suspense fallback={<PageLoader />}><ChessPage /></Suspense>} />
           <Route path='/chess-classic' element={<Suspense fallback={<PageLoader />}><ChessViz /></Suspense>} />
+          <Route path='/chess/m/:matchId' element={<Suspense fallback={<PageLoader />}><ChessLive /></Suspense>} />
           <Route path='/science' element={<Suspense fallback={<PageLoader />}><Science /></Suspense>} />
           <Route path='/science/:module' element={<Suspense fallback={<PageLoader />}><ScienceModule /></Suspense>} />
           <Route path='/vision' element={<Suspense fallback={<PageLoader />}><FaceDetection /></Suspense>} />
@@ -255,6 +258,8 @@ const App = () => {
           <Route path='/dragon'          element={<Suspense fallback={<PageLoader />}><Dragon3D /></Suspense>} />
           {/* Vault-gated lane — VaultGate inside the page handles the auth bounce. */}
           <Route path='/deepfake'        element={<Suspense fallback={<PageLoader />}><Deepfake /></Suspense>} />
+          {/* Vault-gated admin dashboard — intentionally unlisted in the nav */}
+          <Route path='/settings'        element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
           {/* Hand-gesture endless runner — MediaPipe + Three.js */}
           <Route path='/runner'          element={<Suspense fallback={<PageLoader />}><Runner /></Suspense>} />
           <Route path='/game'            element={<Suspense fallback={<PageLoader />}><Runner /></Suspense>} />

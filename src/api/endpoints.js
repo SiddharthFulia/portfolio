@@ -63,6 +63,13 @@ export const ENDPOINTS = {
   CHESS_PLAY:           '/api/chess/play',
   CHESS_STATUS:         '/api/chess/status',
   CHESS_GAMES:          '/api/chess/games',       // /:id appended at call site for one-game ops
+  CHESS_MATCHES:        '/api/chess/matches',     // /:id, /:id/join, /:id/move, /:id/resign appended at call site
+  // Vault-gated admin dashboard
+  ADMIN_SERVER_STATS:   '/api/admin/server-stats',
+  ADMIN_DB_STATS:       '/api/admin/db-stats',
+  ADMIN_QUEUES:         '/api/admin/queues',
+  ADMIN_WORKERS:        '/api/admin/workers',
+  ADMIN_PURGE_QUEUE:    '/api/admin/queues/purge',
   JOB_LOGS:             '/api/job-logs',   // /:lane/:jobId?since=<ms>&limit=80
   EXPORT:               '/api/export',     // POST { format, rows|content, title, filename }
 
