@@ -133,6 +133,13 @@ const classifyGesture = (fingers) => {
 // Lookup map for quick `id → filter` access from the RAF loop.
 const FILTERS_BY_ID = FILTERS.reduce((m, f) => { m[f.id] = f; return m }, {})
 
+// Reverse of GESTURE_DEFAULTS: filterId → gesture name. Used to badge
+// gesture-activated filters in the chip strip so users see how to swap
+// without manually clicking.
+const FILTER_GESTURE = Object.entries(GESTURE_DEFAULTS)
+  .reduce((m, [gesture, filterId]) => { m[filterId] = gesture; return m }, {})
+const GESTURE_GLYPH = { fist: '✊', peace: '✌', point: '☝', open: '✋' }
+
 // Paint the active filter onto the overlay canvas. Coordinates are in
 // canvas pixels in the MIRRORED frame (so they line up with what the
 // user sees on-screen). `t` is millis since the page mounted.
@@ -243,7 +250,10 @@ export default function HandTracking() {
         const lm = await HandLandmarker.createFromOptions(filesetResolver, {
           baseOptions: { modelAssetPath: HAND_MODEL_URL, delegate: 'GPU' },
           runningMode: 'VIDEO',
-          numHands: 2,
+          // MediaPipe HandLandmarker accepts up to 4 hands. Bumped from 2
+          // so users can experiment with all-fingers-up gesture combos
+          // or pair up for 2-person "interaction" demos.
+          numHands: 4,
           minHandDetectionConfidence: 0.6,
           minHandPresenceConfidence: 0.5,
           minTrackingConfidence: 0.5,
@@ -870,7 +880,7 @@ export default function HandTracking() {
               {/* Gesture → default filter cheatsheet */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mb-3">
                 {[
-                  { id: 'fist',  label: 'Fist',        effect: 'Dither dark' },
+                  { id: 'fist',  label: 'Fist ✊',      effect: 'Dither dark' },
                   { id: 'peace', label: 'Peace ✌',     effect: 'VHS Aberration' },
                   { id: 'point', label: 'Point ☝',     effect: 'Spotlight' },
                   { id: 'open',  label: 'Open hand ✋', effect: 'Water ripple' },
@@ -907,10 +917,16 @@ export default function HandTracking() {
                                       [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                         {items.map(f => {
                           const active = activeFilterId === f.id
+                          // Badge: if this filter has a gesture mapping, show the
+                          // pictogram + gesture name so the user knows how to
+                          // trigger it hands-free.
+                          const gesture = FILTER_GESTURE[f.id]
                           return (
                             <button key={f.id}
                               onClick={() => { setActiveFilterId(f.id); setUserPickedFilter(true) }}
-                              title={f.name}
+                              title={gesture
+                                ? `${f.name} · gesture: ${gesture}`
+                                : `${f.name} · tap to apply`}
                               className={`shrink-0 inline-flex items-center gap-1
                                           px-2 py-1 rounded-lg text-[10px] font-semibold
                                           border transition-all ${
@@ -920,6 +936,13 @@ export default function HandTracking() {
                               }`}>
                               <span className="text-[13px] leading-none">{f.icon}</span>
                               <span className="whitespace-nowrap">{f.name}</span>
+                              {gesture && (
+                                <span className={`ml-0.5 text-[10px] leading-none ${
+                                  active ? 'text-amber-200' : 'text-amber-400/80'
+                                }`}>
+                                  {GESTURE_GLYPH[gesture]}
+                                </span>
+                              )}
                             </button>
                           )
                         })}
