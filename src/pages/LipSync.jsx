@@ -106,7 +106,7 @@ export default function LipSync() {
             flush against the next heading. */}
         <section className="grid sm:grid-cols-2 gap-4 mb-8">
           {/* Source audio — relabelled "driver video" when LivePortrait is picked */}
-          <div className="rounded-2xl border-2 border-dashed border-gray-800 hover:border-emerald-500/40 transition-colors p-4 bg-gray-900/40 flex flex-col gap-2">
+          <div className="luxe-card border-2 border-dashed border-gray-800 hover:border-emerald-500/40 transition-colors p-4 flex flex-col gap-2">
             <p className="text-[10px] uppercase tracking-wider text-gray-500">
               {model === 'liveportrait' ? 'Driver video' : 'Source audio'}
             </p>
@@ -160,7 +160,7 @@ export default function LipSync() {
           </div>
 
           {/* Source portrait */}
-          <div className="rounded-2xl border-2 border-dashed border-gray-800 hover:border-cyan-500/40 transition-colors p-4 bg-gray-900/40">
+          <div className="luxe-card border-2 border-dashed border-gray-800 hover:border-cyan-500/40 transition-colors p-4">
             <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Portrait image</p>
             {portraitDataUrl ? (
               <div className="relative">
@@ -193,7 +193,7 @@ export default function LipSync() {
         </section>
 
         {/* Result */}
-        <section className="rounded-2xl border border-gray-800 p-4 bg-gray-900/40 mb-6">
+        <section className="luxe-card p-4 mb-6">
           <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Output</p>
           {job?.outputUrl ? (
             <>
@@ -238,10 +238,10 @@ export default function LipSync() {
           )}
           <button onClick={generate}
             disabled={working || !audioDataUrl || !portraitDataUrl}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all ${
+            className={`luxe-btn luxe-btn-primary ${
               working || !audioDataUrl || !portraitDataUrl
-                ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
-                : 'bg-gradient-to-r from-emerald-400 to-cyan-400 text-black hover:scale-[1.02]'
+                ? 'opacity-50 cursor-not-allowed'
+                : ''
             }`}>
             <ThunderboltOutlined />
             {working ? 'Working…' : 'Generate lip-sync'}
@@ -283,7 +283,7 @@ function LipsyncCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
     ? { to: href }
     : { href, target: '_blank', rel: 'noopener' }
   return (
-    <div className={`group relative aspect-video rounded-xl overflow-hidden border transition-all bg-gray-900/40 ${
+    <div className={`luxe-card-hover group relative aspect-video rounded-xl overflow-hidden border transition-all bg-gray-900/40 ${
       checked
         ? 'border-emerald-400 shadow-lg shadow-emerald-500/30 ring-2 ring-emerald-400/40'
         : 'border-gray-800 hover:border-emerald-400/50'

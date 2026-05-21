@@ -1664,7 +1664,7 @@ function TutorialCard({ tutorial, isOpen, onToggle, onComplete, completed }) {
   const progress = ((step + 1) / totalSteps) * 100
 
   return (
-    <div className={`rounded-2xl border transition-all duration-300 overflow-hidden ${
+    <div className={`luxe-card-hover rounded-2xl border transition-all duration-300 overflow-hidden ${
       isOpen
         ? 'border-purple-600/50 bg-gray-900/80 col-span-full'
         : 'border-gray-800 bg-gray-900/60 hover:border-gray-700 hover:bg-gray-900 cursor-pointer'
@@ -2023,14 +2023,14 @@ export default function Learn() {
 
         {/* Stats row */}
         <FadeIn delay={0.1}>
-          <div className="flex flex-wrap gap-8 mt-6">
+          <div className="flex flex-wrap gap-3 mt-6">
             {[
               [String(TUTORIALS.length), 'Tutorials', 'text-purple-400'],
               [String(TUTORIALS.reduce((a, t) => a + t.steps.length, 0)), 'Total Steps', 'text-cyan-400'],
               [String(completed.size), 'Completed', 'text-green-400'],
               ['6', 'Live Demos', 'text-pink-400'],
             ].map(([n, l, color]) => (
-              <div key={l} className="text-center">
+              <div key={l} className="luxe-card luxe-card-hover text-center px-5 py-3">
                 <div className={`text-3xl font-black ${color}`}>{n}</div>
                 <div className="text-xs text-gray-500 mt-0.5">{l}</div>
               </div>
@@ -2063,10 +2063,10 @@ export default function Learn() {
               <button
                 key={cat}
                 onClick={() => { setActiveCategory(cat); setOpenId(null) }}
-                className={`px-4 py-2 rounded-full text-sm font-semibold transition-all ${
+                className={`luxe-btn ${
                   activeCategory === cat
-                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/30'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                    ? 'luxe-btn-secondary'
+                    : 'luxe-btn-ghost'
                 }`}
               >
                 {cat}

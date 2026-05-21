@@ -205,7 +205,7 @@ export default function Cinema({ embedded = false }) {
             </div>
             <ol className="space-y-2">
               {project.shotPrompts.map((p, i) => (
-                <li key={i} className="rounded-lg border border-gray-800 bg-black/40 p-3 hover:border-amber-500/40 transition-colors">
+                <li key={i} className="luxe-card luxe-card-hover p-3 hover:border-amber-500/40">
                   <div className="flex items-center justify-between mb-1 gap-2 flex-wrap">
                     <span className="text-[10px] font-mono text-amber-400 font-bold">SHOT {i + 1}</span>
                     <div className="flex items-center gap-1">

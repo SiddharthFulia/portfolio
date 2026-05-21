@@ -104,28 +104,20 @@ export default function MessageImage({ src, messageId, alt = '', prompt }) {
                       transition-opacity">
         <Tooltip title="Download image">
           <button onClick={(e) => { e.stopPropagation(); handleDownload() }}
-            className="w-8 h-8 inline-flex items-center justify-center rounded-lg
-                       bg-gray-950/85 hover:bg-cyan-500/30 border border-gray-700
-                       hover:border-cyan-400 text-gray-200 hover:text-white
-                       backdrop-blur-sm shadow-lg shadow-black/40 transition-colors">
+            className="luxe-btn luxe-btn-ghost !w-8 !h-8 !p-0">
             <DownloadOutlined />
           </button>
         </Tooltip>
         <Tooltip title="Open full size in a new tab">
           <button onClick={(e) => { e.stopPropagation(); handleOpen() }}
-            className="w-8 h-8 inline-flex items-center justify-center rounded-lg
-                       bg-gray-950/85 hover:bg-violet-500/30 border border-gray-700
-                       hover:border-violet-400 text-gray-200 hover:text-white
-                       backdrop-blur-sm shadow-lg shadow-black/40 transition-colors">
+            className="luxe-btn luxe-btn-ghost !w-8 !h-8 !p-0">
             <ExpandAltOutlined />
           </button>
         </Tooltip>
         <Tooltip title={copied ? 'Copied!' : 'Copy image URL'}>
           <button onClick={(e) => { e.stopPropagation(); handleCopy() }}
-            className={`w-8 h-8 inline-flex items-center justify-center rounded-lg border backdrop-blur-sm shadow-lg shadow-black/40 transition-colors ${
-              copied
-                ? 'bg-emerald-500/30 border-emerald-400 text-white'
-                : 'bg-gray-950/85 hover:bg-amber-500/30 border-gray-700 hover:border-amber-400 text-gray-200 hover:text-white'
+            className={`luxe-btn luxe-btn-ghost !w-8 !h-8 !p-0 ${
+              copied ? '!text-emerald-300' : ''
             }`}>
             {copied ? <CheckOutlined /> : <LinkOutlined />}
           </button>

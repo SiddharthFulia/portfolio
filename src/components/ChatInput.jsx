@@ -195,7 +195,7 @@ export default function ChatInput({
   }
 
   return (
-    <div className="rounded-2xl border border-gray-800 bg-gray-900/60 backdrop-blur-md p-2 shadow-lg shadow-black/50">
+    <div className="luxe-card p-2">
       {/* Attachment chips */}
       {(image || doc) && (
         <div className="flex items-center gap-2 px-2 pb-2 flex-wrap">
@@ -246,11 +246,9 @@ export default function ChatInput({
             models. Both halves come from the parent so the chip stays
             in sync with the Tune popover. */}
         {onToggleImageGen && (
-          <div className="hidden sm:inline-flex items-stretch rounded-full overflow-hidden border transition-colors shrink-0"
-            style={{
-              borderColor: imageGenEnabled ? 'rgba(168, 85, 247, 0.55)' : 'rgba(75, 85, 99, 0.5)',
-              background:  imageGenEnabled ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.16), rgba(236, 72, 153, 0.10))' : 'rgba(17, 24, 39, 0.6)',
-            }}>
+          <div className={`hidden sm:inline-flex items-stretch overflow-hidden shrink-0 luxe-btn ${
+            imageGenEnabled ? 'luxe-btn-primary' : 'luxe-btn-secondary'
+          } !p-0 !rounded-full`}>
             <Tooltip title={imageGenEnabled
               ? `Image generation ON · ${IMAGE_GEN_MODELS.find(m => m.id === imageGenModel)?.label || 'Flux Schnell'}`
               : 'Click to let the chat draw images'}>
@@ -258,12 +256,8 @@ export default function ChatInput({
                 type="button"
                 onClick={() => onToggleImageGen(!imageGenEnabled)}
                 disabled={disabled || sending}
-                className={`inline-flex items-center gap-1.5 px-2.5 text-[11px] font-bold transition-colors ${
-                  imageGenEnabled
-                    ? 'text-white hover:text-fuchsia-100'
-                    : 'text-gray-400 hover:text-gray-200'
-                }`}>
-                <BgColorsOutlined className={imageGenEnabled ? 'text-fuchsia-300' : ''} />
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold">
+                <BgColorsOutlined />
                 <span>{imageGenEnabled
                   ? (IMAGE_GEN_MODELS.find(m => m.id === imageGenModel)?.label || 'Image')
                   : 'Image'

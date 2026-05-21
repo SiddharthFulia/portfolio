@@ -781,12 +781,12 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
                   aria-pressed={active}
                   aria-disabled={!!p.disabled}
                   disabled={!!p.disabled}
-                  className={`relative p-4 rounded-xl border text-left transition-all duration-200 overflow-hidden ${
+                  className={`luxe-card luxe-card-hover relative p-4 text-left overflow-hidden ${
                     p.disabled
-                      ? 'border-2 border-gray-900 bg-gray-900/30 opacity-50 cursor-not-allowed grayscale'
+                      ? 'opacity-50 cursor-not-allowed grayscale'
                       : active
-                        ? `border-2 ${p.border.replace('/60', '')} bg-gray-900 shadow-xl ${p.glow.replace('/20', '/40')} scale-[1.02] ring-1 ring-white/5`
-                        : 'border-2 border-gray-800 bg-gray-900/40 hover:bg-gray-900 hover:border-gray-700 hover:scale-[1.01]'
+                        ? `ring-2 ${p.border.replace('border-', 'ring-').replace('/60', '/70')} shadow-xl ${p.glow.replace('/20', '/40')} scale-[1.02]`
+                        : ''
                   }`}>
                   {p.luxe && (
                     <div aria-hidden className={`absolute inset-0 pointer-events-none opacity-30 bg-gradient-to-br ${p.accent} mix-blend-overlay`} />
@@ -925,6 +925,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
               </div>
               <Input.TextArea value={prompt} onChange={e => setPrompt(e.target.value)}
                 placeholder="a cat dancing"
+                className="luxe-textarea"
                 autoSize={{ minRows: 3, maxRows: 6 }} maxLength={400} showCount />
 
               <div className="mt-3">
@@ -1080,7 +1081,8 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
             return false
           })()}
           icon={<ThunderboltOutlined />}
-          style={{ height: 52, background: 'linear-gradient(135deg, #7c3aed, #06b6d4, #f59e0b)', border: 'none', fontWeight: 700, fontSize: 15 }}>
+          className="luxe-btn luxe-btn-primary"
+          style={{ height: 52, fontSize: 15, width: '100%' }}>
           {loading ? 'Generating…' : 'Generate Video'}
         </Button>
 
@@ -1257,10 +1259,10 @@ const LibraryCard = ({ video, onClick, onDelete, selectMode, isSelected, onToggl
   }
 
   return (
-    <div className={`group relative rounded-xl overflow-hidden border bg-gray-900/50 hover:bg-gray-900 transition-all ${
+    <div className={`luxe-card luxe-card-hover group relative overflow-hidden ${
       isSelected
-        ? 'border-cyan-400 ring-2 ring-cyan-400/40'
-        : 'border-gray-800 hover:border-gray-700'
+        ? 'ring-2 ring-cyan-400/60'
+        : ''
     }`}>
       <button onClick={handleClick} className="w-full text-left">
         <div className="relative aspect-[9/16] bg-gradient-to-br from-gray-800/80 to-gray-950 overflow-hidden">
@@ -1344,7 +1346,7 @@ const JobCard = ({ job }) => {
   const errShort = (job.error || '').slice(0, 120)
 
   return (
-    <div className={`group relative rounded-2xl border ${meta.ring} bg-gradient-to-b from-gray-900/70 to-gray-950/50 overflow-hidden transition-all hover:scale-[1.01] hover:shadow-xl`}>
+    <div className={`luxe-card luxe-card-hover group relative overflow-hidden ring-1 ${meta.ring.replace('border-', 'ring-')}`}>
       <div className="aspect-video bg-black/40 relative overflow-hidden">
         {job.status === 'completed' && job.videoUrl ? (
           <video src={job.videoUrl} muted loop playsInline
@@ -1356,7 +1358,7 @@ const JobCard = ({ job }) => {
             <span className="text-5xl opacity-60">{meta.icon}</span>
           </div>
         )}
-        <div className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${meta.chip}`}>
+        <div className={`glass absolute top-2 left-2 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${meta.chip}`}>
           {meta.icon} {meta.label}
         </div>
         <div className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-gradient-to-r ${lane.bg} text-black`}>
@@ -1757,11 +1759,9 @@ const AIVideo = () => {
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-cyan-900/8 to-amber-900/12 pointer-events-none" />
         <div className="relative max-w-6xl mx-auto px-5 sm:px-6 pt-28 sm:pt-32 pb-8">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gray-800/60 border border-gray-700 backdrop-blur-sm mb-3">
+          <div className="luxe-eyebrow mb-3">
             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-            <span className="text-[11px] uppercase tracking-wider text-gray-300 font-semibold">
-              {activeKey === 'cinema' ? 'multi-shot orchestrator · 5090 powered' : 'multi-provider · 5090 powered'}
-            </span>
+            {activeKey === 'cinema' ? 'multi-shot orchestrator · 5090 powered' : 'multi-provider · 5090 powered'}
           </div>
           <h1 className="font-poppins font-black text-3xl sm:text-5xl md:text-6xl bg-gradient-to-r from-cyan-300 via-purple-300 to-amber-300 bg-clip-text text-transparent leading-tight pb-1 mb-2">
             {activeKey === 'cinema' ? 'Cinema · Multi-shot' : 'AI Video Studio'}

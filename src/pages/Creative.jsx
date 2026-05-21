@@ -142,14 +142,14 @@ const Creative = () => {
 
         {/* Stats */}
         <FadeIn delay={0.2}>
-          <div className='flex flex-wrap gap-8 mt-6'>
+          <div className='flex flex-wrap gap-3 mt-6'>
             {[
               ['13', 'Experiments', 'text-purple-400'],
               ['6', 'Interactive Tools', 'text-cyan-400'],
               ['7', 'Visual Effects', 'text-pink-400'],
               ['100%', 'Browser-Native', 'text-yellow-400'],
             ].map(([n, l, c]) => (
-              <div key={l} className='text-center'>
+              <div key={l} className='luxe-card text-center px-5 py-3'>
                 <div className={`text-3xl font-black ${c}`}>{n}</div>
                 <div className='text-xs text-gray-500 mt-0.5'>{l}</div>
               </div>
@@ -176,10 +176,10 @@ const Creative = () => {
               <button
                 key={f.key}
                 onClick={() => setFilter(f.key)}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                className={`luxe-btn ${
                   filter === f.key
-                    ? 'bg-pink-600 text-white shadow-lg shadow-pink-600/20'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                    ? 'luxe-btn-secondary'
+                    : 'luxe-btn-ghost'
                 }`}
               >
                 {f.label}
@@ -199,7 +199,7 @@ const Creative = () => {
               <FadeIn key={d.id} delay={0.25 + i * 0.04}>
                 <AnimatedCard effect={effectMap[d.id] || 'default'} onClick={() => handleClick(d.id)} className="h-full w-full">
                   <div
-                    className={`relative group text-left p-4 transition-all duration-300 w-full ${
+                    className={`luxe-card-hover relative group text-left p-4 transition-all duration-300 w-full ${
                       isActive
                         ? 'shadow-lg shadow-pink-900/20'
                         : ''

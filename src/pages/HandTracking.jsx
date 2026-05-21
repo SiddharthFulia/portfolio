@@ -725,7 +725,7 @@ export default function HandTracking() {
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Mode-specific tool panel */}
           {mode === 'draw' && (
-            <div className="rounded-xl border border-violet-500/40 bg-gray-950/60 p-3">
+            <div className="luxe-card p-3 border-violet-500/40">
               <div className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-2 flex items-center justify-between">
                 <span>✍ Drawing — pinch index + thumb to draw</span>
                 <button onClick={() => setWhiteboard(w => !w)}
@@ -754,9 +754,10 @@ export default function HandTracking() {
                 <span className="text-[10px] font-mono text-gray-400 w-8">{brush}px</span>
               </div>
               <div className="flex items-center gap-2 mt-3">
-                <Button size="small" icon={<ClearOutlined />} onClick={clearDrawing}>Clear</Button>
+                <Button size="small" icon={<ClearOutlined />} onClick={clearDrawing} className="luxe-btn luxe-btn-secondary">Clear</Button>
                 <Button size="small" type="primary" icon={<DownloadOutlined />} onClick={saveDrawing}
-                  style={{ background: 'linear-gradient(135deg, #8b5cf6, #ec4899)', border: 'none' }}>
+                  style={{ background: 'linear-gradient(135deg, #8b5cf6, #ec4899)', border: 'none' }}
+                  className="luxe-btn luxe-btn-secondary">
                   Save PNG
                 </Button>
               </div>
@@ -765,7 +766,7 @@ export default function HandTracking() {
 
           {/* Cursor mode — pick a cursor style */}
           {mode === 'cursor' && (
-            <div className="rounded-xl border border-amber-500/40 bg-gray-950/60 p-3">
+            <div className="luxe-card p-3 border-amber-500/40">
               <div className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-2">
                 🎯 Cursor — pick a style
               </div>
@@ -795,7 +796,7 @@ export default function HandTracking() {
 
           {/* Filters mode — explain the 4 gestures + show what's currently active */}
           {mode === 'filters' && (
-            <div className="rounded-xl border border-fuchsia-500/40 bg-gray-950/60 p-3">
+            <div className="luxe-card p-3 border-fuchsia-500/40">
               <div className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-2 flex items-center justify-between">
                 <span>✨ Filters — gesture-driven</span>
                 {activeFilter && (
@@ -837,7 +838,7 @@ export default function HandTracking() {
 
           {/* View mode — small instruction card */}
           {mode === 'view' && (
-            <div className="rounded-xl border border-cyan-500/40 bg-gray-950/60 p-3">
+            <div className="luxe-card p-3 border-cyan-500/40">
               <div className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-2">
                 👁 Skeleton view
               </div>
@@ -850,7 +851,7 @@ export default function HandTracking() {
           )}
 
           {/* Controls + Tips */}
-          <div className="rounded-xl border border-gray-800 bg-gray-950/60 p-3">
+          <div className="luxe-card p-3">
             <div className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-2">
               Controls
             </div>

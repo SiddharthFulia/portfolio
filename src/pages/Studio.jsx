@@ -15,7 +15,7 @@ const Studio = () => {
       <AmbientBlobs variant="cool" />
       <div className="relative max-w-5xl mx-auto px-4 sm:px-6">
         <header className="text-center mb-6 sm:mb-8">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gray-800/60 border border-gray-700 backdrop-blur-sm mb-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full luxe-card mb-3">
             <span className="w-2 h-2 rounded-full bg-fuchsia-400 animate-pulse" />
             <span className="text-[10px] sm:text-[11px] uppercase tracking-wider text-gray-300 font-semibold">
               Image · Video · 3D Avatar

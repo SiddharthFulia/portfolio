@@ -1022,6 +1022,7 @@ function NegativePromptField({ value, onChange, family, supported = true }) {
         <>
           <Input.TextArea
             value={value} onChange={e => onChange(e.target.value)}
+            className="luxe-textarea"
             autoSize={{ minRows: 2, maxRows: 5 }}
             placeholder={family === 'pony'
               ? `Recommended: ${ponyBaseline.slice(0, 80)}…`
@@ -1091,10 +1092,10 @@ function WorkflowCard({ workflow: w, active, onSelect }) {
         transform: 'perspective(800px) rotateX(var(--tx, 0deg)) rotateY(var(--ty, 0deg))',
         transition: 'transform 120ms ease-out, border-color 200ms, box-shadow 200ms',
       }}
-      className={`relative p-3 rounded-xl text-left border-2 transition-all overflow-hidden group will-change-transform ${
+      className={`luxe-card luxe-card-hover relative p-3 text-left overflow-hidden group will-change-transform ${
         active
-          ? 'border-cyan-400/70 bg-cyan-500/10 shadow-lg shadow-cyan-500/20'
-          : 'border-gray-800 bg-gray-900/40 hover:border-gray-700 hover:bg-gray-900'
+          ? 'ring-2 ring-cyan-400/70 shadow-lg shadow-cyan-500/20'
+          : ''
       }`}>
       {/* Cursor-following glow — purely cosmetic, pointer-events-none */}
       <span aria-hidden
@@ -1135,10 +1136,10 @@ function PresetCard({ preset: p, active, onSelect, onExpand }) {
         transform: 'perspective(800px) rotateX(var(--tx, 0deg)) rotateY(var(--ty, 0deg))',
         transition: 'transform 120ms ease-out, border-color 200ms, box-shadow 200ms',
       }}
-      className={`relative p-4 rounded-2xl text-left border-2 transition-all overflow-hidden group will-change-transform ${
+      className={`luxe-card luxe-card-hover relative p-4 text-left overflow-hidden group will-change-transform ${
         active
-          ? `${p.border.replace('/40', '')} bg-gray-900 shadow-xl ${p.glow}`
-          : 'border-gray-800 bg-gray-900/40 hover:bg-gray-900 hover:border-gray-700'
+          ? `ring-2 ${p.border.replace('border-', 'ring-').replace('/40', '/70')} shadow-xl ${p.glow}`
+          : ''
       }`}>
       {/* Cursor-following glow */}
       <span aria-hidden
@@ -1251,7 +1252,8 @@ function GenerateSection({
                 <div className="relative">
                   <img src={sourceDataUrl} alt="source" className="w-full max-h-72 object-contain rounded-lg" />
                   <button onClick={reset}
-                    className="absolute top-2 right-2 inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full bg-black/70 hover:bg-rose-600 text-gray-200 hover:text-white border border-white/10 transition-colors">
+                    className="luxe-btn luxe-btn-secondary absolute top-2 right-2 text-[10px]"
+                    style={{ padding: '4px 10px' }}>
                     <SyncOutlined className="text-[9px]" /> Replace
                   </button>
                 </div>
@@ -1309,7 +1311,7 @@ function GenerateSection({
           </div>
           )}
 
-          <div className="rounded-2xl border border-gray-800 p-4 bg-gray-900/40 flex flex-col">
+          <div className="luxe-card p-4 flex flex-col">
             <div className="flex items-center justify-between mb-2">
               <p className="text-[10px] uppercase tracking-wider text-gray-500">Enhanced output</p>
               {status && status !== 'completed' && (
@@ -1357,14 +1359,16 @@ function GenerateSection({
                   <button
                     type="button"
                     onClick={() => setLogsView(v => v === 'flat' ? 'plan' : 'flat')}
-                    className="flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-fuchsia-500/15 hover:bg-fuchsia-500/25 text-fuchsia-300 border border-fuchsia-500/40 transition-colors shrink-0"
+                    className="luxe-btn luxe-btn-secondary shrink-0 text-[10px]"
+                    style={{ padding: '4px 10px' }}
                     title={logsView === 'flat' ? 'Switch to Plan view' : 'Switch to Logs view'}
                   >
                     {logsView === 'flat' ? 'Plan' : 'Logs'}
                   </button>
                   {/* Prominent View Logs button — always visible during processing */}
                   <button type="button" onClick={() => setLogsModalOpen(true)}
-                    className="flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 transition-colors shrink-0">
+                    className="luxe-btn luxe-btn-secondary shrink-0 text-[10px]"
+                    style={{ padding: '4px 10px' }}>
                     <ExpandAltOutlined className="text-[10px]" />
                     Live logs
                   </button>
@@ -1558,6 +1562,7 @@ function GenerateSection({
                 />
                 <Input.TextArea
                   value={atelierPrompt} onChange={e => setAtelierPrompt(e.target.value)}
+                  className="luxe-textarea"
                   autoSize={{ minRows: 3, maxRows: 8 }}
                   placeholder={wf.family === 't2i'
                     ? 'e.g. "a cinematic portrait of a wolf in misty forest, golden hour, 35mm film"'
@@ -1605,7 +1610,7 @@ function GenerateSection({
                     Checkpoint <span className="text-gray-700 normal-case font-normal">— installed on the 5090</span>
                   </label>
                   <Select
-                    className="w-full"
+                    className="luxe-input w-full"
                     size="middle"
                     placeholder={`Default: ${defaultModel}`}
                     value={customModel || undefined}
@@ -1722,10 +1727,10 @@ function GenerateSection({
               : <>Active preset: <span className="text-cyan-300 font-semibold">{activePreset?.name}</span></>}
           </p>
           <button onClick={() => enhance()} disabled={(wf.needsImage && !sourceDataUrl && isAtelier) || (!isAtelier && !sourceDataUrl) || working}
-            className={`flex items-center justify-center gap-2 w-full sm:w-auto px-5 py-2.5 rounded-xl font-semibold text-sm transition-all ${
+            className={`luxe-btn luxe-btn-primary w-full sm:w-auto ${
               ((wf.needsImage && !sourceDataUrl && isAtelier) || (!isAtelier && !sourceDataUrl) || working)
-                ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
-                : 'bg-gradient-to-r from-cyan-400 via-fuchsia-400 to-amber-400 text-black hover:shadow-xl hover:shadow-fuchsia-500/30 hover:scale-[1.02]'
+                ? 'opacity-50 cursor-not-allowed'
+                : ''
             }`}>
             <ThunderboltOutlined />
             {working ? 'Working…' : isAtelier ? `Run ${wf.label}` : 'Enhance image'}

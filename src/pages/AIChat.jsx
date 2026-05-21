@@ -562,10 +562,8 @@ const AIChat = () => {
                 {conversation?.title || 'AI Chat'}
               </h1>
               {provider === '5090' && (
-                <span className={`hidden sm:inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full border ${
-                  localOnline
-                    ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/40'
-                    : 'bg-rose-500/10 text-rose-300 border-rose-500/40'
+                <span className={`luxe-card hidden sm:inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 !rounded-full ${
+                  localOnline ? 'text-emerald-300' : 'text-rose-300'
                 }`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${localOnline ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
                   {localOnline ? 'Studio Pro online' : 'Studio Pro offline'}
@@ -580,7 +578,7 @@ const AIChat = () => {
                       icon={<MergeCellsOutlined />}
                       onClick={onCompact}
                       loading={compacting}
-                      className="!border-fuchsia-500/40 !bg-fuchsia-500/10 hover:!bg-fuchsia-500/20 !text-fuchsia-200">
+                      className="luxe-btn luxe-btn-secondary">
                       <span className="hidden sm:inline">Compact</span>
                     </Button>
                   </Tooltip>
@@ -610,9 +608,7 @@ const AIChat = () => {
                       <Button
                         size="small"
                         icon={<SettingOutlined />}
-                        className={`!border-gray-700 !bg-gray-900/60 hover:!bg-gray-800 !text-gray-200 ${
-                          (temperature !== null || maxTokens !== null || imageGenEnabled) ? '!border-cyan-500/40 !text-cyan-200' : ''
-                        }`}>
+                        className="luxe-btn luxe-btn-secondary">
                         <span className="hidden sm:inline">
                           {(temperature !== null || maxTokens !== null || imageGenEnabled) ? 'Tuned' : 'Tune'}
                         </span>
@@ -801,10 +797,8 @@ function WelcomeHero({ provider, localModels, localOnline, onPickProvider, onNew
           const active = provider === p.id
           return (
             <button key={p.id} onClick={() => onPickProvider(p.id)}
-              className={`relative p-4 rounded-2xl border-2 text-left transition-all overflow-hidden ${
-                active
-                  ? 'border-cyan-400/60 bg-gray-900 shadow-xl shadow-cyan-500/10 scale-[1.02]'
-                  : 'border-gray-800 bg-gray-900/40 hover:bg-gray-900 hover:border-gray-700 hover:-translate-y-0.5'
+              className={`luxe-card luxe-card-hover relative p-4 text-left overflow-hidden ${
+                active ? 'scale-[1.02]' : ''
               }`}>
               <div aria-hidden className={`absolute inset-0 pointer-events-none opacity-25 bg-gradient-to-br ${p.accent} mix-blend-overlay`} />
               <div className="relative">
@@ -859,8 +853,7 @@ function WelcomeHero({ provider, localModels, localOnline, onPickProvider, onNew
       <div className="relative z-10 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 justify-center">
         <Button type="primary" size="large" onClick={onNewChat}
           icon={<span className="inline-flex items-center"><ChatLogo size={18} /></span>}
-          style={{ background: 'linear-gradient(135deg, #06b6d4, #7c3aed, #f59e0b)', border: 'none', fontWeight: 700, paddingLeft: 14 }}
-          className="!h-12">
+          className="luxe-btn luxe-btn-primary !h-12 !px-6">
           Start a new chat
         </Button>
       </div>
@@ -918,7 +911,7 @@ function VisionSwitchHint({ provider, available5090Vision, onSwitchProvider, onS
 
 function HelpCard({ icon, title, body }) {
   return (
-    <div className="p-3 rounded-xl border border-gray-800 bg-gray-900/40 hover:border-gray-700 hover:-translate-y-0.5 transition-all">
+    <div className="luxe-card p-3">
       <div className="text-2xl mb-1">{icon}</div>
       <div className="text-xs font-semibold text-gray-200 mb-1">{title}</div>
       <p className="text-[11px] text-gray-500 leading-relaxed">{body}</p>
@@ -962,12 +955,12 @@ function MessageBubble({ msg }) {
           <ChatLogo size={32} />
         </div>
       )}
-      <div className={`max-w-[88%] sm:max-w-[78%] min-w-0 break-words rounded-2xl px-3 sm:px-4 py-2.5 overflow-hidden ${
+      <div className={`max-w-[88%] sm:max-w-[78%] min-w-0 break-words px-3 sm:px-4 py-2.5 overflow-hidden ${
         isUser
-          ? 'bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-cyan-500/30 text-gray-100'
+          ? 'rounded-2xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-cyan-500/30 text-gray-100'
           : msg._failed
-            ? 'bg-rose-500/10 border border-rose-500/30 text-rose-200'
-            : 'bg-gray-900/80 border border-gray-800 text-gray-100'
+            ? 'rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-200'
+            : 'luxe-card text-gray-100'
       }`}>
         {msg.imageUrl && (
           <MessageImage

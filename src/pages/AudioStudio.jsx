@@ -493,7 +493,7 @@ export default function AudioStudio() {
         </section>
 
         {/* Output */}
-        <section className="rounded-2xl border border-gray-800 p-4 bg-gray-900/40 mb-6">
+        <section className="luxe-card p-4 mb-6">
           <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Output</p>
           {/* Stem-separation result — 4 audio players + optional lyrics */}
           {kind === 'separate' && sepResult ? (
@@ -619,10 +619,10 @@ export default function AudioStudio() {
                   : `Generate ${kindObj?.label.toLowerCase().replace(/[🎵🔊🗣✍️🎚 ]/g, '').trim() || 'audio'}`
             return (
               <button onClick={generate} disabled={disabled}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all ${
+                className={`luxe-btn luxe-btn-primary ${
                   disabled
-                    ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-fuchsia-400 to-amber-400 text-black hover:scale-[1.02]'
+                    ? 'opacity-50 cursor-not-allowed'
+                    : ''
                 }`}>
                 <ThunderboltOutlined />
                 {label}
@@ -678,7 +678,7 @@ function AudioCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
     ? (typeof item.stems === 'string' ? (() => { try { return JSON.parse(item.stems) } catch { return null } })() : item.stems)
     : null
   return (
-    <div className={`group relative rounded-xl overflow-hidden border transition-all bg-gray-900/40 p-3 ${
+    <div className={`luxe-card-hover group relative rounded-xl overflow-hidden border transition-all bg-gray-900/40 p-3 ${
       checked
         ? 'border-fuchsia-400 shadow-lg shadow-fuchsia-500/30 ring-2 ring-fuchsia-400/40'
         : 'border-gray-800 hover:border-fuchsia-400/50'

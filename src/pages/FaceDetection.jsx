@@ -124,10 +124,10 @@ const FaceDetection = () => {
               <button
                 key={t.id}
                 onClick={() => setMode(t.id)}
-                className={`group relative p-3 sm:p-4 rounded-xl text-left transition-all border ${
+                className={`group relative p-3 sm:p-4 rounded-xl text-left transition-all border luxe-card luxe-card-hover ${
                   isActive
                     ? `${t.border} bg-gray-900 shadow-lg ${t.glow}`
-                    : 'border-gray-800 bg-gray-900/40 hover:bg-gray-900 hover:border-gray-700'
+                    : 'border-gray-800 hover:bg-gray-900 hover:border-gray-700'
                 }`}>
                 <div className={`mb-2 inline-flex items-center justify-center w-9 h-9 rounded-lg bg-gradient-to-br ${t.accent} text-black/80`}>
                   {t.icon}

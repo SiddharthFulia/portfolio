@@ -287,7 +287,7 @@ const Lab = () => {
             return (
               <AnimatedCard key={s.id} effect={effectMap[s.id] || 'default'} onClick={() => handleClick(s.id)} className="h-full">
                 <div
-                  className={`relative group text-left p-4 transition-all duration-300 ${
+                  className={`luxe-card luxe-card-hover relative group text-left p-4 transition-all duration-300 ${
                     isActive
                       ? 'shadow-lg shadow-cyan-900/20'
                       : ''

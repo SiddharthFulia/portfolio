@@ -198,20 +198,18 @@ export default function ChatSidebar({ refreshKey = 0, onNewChat, isOpenMobile, o
       {/* Top row — New chat / refresh / multi-select */}
       <div className="flex items-center gap-2 px-3 pt-3 pb-2">
         <button onClick={onNewChat}
-          className="flex-1 inline-flex items-center justify-center gap-2 text-xs font-semibold px-3 py-2 rounded-xl text-white bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 hover:from-cyan-400 hover:via-blue-400 hover:to-purple-400 shadow-lg shadow-purple-500/20 transition-all hover:scale-[1.02]">
+          className="luxe-btn luxe-btn-primary flex-1">
           <PlusOutlined /> New chat
         </button>
         <button onClick={() => setInternalRefresh(n => n + 1)}
           title="Refresh"
-          className="w-9 h-9 inline-flex items-center justify-center rounded-xl border border-gray-800 hover:border-gray-700 bg-gray-900/60 hover:bg-gray-900 text-gray-400 hover:text-gray-200 transition-colors">
+          className="luxe-btn luxe-btn-ghost !w-9 !h-9 !p-0">
           <ReloadOutlined />
         </button>
         <button onClick={() => setSelectMode(m => !m)}
           title="Select multiple"
-          className={`w-9 h-9 inline-flex items-center justify-center rounded-xl border transition-colors ${
-            selectMode
-              ? 'border-amber-400/50 bg-amber-500/10 text-amber-200'
-              : 'border-gray-800 hover:border-gray-700 bg-gray-900/60 hover:bg-gray-900 text-gray-400 hover:text-gray-200'
+          className={`luxe-btn luxe-btn-ghost !w-9 !h-9 !p-0 ${
+            selectMode ? '!text-amber-200' : ''
           }`}>
           <CheckOutlined />
         </button>
@@ -226,7 +224,7 @@ export default function ChatSidebar({ refreshKey = 0, onNewChat, isOpenMobile, o
           onChange={e => setQ(e.target.value)}
           placeholder="Search chats…"
           prefix={<SearchOutlined className="text-gray-500" />}
-          className="!bg-gray-900/60 !border-gray-800 [&_.ant-input]:!bg-transparent [&_.ant-input]:!text-gray-200 [&_.ant-input::placeholder]:!text-gray-600"
+          className="luxe-input"
         />
         <div className="flex items-center gap-1.5">
           <Select
@@ -259,7 +257,7 @@ export default function ChatSidebar({ refreshKey = 0, onNewChat, isOpenMobile, o
       {/* Bulk-delete strip */}
       {selectMode && selected.size > 0 && (
         <div className="mx-3 mb-2 rounded-lg border border-rose-500/40 bg-rose-500/10 p-2 flex items-center justify-between">
-          <span className="text-[11px] text-rose-200 font-semibold">
+          <span className="luxe-eyebrow !text-rose-200">
             {selected.size} selected
           </span>
           <button onClick={bulkDelete}
