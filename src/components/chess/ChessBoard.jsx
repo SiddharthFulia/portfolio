@@ -24,8 +24,23 @@ function buildDests(chess) {
   return dests
 }
 
+// Build chessground shape objects from a list of UCI moves. Top-ranked
+// move gets the strongest colour; opacity drops per rank so the user can
+// see at a glance which alternative is the engine's preference.
+const ARROW_BRUSHES = ['green', 'paleGreen', 'blue']   // chessground built-in colour names
+function uciToShape(uci, brushIdx) {
+  return {
+    orig: uci.slice(0, 2),
+    dest: uci.slice(2, 4),
+    brush: ARROW_BRUSHES[brushIdx] || 'paleBlue',
+  }
+}
+
 export default function ChessBoard({
   chess, fen, orientation = 'white', movableColor, onMove,
+  // candidateMoves — array of UCI strings, in ranked order. Top-3 are
+  // drawn as arrows with descending intensity.
+  candidateMoves = [],
 }) {
   const elRef = useRef(null)
   const cgRef = useRef(null)
@@ -67,6 +82,7 @@ export default function ChessBoard({
   useEffect(() => {
     const cg = cgRef.current
     if (!cg) return
+    const autoShapes = (candidateMoves || []).slice(0, 3).map(uciToShape)
     cg.set({
       fen,
       orientation,
@@ -79,8 +95,9 @@ export default function ChessBoard({
           after: (from, to) => onMoveRef.current?.(from, to),
         },
       },
+      drawable: { autoShapes },
     })
-  }, [fen, orientation, movableColor, chess])
+  }, [fen, orientation, movableColor, chess, candidateMoves])
 
   return <div ref={elRef} className="w-full aspect-square cg-wrap" />
 }

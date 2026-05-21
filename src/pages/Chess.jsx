@@ -2,13 +2,19 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { Chess } from 'chess.js'
 import 'chessground/assets/chessground.base.css'
 import 'chessground/assets/chessground.brown.css'
-import 'chessground/assets/chessground.cburnett.css'
+// cburnett.css NOT imported — usePieceSet injects piece CSS dynamically
+// from /public/piece/{set}/{file}.svg so users can switch themes.
 
-import ChessBoard from '../components/chess/ChessBoard'
-import EvalBar    from '../components/chess/EvalBar'
-import EvalGraph  from '../components/chess/EvalGraph'
-import MoveList   from '../components/chess/MoveList'
-import Variations from '../components/chess/Variations'
+import ChessBoard       from '../components/chess/ChessBoard'
+import EvalBar          from '../components/chess/EvalBar'
+import EvalGraph        from '../components/chess/EvalGraph'
+import MoveList         from '../components/chess/MoveList'
+import Variations       from '../components/chess/Variations'
+import EnginePanel      from '../components/chess/EnginePanel'
+import PieceSetPicker   from '../components/chess/PieceSetPicker'
+import usePieceSet      from '../components/chess/usePieceSet'
+import Clocks           from '../components/chess/Clocks'
+import TimeControlPicker, { TIME_CONTROLS } from '../components/chess/TimeControl'
 import {
   chessBestMove, chessAnalyze, chessPlay, chessEngineStatus,
 } from '../api/ai'
@@ -41,6 +47,75 @@ export default function ChessPage() {
   const [status, setStatus] = useState({ kind: 'idle', text: 'Ready' })
   const [engineHealth, setEngineHealth] = useState(null)
   const [fenInput, setFenInput] = useState('')
+  // Live engine telemetry — populated from every best-move / analyze
+  // response. Drives the EnginePanel sidebar widget.
+  const [telemetry, setTelemetry] = useState(null)
+  // Piece set — persists across reloads via localStorage.
+  const [pieceSet, setPieceSet] = useState(() => {
+    try { return localStorage.getItem('sid-chess-pieces') || 'cburnett' } catch { return 'cburnett' }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('sid-chess-pieces', pieceSet) } catch {}
+  }, [pieceSet])
+  // Inject the active set's CSS into <head>. Hot-swappable at runtime.
+  usePieceSet(pieceSet)
+  // Clock state. timeControl is the picked preset (null = no clock).
+  // whiteMs / blackMs are the remaining millis; null when no clock.
+  const [timeControl, setTimeControl] = useState(TIME_CONTROLS[0])
+  const [whiteMs, setWhiteMs] = useState(null)
+  const [blackMs, setBlackMs] = useState(null)
+  const [flagged, setFlagged] = useState(null)   // 'white' | 'black' on flag fall
+
+  // Tick the active side's clock once per 100ms. Pause when game-over,
+  // not started (no clock), or paused (no activeSide).
+  useEffect(() => {
+    if (!timeControl.baseMs) return    // 'none' control — clocks disabled
+    if (chessRef.current.isGameOver() || flagged) return
+    if (history.length === 0) return    // game hasn't started yet
+    const tickActive = chessRef.current.turn() === 'w' ? 'white' : 'black'
+    const setter = tickActive === 'white' ? setWhiteMs : setBlackMs
+    let last = performance.now()
+    const id = setInterval(() => {
+      const now = performance.now()
+      const delta = now - last
+      last = now
+      setter(prev => {
+        if (prev == null) return prev
+        const next = prev - delta
+        if (next <= 0) {
+          setFlagged(tickActive)
+          setStatus({ kind: 'error', text: `${tickActive[0].toUpperCase() + tickActive.slice(1)} flagged on time` })
+          return 0
+        }
+        return next
+      })
+    }, 100)
+    return () => clearInterval(id)
+  }, [history.length, timeControl, flagged, fen])
+
+  // When the user picks a new time control, reset both clocks.
+  useEffect(() => {
+    if (timeControl.baseMs == null) {
+      setWhiteMs(null); setBlackMs(null); setFlagged(null)
+    } else {
+      setWhiteMs(timeControl.baseMs)
+      setBlackMs(timeControl.baseMs)
+      setFlagged(null)
+    }
+  }, [timeControl])
+
+  // After every completed move (history grows), add the Fischer increment
+  // to the side that just moved. The new turn's side starts ticking via
+  // the effect above.
+  useEffect(() => {
+    if (!timeControl.baseMs || timeControl.incMs <= 0) return
+    if (history.length === 0) return
+    // history.length is even AFTER black moves → previous mover was black.
+    const justMoved = history.length % 2 === 0 ? 'black' : 'white'
+    const adder = justMoved === 'white' ? setWhiteMs : setBlackMs
+    adder(prev => (prev == null ? prev : prev + timeControl.incMs))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [history.length])
 
   useEffect(() => { document.title = 'Chess · Sid' }, [])
 
@@ -84,6 +159,7 @@ export default function ChessPage() {
         setStatus({ kind: 'error', text: err || 'Engine returned no move' })
         return
       }
+      if (data) setTelemetry(data)
       const uci = data.bestmove
       const move = chessRef.current.move({
         from: uci.slice(0, 2),
@@ -110,6 +186,7 @@ export default function ChessPage() {
           if (cancelled) return
           if (err) { setStatus({ kind: 'error', text: err }); return }
           setVariations(data?.variations || [])
+          if (data) setTelemetry(data)
           const topScore = data?.variations?.[0]?.score || null
           setEvalHistory(prev => {
             if (!prev.length) return prev
@@ -194,6 +271,19 @@ export default function ChessPage() {
 
             <div className="flex gap-3">
               <EvalBar score={evalLatest?.score} orientation={playerColor} />
+              {/* Clocks column — only when a time control is active.
+                  Active side ticks; flagged side flashes red. */}
+              {timeControl.baseMs != null && (
+                <div className="w-24">
+                  <Clocks
+                    white={whiteMs} black={blackMs}
+                    activeSide={chessRef.current.isGameOver() || flagged ? null
+                                : history.length === 0 ? null
+                                : (chessRef.current.turn() === 'w' ? 'white' : 'black')}
+                    orientation={playerColor}
+                  />
+                </div>
+              )}
               <div className="flex-1 max-w-[640px]">
                 <ChessBoard
                   chess={chessRef.current}
@@ -201,6 +291,12 @@ export default function ChessPage() {
                   orientation={playerColor}
                   movableColor={movableColor}
                   onMove={onUserMove}
+                  // Top-3 candidate arrows — only in analyze mode so they
+                  // don't spoil play-vs-engine. Each variation's first
+                  // UCI move is the arrow's orig→dest.
+                  candidateMoves={engineMode === 'analyze'
+                    ? variations.slice(0, 3).map(v => v.pv?.[0]).filter(Boolean)
+                    : []}
                 />
               </div>
             </div>
@@ -219,8 +315,9 @@ export default function ChessPage() {
 
           {/* ── Sidebar ── */}
           <div className="space-y-3">
+            <EnginePanel telemetry={telemetry} status={status} thinking={thinking} />
             {engineMode === 'analyze' && variations.length > 0 && (
-              <Variations variations={variations} />
+              <Variations variations={variations} chess={chessRef.current} />
             )}
             <div className="luxe-card p-3">
               <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Moves</p>
@@ -232,6 +329,8 @@ export default function ChessPage() {
                 <EvalGraph history={evalHistory} />
               </div>
             )}
+            <TimeControlPicker value={timeControl} onChange={setTimeControl} />
+            <PieceSetPicker value={pieceSet} onChange={setPieceSet} />
           </div>
         </div>
       </div>
