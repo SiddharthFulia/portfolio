@@ -9,7 +9,8 @@
 //   4. If 2+ games → show a list modal with metadata so user picks one
 
 import { useState } from 'react'
-import { Modal } from 'antd'
+import { Modal, Input, message } from 'antd'
+import { chessBulkSaveGames } from '../../api/ai'
 
 // Split a PGN blob into individual games. Standard PGN: each game starts
 // with `[Event "..."]` tag (sometimes with leading whitespace), followed
@@ -52,11 +53,15 @@ const RESULT_TONE = {
   '*':      'text-violet-300 bg-violet-500/15 border-violet-500/40',
 }
 
-export default function PgnDatabaseLoader({ onLoad }) {
+export default function PgnDatabaseLoader({ onLoad, onSavedCollection }) {
   // Pending multi-game blob — opens the picker when set.
   const [games, setGames] = useState([])
   const [open, setOpen] = useState(false)
   const [error, setError] = useState('')
+  // Bulk-save modal state — separate from the per-game picker.
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkName, setBulkName] = useState('')
+  const [bulkSaving, setBulkSaving] = useState(false)
 
   const handleFile = async (file) => {
     if (!file) return
@@ -80,6 +85,56 @@ export default function PgnDatabaseLoader({ onLoad }) {
   const pick = (idx) => {
     onLoad(games[idx])
     setOpen(false)
+  }
+
+  // Open the bulk-save modal. Default the collection name from the first
+  // game's Event tag if present — saves the user a typing pass.
+  const openBulkSave = () => {
+    const first = games[0] ? readTags(games[0]) : {}
+    const suggested = (first.event || '').trim().slice(0, 80)
+    setBulkName(suggested)
+    setBulkOpen(true)
+  }
+
+  // Build a row per game and POST them all in a single transaction via
+  // the bulk endpoint. The "name" is derived from PGN tags so the row
+  // is recognisable in the saved-games list ("White vs Black · Event · Date").
+  const commitBulkSave = async () => {
+    const collection = (bulkName || '').trim()
+    if (!collection) { message.warning('Pick a collection name'); return }
+    setBulkSaving(true)
+    try {
+      const rows = games.map(pgn => {
+        const t = readTags(pgn)
+        const namePieces = [
+          `${t.white || '?'} vs ${t.black || '?'}`,
+          t.event,
+          t.date,
+        ].filter(Boolean)
+        const name = namePieces.join(' · ').slice(0, 80)
+        return {
+          name,
+          pgn,
+          // Final FEN isn't trivially derivable from raw PGN without chess.js;
+          // BE accepts any string and we leave the starting FEN. Loading from
+          // the saved games panel re-parses the PGN to find the real position.
+          fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+          mode: 'analyze',
+          result: t.result || '*',
+        }
+      })
+      const { data, error: err } = await chessBulkSaveGames(rows, collection)
+      if (err) {
+        message.error(`Save failed: ${err}`)
+      } else {
+        message.success(`Saved ${data?.saved ?? rows.length} games to "${collection}"`)
+        setBulkOpen(false)
+        setOpen(false)
+        onSavedCollection?.(collection)
+      }
+    } finally {
+      setBulkSaving(false)
+    }
   }
 
   return (
@@ -109,6 +164,18 @@ export default function PgnDatabaseLoader({ onLoad }) {
         title={`Pick a game — ${games.length} found`}
         width={640}
       >
+        {games.length > 1 && (
+          <div className="mb-3 flex items-center justify-between gap-2 px-2 py-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5">
+            <span className="text-xs text-emerald-200/90">
+              💾 Save all {games.length} games into a single collection?
+            </span>
+            <button
+              onClick={openBulkSave}
+              className="text-[11px] font-semibold px-2.5 py-1 rounded border border-emerald-400/60 hover:border-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-100 transition-colors">
+              Save all to collection
+            </button>
+          </div>
+        )}
         <ul className="space-y-1.5 max-h-[60vh] overflow-y-auto pr-1">
           {games.map((pgn, i) => {
             const t = readTags(pgn)
@@ -135,6 +202,32 @@ export default function PgnDatabaseLoader({ onLoad }) {
             )
           })}
         </ul>
+      </Modal>
+
+      <Modal
+        open={bulkOpen}
+        onCancel={() => !bulkSaving && setBulkOpen(false)}
+        onOk={commitBulkSave}
+        okText={bulkSaving ? 'Saving…' : `Save ${games.length} games`}
+        confirmLoading={bulkSaving}
+        cancelButtonProps={{ disabled: bulkSaving }}
+        title="📁 Save all games to collection"
+        width={460}
+        centered
+      >
+        <p className="text-xs text-gray-400 mb-2">
+          Pick a collection name. All {games.length} games from this PGN will
+          be filed under it in your saved-games library.
+        </p>
+        <Input
+          autoFocus
+          value={bulkName}
+          maxLength={80}
+          placeholder="e.g. MacKenzie, Tata Steel 2024, My Lichess study"
+          onChange={(e) => setBulkName(e.target.value)}
+          onPressEnter={commitBulkSave}
+          disabled={bulkSaving}
+        />
       </Modal>
     </>
   )
