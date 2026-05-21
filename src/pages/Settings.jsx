@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
-import { Modal, message as antMessage } from 'antd'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { Modal, message as antMessage, InputNumber, Select } from 'antd'
 import { LockOutlined, ReloadOutlined, DatabaseOutlined, CloudServerOutlined, ApiOutlined, ClusterOutlined } from '@ant-design/icons'
 import VaultGate from '../components/VaultGate'
 import {
@@ -11,7 +11,9 @@ import {
 // Deepfake.jsx pattern: outer VaultGate wraps an inner component that
 // runs the actual UI once the JWT is in localStorage.
 
-const POLL_MS = 5000
+const DEFAULT_POLL_MS = 2000
+const MIN_POLL_MS     = 100
+const POLL_STORAGE_KEY = 'sid-settings-poll-ms'
 
 function fmtUptime(secs) {
   if (!secs || secs < 0) return '—'
@@ -44,6 +46,28 @@ function SettingsInner() {
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState(null)
   const timerRef = useRef(null)
+  // Poll-interval control. Stored as raw ms so the timer can use it
+  // directly; the UI splits it into "value + unit" for display. Persists
+  // across reloads so the user's preference sticks.
+  const [pollMs, setPollMs] = useState(() => {
+    try {
+      const stored = parseInt(localStorage.getItem(POLL_STORAGE_KEY) || '', 10)
+      if (Number.isFinite(stored) && stored >= MIN_POLL_MS) return stored
+    } catch {}
+    return DEFAULT_POLL_MS
+  })
+  const [pollUnit, setPollUnit] = useState(() => {
+    // Default unit: ms if the value is non-integer-seconds, else s.
+    const init = (() => {
+      try {
+        const stored = parseInt(localStorage.getItem(POLL_STORAGE_KEY) || '', 10)
+        return Number.isFinite(stored) ? stored : DEFAULT_POLL_MS
+      } catch { return DEFAULT_POLL_MS }
+    })()
+    return init >= 1000 && init % 1000 === 0 ? 's' : 'ms'
+  })
+  const pollValue = useMemo(() => pollUnit === 's' ? pollMs / 1000 : pollMs, [pollMs, pollUnit])
+  const minForUnit = pollUnit === 's' ? 0.1 : MIN_POLL_MS
 
   useEffect(() => { document.title = 'Settings · Sid' }, [])
 
@@ -69,10 +93,25 @@ function SettingsInner() {
 
   useEffect(() => {
     tick()
-    timerRef.current = setInterval(tick, POLL_MS)
+    timerRef.current = setInterval(tick, pollMs)
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [pollMs])
+
+  // Persist whichever ms value the user lands on.
+  useEffect(() => {
+    try { localStorage.setItem(POLL_STORAGE_KEY, String(pollMs)) } catch {}
+  }, [pollMs])
+
+  const handlePollValueChange = (v) => {
+    if (v == null || Number.isNaN(v)) return
+    const ms = pollUnit === 's' ? Math.round(v * 1000) : Math.round(v)
+    if (ms < MIN_POLL_MS) {
+      setPollMs(MIN_POLL_MS)
+    } else {
+      setPollMs(ms)
+    }
+  }
 
   const confirmPurge = (queue) => {
     Modal.confirm({
@@ -87,7 +126,7 @@ function SettingsInner() {
           antMessage.error(`Purge failed: ${error}`)
         } else {
           antMessage.success(`Purged ${data?.purged ?? 0} messages from ${queue}`)
-          tick()
+          await tick()
         }
       },
     })
@@ -112,8 +151,32 @@ function SettingsInner() {
             )}
           </div>
           <p className="text-sm text-gray-400">
-            Live server + database + queue + worker telemetry. Polls every {POLL_MS / 1000}s.
+            Admin only — Sid's monitoring panel.
           </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-[10px] uppercase tracking-wider text-gray-500">Poll every</span>
+            <InputNumber
+              size="small"
+              value={pollValue}
+              min={minForUnit}
+              step={pollUnit === 's' ? 0.1 : 100}
+              onChange={handlePollValueChange}
+              className="!w-24"
+            />
+            <Select
+              size="small"
+              value={pollUnit}
+              onChange={(u) => setPollUnit(u)}
+              options={[
+                { value: 'ms', label: 'ms' },
+                { value: 's',  label: 's' },
+              ]}
+              className="!w-20"
+            />
+            <span className="text-[10px] uppercase tracking-wider text-gray-600">
+              (min 100ms · resolves to {pollMs} ms)
+            </span>
+          </div>
           {err && (
             <p className="text-rose-400 text-xs mt-2 font-mono">✗ {err}</p>
           )}
@@ -175,7 +238,7 @@ function DatabaseCard({ data }) {
             <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">
               Tables ({tables.length})
             </div>
-            <div className="max-h-72 overflow-y-auto -mr-1 pr-1">
+            <div>
               <table className="w-full text-xs">
                 <tbody>
                   {tables.map(t => (
@@ -206,7 +269,7 @@ function QueuesCard({ data, onPurge }) {
           RABBITMQ_URL not configured on this BE.
         </p>
       ) : (
-        <div className="max-h-80 overflow-y-auto -mr-1 pr-1">
+        <div>
           <table className="w-full text-xs">
             <thead>
               <tr className="text-[10px] uppercase tracking-wider text-gray-500">
@@ -262,7 +325,7 @@ function WorkersCard({ rows }) {
           No worker heartbeats recorded.
         </p>
       ) : (
-        <div className="max-h-80 overflow-y-auto -mr-1 pr-1 space-y-1.5">
+        <div className="space-y-1.5">
           {rows.map(w => (
             <div key={w.id || `${w.role}-${w.lastSeenAt}`}
               className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg bg-gray-900/40 border border-gray-800">
@@ -321,7 +384,10 @@ function Empty() {
 
 export default function Settings() {
   return (
-    <VaultGate label="Settings">
+    <VaultGate
+      label="Settings"
+      subtitle="Admin only · Sid's monitoring panel · server, DB, queues, workers"
+    >
       <SettingsInner />
     </VaultGate>
   )

@@ -26,7 +26,7 @@ export function setVaultToken(token) {
 // The compact login panel — just the card, no full-screen wrapper.
 // Use inside an Antd Modal or any container. Calls `onUnlocked()` once the
 // JWT is in localStorage. Renders nothing if already unlocked.
-export function VaultLoginPanel({ label = 'Unlock vault', onUnlocked }) {
+export function VaultLoginPanel({ label = 'Unlock vault', subtitle, onUnlocked }) {
   const [attempt, setAttempt] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -71,7 +71,7 @@ export function VaultLoginPanel({ label = 'Unlock vault', onUnlocked }) {
             {label}
           </h2>
           <p className="text-[11px] text-gray-500 mt-1.5 leading-relaxed max-w-[34ch] mx-auto">
-            Bypasses the NSFW filter · routes outputs to the private Vault library
+            {subtitle ?? 'Bypasses the NSFW filter · routes outputs to the private Vault library'}
           </p>
         </div>
         <Input.Password
@@ -105,7 +105,7 @@ export function VaultLoginPanel({ label = 'Unlock vault', onUnlocked }) {
 }
 
 // Full-page wrapper — only used if you want to gate a whole page (not us anymore).
-export default function VaultGate({ children, label = 'AI Studio' }) {
+export default function VaultGate({ children, label = 'AI Studio', subtitle }) {
   const [unlocked, setUnlocked] = useState(false)
   const [checking, setChecking] = useState(true)
 
@@ -132,7 +132,7 @@ export default function VaultGate({ children, label = 'AI Studio' }) {
   return (
     <div className="min-h-screen bg-black text-gray-100 flex items-center justify-center px-4">
       <div className="max-w-md w-full">
-        <VaultLoginPanel label={label} onUnlocked={() => setUnlocked(true)} />
+        <VaultLoginPanel label={label} subtitle={subtitle} onUnlocked={() => setUnlocked(true)} />
       </div>
     </div>
   )

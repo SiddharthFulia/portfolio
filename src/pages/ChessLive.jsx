@@ -104,10 +104,12 @@ export default function ChessLive() {
     }
   }, [match?.fen])
 
-  // Pull match state once on mount + on every poll tick.
+  // Pull match state once on mount + on every poll tick. The BE uses
+  // ?session=… to bump our lastSeenAt so the auto-abort timer (60s of
+  // silence from both sides) doesn't kill a match we're actively viewing.
   const fetchState = useCallback(async () => {
     if (!matchId) return null
-    const { data, error: err } = await chessGetMatch(matchId)
+    const { data, error: err } = await chessGetMatch(matchId, session)
     if (err) {
       // 404 "match not found" — increment attempts; the retry effect
       // below handles scheduling the next try. Don't surface 404 as a
@@ -136,7 +138,7 @@ export default function ChessLive() {
       setBlackMsLocal(data.blackMs ?? data.baseMs ?? null)
     }
     return data
-  }, [matchId])
+  }, [matchId, session])
 
   // Initial load.
   useEffect(() => { fetchState() }, [fetchState])
@@ -165,6 +167,39 @@ export default function ChessLive() {
     const id = setInterval(fetchState, POLL_MS)
     return () => clearInterval(id)
   }, [match?.status, fetchState])
+
+  // Game-over auto-redirect — once the match is completed/aborted the
+  // page is just a result screen. We hold the user here for a short
+  // grace period so they can see the outcome + maybe copy the PGN, then
+  // bounce them back to /chess. They can hit "🔄 New game" sooner to
+  // skip the countdown.
+  const [endCountdown, setEndCountdown] = useState(null)
+  useEffect(() => {
+    const s = match?.status
+    if (s !== 'completed' && s !== 'aborted') {
+      setEndCountdown(null)
+      return
+    }
+    setEndCountdown(15)
+    const id = setInterval(() => {
+      setEndCountdown(prev => {
+        if (prev == null) return prev
+        if (prev <= 1) {
+          clearInterval(id)
+          // Clear our session for this match before bouncing so a stale
+          // token can't follow us into the next game.
+          try {
+            sessionStorage.removeItem(sessionKey(matchId))
+            sessionStorage.removeItem(`${sessionKey(matchId)}-role`)
+          } catch {}
+          navigate('/chess')
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    return () => clearInterval(id)
+  }, [match?.status, matchId, navigate])
 
   // Local clock interpolation — decrement the active side's clock
   // between polls so the timer counts down visibly. BE values are
@@ -282,16 +317,29 @@ export default function ChessLive() {
     setPendingPromotion(null)
   }
 
-  const onResign = async () => {
-    if (!session) return
-    if (!confirm('Resign this match? The other player will be awarded the win.')) return
+  const doResign = useCallback(async () => {
     const { data, error: err } = await chessResignMatch(matchId, { session })
     if (err) {
       setError(err)
       return
     }
     setMatch(data)
-  }
+  }, [matchId, session])
+
+  const onResign = useCallback(() => {
+    if (!session) return
+    Modal.confirm({
+      title: 'Resign this match?',
+      content: 'The other player will be awarded the win. This cannot be undone.',
+      okText: 'Resign',
+      cancelText: 'Cancel',
+      okType: 'danger',
+      okButtonProps: { danger: true },
+      autoFocusButton: 'cancel',
+      centered: true,
+      onOk: doResign,
+    })
+  }, [session, doResign])
 
   // ── Share-link copy ──
   const shareUrl = typeof window !== 'undefined'
@@ -381,6 +429,8 @@ export default function ChessLive() {
   const isWaiting = status === 'waiting'
   const isActive  = status === 'active'
   const isDone    = status === 'completed'
+  const isAborted = status === 'aborted'
+  const isOver    = isDone || isAborted
   const fen = match?.fen || STARTING_FEN
 
   // We orient the board so the local player sees their pieces at the
@@ -395,6 +445,7 @@ export default function ChessLive() {
                     : (match?.blackName ? match.blackName : (isWaiting ? 'Waiting…' : 'Opponent'))
 
   const resultText = (() => {
+    if (isAborted) return 'Aborted'
     if (!isDone) return null
     if (result === '1-0') return 'White wins'
     if (result === '0-1') return 'Black wins'
@@ -436,6 +487,7 @@ export default function ChessLive() {
               {isWaiting && 'Waiting for opponent'}
               {isActive && 'Match active'}
               {isDone && 'Completed'}
+              {isAborted && 'Aborted — both players left'}
             </span>
             <span className="px-2 py-0.5 rounded-full border border-gray-700 bg-gray-900/60 text-gray-400 font-mono">
               #{matchId}
@@ -451,14 +503,14 @@ export default function ChessLive() {
               <span>{turnSide === 'white' ? '♙' : '♟'} {turnSide} to move</span>
             )}
             {isWaiting && <span className="text-amber-300">Share the link →</span>}
-            {isDone && resultText && <span className="text-amber-300">{resultText}</span>}
+            {isOver && resultText && <span className="text-amber-300">{resultText}</span>}
           </div>
           <PlayerTag side="black" name={whoIsBlack} isTurn={turnSide === 'black' && isActive} align="right" />
         </div>
 
         {/* Share button — opens a modal (touch-friendly, easier to read
             the full URL on phones than a one-line truncated bar). */}
-        {!isDone && (
+        {!isOver && (
           <div className="luxe-card p-3 flex items-center gap-2 justify-between">
             <span className="text-[11px] text-gray-400">Share this link so a friend can join.</span>
             <button onClick={() => setShareOpen(true)}
@@ -530,10 +582,18 @@ export default function ChessLive() {
                 🏳️ Resign
               </button>
             )}
-            {isDone && (
+            {isOver && (
               <>
-                {youWonText && (
+                {isAborted && (
+                  <span className="text-xs font-semibold text-gray-400 mr-2">Match aborted</span>
+                )}
+                {!isAborted && youWonText && (
                   <span className="text-xs font-semibold text-amber-300 mr-2">{youWonText}</span>
+                )}
+                {endCountdown != null && (
+                  <span className="text-[11px] font-mono text-gray-500 mr-1">
+                    Closing in {endCountdown}s…
+                  </span>
                 )}
                 <button onClick={onNewGame}
                   className="text-xs font-semibold px-3 py-2 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20">

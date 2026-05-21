@@ -207,3 +207,43 @@ body:has(.card[data-color="green"]:hover) {
   box-shadow: 0.6vmin 0.6vmin #fff, 1vmin 1vmin #d2e4ff, 1vmin 1vmin #d2e4ff,
     0.65vmin 1vmin #d2e4ff, 1vmin 0.65vmin #d2e4ff;
 }
+
+/* ── Thin, auto-fading scrollbars (site-wide) ──
+ * Default state: invisible thumb on transparent track — no visible
+ * scrollbar at rest. On hover/focus of a scrollable region, the thumb
+ * fades in as a 6px subtle pill. Firefox uses the modern `scrollbar-*`
+ * properties; WebKit (Chrome/Edge/Safari) uses ::-webkit-scrollbar.
+ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+*:hover,
+*:focus,
+*:focus-within {
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background: transparent;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+  transition: background 0.25s ease;
+}
+*:hover::-webkit-scrollbar-thumb,
+*:focus::-webkit-scrollbar-thumb,
+*:focus-within::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.55);
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
