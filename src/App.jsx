@@ -5,42 +5,70 @@ import { Footer, Navbar } from "./components";
 import BackToTop from './components/BackToTop';
 import EasterEgg from './components/EasterEgg';
 import RouteErrorBoundary from './components/RouteErrorBoundary';
+
+// Lazy import wrapper that auto-recovers from Vite/Vercel chunk-hash
+// mismatches. After a deploy, an open tab still has the OLD index.html
+// referencing chunks with old hashes (e.g. ImageEnhancer-559d1b9a.js).
+// New build replaced those chunks with new hashes (-72ac1f00.js), so the
+// fetch 404s and `Failed to fetch dynamically imported module` throws.
+// One hard-reload pulls the new index.html which references the right
+// chunks. sessionStorage guard prevents an infinite reload loop if the
+// import legitimately fails for some other reason.
+const RELOAD_KEY = 'sid-chunk-reload-at';
+const CHUNK_RE = /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module/i;
+const lazyWithReload = (importFn) => lazy(() =>
+  importFn().catch((err) => {
+    if (err && typeof err.message === 'string' && CHUNK_RE.test(err.message)) {
+      const last = Number(sessionStorage.getItem(RELOAD_KEY) || '0');
+      const now = Date.now();
+      // Only reload once per 30s window — protects against real (non-deploy) issues.
+      if (now - last > 30_000) {
+        sessionStorage.setItem(RELOAD_KEY, String(now));
+        window.location.reload();
+        // Return a Promise that never resolves so React doesn't try to render
+        // a fallback in the millisecond before the reload actually fires.
+        return new Promise(() => {});
+      }
+    }
+    throw err;
+  })
+);
 // PageTransition removed 2026-05 — the fade/slide on every route was the
 // "flashy switch" the user wanted gone. Routes now render directly.
 // VaultGate is now used inline inside each page (only for the "Save to
 // Vault" toggle), not as a page-level gate.
 
 /* ── Lazy page imports ── */
-const Home = lazy(() => import("./pages/Home"));
-const About = lazy(() => import("./pages/About"));
-const Projects = lazy(() => import("./pages/Projects"));
-const Contact = lazy(() => import("./pages/Contact"));
-const Lab = lazy(() => import("./pages/Lab"));
-const Learn = lazy(() => import("./pages/Learn"));
-const Creative = lazy(() => import("./pages/Creative"));
-const ChessViz = lazy(() => import("./pages/ChessViz"));
-const Science = lazy(() => import("./pages/Science"));
-const ScienceModule = lazy(() => import("./pages/ScienceModule"));
-const FaceDetection = lazy(() => import("./pages/FaceDetection"));
-const Explore = lazy(() => import("./pages/Explore"));
-const ExploreModule = lazy(() => import("./pages/ExploreModule"));
-const AIChat = lazy(() => import("./pages/AIChat"));
-const AIVideo = lazy(() => import("./pages/AIVideo"));
-const ImageEnhancer = lazy(() => import("./pages/ImageEnhancer"));
-const AIStudio = lazy(() => import("./pages/AIStudio"));
-const Dragon3D = lazy(() => import("./pages/Dragon3D"));
-const Deepfake = lazy(() => import("./pages/Deepfake"));
-const Runner = lazy(() => import("./pages/Runner"));
-const SummarizerPage = lazy(() => import("./pages/SummarizerPage"));
-const HandTracking = lazy(() => import("./pages/HandTracking"));
-const LipSync = lazy(() => import("./pages/LipSync"));
-const AudioStudio = lazy(() => import("./pages/AudioStudio"));
-const Cinema = lazy(() => import("./pages/Cinema"));
-const AIVideoDetail = lazy(() => import("./pages/AIVideoDetail"));
-const ImageEnhancerDetail = lazy(() => import("./pages/ImageEnhancerDetail"));
-const LipsyncDetail = lazy(() => import("./pages/LipsyncDetail"));
-const AudioDetail = lazy(() => import("./pages/AudioDetail"));
-const CinemaDetail = lazy(() => import("./pages/CinemaDetail"));
+const Home = lazyWithReload(() => import("./pages/Home"));
+const About = lazyWithReload(() => import("./pages/About"));
+const Projects = lazyWithReload(() => import("./pages/Projects"));
+const Contact = lazyWithReload(() => import("./pages/Contact"));
+const Lab = lazyWithReload(() => import("./pages/Lab"));
+const Learn = lazyWithReload(() => import("./pages/Learn"));
+const Creative = lazyWithReload(() => import("./pages/Creative"));
+const ChessViz = lazyWithReload(() => import("./pages/ChessViz"));
+const Science = lazyWithReload(() => import("./pages/Science"));
+const ScienceModule = lazyWithReload(() => import("./pages/ScienceModule"));
+const FaceDetection = lazyWithReload(() => import("./pages/FaceDetection"));
+const Explore = lazyWithReload(() => import("./pages/Explore"));
+const ExploreModule = lazyWithReload(() => import("./pages/ExploreModule"));
+const AIChat = lazyWithReload(() => import("./pages/AIChat"));
+const AIVideo = lazyWithReload(() => import("./pages/AIVideo"));
+const ImageEnhancer = lazyWithReload(() => import("./pages/ImageEnhancer"));
+const AIStudio = lazyWithReload(() => import("./pages/AIStudio"));
+const Dragon3D = lazyWithReload(() => import("./pages/Dragon3D"));
+const Deepfake = lazyWithReload(() => import("./pages/Deepfake"));
+const Runner = lazyWithReload(() => import("./pages/Runner"));
+const SummarizerPage = lazyWithReload(() => import("./pages/SummarizerPage"));
+const HandTracking = lazyWithReload(() => import("./pages/HandTracking"));
+const LipSync = lazyWithReload(() => import("./pages/LipSync"));
+const AudioStudio = lazyWithReload(() => import("./pages/AudioStudio"));
+const Cinema = lazyWithReload(() => import("./pages/Cinema"));
+const AIVideoDetail = lazyWithReload(() => import("./pages/AIVideoDetail"));
+const ImageEnhancerDetail = lazyWithReload(() => import("./pages/ImageEnhancerDetail"));
+const LipsyncDetail = lazyWithReload(() => import("./pages/LipsyncDetail"));
+const AudioDetail = lazyWithReload(() => import("./pages/AudioDetail"));
+const CinemaDetail = lazyWithReload(() => import("./pages/CinemaDetail"));
 
 /* ── Skeleton building blocks ── */
 const B = "animate-pulse bg-slate-200 rounded";
