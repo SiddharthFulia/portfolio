@@ -3,6 +3,7 @@ import { Input, Button, Select, Tabs } from 'antd'
 import { PictureOutlined, SoundOutlined, FileTextOutlined, EyeOutlined, DownloadOutlined, CopyOutlined, CheckOutlined } from '@ant-design/icons'
 import { generateImage, geminiVision, summarizeText, textToSpeech } from '../api/ai'
 import ReactMarkdown from 'react-markdown'
+import CameraCapture from '../components/CameraCapture'
 
 const P = 'animate-pulse bg-gray-800 rounded-xl'
 
@@ -150,9 +151,17 @@ const VisionAI = () => {
               </div>
             </div>
           ) : (
-            <div className="h-64 rounded-xl border-2 border-dashed border-gray-700 flex items-center justify-center cursor-pointer hover:border-gray-500 transition-colors"
-              onClick={() => fileRef.current?.click()}>
-              <div className="text-center text-gray-500"><PictureOutlined style={{ fontSize: 40 }} /><p className="text-sm mt-2">Click to upload image</p></div>
+            <div className="space-y-2">
+              <div className="h-48 rounded-xl border-2 border-dashed border-gray-700 flex items-center justify-center cursor-pointer hover:border-gray-500 transition-colors"
+                onClick={() => fileRef.current?.click()}>
+                <div className="text-center text-gray-500"><PictureOutlined style={{ fontSize: 40 }} /><p className="text-sm mt-2">Click to upload image</p></div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-px bg-gray-800" />
+                <span className="text-[10px] uppercase tracking-wider text-gray-600">or snap</span>
+                <div className="flex-1 h-px bg-gray-800" />
+              </div>
+              <CameraCapture accentColor="#22d3ee" onSnap={(dataUrl) => setImage(dataUrl)} />
             </div>
           )}
           <input ref={fileRef} type="file" accept="image/*" onChange={handleUpload} className="hidden" />

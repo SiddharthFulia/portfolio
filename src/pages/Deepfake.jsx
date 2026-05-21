@@ -3,6 +3,7 @@ import { Upload, Input, Select, message as antMessage } from 'antd'
 import { UploadOutlined, ThunderboltOutlined, DownloadOutlined, SyncOutlined, LockOutlined, ReloadOutlined } from '@ant-design/icons'
 import VaultGate from '../components/VaultGate'
 import AudioRecorder from '../components/AudioRecorder'
+import CameraCapture from '../components/CameraCapture'
 import JobLogsAgentPlan from '../components/JobLogsAgentPlan'
 import { submitDeepfakeJob, getDeepfakeStatus, fileToDataUrl } from '../api/ai'
 
@@ -158,11 +159,13 @@ function DeepfakeInner() {
               accent="fuchsia" dataUrl={srcDataUrl} file={srcFile}
               onUpload={handleSrcUpload}
               onClear={() => { setSrcFile(null); setSrcDataUrl('') }}
+              onCapture={(dataUrl) => { setSrcDataUrl(dataUrl); setSrcFile(null); setError(null) }}
               hint="Clean front-facing portrait works best" />
             <UploadCard label="Target image"
               accent="amber" dataUrl={tgtDataUrl} file={tgtFile}
               onUpload={handleTgtUpload}
               onClear={() => { setTgtFile(null); setTgtDataUrl('') }}
+              onCapture={(dataUrl) => { setTgtDataUrl(dataUrl); setTgtFile(null); setError(null) }}
               hint="Any photo · multi-face targets swap every face" />
           </section>
         ) : (
@@ -219,13 +222,22 @@ function DeepfakeInner() {
                   </div>
                 </div>
               ) : (
-                <Upload.Dragger multiple={false} showUploadList={false}
-                  accept="audio/*"
-                  beforeUpload={handleMelodyUpload}
-                  style={{ background: 'transparent', borderColor: '#374151', padding: '16px 0' }}>
-                  <UploadOutlined className="text-2xl text-amber-400 mb-1" />
-                  <p className="text-xs text-gray-300">Upload a hummed / sung melody</p>
-                </Upload.Dragger>
+                <div className="space-y-2">
+                  <Upload.Dragger multiple={false} showUploadList={false}
+                    accept="audio/*"
+                    beforeUpload={handleMelodyUpload}
+                    style={{ background: 'transparent', borderColor: '#374151', padding: '16px 0' }}>
+                    <UploadOutlined className="text-2xl text-amber-400 mb-1" />
+                    <p className="text-xs text-gray-300">Upload a hummed / sung melody</p>
+                  </Upload.Dragger>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-px bg-gray-800" />
+                    <span className="text-[10px] uppercase tracking-wider text-gray-600">or hum it live</span>
+                    <div className="flex-1 h-px bg-gray-800" />
+                  </div>
+                  <AudioRecorder accentColor="#fbbf24" maxSeconds={60}
+                    onComplete={(d) => { setMelodyDataUrl(d); setMelodyFile(null); setError(null) }} />
+                </div>
               )}
             </div>
 
@@ -310,10 +322,10 @@ function DeepfakeInner() {
   )
 }
 
-function UploadCard({ label, accent, dataUrl, file, onUpload, onClear, hint }) {
+function UploadCard({ label, accent, dataUrl, file, onUpload, onClear, onCapture, hint }) {
   const accentMap = {
-    fuchsia: { border: 'border-fuchsia-500/40', icon: 'text-fuchsia-400', btn: 'border-fuchsia-500/40 hover:border-fuchsia-400 bg-fuchsia-500/10 hover:bg-fuchsia-500/20 text-fuchsia-300' },
-    amber:   { border: 'border-amber-500/40',   icon: 'text-amber-400',   btn: 'border-amber-500/40 hover:border-amber-400 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300' },
+    fuchsia: { border: 'border-fuchsia-500/40', icon: 'text-fuchsia-400', btn: 'border-fuchsia-500/40 hover:border-fuchsia-400 bg-fuchsia-500/10 hover:bg-fuchsia-500/20 text-fuchsia-300', hex: '#e879f9' },
+    amber:   { border: 'border-amber-500/40',   icon: 'text-amber-400',   btn: 'border-amber-500/40 hover:border-amber-400 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300', hex: '#fbbf24' },
   }
   const a = accentMap[accent] || accentMap.fuchsia
   return (
@@ -333,14 +345,29 @@ function UploadCard({ label, accent, dataUrl, file, onUpload, onClear, hint }) {
           </div>
         </div>
       ) : (
-        <Upload.Dragger multiple={false} showUploadList={false}
-          accept="image/*"
-          beforeUpload={onUpload}
-          style={{ background: 'transparent', borderColor: '#374151', padding: '32px 0' }}>
-          <UploadOutlined className={`text-3xl ${a.icon} mb-2`} />
-          <p className="text-sm text-gray-300">Drop an image</p>
-          <p className="text-[10px] text-gray-500 mt-1">{hint}</p>
-        </Upload.Dragger>
+        <div className="space-y-2">
+          <Upload.Dragger multiple={false} showUploadList={false}
+            accept="image/*"
+            beforeUpload={onUpload}
+            style={{ background: 'transparent', borderColor: '#374151', padding: '32px 0' }}>
+            <UploadOutlined className={`text-3xl ${a.icon} mb-2`} />
+            <p className="text-sm text-gray-300">Drop an image</p>
+            <p className="text-[10px] text-gray-500 mt-1">{hint}</p>
+          </Upload.Dragger>
+          {/* Camera-capture alternative — same input pattern the Image Enhancer
+              uses. Lets the user snap a face from their webcam instead of
+              digging for a file. */}
+          {onCapture && (
+            <>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-px bg-gray-800" />
+                <span className="text-[10px] uppercase tracking-wider text-gray-600">or snap</span>
+                <div className="flex-1 h-px bg-gray-800" />
+              </div>
+              <CameraCapture accentColor={a.hex} onSnap={onCapture} />
+            </>
+          )}
+        </div>
       )}
     </div>
   )

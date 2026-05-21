@@ -6,6 +6,7 @@ import { submitLipsync, getLipsyncStatus, fileToDataUrl, listLipsyncJobs, lipsyn
 import { useTilt, TILT_STYLE } from '../components/useTilt'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
 import AudioRecorder from '../components/AudioRecorder'
+import CameraCapture from '../components/CameraCapture'
 
 const MODELS = [
   { value: 'latentsync',   label: 'LatentSync 1.5',  blurb: 'Best mouth detail. ByteDance. ~1-3min for a 10s clip on 5090.' },
@@ -169,13 +170,22 @@ export default function LipSync() {
                 </button>
               </div>
             ) : (
-              <Upload.Dragger multiple={false} showUploadList={false}
-                accept="image/*" beforeUpload={handlePortrait}
-                style={{ background: 'transparent', borderColor: 'transparent', padding: '20px 0' }}>
-                <UploadOutlined className="text-3xl text-cyan-400 mb-2" />
-                <p className="text-sm text-gray-300">Drop portrait or click to upload</p>
-                <p className="text-[10px] text-gray-500 mt-1">Single face, front-facing works best</p>
-              </Upload.Dragger>
+              <div className="space-y-2">
+                <Upload.Dragger multiple={false} showUploadList={false}
+                  accept="image/*" beforeUpload={handlePortrait}
+                  style={{ background: 'transparent', borderColor: 'transparent', padding: '20px 0' }}>
+                  <UploadOutlined className="text-3xl text-cyan-400 mb-2" />
+                  <p className="text-sm text-gray-300">Drop portrait or click to upload</p>
+                  <p className="text-[10px] text-gray-500 mt-1">Single face, front-facing works best</p>
+                </Upload.Dragger>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-px bg-gray-800" />
+                  <span className="text-[10px] uppercase tracking-wider text-gray-600">or snap</span>
+                  <div className="flex-1 h-px bg-gray-800" />
+                </div>
+                <CameraCapture accentColor="#22d3ee"
+                  onSnap={(dataUrl) => { setPortraitDataUrl(dataUrl); setPortraitFile(null) }} />
+              </div>
             )}
           </div>
         </section>
