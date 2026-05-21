@@ -33,6 +33,16 @@ export const PIECE_SETS = [
   { id: 'leipzig',    label: 'Leipzig',    blurb: 'Tournament look' },
   { id: 'merida',     label: 'Merida',     blurb: 'Common print style' },
   { id: 'staunty',    label: 'Staunty',    blurb: 'Modern Staunton, popular' },
+  { id: 'chess7',     label: 'Chess7',     blurb: 'Geometric stencil' },
+  { id: 'chessnut',   label: 'Chessnut',   blurb: 'Soft outlined / playful' },
+  { id: 'companion',  label: 'Companion',  blurb: 'Bold filled silhouettes' },
+  { id: 'gioco',      label: 'Gioco',      blurb: 'Hand-drawn elegant' },
+  { id: 'governor',   label: 'Governor',   blurb: 'Heavy serif royal' },
+  { id: 'horsey',     label: 'Horsey',     blurb: 'Cute cartoon' },
+  { id: 'maestro',    label: 'Maestro',    blurb: 'Detailed traditional' },
+  { id: 'pirouetti',  label: 'Pirouetti',  blurb: 'Dynamic / artistic' },
+  { id: 'riohacha',   label: 'Riohacha',   blurb: 'Minimalist outline' },
+  { id: 'tatiana',    label: 'Tatiana',    blurb: 'Modern flat' },
 ]
 
 function buildPieceCSS(setId) {
