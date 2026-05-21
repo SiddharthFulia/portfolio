@@ -15,8 +15,10 @@ import PieceSetPicker   from '../components/chess/PieceSetPicker'
 import usePieceSet      from '../components/chess/usePieceSet'
 import Clocks           from '../components/chess/Clocks'
 import TimeControlPicker, { TIME_CONTROLS } from '../components/chess/TimeControl'
+import SavedGames       from '../components/chess/SavedGames'
 import {
   chessBestMove, chessAnalyze, chessPlay, chessEngineStatus,
+  chessSaveGame, chessLoadGame,
 } from '../api/ai'
 
 // /chess — Stockfish-backed analysis board. chess.js owns the move state,
@@ -50,6 +52,8 @@ export default function ChessPage() {
   // Live engine telemetry — populated from every best-move / analyze
   // response. Drives the EnginePanel sidebar widget.
   const [telemetry, setTelemetry] = useState(null)
+  // Saved-games refresh trigger — bump after save/delete to re-fetch list.
+  const [savedRefresh, setSavedRefresh] = useState(0)
   // Piece set — persists across reloads via localStorage.
   const [pieceSet, setPieceSet] = useState(() => {
     try { return localStorage.getItem('sid-chess-pieces') || 'cburnett' } catch { return 'cburnett' }
@@ -240,6 +244,50 @@ export default function ChessPage() {
     }
   }
 
+  // Saved games — persist current PGN with metadata, and load a row back
+  // onto the board (reconstructing chess.js state from the PGN).
+  const saveCurrentGame = async () => {
+    const chess = chessRef.current
+    const name = prompt(
+      'Name this game',
+      `${engineMode === 'play' ? `vs Stockfish ${engineElo}` : engineMode === 'analyze' ? 'Analysis' : 'Pass-and-play'} · ${new Date().toLocaleDateString()}`
+    )
+    if (!name) return
+    const result = chess.isCheckmate()
+      ? (chess.turn() === 'w' ? '0-1' : '1-0')
+      : chess.isDraw() ? '1/2-1/2' : '*'
+    const { error: err } = await chessSaveGame({
+      name,
+      pgn: chess.pgn(),
+      fen: chess.fen(),
+      side: engineMode === 'play' ? playerColor : null,
+      mode: engineMode,
+      engineName: engineMode === 'play' ? 'Stockfish' : null,
+      engineType: engineMode === 'play' ? 'stockfish' : null,
+      engineStrength: engineMode === 'play' ? engineElo : null,
+      timeControl: timeControl?.id || 'none',
+      result,
+      moveCount: chess.history().length,
+    })
+    if (err) setStatus({ kind: 'error', text: `Save failed: ${err}` })
+    else { setStatus({ kind: 'idle', text: `Saved as "${name}"` }); setSavedRefresh(k => k + 1) }
+  }
+
+  const loadSavedGame = async (row) => {
+    const chess = new Chess()
+    try {
+      chess.loadPgn(row.pgn || '')
+    } catch (err) {
+      setStatus({ kind: 'error', text: `Couldn't load: ${err.message}` })
+      return
+    }
+    chessRef.current = chess
+    setFen(chess.fen())
+    setHistory(chess.history())
+    setEvalHistory([]); setVariations([])
+    setStatus({ kind: 'idle', text: `Loaded "${row.name}"` })
+  }
+
   const isGameOver = chessRef.current.isGameOver()
   const gameOverReason = (() => {
     const c = chessRef.current
@@ -306,6 +354,7 @@ export default function ChessPage() {
               isGameOver={isGameOver} gameOverReason={gameOverReason}
               onUndo={undoMove} onFlip={flipBoard}
               onReset={resetBoard} onCopyPgn={copyPgn}
+              onSave={saveCurrentGame}
             />
 
             <FenImport
@@ -331,6 +380,7 @@ export default function ChessPage() {
             )}
             <TimeControlPicker value={timeControl} onChange={setTimeControl} />
             <PieceSetPicker value={pieceSet} onChange={setPieceSet} />
+            <SavedGames refreshKey={savedRefresh} onLoad={loadSavedGame} />
           </div>
         </div>
       </div>
@@ -429,7 +479,7 @@ function ModeBar({ engineMode, setEngineMode, playerColor, setPlayerColor, engin
 }
 
 // ── Status + action buttons row ──
-function StatusBar({ status, thinking, isGameOver, gameOverReason, onUndo, onFlip, onReset, onCopyPgn }) {
+function StatusBar({ status, thinking, isGameOver, gameOverReason, onUndo, onFlip, onReset, onCopyPgn, onSave }) {
   return (
     <div className="luxe-card p-3 flex items-center justify-between gap-2 flex-wrap">
       <span className={`text-xs font-mono ${
@@ -457,6 +507,10 @@ function StatusBar({ status, thinking, isGameOver, gameOverReason, onUndo, onFli
         <button onClick={onCopyPgn}
           className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20">
           ⎘ Copy PGN
+        </button>
+        <button onClick={onSave}
+          className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20">
+          💾 Save game
         </button>
       </div>
     </div>

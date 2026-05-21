@@ -62,6 +62,7 @@ export const ENDPOINTS = {
   CHESS_ANALYZE:        '/api/chess/analyze',
   CHESS_PLAY:           '/api/chess/play',
   CHESS_STATUS:         '/api/chess/status',
+  CHESS_GAMES:          '/api/chess/games',       // /:id appended at call site for one-game ops
   JOB_LOGS:             '/api/job-logs',   // /:lane/:jobId?since=<ms>&limit=80
   EXPORT:               '/api/export',     // POST { format, rows|content, title, filename }
 

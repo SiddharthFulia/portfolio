@@ -69,10 +69,18 @@ const Navbar = () => {
       accent: 'text-cyan-300',
       items: [
         { to: '/runner',     label: '🏃 Hand Runner',   desc: 'Subway-Surfers, hand-gesture-controlled' },
-        { to: '/lab',        label: 'Interactive Lab',  desc: '17 mini-demos · 7 categories' },
         { to: '/creative',   label: 'Creative UI',      desc: '13 UI experiments' },
+        { to: '/chess',      label: '♛ Chess Engine',  desc: 'Stockfish · clocks · saved games' },
+      ],
+    },
+    {
+      title: 'Others',
+      accent: 'text-emerald-300',
+      items: [
+        { to: '/lab',        label: 'Interactive Lab',  desc: '17 mini-demos · 7 categories' },
         { to: '/learn',      label: 'Learn DSA',        desc: 'Algorithms · system design · CP' },
-        { to: '/chess',      label: 'Chess Engine',     desc: 'Live engine visualiser' },
+        { to: '/science',    label: '🛰 NASA APIs',     desc: '11 modules · APOD · Mars · Asteroids' },
+        { to: '/explore',    label: '🌐 Public APIs',   desc: '9 modules · Pokémon · Memes · Countries' },
         { to: '/summarizer', label: '✂ Summarizer',    desc: 'Paste long text · get a tight summary' },
       ],
     },

@@ -525,6 +525,37 @@ export async function chessEngineStatus() {
     return { data: data?.data || data, error: null };
   } catch (err) { return { data: null, error: err.message }; }
 }
+// ─── Saved games library ──
+export async function chessSaveGame(payload) {
+  try {
+    const data = await post(ENDPOINTS.CHESS_GAMES, payload, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function chessListGames({ limit = 50, result } = {}) {
+  try {
+    const data = await get(ENDPOINTS.CHESS_GAMES, { limit, result }, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function chessLoadGame(id) {
+  try {
+    const data = await get(`${ENDPOINTS.CHESS_GAMES}/${id}`, {}, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function chessUpdateGame(id, body) {
+  try {
+    const data = await patch(`${ENDPOINTS.CHESS_GAMES}/${id}`, body, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function chessDeleteGame(id) {
+  try {
+    const data = await del(`${ENDPOINTS.CHESS_GAMES}/${id}`, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
 
 // ─── Unified live-log tail (added 2026-05) ────────────────────────
 // Cursor-based — pass the ts of the last log you've seen so the BE only
