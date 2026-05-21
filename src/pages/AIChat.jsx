@@ -14,6 +14,7 @@ import ChatSidebar from '../components/ChatSidebar'
 import ChatInput from '../components/ChatInput'
 import DownloadMenu from '../components/DownloadMenu'
 import MessageImage from '../components/MessageImage'
+import AmbientBlobs from '../components/luxe/AmbientBlobs'
 import {
   listLocalModels, createConversation, getConversation, sendChatMessage,
   getChatJobStatus, updateConversation,
@@ -506,8 +507,9 @@ const AIChat = () => {
 
   // ─── Render ─────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-black text-gray-100 pt-20">
-      <div className="flex">
+    <div className="min-h-screen luxe-stage text-gray-100 pt-20 relative">
+      <AmbientBlobs variant="subtle" />
+      <div className="relative flex">
         <ChatSidebar
           refreshKey={sidebarRefresh}
           onNewChat={handleNewChat}

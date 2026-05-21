@@ -13,6 +13,7 @@ import {
   promptCoach, imageBulkAction,
 } from '../api/ai'
 import { VaultLoginPanel, getVaultToken, setVaultToken } from '../components/VaultGate'
+import AmbientBlobs from '../components/luxe/AmbientBlobs'
 
 // localStorage key — persists the in-flight enhancement across refreshes
 const INFLIGHT_KEY = 'sid-imgenh-inflight'
@@ -711,7 +712,9 @@ export default function ImageEnhancer() {
   const status = job?.status
 
   return (
-    <div className="min-h-screen bg-black text-gray-100 pt-20 pb-16 px-3 sm:px-6">
+    <div className="min-h-screen luxe-stage text-gray-100 pt-20 pb-16 px-3 sm:px-6 relative">
+      <AmbientBlobs variant="cool" />
+      <div className="relative">
       <div className="max-w-5xl mx-auto">
         <header className="mb-8">
           <div className="flex items-start sm:items-center justify-between gap-3 mb-2 flex-wrap">
@@ -938,6 +941,7 @@ export default function ImageEnhancer() {
             </>
           )}
         </Modal>
+      </div>
       </div>
     </div>
   )
