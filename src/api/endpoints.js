@@ -63,6 +63,7 @@ export const ENDPOINTS = {
   CHESS_PLAY:           '/api/chess/play',
   CHESS_STATUS:         '/api/chess/status',
   CHESS_GAMES:          '/api/chess/games',       // /:id appended at call site for one-game ops
+  CHESS_COLLECTIONS:    '/api/chess/collections',
   CHESS_MATCHES:        '/api/chess/matches',     // /:id, /:id/join, /:id/move, /:id/resign appended at call site
   // Vault-gated admin dashboard
   ADMIN_SERVER_STATS:   '/api/admin/server-stats',

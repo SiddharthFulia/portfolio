@@ -556,6 +556,8 @@ export async function chessDeleteGame(id) {
     return { data: data?.data || data, error: null };
   } catch (err) { return { data: null, error: err.message }; }
 }
+export async function chessBulkSaveGames(games, collection) { try { const data = await post(`${ENDPOINTS.CHESS_GAMES}/bulk`, { games, collection }, { timeout: 30000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+export async function chessListCollections() { try { const data = await get(ENDPOINTS.CHESS_COLLECTIONS, {}, { timeout: 6000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 
 // ─── Unified live-log tail (added 2026-05) ────────────────────────
 // Cursor-based — pass the ts of the last log you've seen so the BE only
