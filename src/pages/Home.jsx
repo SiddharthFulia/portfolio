@@ -6,7 +6,7 @@ import { HomeInfo, Loader } from "../components";
 import { Bird, Island, Plane, Sky } from "../models";
 
 const STAGE_ROUTES = { 2: '/about', 3: '/projects', 4: '/contact' };
-const AUTO_NAV_DELAY = 5000; // 5 seconds
+const AUTO_NAV_DELAY = 3000; // 3 seconds — tighter pace through the island stages
 
 const Home = () => {
   const [currentStage, setCurrentStage] = useState(1);
@@ -193,10 +193,22 @@ const Home = () => {
           </div>
         </div>
 
-        {/* Subtle scroll cue at the bottom */}
-        <div className='absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2 text-gray-500 pointer-events-none'>
-          <span className='text-[10px] tracking-[0.25em] uppercase'>Scroll</span>
-          <span className='block w-px h-8 bg-gradient-to-b from-gray-500 to-transparent' />
+        {/* Scroll cue — readable but not loud. Animated chevron + a
+            small glow ring so it's hard to miss at first paint but
+            doesn't compete with the headline. */}
+        <div className='absolute bottom-10 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-3 pointer-events-none'>
+          <span className='text-[11px] tracking-[0.3em] uppercase text-gray-300/90 font-semibold'>
+            Scroll to explore
+          </span>
+          <div className='relative w-10 h-10 flex items-center justify-center'>
+            <span className='absolute inset-0 rounded-full border border-violet-400/40 animate-ping' />
+            <span className='absolute inset-1.5 rounded-full bg-violet-500/10 backdrop-blur-sm border border-violet-400/40' />
+            <svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor'
+              strokeWidth='2.5' strokeLinecap='round' strokeLinejoin='round'
+              className='relative text-violet-200 animate-bounce'>
+              <path d='M6 9l6 6 6-6' />
+            </svg>
+          </div>
         </div>
       </section>
 

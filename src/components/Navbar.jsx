@@ -43,13 +43,14 @@ const Navbar = () => {
   const featuredPills = [
     { to: '/ai-video',       label: 'AI Video',     color: 'from-cyan-500 via-purple-500 to-amber-500' },
     { to: '/image-enhancer', label: 'Image Studio', color: 'from-cyan-300 via-fuchsia-400 to-amber-300' },
-    { to: '/ai-studio',      label: '3D · AI',      color: 'from-violet-400 via-fuchsia-400 to-cyan-400' },
+    { to: '/3d',             label: '3D',           color: 'from-violet-400 via-fuchsia-400 to-cyan-400' },
     { to: '/ai',             label: 'AI Chat',      color: 'from-blue-500 to-cyan-500' },
   ];
 
   // More dropdown items — grouped logically.
   const moreLinks = [
     // AI / Creative lanes that didn't make the featured row
+    { to: '/ai-studio', label: 'AI Studio · Image+TTS+Vision' },
     { to: '/lipsync',  label: 'Lip Sync' },
     { to: '/audio',    label: 'Audio Studio' },
     { to: '/vision',   label: 'Vision AI' },
