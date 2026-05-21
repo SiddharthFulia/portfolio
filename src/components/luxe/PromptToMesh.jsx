@@ -19,7 +19,7 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { useGLTF, PresentationControls, Environment } from '@react-three/drei'
+import { useGLTF, OrbitControls, Environment } from '@react-three/drei'
 import * as THREE from 'three'
 import { submitMeshJob, getMeshStatus } from '../../api/ai'
 import notify from '../../utils/notify'
@@ -255,16 +255,21 @@ export default function PromptToMesh() {
                 <ambientLight intensity={0.55} />
                 <directionalLight position={[4, 6, 5]} intensity={1.2} color="#fde68a" />
                 <directionalLight position={[-4, -2, -3]} intensity={0.7} color="#a78bfa" />
-                {glbUrl && (
-                  <PresentationControls
-                    global
-                    snap
-                    polar={[-Math.PI / 3, Math.PI / 3]}
-                    azimuth={[-Math.PI, Math.PI]}
-                    config={{ mass: 1, tension: 220, friction: 24 }}>
-                    <GltfModel key={glbUrl} url={glbUrl} />
-                  </PresentationControls>
-                )}
+                {glbUrl && <GltfModel key={glbUrl} url={glbUrl} />}
+                {/* OrbitControls — free rotate (stays where dragged) + wheel /
+                    pinch zoom. enablePan=false keeps the mesh centered so the
+                    auto-scale framing isn't fought by accidental pans. zoom
+                    bounds protect against zooming into the GLB surface or
+                    flying out of the lit area. */}
+                <OrbitControls
+                  enablePan={false}
+                  enableZoom
+                  enableDamping
+                  dampingFactor={0.08}
+                  minDistance={1.2}
+                  maxDistance={8}
+                  autoRotate={false}
+                />
                 <Environment preset="city" />
               </Suspense>
             </Canvas>
@@ -282,7 +287,7 @@ export default function PromptToMesh() {
                 <span className={`w-1.5 h-1.5 rounded-full ${isWorking ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`} />
                 {isWorking
                   ? (status || 'working') + (jobId ? ` · ${jobId.slice(0, 8)}` : '')
-                  : (glbUrl ? 'Drag to rotate · 5090 mesh' : 'Idle')}
+                  : (glbUrl ? 'Drag to rotate · scroll to zoom' : 'Idle')}
               </span>
             </div>
           </div>

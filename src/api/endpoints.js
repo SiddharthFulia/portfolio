@@ -49,6 +49,10 @@ export const ENDPOINTS = {
   MESH_GENERATE:        '/api/mesh/generate',
   MESH_STATUS:          '/api/mesh/status',   // /:jobId appended at call site
   MESH_LIST:            '/api/mesh/list',
+  // Deepfake lane — Vault-gated (face-swap + voice-clone-of-anyone)
+  DEEPFAKE_GENERATE:    '/api/deepfake/generate',
+  DEEPFAKE_STATUS:      '/api/deepfake/status',
+  DEEPFAKE_LIST:        '/api/deepfake/list',
   JOB_LOGS:             '/api/job-logs',   // /:lane/:jobId?since=<ms>&limit=80
   EXPORT:               '/api/export',     // POST { format, rows|content, title, filename }
 

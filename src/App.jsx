@@ -29,6 +29,7 @@ const AIVideo = lazy(() => import("./pages/AIVideo"));
 const ImageEnhancer = lazy(() => import("./pages/ImageEnhancer"));
 const AIStudio = lazy(() => import("./pages/AIStudio"));
 const Dragon3D = lazy(() => import("./pages/Dragon3D"));
+const Deepfake = lazy(() => import("./pages/Deepfake"));
 const HandTracking = lazy(() => import("./pages/HandTracking"));
 const LipSync = lazy(() => import("./pages/LipSync"));
 const AudioStudio = lazy(() => import("./pages/AudioStudio"));
@@ -191,6 +192,8 @@ const App = () => {
           <Route path='/ai-studio'       element={<Suspense fallback={<DarkPageSkeleton />}><AIStudio /></Suspense>} />
           <Route path='/3d'              element={<Suspense fallback={<DarkPageSkeleton />}><Dragon3D /></Suspense>} />
           <Route path='/dragon'          element={<Suspense fallback={<DarkPageSkeleton />}><Dragon3D /></Suspense>} />
+          {/* Vault-gated lane — VaultGate inside the page handles the auth bounce. */}
+          <Route path='/deepfake'        element={<RouteErrorBoundary><Suspense fallback={<DarkPageSkeleton />}><Deepfake /></Suspense></RouteErrorBoundary>} />
           <Route path='/hand'            element={<Suspense fallback={<DarkPageSkeleton />}><HandTracking /></Suspense>} />
           <Route path='/hands'           element={<Suspense fallback={<DarkPageSkeleton />}><HandTracking /></Suspense>} />
           <Route path='/draw'            element={<Suspense fallback={<DarkPageSkeleton />}><HandTracking /></Suspense>} />

@@ -449,6 +449,29 @@ export async function listMeshJobs({ status = 'completed', visibility = 'public'
   } catch (err) { return { data: null, error: err.message }; }
 }
 
+// ─── Deepfake lane (Vault-gated) ──────────────────────────────────
+// All three endpoints require a valid Vault JWT in Authorization. request.js
+// auto-attaches `sid-vault-token` if present; if missing/expired the BE
+// returns 401 with code: 'VAULT_REQUIRED' which the FE listens for.
+export async function submitDeepfakeJob(payload = {}) {
+  try {
+    const data = await post(ENDPOINTS.DEEPFAKE_GENERATE, payload, { timeout: 60000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message, status: err.status }; }
+}
+export async function getDeepfakeStatus(jobId) {
+  try {
+    const data = await get(`${ENDPOINTS.DEEPFAKE_STATUS}/${jobId}`, {}, { timeout: 6000 });
+    return { data: data?.data || null, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function listDeepfakeJobs({ status, kind, limit = 24 } = {}) {
+  try {
+    const data = await get(ENDPOINTS.DEEPFAKE_LIST, { status, kind, limit }, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+
 // ─── Unified live-log tail (added 2026-05) ────────────────────────
 // Cursor-based — pass the ts of the last log you've seen so the BE only
 // returns new lines. Cheap enough to poll every 1.5s during a job without
