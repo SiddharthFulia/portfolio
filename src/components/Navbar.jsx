@@ -67,6 +67,7 @@ const Navbar = () => {
       title: 'Play',
       accent: 'text-cyan-300',
       items: [
+        { to: '/runner',   label: '🏃 Hand Runner',   desc: 'Subway-Surfers, hand-gesture-controlled' },
         { to: '/lab',      label: 'Interactive Lab', desc: '17 mini-demos · 7 categories' },
         { to: '/creative', label: 'Creative UI',     desc: '13 UI experiments' },
         { to: '/learn',    label: 'Learn DSA',       desc: 'Algorithms · system design · CP' },
