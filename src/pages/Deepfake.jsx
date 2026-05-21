@@ -4,6 +4,7 @@ import { UploadOutlined, ThunderboltOutlined, DownloadOutlined, SyncOutlined, Lo
 import VaultGate from '../components/VaultGate'
 import AudioRecorder from '../components/AudioRecorder'
 import CameraCapture from '../components/CameraCapture'
+import VoiceCloneAnalysis from '../components/VoiceCloneAnalysis'
 import JobLogsAgentPlan from '../components/JobLogsAgentPlan'
 import { submitDeepfakeJob, getDeepfakeStatus, listDeepfakeJobs, fileToDataUrl } from '../api/ai'
 
@@ -305,6 +306,12 @@ function DeepfakeInner() {
                     <DownloadOutlined /> Download
                   </a>
                 </div>
+                {/* Comparison card — before/after stats + inline waveforms */}
+                <VoiceCloneAnalysis
+                  analysis={job?.analysis}
+                  referenceUrl={job?.sourceUrl}
+                  outputUrl={outputUrl}
+                />
               </>
             )
           ) : working ? (

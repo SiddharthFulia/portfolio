@@ -7,6 +7,7 @@ import PromptHelper from '../components/PromptHelper'
 import { useTilt, TILT_STYLE } from '../components/useTilt'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
 import AudioRecorder from '../components/AudioRecorder'
+import VoiceCloneAnalysis from '../components/VoiceCloneAnalysis'
 
 const KINDS = [
   { value: 'music',        label: '🎵 Music',            blurb: 'Background tracks, soundtracks, loops. Best for video soundtracks.',  defaultModel: 'musicgen' },
@@ -765,6 +766,16 @@ export default function AudioStudio() {
                   <DownloadOutlined /> Download
                 </a>
               </div>
+              {/* Voice-clone analysis card — only renders when the row
+                  carries an `analysis` JSON (i.e. voice-clone / voice-sing
+                  kinds; music/sfx/tts/stt rows don't have it). */}
+              {(job.kind === 'voice-clone' || job.kind === 'voice-sing') && job.analysis && (
+                <VoiceCloneAnalysis
+                  analysis={job.analysis}
+                  referenceUrl={job.sourceUrl}
+                  outputUrl={job.outputUrl}
+                />
+              )}
             </>
           ) : working ? (
             <div className="py-6 flex flex-col items-center gap-2">
