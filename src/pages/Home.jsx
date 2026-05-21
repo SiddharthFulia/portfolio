@@ -139,19 +139,14 @@ const Home = () => {
           />
         </svg>
 
-        {/* Top brand pill (left) + nav row (right) */}
-        <div className='absolute top-6 left-0 right-0 z-20 flex items-center justify-between px-6 sm:px-10 lg:px-16'>
+        {/* Brand pill only. The site-wide Navbar (top of page) already
+            shows About / Work / AI / etc. — duplicating them here just
+            made the header noisy. */}
+        <div className='absolute top-24 left-0 right-0 z-20 flex items-center px-6 sm:px-10 lg:px-16'>
           <div className='luxe-pill'>
             <span className='inline-block w-1.5 h-1.5 rounded-full bg-violet-400 shadow-[0_0_8px_rgba(139,92,246,0.8)]' />
             Sid · Engineer
           </div>
-          <nav className='hidden md:flex items-center gap-1'>
-            <button onClick={() => navigate('/about')}    className='luxe-btn luxe-btn-ghost'>About</button>
-            <button onClick={() => navigate('/projects')} className='luxe-btn luxe-btn-ghost'>Work</button>
-            <button onClick={() => navigate('/lab')}      className='luxe-btn luxe-btn-ghost'>Lab</button>
-            <button onClick={() => navigate('/ai')}       className='luxe-btn luxe-btn-ghost'>AI</button>
-            <button onClick={() => navigate('/contact')}  className='luxe-btn luxe-btn-ghost'>Contact</button>
-          </nav>
         </div>
 
         {/* Hero content */}

@@ -5,7 +5,7 @@ import sakura from "../assets/sakura.mp3";
 
 const Navbar = () => {
   const { pathname } = useLocation();
-  const isDark = ['/lab', '/learn', '/creative', '/chess', '/science', '/face', '/vision', '/explore', '/ai', '/studio', '/ai-video', '/video', '/image-enhancer', '/enhance', '/hand', '/hands', '/draw', '/lipsync', '/audio', '/cinema'].some(r => pathname.startsWith(r));
+  const isDark = ['/lab', '/learn', '/creative', '/chess', '/science', '/face', '/vision', '/explore', '/ai', '/studio', '/ai-studio', '/ai-video', '/video', '/image-enhancer', '/enhance', '/hand', '/hands', '/draw', '/lipsync', '/audio', '/cinema', '/about', '/projects', '/contact'].some(r => pathname.startsWith(r));
 
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
@@ -37,22 +37,24 @@ const Navbar = () => {
     { to: '/contact', label: 'Contact' },
   ];
 
-  // Featured pills — AI studio stuff up front; Science/Explore moved into the More dropdown
-  // so the top bar doesn't overflow with the new Lip Sync / Audio / Cinema lanes.
+  // Featured pills — slimmed down to the 4 flagship AI lanes. The
+  // long bar with every studio was overflowing on lg viewports; the
+  // rest live in the More dropdown grouped by category.
   const featuredPills = [
     { to: '/ai-video',       label: 'AI Video',     color: 'from-cyan-500 via-purple-500 to-amber-500' },
     { to: '/image-enhancer', label: 'Image Studio', color: 'from-cyan-300 via-fuchsia-400 to-amber-300' },
-    { to: '/lipsync',        label: 'Lip Sync',     color: 'from-emerald-400 via-cyan-400 to-fuchsia-400' },
-    { to: '/audio',          label: 'Audio',        color: 'from-fuchsia-400 via-amber-400 to-emerald-400' },
-    // Cinema is now a tab inside AI Video — the old /cinema route
-    // redirects to /ai-video?tab=cinema, so no top-level pill needed.
+    { to: '/ai-studio',      label: '3D · AI',      color: 'from-violet-400 via-fuchsia-400 to-cyan-400' },
     { to: '/ai',             label: 'AI Chat',      color: 'from-blue-500 to-cyan-500' },
-    { to: '/vision',         label: 'Vision AI',    color: 'from-purple-500 to-pink-600' },
-    { to: '/hand',           label: 'Hand Tracking', color: 'from-cyan-400 via-violet-400 to-fuchsia-500' },
   ];
 
-  // More dropdown items — Science/Explore moved here, plus the existing demos
+  // More dropdown items — grouped logically.
   const moreLinks = [
+    // AI / Creative lanes that didn't make the featured row
+    { to: '/lipsync',  label: 'Lip Sync' },
+    { to: '/audio',    label: 'Audio Studio' },
+    { to: '/vision',   label: 'Vision AI' },
+    { to: '/hand',     label: 'Hand Tracking · 50 filters' },
+    // Explore / learn / play
     { to: '/science',  label: 'Science · NASA APIs' },
     { to: '/explore',  label: 'Explore · Public APIs' },
     { to: '/lab',      label: 'Interactive Lab' },

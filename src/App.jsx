@@ -26,6 +26,7 @@ const ExploreModule = lazy(() => import("./pages/ExploreModule"));
 const AIChat = lazy(() => import("./pages/AIChat"));
 const AIVideo = lazy(() => import("./pages/AIVideo"));
 const ImageEnhancer = lazy(() => import("./pages/ImageEnhancer"));
+const AIStudio = lazy(() => import("./pages/AIStudio"));
 const HandTracking = lazy(() => import("./pages/HandTracking"));
 const LipSync = lazy(() => import("./pages/LipSync"));
 const AudioStudio = lazy(() => import("./pages/AudioStudio"));
@@ -185,6 +186,7 @@ const App = () => {
           <Route path='/image-enhancer'  element={<Suspense fallback={<DarkPageSkeleton />}><ImageEnhancer /></Suspense>} />
           <Route path='/image-enhancer/:id' element={<Suspense fallback={<DarkPageSkeleton />}><ImageEnhancerDetail /></Suspense>} />
           <Route path='/enhance'         element={<Suspense fallback={<DarkPageSkeleton />}><ImageEnhancer /></Suspense>} />
+          <Route path='/ai-studio'       element={<Suspense fallback={<DarkPageSkeleton />}><AIStudio /></Suspense>} />
           <Route path='/hand'            element={<Suspense fallback={<DarkPageSkeleton />}><HandTracking /></Suspense>} />
           <Route path='/hands'           element={<Suspense fallback={<DarkPageSkeleton />}><HandTracking /></Suspense>} />
           <Route path='/draw'            element={<Suspense fallback={<DarkPageSkeleton />}><HandTracking /></Suspense>} />
