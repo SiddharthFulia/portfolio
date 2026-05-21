@@ -859,7 +859,7 @@ export default function ImageEnhancer() {
               // page; consolidated here so the Image Studio is the
               // one-stop image lane.
               key: 'vision',
-              label: <span>👁 Vision AI</span>,
+              label: <span>👁 Explain Image</span>,
               children: <VisionAI />,
             },
           ]}
