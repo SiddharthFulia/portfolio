@@ -71,7 +71,13 @@ const LipsyncDetail = lazyWithReload(() => import("./pages/LipsyncDetail"));
 const AudioDetail = lazyWithReload(() => import("./pages/AudioDetail"));
 const CinemaDetail = lazyWithReload(() => import("./pages/CinemaDetail"));
 
-/* ── Skeleton building blocks ── */
+/* ── Skeleton building blocks ──
+ * The legacy hand-rolled pulse blocks (Light/Dark/Science/etc) are
+ * still referenced below for safety, but every Suspense fallback now
+ * uses the antd-Skeleton-based <PageLoader /> for a polished animated
+ * placeholder. Old skeletons can be removed in a follow-up cleanup.
+ */
+import PageLoader from './components/PageLoader';
 const B = "animate-pulse bg-slate-200 rounded";
 const BD = "animate-pulse bg-gray-800 rounded";
 
@@ -215,57 +221,61 @@ const App = () => {
         <Navbar />
         <RoutesWithBoundary>
         <Routes>
-          <Route path='/' element={<Suspense fallback={<HomeSkeleton />}><Home /></Suspense>} />
-          <Route path='/about' element={<Suspense fallback={<LightPageSkeleton />}><About /></Suspense>} />
-          <Route path='/projects' element={<Suspense fallback={<LightPageSkeleton />}><Projects /></Suspense>} />
-          <Route path='/contact' element={<Suspense fallback={<ContactSkeleton />}><Contact /></Suspense>} />
-          <Route path='/lab' element={<Suspense fallback={<DarkPageSkeleton />}><Lab /></Suspense>} />
-          <Route path='/learn' element={<Suspense fallback={<DarkPageSkeleton />}><Learn /></Suspense>} />
-          <Route path='/creative' element={<Suspense fallback={<DarkPageSkeleton />}><Creative /></Suspense>} />
+          <Route path='/' element={<Suspense fallback={<PageLoader variant="home" />}><Home /></Suspense>} />
+          <Route path='/about' element={<Suspense fallback={<PageLoader />}><About /></Suspense>} />
+          <Route path='/projects' element={<Suspense fallback={<PageLoader />}><Projects /></Suspense>} />
+          <Route path='/contact' element={<Suspense fallback={<PageLoader />}><Contact /></Suspense>} />
+          <Route path='/lab' element={<Suspense fallback={<PageLoader />}><Lab /></Suspense>} />
+          <Route path='/learn' element={<Suspense fallback={<PageLoader />}><Learn /></Suspense>} />
+          <Route path='/creative' element={<Suspense fallback={<PageLoader />}><Creative /></Suspense>} />
           {/* /chess — new Stockfish-backed page. Old custom-engine version
               still reachable at /chess-classic in case the new one needs
               triage during deploy. */}
-          <Route path='/chess'         element={<Suspense fallback={<DarkPageSkeleton />}><ChessPage /></Suspense>} />
-          <Route path='/chess-classic' element={<Suspense fallback={<DarkPageSkeleton />}><ChessViz /></Suspense>} />
-          <Route path='/science' element={<Suspense fallback={<ScienceSkeleton />}><Science /></Suspense>} />
-          <Route path='/science/:module' element={<Suspense fallback={<ScienceModuleSkeleton />}><ScienceModule /></Suspense>} />
-          <Route path='/vision' element={<Suspense fallback={<DarkPageSkeleton />}><FaceDetection /></Suspense>} />
-          <Route path='/face' element={<Suspense fallback={<DarkPageSkeleton />}><FaceDetection /></Suspense>} />
-          <Route path='/explore' element={<Suspense fallback={<DarkPageSkeleton />}><Explore /></Suspense>} />
-          <Route path='/explore/:module' element={<Suspense fallback={<DarkPageSkeleton />}><ExploreModule /></Suspense>} />
-          <Route path='/ai' element={<Suspense fallback={<DarkPageSkeleton />}><AIChat /></Suspense>} />
-          <Route path='/ai/:chatId' element={<Suspense fallback={<DarkPageSkeleton />}><AIChat /></Suspense>} />
+          <Route path='/chess'         element={<Suspense fallback={<PageLoader />}><ChessPage /></Suspense>} />
+          <Route path='/chess-classic' element={<Suspense fallback={<PageLoader />}><ChessViz /></Suspense>} />
+          <Route path='/science' element={<Suspense fallback={<PageLoader />}><Science /></Suspense>} />
+          <Route path='/science/:module' element={<Suspense fallback={<PageLoader />}><ScienceModule /></Suspense>} />
+          <Route path='/vision' element={<Suspense fallback={<PageLoader />}><FaceDetection /></Suspense>} />
+          <Route path='/face' element={<Suspense fallback={<PageLoader />}><FaceDetection /></Suspense>} />
+          <Route path='/explore' element={<Suspense fallback={<PageLoader />}><Explore /></Suspense>} />
+          <Route path='/explore/:module' element={<Suspense fallback={<PageLoader />}><ExploreModule /></Suspense>} />
+          <Route path='/ai' element={<Suspense fallback={<PageLoader />}><AIChat /></Suspense>} />
+          <Route path='/ai/:chatId' element={<Suspense fallback={<PageLoader />}><AIChat /></Suspense>} />
           {/* AI Video + Image Studio are fully public. Generate / browse / delete
               are all open. Only the "Save to Vault" toggle on the create UI
               prompts for the password (handled inline in each page). */}
-          <Route path='/ai-video'        element={<Suspense fallback={<AIVideoSkeleton />}><AIVideo /></Suspense>} />
-          <Route path='/ai-video/:id'    element={<Suspense fallback={<DarkPageSkeleton />}><AIVideoDetail /></Suspense>} />
-          <Route path='/video'           element={<Suspense fallback={<AIVideoSkeleton />}><AIVideo /></Suspense>} />
-          <Route path='/image-enhancer'  element={<Suspense fallback={<DarkPageSkeleton />}><ImageEnhancer /></Suspense>} />
-          <Route path='/image-enhancer/:id' element={<Suspense fallback={<DarkPageSkeleton />}><ImageEnhancerDetail /></Suspense>} />
-          <Route path='/enhance'         element={<Suspense fallback={<DarkPageSkeleton />}><ImageEnhancer /></Suspense>} />
-          <Route path='/ai-studio'       element={<Suspense fallback={<DarkPageSkeleton />}><AIStudio /></Suspense>} />
-          <Route path='/3d'              element={<Suspense fallback={<DarkPageSkeleton />}><Dragon3D /></Suspense>} />
-          <Route path='/dragon'          element={<Suspense fallback={<DarkPageSkeleton />}><Dragon3D /></Suspense>} />
+          <Route path='/ai-video'        element={<Suspense fallback={<PageLoader />}><AIVideo /></Suspense>} />
+          <Route path='/ai-video/:id'    element={<Suspense fallback={<PageLoader />}><AIVideoDetail /></Suspense>} />
+          <Route path='/video'           element={<Suspense fallback={<PageLoader />}><AIVideo /></Suspense>} />
+          <Route path='/image-enhancer'  element={<Suspense fallback={<PageLoader />}><ImageEnhancer /></Suspense>} />
+          <Route path='/image-enhancer/:id' element={<Suspense fallback={<PageLoader />}><ImageEnhancerDetail /></Suspense>} />
+          <Route path='/enhance'         element={<Suspense fallback={<PageLoader />}><ImageEnhancer /></Suspense>} />
+          <Route path='/ai-studio'       element={<Suspense fallback={<PageLoader />}><AIStudio /></Suspense>} />
+          <Route path='/3d'              element={<Suspense fallback={<PageLoader />}><Dragon3D /></Suspense>} />
+          <Route path='/dragon'          element={<Suspense fallback={<PageLoader />}><Dragon3D /></Suspense>} />
           {/* Vault-gated lane — VaultGate inside the page handles the auth bounce. */}
-          <Route path='/deepfake'        element={<Suspense fallback={<DarkPageSkeleton />}><Deepfake /></Suspense>} />
+          <Route path='/deepfake'        element={<Suspense fallback={<PageLoader />}><Deepfake /></Suspense>} />
           {/* Hand-gesture endless runner — MediaPipe + Three.js */}
-          <Route path='/runner'          element={<Suspense fallback={<DarkPageSkeleton />}><Runner /></Suspense>} />
-          <Route path='/game'            element={<Suspense fallback={<DarkPageSkeleton />}><Runner /></Suspense>} />
-          <Route path='/summarizer'      element={<Suspense fallback={<DarkPageSkeleton />}><SummarizerPage /></Suspense>} />
-          <Route path='/hand'            element={<Suspense fallback={<DarkPageSkeleton />}><HandTracking /></Suspense>} />
-          <Route path='/hands'           element={<Suspense fallback={<DarkPageSkeleton />}><HandTracking /></Suspense>} />
-          <Route path='/draw'            element={<Suspense fallback={<DarkPageSkeleton />}><HandTracking /></Suspense>} />
+          <Route path='/runner'          element={<Suspense fallback={<PageLoader />}><Runner /></Suspense>} />
+          <Route path='/game'            element={<Suspense fallback={<PageLoader />}><Runner /></Suspense>} />
+          <Route path='/summarizer'      element={<Suspense fallback={<PageLoader />}><SummarizerPage /></Suspense>} />
+          <Route path='/hand'            element={<Suspense fallback={<PageLoader />}><HandTracking /></Suspense>} />
+          <Route path='/hands'           element={<Suspense fallback={<PageLoader />}><HandTracking /></Suspense>} />
+          <Route path='/draw'            element={<Suspense fallback={<PageLoader />}><HandTracking /></Suspense>} />
           {/* Tier 3 Studio lanes — Lip Sync / Audio / Cinema */}
-          <Route path='/lipsync'         element={<Suspense fallback={<DarkPageSkeleton />}><LipSync /></Suspense>} />
-          <Route path='/lipsync/:id'     element={<Suspense fallback={<DarkPageSkeleton />}><LipsyncDetail /></Suspense>} />
-          <Route path='/audio'           element={<Suspense fallback={<DarkPageSkeleton />}><AudioStudio /></Suspense>} />
-          <Route path='/audio/:id'       element={<Suspense fallback={<DarkPageSkeleton />}><AudioDetail /></Suspense>} />
-          <Route path='/audio-studio'    element={<Suspense fallback={<DarkPageSkeleton />}><AudioStudio /></Suspense>} />
+          <Route path='/lipsync'         element={<Suspense fallback={<PageLoader />}><LipSync /></Suspense>} />
+          <Route path='/lipsync/:id'     element={<Suspense fallback={<PageLoader />}><LipsyncDetail /></Suspense>} />
+          <Route path='/audio'           element={<Suspense fallback={<PageLoader />}><AudioStudio /></Suspense>} />
+          <Route path='/audio/:id'       element={<Suspense fallback={<PageLoader />}><AudioDetail /></Suspense>} />
+          <Route path='/audio-studio'    element={<Suspense fallback={<PageLoader />}><AudioStudio /></Suspense>} />
           {/* Cinema lives inside AI Video as a tab now — redirect the
               standalone /cinema URL so old links still resolve. */}
           <Route path='/cinema' element={<Navigate to="/ai-video?tab=cinema" replace />} />
-          <Route path='/cinema/:id' element={<Suspense fallback={<DarkPageSkeleton />}><CinemaDetail /></Suspense>} />
+          <Route path='/cinema/:id' element={<Suspense fallback={<PageLoader />}><CinemaDetail /></Suspense>} />
+          {/* Catch-all — any unknown URL bounces to home instead of 404.
+              Visitors fat-fingering /settngs or /chses end up somewhere
+              real instead of staring at a blank page. */}
+          <Route path='*' element={<Navigate to='/' replace />} />
         </Routes>
         </RoutesWithBoundary>
         <ConditionalFooter />
