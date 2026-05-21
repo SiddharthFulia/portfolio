@@ -37,6 +37,12 @@ const DIFFICULTIES = {
 // One unit of frontend distance ≈ 1 meter for the purposes of scoring.
 // 1 point per meter + 50 per coin.
 const COIN_VALUE = 50
+// Y height a character sits at when riding on top of a train (top of the
+// 2.4-unit train + a small offset). Reached via a ramp.
+const TRAIN_TOP_Y = 2.5
+// How long after losing train-support to keep the character elevated — gives
+// "leap from one train onto the next" a generous window before dropping.
+const ELEVATED_GRACE_S = 0.25
 
 export default function Runner() {
   // ── App-level (menu, player, leaderboard) ──
@@ -54,6 +60,11 @@ export default function Runner() {
   const [speed, setSpeed] = useState(0)
   const [revived, setRevived] = useState(false)
   const [reviveAvailable, setReviveAvailable] = useState(true)
+  // Floating coin pickups — rendered as DOM overlays so we don't burn a
+  // Three.js draw call per popup. Each one auto-removes after 800ms.
+  const [scorePops, setScorePops] = useState([])
+  // Combo counter (consecutive coin pickups within 1.2s) — multiplies score.
+  const [combo, setCombo] = useState(0)
 
   // ── Refs shared by Three.js + hand loop ──
   const containerRef = useRef(null)
@@ -251,13 +262,24 @@ export default function Runner() {
       jumpY: 0,
       rolling: false,
       rollTimer: 0,
+      // Elevated state — running on top of a train after hitting a ramp.
+      // While elevated, character Y locks to TRAIN_TOP_Y; train-tops below
+      // are harmless. Drops back down when no train is under the character.
+      elevated: false,
+      elevatedTimer: 0,        // grace seconds to "land" on next train
       // Obstacles
       obstacles: [],
       coins: [],
+      // Floating "+50" / combo popups (DOM, driven by React state)
+      collectedCoins: 0,
+      coinCombo: 0,
+      lastCoinAt: 0,
+      // Per-row spawn cadence
       nextSpawnAt: 0,
       // Misc
       alive: true,
       lastTs: performance.now(),
+      shakeUntil: 0,           // screen-shake timestamp (ms)
     }
     gameRef.current = g
     setScore(g.score); setDistance(g.distance); setSpeed(diff.speed)
@@ -296,7 +318,24 @@ export default function Runner() {
       g.jumpY += g.jumpVel * dt
       if (g.jumpY < 0) { g.jumpY = 0; g.jumpVel = 0 }
     }
-    g.charGroup.position.y = g.jumpY
+    // Elevated (riding-on-train) state — if no train below us, start dropping.
+    // Grace timer lets the player jump between adjacent train tops.
+    if (g.elevated) {
+      const hasTrainBelow = g.obstacles.some(o =>
+        (o.kind === 'train') && o.lane === g.targetLane &&
+        o.mesh.position.z > -8 && o.mesh.position.z < 8
+      )
+      if (hasTrainBelow) {
+        g.elevatedTimer = ELEVATED_GRACE_S
+      } else {
+        g.elevatedTimer -= dt
+        if (g.elevatedTimer <= 0) {
+          g.elevated = false
+          g.jumpVel = -2   // small downward velocity so the drop reads as a fall
+        }
+      }
+    }
+    g.charGroup.position.y = (g.elevated ? TRAIN_TOP_Y : 0) + g.jumpY
 
     // ── Roll timer + visual squash ──
     if (g.rolling) {
@@ -332,7 +371,10 @@ export default function Runner() {
 
     for (let i = g.obstacles.length - 1; i >= 0; i--) {
       const o = g.obstacles[i]
-      o.mesh.position.z += moved
+      // Oncoming trains move TOWARD camera FASTER than the world scroll.
+      // Everything else just rides the world scroll.
+      const dz = o.kind === 'oncoming' ? moved * (1 + (o.extraSpeed || 0.9)) : moved
+      o.mesh.position.z += dz
       if (o.mesh.position.z > 8) {
         g.scene.remove(o.mesh); o.mesh.geometry.dispose(); o.mesh.material.dispose()
         g.obstacles.splice(i, 1)
@@ -341,9 +383,21 @@ export default function Runner() {
       // Collision — only if same lane band and within range
       const ob = new THREE.Box3().setFromObject(o.mesh)
       if (charBox.intersectsBox(ob)) {
+        // Ramp — launches the player up onto train-top height. Continues
+        // running at TRAIN_TOP_Y until they leave the ride.
+        if (o.kind === 'ramp') {
+          g.elevated = true
+          g.elevatedTimer = ELEVATED_GRACE_S
+          g.jumpVel = 6   // small hop adds visual flair as we leave the ramp
+          continue
+        }
         // Allow jump over BARRIER (low), roll under OVERHANG (high)
         if (o.kind === 'barrier' && g.jumpY > 0.8) continue
         if (o.kind === 'overhang' && g.rolling)   continue
+        // Riding on top of a train — passes through the rest of that train
+        if (o.kind === 'train' && g.elevated) continue
+        // Otherwise: collision → game over (with a brief screen shake).
+        g.shakeUntil = g.lastTs + 600
         return gameOver()
       }
     }
@@ -362,8 +416,45 @@ export default function Runner() {
       if (charBox.intersectsBox(cb)) {
         g.scene.remove(c.mesh); c.mesh.geometry.dispose(); c.mesh.material.dispose()
         g.coins.splice(i, 1)
-        g.collectedCoins += 1
+        const worth = c.bonus ? 2 : 1
+        g.collectedCoins += worth
+        // Combo: consecutive pickups within 1.2s stack a small multiplier
+        const sinceLast = (g.lastCoinAt && g.lastTs - g.lastCoinAt < 1200)
+        g.coinCombo = sinceLast ? g.coinCombo + 1 : 1
+        g.lastCoinAt = g.lastTs
+        // Emit a DOM popup at the screen position of the coin so it floats
+        // up above the player. Throttled by id; React state batches.
+        const pop = {
+          id: `${g.lastTs}-${i}-${Math.random().toString(36).slice(2, 6)}`,
+          value: COIN_VALUE * worth,
+          combo: g.coinCombo > 1 ? g.coinCombo : null,
+          bonus: !!c.bonus,
+        }
+        setScorePops(prev => [...prev.slice(-5), pop])
+        setCombo(g.coinCombo)
+        // Auto-remove the popup after the CSS animation finishes (800ms).
+        setTimeout(() => {
+          setScorePops(prev => prev.filter(p => p.id !== pop.id))
+        }, 800)
       }
+    }
+    // Combo decay — reset combo display after 1.2s of no pickups.
+    if (combo > 0 && g.lastCoinAt && g.lastTs - g.lastCoinAt > 1200) {
+      g.coinCombo = 0
+      setCombo(0)
+    }
+
+    // ── Screen shake on impact ──
+    // Brief camera-rattle when shakeUntil is in the future. Decays over time.
+    if (g.shakeUntil && g.lastTs < g.shakeUntil) {
+      const t = (g.shakeUntil - g.lastTs) / 600
+      const amp = 0.15 * t
+      g.camera.position.x = (Math.random() - 0.5) * amp
+      g.camera.position.y = 4.5 + (Math.random() - 0.5) * amp
+    } else if (g.camera.position.x !== 0 || g.camera.position.y !== 4.5) {
+      g.camera.position.x = 0
+      g.camera.position.y = 4.5
+      g.camera.lookAt(0, 1.2, 0)
     }
 
     // ── Render ──
@@ -380,9 +471,105 @@ export default function Runner() {
     rafGameRef.current = requestAnimationFrame(gameLoop)
   }
 
+  // Extracted single-obstacle spawn so the row generator + combo generator
+  // share the same train/barrier/overhang/crate shapes.
+  const _spawnSingle = (g, lane, kind) => {
+    let mesh
+    if (kind === 'train') {
+      mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(1.7, 2.4, 6),
+        new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0x7f1d1d, emissiveIntensity: 0.2 }),
+      )
+      mesh.position.set(LANE_X[lane], 1.2, -60)
+    } else if (kind === 'barrier') {
+      mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(1.8, 0.8, 0.6),
+        new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xd97706, emissiveIntensity: 0.3 }),
+      )
+      mesh.position.set(LANE_X[lane], 0.4, -60)
+    } else {   // overhang
+      mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(1.8, 0.5, 0.6),
+        new THREE.MeshStandardMaterial({ color: 0xa78bfa, emissive: 0x6d28d9, emissiveIntensity: 0.35 }),
+      )
+      mesh.position.set(LANE_X[lane], 1.8, -60)
+    }
+    mesh.castShadow = true
+    g.scene.add(mesh)
+    g.obstacles.push({ mesh, kind, lane })
+  }
+
   // ── Spawning helpers ──
+  // 6 obstacle types now:
+  //   train    — blocks full lane, dodge or RAMP onto top
+  //   barrier  — low, jump over
+  //   overhang — high, roll under
+  //   ramp     — angled wedge IN FRONT of a train, hop on top for bonus coins
+  //   oncoming — train coming the OPPOSITE direction, approaches FAST (must dodge)
+  //   crate    — small obstacle, jump or change lane (filler)
   const spawnObstacleRow = (g) => {
-    // Pick how many of the 3 lanes to block (1 or 2; never all)
+    // 18% chance to spawn a "ramp + train" combo — visually obvious "ride on top".
+    if (Math.random() < 0.18) {
+      const lane = Math.floor(Math.random() * 3)
+      // Ramp: triangular wedge sloping up
+      const rampGeo = new THREE.BoxGeometry(1.4, 0.4, 3)
+      const ramp = new THREE.Mesh(
+        rampGeo,
+        new THREE.MeshStandardMaterial({ color: 0x10b981, emissive: 0x059669, emissiveIntensity: 0.45, metalness: 0.6, roughness: 0.3 }),
+      )
+      ramp.position.set(LANE_X[lane], 0.2, -56)
+      ramp.rotation.x = -0.45   // tilt upward toward player
+      ramp.castShadow = true
+      g.scene.add(ramp)
+      g.obstacles.push({ mesh: ramp, kind: 'ramp', lane })
+      // Train RIGHT BEHIND the ramp (further along the negative Z), so the
+      // player launches off the ramp and lands on top of this train.
+      const trainTop = new THREE.Mesh(
+        new THREE.BoxGeometry(1.7, 2.4, 7),
+        new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xb45309, emissiveIntensity: 0.25, metalness: 0.5, roughness: 0.4 }),
+      )
+      trainTop.position.set(LANE_X[lane], 1.2, -64)
+      trainTop.castShadow = true
+      g.scene.add(trainTop)
+      g.obstacles.push({ mesh: trainTop, kind: 'train', lane, ridable: true })
+      // Coins ON TOP of the train as the reward for ramping up
+      for (let k = 0; k < 4; k++) {
+        const coin = new THREE.Mesh(
+          new THREE.TorusGeometry(0.25, 0.08, 12, 24),
+          new THREE.MeshStandardMaterial({ color: 0xfde047, emissive: 0xfacc15, emissiveIntensity: 0.7, metalness: 0.8, roughness: 0.2 }),
+        )
+        coin.rotation.x = Math.PI / 2
+        coin.position.set(LANE_X[lane], TRAIN_TOP_Y + 0.6, -62 - k * 1.4)
+        g.scene.add(coin)
+        g.coins.push({ mesh: coin, bonus: true })   // bonus coin = 2× score
+      }
+      // Plain obstacle on one of the other lanes so the player can't just sit centre
+      const filler = ((lane + 1 + Math.floor(Math.random() * 2)) % 3)
+      _spawnSingle(g, filler, ['barrier', 'overhang'][Math.floor(Math.random() * 2)])
+      return
+    }
+
+    // 14% chance: oncoming train — spawns FAR back, moves toward camera FASTER
+    // than the world scroll, so it whooshes past on a single lane. Must dodge.
+    if (Math.random() < 0.14) {
+      const lane = Math.floor(Math.random() * 3)
+      const onc = new THREE.Mesh(
+        new THREE.BoxGeometry(1.7, 2.4, 8),
+        new THREE.MeshStandardMaterial({ color: 0x06b6d4, emissive: 0x0891b2, emissiveIntensity: 0.55, metalness: 0.6, roughness: 0.3 }),
+      )
+      onc.position.set(LANE_X[lane], 1.2, -110)
+      onc.castShadow = true
+      g.scene.add(onc)
+      g.obstacles.push({
+        mesh: onc, kind: 'oncoming', lane,
+        // Custom extra speed — moves toward camera (positive Z) faster than
+        // the world scroll. World scroll is `+moved`; oncoming gets +moved*0.9.
+        extraSpeed: 0.9,
+      })
+      return
+    }
+
+    // Default mix — 1-2 obstacles per row
     const lanes = [0, 1, 2]
     const blockCount = Math.random() < 0.4 ? 2 : 1
     const blocked = []
@@ -392,35 +579,8 @@ export default function Runner() {
     }
     for (const lane of blocked) {
       const r = Math.random()
-      let mesh, kind
-      if (r < 0.45) {
-        // Train — full lane, must change lane
-        mesh = new THREE.Mesh(
-          new THREE.BoxGeometry(1.7, 2.4, 6),
-          new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0x7f1d1d, emissiveIntensity: 0.2 }),
-        )
-        mesh.position.set(LANE_X[lane], 1.2, -60)
-        kind = 'train'
-      } else if (r < 0.75) {
-        // Low barrier — must jump
-        mesh = new THREE.Mesh(
-          new THREE.BoxGeometry(1.8, 0.8, 0.6),
-          new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xd97706, emissiveIntensity: 0.3 }),
-        )
-        mesh.position.set(LANE_X[lane], 0.4, -60)
-        kind = 'barrier'
-      } else {
-        // Overhang — must roll under
-        mesh = new THREE.Mesh(
-          new THREE.BoxGeometry(1.8, 0.5, 0.6),
-          new THREE.MeshStandardMaterial({ color: 0xa78bfa, emissive: 0x6d28d9, emissiveIntensity: 0.35 }),
-        )
-        mesh.position.set(LANE_X[lane], 1.8, -60)
-        kind = 'overhang'
-      }
-      mesh.castShadow = true
-      g.scene.add(mesh)
-      g.obstacles.push({ mesh, kind, lane })
+      const kind = r < 0.45 ? 'train' : r < 0.75 ? 'barrier' : 'overhang'
+      _spawnSingle(g, lane, kind)
     }
     // Drop a coin row in the free lane (if any)
     const freeLane = [0, 1, 2].find(l => !blocked.includes(l))
@@ -546,6 +706,15 @@ export default function Runner() {
   // ── UI ───────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-black text-gray-100 relative overflow-hidden">
+      {/* Inline keyframes for score pops — float up + fade out over 800ms.
+          Cheaper than wiring a Framer-Motion AnimatePresence for ~5 popups. */}
+      <style>{`
+        @keyframes scorepop {
+          0%   { opacity: 0; transform: translateY(0)    scale(0.7); }
+          15%  { opacity: 1; transform: translateY(-12px) scale(1.15); }
+          100% { opacity: 0; transform: translateY(-90px) scale(1.0); }
+        }
+      `}</style>
       {/* Three.js canvas */}
       <div ref={containerRef} className="absolute inset-0" />
       {/* Hidden video feed used by MediaPipe */}
@@ -554,18 +723,42 @@ export default function Runner() {
       {/* HUD */}
       {phase === 'playing' && (
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-4 left-4 luxe-card px-4 py-3">
+          {/* Score (top-left) — gradient frame + pulsing glow on combo */}
+          <div className={`absolute top-4 left-4 luxe-card px-4 py-3 transition-shadow ${combo >= 3 ? 'shadow-[0_0_30px_-4px_rgba(251,191,36,0.65)]' : ''}`}>
             <p className="text-[10px] uppercase tracking-wider text-cyan-300/80 mb-0.5">Score</p>
-            <p className="text-3xl font-bold text-white font-mono">{score.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-white font-mono tabular-nums">{score.toLocaleString()}</p>
+            {combo >= 2 && (
+              <p className="text-[10px] text-amber-300 font-bold mt-1 animate-pulse">
+                ⚡ {combo}× COMBO
+              </p>
+            )}
           </div>
+          {/* Distance + speed + mode (top-right) */}
           <div className="absolute top-4 right-4 luxe-card px-3 py-2 space-y-1 text-right">
-            <p className="text-[10px] text-gray-400">{Math.floor(distance)} m · {speed.toFixed(1)} m/s</p>
-            <p className="text-[10px] uppercase tracking-wider text-fuchsia-300">{DIFFICULTIES[difficulty].label}</p>
+            <p className="text-[10px] text-gray-400 font-mono tabular-nums">
+              {Math.floor(distance)} m · {speed.toFixed(1)} m/s
+            </p>
+            <p className="text-[10px] uppercase tracking-wider text-fuchsia-300">
+              {DIFFICULTIES[difficulty].label}
+            </p>
           </div>
+          {/* Floating "+50" score pops over the centre of the screen */}
+          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none">
+            {scorePops.map((p, i) => (
+              <span key={p.id}
+                className={`absolute text-2xl font-black font-mono ${p.bonus ? 'text-amber-300 drop-shadow-[0_0_12px_rgba(251,191,36,0.8)]' : 'text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.7)]'} animate-[scorepop_800ms_ease-out_forwards]`}
+                style={{ marginTop: `${i * -6}px` }}>
+                +{p.value}{p.combo && p.combo > 1 ? ` ×${p.combo}` : ''}
+              </span>
+            ))}
+          </div>
+          {/* Control hint */}
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 luxe-card px-4 py-2 flex items-center gap-3 text-[11px] text-gray-300">
             <span>← → swipe to switch lanes</span><span className="text-gray-700">·</span>
             <span>↑ raise hand to jump</span><span className="text-gray-700">·</span>
-            <span>↓ lower hand to roll</span>
+            <span>↓ lower hand to roll</span><span className="text-gray-700">·</span>
+            <span className="text-emerald-300">🟩 ramp</span><span className="text-gray-700">·</span>
+            <span className="text-cyan-300">🟦 oncoming!</span>
           </div>
           <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-auto">
             <button onClick={() => setPhase('paused')}
