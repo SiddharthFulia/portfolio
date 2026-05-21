@@ -543,32 +543,46 @@ export default function HandTracking() {
   }, [running])
 
   return (
-    <div className="min-h-screen bg-black text-gray-100 pt-20 pb-16">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6">
-        {/* Hero */}
-        <header className="text-center mb-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full
+    // overflow-x-hidden defensively prevents any overlong row (chips,
+    // status pill, gesture chip) from forcing a horizontal scrollbar
+    // on narrow phones.
+    <div className="min-h-screen bg-black text-gray-100 pt-20 sm:pt-24 pb-12 overflow-x-hidden">
+      <div className="max-w-5xl mx-auto px-3 sm:px-6">
+        {/* Hero — mobile-tuned: shorter pill text, smaller H1 + body on
+            phone, no horizontal overflow. */}
+        <header className="text-center mb-5 sm:mb-6">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
                           bg-gradient-to-r from-cyan-500/20 via-violet-500/20 to-fuchsia-500/20
-                          border border-cyan-500/30 text-[10px] uppercase tracking-wider
-                          text-cyan-200 font-semibold mb-3">
-            ✋ Hand tracking · MediaPipe (in-browser, no upload)
+                          border border-cyan-500/30 text-[9px] sm:text-[10px] uppercase tracking-wider
+                          text-cyan-200 font-semibold mb-2.5 sm:mb-3 max-w-full">
+            <span>✋ MediaPipe Hand Tracking</span>
+            <span className="hidden sm:inline opacity-70">· runs in-browser, no upload</span>
           </div>
-          <h1 className="text-3xl sm:text-5xl font-black leading-tight pb-1
+          <h1 className="text-2xl sm:text-4xl md:text-5xl font-black leading-tight pb-1
                          bg-gradient-to-r from-cyan-300 via-violet-300 to-fuchsia-300
                          bg-clip-text text-transparent">
-            Track hands, draw with your finger
+            Track hands. Draw with your finger.
           </h1>
-          <p className="text-gray-400 text-sm sm:text-base mt-2 max-w-2xl mx-auto leading-relaxed">
-            21-point hand skeleton via MediaPipe HandLandmarker. Three modes:
-            inspect the bones, draw on a canvas by pinching your index +
-            thumb, or pilot a virtual cursor over the page.
+          <p className="text-gray-400 text-[12px] sm:text-sm md:text-base mt-2
+                        max-w-xl mx-auto leading-relaxed px-2">
+            <span className="hidden sm:inline">
+              21-point hand skeleton, four modes — inspect the bones, draw on a
+              whiteboard by pinching, pilot a cursor, or paint live filters with
+              hand gestures.
+            </span>
+            <span className="sm:hidden">
+              4 modes: skeleton, draw, filters &amp; cursor. All in-browser.
+            </span>
           </p>
         </header>
 
         {/* Mode chips — top-level tabs for the page. Cursor mode is
             hidden on touch devices since pointer-by-finger is pointless
-            on a touchscreen (the user can already touch the buttons). */}
-        <div className="flex items-center justify-center gap-2 mb-4 flex-wrap">
+            on a touchscreen. On phone the row scrolls horizontally
+            instead of wrapping so the chips stay one neat strip. */}
+        <div className="flex items-center justify-start sm:justify-center gap-1.5 sm:gap-2 mb-4
+                        overflow-x-auto -mx-1 px-1 pb-1
+                        snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {[
             { id: 'view',    icon: <EyeOutlined />,       label: 'Skeleton',  color: 'from-cyan-500 to-blue-500' },
             { id: 'draw',    icon: <HighlightOutlined />, label: 'Draw',      color: 'from-violet-500 to-fuchsia-500' },
@@ -578,7 +592,9 @@ export default function HandTracking() {
             const active = mode === m.id
             return (
               <button key={m.id} onClick={() => setMode(m.id)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold
+                className={`shrink-0 snap-start inline-flex items-center gap-1.5
+                            px-3 py-2 sm:py-1.5 min-h-[40px] sm:min-h-0
+                            rounded-full text-[11px] sm:text-xs font-bold
                             border-2 transition-all ${
                   active
                     ? `border-transparent bg-gradient-to-r ${m.color} text-white shadow-md`
@@ -665,15 +681,16 @@ export default function HandTracking() {
             </button>
           )}
 
-          {/* Live gesture chip */}
+          {/* Live gesture chip — compact, never wider than half the
+              stage on phone so it can't push the camera frame around. */}
           {gestures && running && (
-            <div className="absolute top-3 right-3 px-3 py-1.5 rounded-xl
+            <div className="absolute top-3 right-3 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl
                             bg-gray-950/85 backdrop-blur-sm border border-gray-700
-                            text-[11px]">
-              <div className="text-cyan-300 font-bold mb-0.5">
-                {gestures.hand} hand {gestures.pinch && '· 🤏 pinch'}
+                            text-[10px] sm:text-[11px] max-w-[55%]">
+              <div className="text-cyan-300 font-bold mb-0.5 truncate">
+                {gestures.hand}{gestures.pinch && ' · 🤏'}
               </div>
-              <div className="font-mono text-gray-400 text-[10px]">
+              <div className="font-mono text-gray-400 text-[9px] sm:text-[10px] whitespace-nowrap">
                 {Object.entries(gestures.fingers).map(([k, up]) => (
                   <span key={k} className={up ? 'text-emerald-300' : 'text-gray-600'}>
                     {k[0]}{up ? '↑' : '·'}{' '}
