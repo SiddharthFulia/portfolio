@@ -5,6 +5,7 @@ import {
   EyeOutlined, HighlightOutlined, AimOutlined, ClearOutlined,
 } from '@ant-design/icons'
 import notify from '../utils/notify'
+import { FILTERS, GESTURE_DEFAULTS, FAMILY_ORDER, FAMILY_LABELS } from '../components/luxe/HandFilters'
 
 // Hand-tracking page. MediaPipe HandLandmarker runs in WebAssembly on
 // the user's machine — no BE round-trip, ~30-60fps on modern hardware.
@@ -129,71 +130,17 @@ const classifyGesture = (fingers) => {
   return null
 }
 
+// Lookup map for quick `id → filter` access from the RAF loop.
+const FILTERS_BY_ID = FILTERS.reduce((m, f) => { m[f.id] = f; return m }, {})
+
 // Paint the active filter onto the overlay canvas. Coordinates are in
 // canvas pixels in the MIRRORED frame (so they line up with what the
 // user sees on-screen). `t` is millis since the page mounted.
-function drawFilter(ctx, kind, tipX, tipY, W, H, t) {
-  if (kind === 'fist') {
-    // Dither — diagonal cross-hatch + slight darken so the camera looks
-    // posterized. Cheap to render and reads as 'pixel art'.
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.32)'
-    ctx.fillRect(0, 0, W, H)
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.18)'
-    const step = 7
-    for (let y = 0; y < H; y += step) {
-      const offset = ((y / step) | 0) % 2 === 0 ? 0 : step / 2
-      for (let x = offset; x < W; x += step) ctx.fillRect(x, y, 2, 2)
-    }
-  }
-  else if (kind === 'peace') {
-    // VHS feel — magenta wash, moving glitch band, fine scanlines.
-    // Chromatic aberration on the camera RGB is applied via the SVG
-    // filter on the <video> element when this gesture is active.
-    ctx.fillStyle = 'rgba(255, 30, 120, 0.06)'
-    ctx.fillRect(0, 0, W, H)
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)'
-    ctx.lineWidth = 1
-    const offset = (t / 30) % 4
-    for (let y = offset; y < H; y += 4) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke()
-    }
-    const bandY = (t / 4) % H
-    ctx.fillStyle = 'rgba(0, 255, 255, 0.12)'
-    ctx.fillRect(0, bandY, W, 24)
-    // "VHS" / "REC" badge
-    ctx.font = 'bold 16px monospace'
-    ctx.fillStyle = '#ef4444'
-    ctx.fillText('● REC', 12, H - 14)
-  }
-  else if (kind === 'point') {
-    // Spotlight — everything dimmed except a circle around the tip.
-    const grad = ctx.createRadialGradient(tipX, tipY, 25, tipX, tipY, Math.max(W, H) * 0.55)
-    grad.addColorStop(0,    'rgba(0, 0, 0, 0)')
-    grad.addColorStop(0.18, 'rgba(0, 0, 0, 0)')
-    grad.addColorStop(1,    'rgba(0, 0, 0, 0.85)')
-    ctx.fillStyle = grad
-    ctx.fillRect(0, 0, W, H)
-    ctx.beginPath()
-    ctx.arc(tipX, tipY, 26, 0, Math.PI * 2)
-    ctx.strokeStyle = 'rgba(255, 240, 200, 0.95)'
-    ctx.lineWidth = 2
-    ctx.stroke()
-  }
-  else if (kind === 'open') {
-    // Water ripple — concentric circles expand from the index tip.
-    for (let i = 0; i < 4; i++) {
-      const r = ((t / 6) + i * 70) % 320
-      const alpha = Math.max(0, 1 - r / 320)
-      ctx.beginPath()
-      ctx.arc(tipX, tipY, r, 0, Math.PI * 2)
-      ctx.strokeStyle = `rgba(125, 211, 252, ${alpha * 0.7})`
-      ctx.lineWidth = 3
-      ctx.stroke()
-    }
-    // Soft blue tint for the "underwater" feel
-    ctx.fillStyle = 'rgba(56, 189, 248, 0.06)'
-    ctx.fillRect(0, 0, W, H)
-  }
+// `id` is a filter id from the FILTERS catalog.
+function drawFilter(ctx, id, tipX, tipY, W, H, t) {
+  const f = FILTERS_BY_ID[id]
+  if (!f) return
+  f.render(ctx, tipX, tipY, W, H, t)
 }
 
 // Which fingers are extended? Each finger uses the "tip above the
@@ -233,6 +180,14 @@ export default function HandTracking() {
   const [fps, setFps] = useState(0)
   const [gestures, setGestures] = useState(null)  // { handed, fingers, pinch }
   const [activeFilter, setActiveFilter] = useState(null) // detected gesture in filters mode
+  // The actual filter id being rendered. Defaults to the first catalog
+  // entry; flips to a gesture-driven id when the user hasn't manually
+  // picked anything yet, OR to whatever chip the user clicked.
+  const [activeFilterId, setActiveFilterId] = useState(FILTERS[0].id)
+  // Tracks whether the user has explicitly clicked a chip. While false
+  // (default), the active filter follows the detected gesture. After a
+  // click, gestures stop overriding until the user toggles Auto back on.
+  const [userPickedFilter, setUserPickedFilter] = useState(false)
   const [cursorStyle, setCursorStyle] = useState('bullseye')
   const [whiteboard, setWhiteboard] = useState(false)  // hide video → canvas-only
   const [facingMode, setFacingMode] = useState('user') // 'user' (front) | 'environment' (back) — relevant on phones
@@ -265,9 +220,16 @@ export default function HandTracking() {
   const gesturesRef     = useRef(null)
   const fpsRef          = useRef(0)
   const activeFilterRef = useRef(null)
+  // Filter selection refs — mirrored from state so the RAF loop can
+  // read them without re-rendering. activeFilterIdRef holds the id we
+  // actually paint; userPickedFilterRef gates the gesture override.
+  const activeFilterIdRef = useRef(FILTERS[0].id)
+  const userPickedFilterRef = useRef(false)
   useEffect(() => { modeRef.current = mode }, [mode])
   useEffect(() => { colorRef.current = color }, [color])
   useEffect(() => { brushRef.current = brush }, [brush])
+  useEffect(() => { activeFilterIdRef.current = activeFilterId }, [activeFilterId])
+  useEffect(() => { userPickedFilterRef.current = userPickedFilter }, [userPickedFilter])
 
   useEffect(() => { document.title = 'Hand Tracking · Sid' }, [])
 
@@ -316,14 +278,31 @@ export default function HandTracking() {
   const start = async () => {
     if (!ready || running) return
     try {
-      // 640×480 is plenty for hand tracking — MediaPipe downscales
-      // internally anyway. Going lower keeps the per-frame inference
-      // cheap and lets us stay near display refresh on modest GPUs
-      // and even more on phones.
+      // Camera capture target. Bumped to 60fps so a 5090 / modern GPU
+      // can actually push 60 — the previous 30fps cap was the real
+      // bottleneck on capable hardware, not MediaPipe inference.
+      // We pass `min`+`ideal` so the browser picks the highest mode the
+      // camera supports up to 60. If the camera tops out at 30 the
+      // browser falls back gracefully.
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode, width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } },
+        video: {
+          facingMode,
+          width:     { ideal: 1280 },
+          height:    { ideal: 720 },
+          frameRate: { min: 30, ideal: 60, max: 60 },
+        },
         audio: false,
       })
+      // Log the actual capture rate we got so the user can verify the
+      // bump took effect — some webcams cap themselves below 60.
+      const track = stream.getVideoTracks()[0]
+      try {
+        const settings = track.getSettings?.()
+        if (settings) {
+          // eslint-disable-next-line no-console
+          console.log(`[HandTracking] camera: ${settings.width}×${settings.height} @ ${settings.frameRate ?? '?'}fps`)
+        }
+      } catch {}
       streamRef.current = stream
       videoRef.current.srcObject = stream
       // iOS Safari requires playsInline (set in JSX) + a user gesture
@@ -476,13 +455,26 @@ export default function HandTracking() {
     if (mode === 'filters') {
       const g = hands.length > 0 ? classifyGesture(summary[0].fingers) : null
       activeFilterRef.current = g
-      if (g && hands.length > 0) {
-        // Index-tip pixel coords in mirrored (visible) space
-        const tipX = (1 - hands[0][8].x) * W
-        const tipY = hands[0][8].y * H
-        const t = performance.now() - filterStateRef.current.t0
-        drawFilter(overlay, g, tipX, tipY, W, H, t)
+      // Decide which filter id to paint:
+      // - If user picked one manually, honour that (gestures don't override).
+      // - Otherwise follow the gesture's default filter for this frame.
+      let filterId = activeFilterIdRef.current
+      if (!userPickedFilterRef.current && g && GESTURE_DEFAULTS[g]) {
+        filterId = GESTURE_DEFAULTS[g]
+        // Reflect into the ref so the chip strip can highlight it.
+        if (activeFilterIdRef.current !== filterId) {
+          activeFilterIdRef.current = filterId
+        }
       }
+      // Tip coords default to the visual center when no hand is in
+      // frame — so static (non-tip-driven) filters keep looking right.
+      let tipX = W / 2, tipY = H / 2
+      if (hands.length > 0) {
+        tipX = (1 - hands[0][8].x) * W
+        tipY = hands[0][8].y * H
+      }
+      const t = performance.now() - filterStateRef.current.t0
+      drawFilter(overlay, filterId, tipX, tipY, W, H, t)
     } else {
       activeFilterRef.current = null
     }
@@ -562,6 +554,9 @@ export default function HandTracking() {
       setGestures(gesturesRef.current)
       setFps(fpsRef.current)
       setActiveFilter((prev) => prev === activeFilterRef.current ? prev : activeFilterRef.current)
+      // Mirror the ref-driven filter id back into state so the chip
+      // strip highlights the gesture-selected filter when in Auto mode.
+      setActiveFilterId((prev) => prev === activeFilterIdRef.current ? prev : activeFilterIdRef.current)
     }, 200)
     return () => clearInterval(iv)
   }, [running])
@@ -662,7 +657,7 @@ export default function HandTracking() {
             className="absolute inset-0 w-full h-full block object-cover"
             style={{
               transform: 'scaleX(-1)',
-              filter: (mode === 'filters' && activeFilter === 'peace') ? 'url(#hand-vhs)' : 'none',
+              filter: (mode === 'filters' && activeFilterId === 'vhs-aberration') ? 'url(#hand-vhs)' : 'none',
               opacity: (mode === 'draw' && whiteboard) ? 0 : 1,
               transition: 'opacity 200ms',
             }}
@@ -816,26 +811,41 @@ export default function HandTracking() {
             </div>
           )}
 
-          {/* Filters mode — explain the 4 gestures + show what's currently active */}
+          {/* Filters mode — gesture map + a chip strip for the full catalog.
+              Auto mode lets gestures choose; clicking a chip locks in a pick. */}
           {mode === 'filters' && (
-            <div className="luxe-card p-3 border-fuchsia-500/40">
-              <div className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-2 flex items-center justify-between">
-                <span>✨ Filters — gesture-driven</span>
-                {activeFilter && (
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded
-                                   bg-fuchsia-500/20 text-fuchsia-200 border border-fuchsia-500/40">
-                    active: {activeFilter}
-                  </span>
-                )}
+            <div className="luxe-card p-3 border-fuchsia-500/40 sm:col-span-2">
+              <div className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-2 flex items-center justify-between gap-2">
+                <span>✨ Filters — {userPickedFilter ? 'manual pick' : 'gesture-driven (Auto)'}</span>
+                <div className="flex items-center gap-1.5">
+                  {activeFilter && (
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded
+                                     bg-fuchsia-500/20 text-fuchsia-200 border border-fuchsia-500/40">
+                      gesture: {activeFilter}
+                    </span>
+                  )}
+                  <button
+                    onClick={() => setUserPickedFilter(false)}
+                    title="Resume gesture-driven filter selection"
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border transition-colors ${
+                      !userPickedFilter
+                        ? 'bg-fuchsia-500/25 border-fuchsia-400 text-fuchsia-100'
+                        : 'border-gray-700 bg-gray-900/60 text-gray-300 hover:border-gray-600'
+                    }`}>
+                    {userPickedFilter ? 'Auto OFF' : 'Auto ON'}
+                  </button>
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-1.5">
+
+              {/* Gesture → default filter cheatsheet */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mb-3">
                 {[
-                  { id: 'fist',  label: 'Fist',        effect: 'Dither' },
-                  { id: 'peace', label: 'Peace ✌',     effect: 'VHS + chromatic' },
+                  { id: 'fist',  label: 'Fist',        effect: 'Dither dark' },
+                  { id: 'peace', label: 'Peace ✌',     effect: 'VHS Aberration' },
                   { id: 'point', label: 'Point ☝',     effect: 'Spotlight' },
                   { id: 'open',  label: 'Open hand ✋', effect: 'Water ripple' },
                 ].map(g => {
-                  const on = activeFilter === g.id
+                  const on = !userPickedFilter && activeFilter === g.id
                   return (
                     <div key={g.id}
                       className={`p-2 rounded-lg border ${
@@ -851,9 +861,48 @@ export default function HandTracking() {
                   )
                 })}
               </div>
+
+              {/* Chip picker — 50 filters grouped by family. Horizontal
+                  scroll strip per family so it stays compact on phones. */}
+              <div className="border-t border-gray-800 pt-3 space-y-2.5">
+                {FAMILY_ORDER.map(fam => {
+                  const items = FILTERS.filter(f => f.family === fam)
+                  if (items.length === 0) return null
+                  return (
+                    <div key={fam}>
+                      <div className="text-[9px] uppercase tracking-wider text-gray-500 font-bold mb-1 pl-0.5">
+                        {FAMILY_LABELS[fam]} <span className="text-gray-700">· {items.length}</span>
+                      </div>
+                      <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1 pb-1
+                                      [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                        {items.map(f => {
+                          const active = activeFilterId === f.id
+                          return (
+                            <button key={f.id}
+                              onClick={() => { setActiveFilterId(f.id); setUserPickedFilter(true) }}
+                              title={f.name}
+                              className={`shrink-0 inline-flex items-center gap-1
+                                          px-2 py-1 rounded-lg text-[10px] font-semibold
+                                          border transition-all ${
+                                active
+                                  ? 'border-fuchsia-400 bg-fuchsia-500/15 text-white shadow-md shadow-fuchsia-500/20'
+                                  : 'border-gray-800 bg-gray-900/40 text-gray-300 hover:border-gray-700 hover:text-gray-100'
+                              }`}>
+                              <span className="text-[13px] leading-none">{f.icon}</span>
+                              <span className="whitespace-nowrap">{f.name}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
               <p className="text-[10px] text-gray-500 mt-2 leading-snug">
-                A white dot tracks your index fingertip. Make any of the 4 gestures
-                above to swap effects in real-time.
+                A white dot tracks your index fingertip. In Auto mode, fist / peace /
+                point / open-hand cycle through 4 default filters. Click a chip to
+                lock in any of the 50 effects.
               </p>
             </div>
           )}
