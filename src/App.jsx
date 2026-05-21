@@ -45,15 +45,21 @@ const CinemaDetail = lazy(() => import("./pages/CinemaDetail"));
 const B = "animate-pulse bg-slate-200 rounded";
 const BD = "animate-pulse bg-gray-800 rounded";
 
+// About / Projects / Contact were rewritten with a dark theme (#0a0a0e
+// matches their <section> bg). The old skeleton was bg-slate-200, which
+// caused a white flash before the page rendered — visibly jarring.
+// Now matches the page bg so the transition is invisible.
 const LightPageSkeleton = () => (
-  <div className="max-w-5xl mx-auto px-8 sm:px-16 pt-28 pb-16 space-y-8">
-    <div className={`${B} h-10 w-64`} />
-    <div className={`${B} h-5 w-96 max-w-full`} />
-    <div className="space-y-4 mt-8">
-      {[1,2,3].map(i => <div key={i} className={`${B} h-28`} style={{borderRadius:12}} />)}
-    </div>
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-6">
-      {[1,2,3,4,5,6].map(i => <div key={i} className={`${B} h-20`} style={{borderRadius:10}} />)}
+  <div className="min-h-screen bg-[#0a0a0e] pt-28 px-6 pb-16">
+    <div className="max-w-5xl mx-auto space-y-8">
+      <div className={`${BD} h-10 w-64`} />
+      <div className={`${BD} h-5 w-96 max-w-full`} />
+      <div className="space-y-4 mt-8">
+        {[1,2,3].map(i => <div key={i} className={`${BD} h-28`} style={{borderRadius:12}} />)}
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-6">
+        {[1,2,3,4,5,6].map(i => <div key={i} className={`${BD} h-20`} style={{borderRadius:10}} />)}
+      </div>
     </div>
   </div>
 );
@@ -135,15 +141,17 @@ const AIVideoSkeleton = () => (
 );
 
 const ContactSkeleton = () => (
-  <div className="max-w-5xl mx-auto px-8 sm:px-16 pt-28 pb-16">
-    <div className={`${B} h-10 w-48 mb-6`} />
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-      <div className="space-y-4">
-        {[1,2,3].map(i => <div key={i} className={`${B} h-14`} style={{borderRadius:8}} />)}
-        <div className={`${B} h-32`} style={{borderRadius:8}} />
-        <div className={`${B} h-12 w-40`} style={{borderRadius:8}} />
+  <div className="min-h-screen bg-[#0a0a0e] pt-28 px-6 pb-16">
+    <div className="max-w-5xl mx-auto">
+      <div className={`${BD} h-10 w-48 mb-6`} />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+        <div className="space-y-4">
+          {[1,2,3].map(i => <div key={i} className={`${BD} h-14`} style={{borderRadius:8}} />)}
+          <div className={`${BD} h-32`} style={{borderRadius:8}} />
+          <div className={`${BD} h-12 w-40`} style={{borderRadius:8}} />
+        </div>
+        <div className={`${BD} h-80`} style={{borderRadius:16}} />
       </div>
-      <div className={`${B} h-80`} style={{borderRadius:16}} />
     </div>
   </div>
 );
@@ -155,6 +163,17 @@ const ConditionalFooter = () => {
   return <Footer />;
 };
 
+/* ── Site-wide route error boundary ──
+ * Wraps every <Routes> render. Keying it on pathname means each
+ * navigation mounts a FRESH boundary instance, so an error on one page
+ * doesn't stick around when you move to another. Without this, a render
+ * exception in a lazy page bubbles up to the root and unmounts the whole
+ * tree → "page just goes blank" feeling the user reported. */
+const RoutesWithBoundary = ({ children }) => {
+  const { pathname } = useLocation();
+  return <RouteErrorBoundary key={pathname}>{children}</RouteErrorBoundary>;
+};
+
 const App = () => {
   return (
     <ConfigProvider theme={{
@@ -164,6 +183,7 @@ const App = () => {
     <main className='bg-slate-300/20'>
       <Router>
         <Navbar />
+        <RoutesWithBoundary>
         <Routes>
           <Route path='/' element={<Suspense fallback={<HomeSkeleton />}><Home /></Suspense>} />
           <Route path='/about' element={<Suspense fallback={<LightPageSkeleton />}><About /></Suspense>} />
@@ -187,17 +207,17 @@ const App = () => {
           <Route path='/ai-video'        element={<Suspense fallback={<AIVideoSkeleton />}><AIVideo /></Suspense>} />
           <Route path='/ai-video/:id'    element={<Suspense fallback={<DarkPageSkeleton />}><AIVideoDetail /></Suspense>} />
           <Route path='/video'           element={<Suspense fallback={<AIVideoSkeleton />}><AIVideo /></Suspense>} />
-          <Route path='/image-enhancer'  element={<RouteErrorBoundary><Suspense fallback={<DarkPageSkeleton />}><ImageEnhancer /></Suspense></RouteErrorBoundary>} />
-          <Route path='/image-enhancer/:id' element={<RouteErrorBoundary><Suspense fallback={<DarkPageSkeleton />}><ImageEnhancerDetail /></Suspense></RouteErrorBoundary>} />
-          <Route path='/enhance'         element={<RouteErrorBoundary><Suspense fallback={<DarkPageSkeleton />}><ImageEnhancer /></Suspense></RouteErrorBoundary>} />
+          <Route path='/image-enhancer'  element={<Suspense fallback={<DarkPageSkeleton />}><ImageEnhancer /></Suspense>} />
+          <Route path='/image-enhancer/:id' element={<Suspense fallback={<DarkPageSkeleton />}><ImageEnhancerDetail /></Suspense>} />
+          <Route path='/enhance'         element={<Suspense fallback={<DarkPageSkeleton />}><ImageEnhancer /></Suspense>} />
           <Route path='/ai-studio'       element={<Suspense fallback={<DarkPageSkeleton />}><AIStudio /></Suspense>} />
           <Route path='/3d'              element={<Suspense fallback={<DarkPageSkeleton />}><Dragon3D /></Suspense>} />
           <Route path='/dragon'          element={<Suspense fallback={<DarkPageSkeleton />}><Dragon3D /></Suspense>} />
           {/* Vault-gated lane — VaultGate inside the page handles the auth bounce. */}
-          <Route path='/deepfake'        element={<RouteErrorBoundary><Suspense fallback={<DarkPageSkeleton />}><Deepfake /></Suspense></RouteErrorBoundary>} />
+          <Route path='/deepfake'        element={<Suspense fallback={<DarkPageSkeleton />}><Deepfake /></Suspense>} />
           {/* Hand-gesture endless runner — MediaPipe + Three.js */}
-          <Route path='/runner'          element={<RouteErrorBoundary><Suspense fallback={<DarkPageSkeleton />}><Runner /></Suspense></RouteErrorBoundary>} />
-          <Route path='/game'            element={<RouteErrorBoundary><Suspense fallback={<DarkPageSkeleton />}><Runner /></Suspense></RouteErrorBoundary>} />
+          <Route path='/runner'          element={<Suspense fallback={<DarkPageSkeleton />}><Runner /></Suspense>} />
+          <Route path='/game'            element={<Suspense fallback={<DarkPageSkeleton />}><Runner /></Suspense>} />
           <Route path='/hand'            element={<Suspense fallback={<DarkPageSkeleton />}><HandTracking /></Suspense>} />
           <Route path='/hands'           element={<Suspense fallback={<DarkPageSkeleton />}><HandTracking /></Suspense>} />
           <Route path='/draw'            element={<Suspense fallback={<DarkPageSkeleton />}><HandTracking /></Suspense>} />
@@ -212,6 +232,7 @@ const App = () => {
           <Route path='/cinema' element={<Navigate to="/ai-video?tab=cinema" replace />} />
           <Route path='/cinema/:id' element={<Suspense fallback={<DarkPageSkeleton />}><CinemaDetail /></Suspense>} />
         </Routes>
+        </RoutesWithBoundary>
         <ConditionalFooter />
       </Router>
       <BackToTop />
