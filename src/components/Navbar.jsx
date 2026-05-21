@@ -47,21 +47,32 @@ const Navbar = () => {
     { to: '/ai',             label: 'AI Chat',      color: 'from-blue-500 to-cyan-500' },
   ];
 
-  // More dropdown items — grouped logically.
-  const moreLinks = [
-    // AI / Creative lanes that didn't make the featured row
-    { to: '/ai-studio', label: 'AI Studio · Image+TTS+Vision' },
-    { to: '/lipsync',  label: 'Lip Sync' },
-    { to: '/audio',    label: 'Audio Studio' },
-    { to: '/vision',   label: 'Vision AI' },
-    { to: '/hand',     label: 'Hand Tracking · 50 filters' },
-    // Explore / learn / play
-    { to: '/science',  label: 'Science · NASA APIs' },
-    { to: '/explore',  label: 'Explore · Public APIs' },
-    { to: '/lab',      label: 'Interactive Lab' },
-    { to: '/creative', label: 'Creative UI' },
-    { to: '/learn',    label: 'Learn DSA' },
-    { to: '/chess',    label: 'Chess Engine Viz' },
+  // Mega-menu groups — AI lanes kept together, Play (non-AI demos)
+  // kept separate. Science / Explore (NASA + public APIs) removed
+  // from the nav per user request — routes still exist for any
+  // direct deep links but they're hidden from discovery.
+  const moreGroups = [
+    {
+      title: 'AI Studios',
+      accent: 'text-violet-300',
+      items: [
+        { to: '/ai-studio', label: 'AI Studio',    desc: 'Image + TTS + Vision + Summariser' },
+        { to: '/lipsync',   label: 'Lip Sync',     desc: 'Talking-head video from audio' },
+        { to: '/audio',     label: 'Audio Studio', desc: 'Music · TTS · STT · stems' },
+        { to: '/vision',    label: 'Vision AI',    desc: 'Face · Object · OCR · Lab' },
+        { to: '/hand',      label: 'Hand Tracking', desc: '50 filters · 2-hand draw · cursor' },
+      ],
+    },
+    {
+      title: 'Play',
+      accent: 'text-cyan-300',
+      items: [
+        { to: '/lab',      label: 'Interactive Lab', desc: '17 mini-demos · 7 categories' },
+        { to: '/creative', label: 'Creative UI',     desc: '13 UI experiments' },
+        { to: '/learn',    label: 'Learn DSA',       desc: 'Algorithms · system design · CP' },
+        { to: '/chess',    label: 'Chess Engine',    desc: 'Live engine visualiser' },
+      ],
+    },
   ];
 
   return (
@@ -76,11 +87,22 @@ const Navbar = () => {
           back at xl. flex-wrap is the safety net — if a future addition pushes
           past the budget, items wrap to a second row instead of clipping. */}
       <nav className='hidden lg:flex flex-wrap items-center gap-x-1.5 gap-y-1 font-medium max-w-[calc(100%-200px)]'>
-        {/* Primary links */}
+        {/* Primary links — animated underline on hover/active */}
         {primaryLinks.map(l => (
           <NavLink key={l.to} to={l.to} className={({ isActive }) =>
-            `text-[12px] xl:text-sm px-1.5 xl:px-2 transition-colors ${isActive ? 'text-blue-400' : isDark ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-black'}`}>
-            {l.label}
+            `group relative text-[12px] xl:text-sm px-1.5 xl:px-2 py-1 transition-colors ${
+              isActive
+                ? 'text-violet-300'
+                : isDark ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-black'
+            }`}>
+            {({ isActive }) => (
+              <>
+                <span>{l.label}</span>
+                <span className={`absolute left-1.5 right-1.5 -bottom-0.5 h-px bg-gradient-to-r from-violet-400 via-fuchsia-400 to-cyan-400 transition-transform origin-left ${
+                  isActive ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
+                }`} />
+              </>
+            )}
           </NavLink>
         ))}
 
@@ -100,36 +122,65 @@ const Navbar = () => {
           </NavLink>
         ))}
 
-        {/* More dropdown */}
+        {/* Mega-menu — AI Studios + Play, grouped */}
         <div className="relative">
           <button
             onClick={() => setMoreOpen(o => !o)}
-            className={`text-[10px] xl:text-[11px] px-2 xl:px-2.5 py-1 xl:py-1.5 rounded-lg font-semibold transition-colors flex items-center gap-1 whitespace-nowrap ${
+            className={`group text-[10px] xl:text-[11px] px-2 xl:px-2.5 py-1 xl:py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1 whitespace-nowrap border ${
               moreOpen
-                ? 'text-cyan-400 bg-gray-800'
-                : isDark ? 'text-gray-400 hover:text-white bg-gray-800/80 hover:bg-gray-700' : 'text-gray-600 hover:text-black bg-gray-100 hover:bg-gray-200'
+                ? 'text-white bg-gradient-to-r from-violet-500/20 to-cyan-500/20 border-violet-400/40 shadow-md'
+                : isDark
+                  ? 'text-gray-300 hover:text-white bg-gray-800/60 border-gray-700 hover:border-violet-400/40 hover:bg-gray-800'
+                  : 'text-gray-600 hover:text-black bg-gray-100 border-gray-200 hover:bg-gray-200'
             }`}>
             More
-            <svg className={`w-3 h-3 transition-transform ${moreOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+            <svg className={`w-3 h-3 transition-transform ${moreOpen ? 'rotate-180' : 'group-hover:translate-y-0.5'}`}
+              fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
             </svg>
           </button>
           {moreOpen && (
             <>
-              <div className="fixed inset-0 z-40" onClick={() => setMoreOpen(false)} />
-              <div className={`absolute top-full right-0 mt-1 py-1 rounded-xl shadow-xl border min-w-[160px] z-50 ${
-                isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'
-              }`}>
-                {moreLinks.map(l => (
-                  <NavLink key={l.to} to={l.to} onClick={() => setMoreOpen(false)}
-                    className={({ isActive }) =>
-                      `block px-4 py-2.5 text-sm transition-colors ${
-                        isActive
-                          ? 'text-cyan-400'
-                          : isDark ? 'text-gray-300 hover:text-white hover:bg-gray-800' : 'text-gray-700 hover:text-black hover:bg-gray-50'
-                      }`}>
-                    {l.label}
-                  </NavLink>
+              <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" onClick={() => setMoreOpen(false)} />
+              <div className={`absolute top-full right-0 mt-2 rounded-2xl shadow-2xl border z-50 overflow-hidden
+                              w-[560px] max-w-[92vw] grid grid-cols-1 sm:grid-cols-2
+                              ${isDark
+                                ? 'bg-[#0a0a0e] border-gray-800'
+                                : 'bg-white border-gray-200'}`}>
+                {moreGroups.map((g, gi) => (
+                  <div key={g.title} className={`p-4 ${gi === 0 ? 'sm:border-r' : ''} ${isDark ? 'sm:border-gray-800' : 'sm:border-gray-200'}`}>
+                    <p className={`text-[10px] uppercase tracking-[0.18em] font-bold mb-3 ${g.accent}`}>
+                      {g.title}
+                    </p>
+                    <ul className="space-y-1">
+                      {g.items.map(it => (
+                        <li key={it.to}>
+                          <NavLink to={it.to} onClick={() => setMoreOpen(false)}
+                            className={({ isActive }) =>
+                              `group flex flex-col px-3 py-2 rounded-lg transition-all ${
+                                isActive
+                                  ? (isDark ? 'bg-white/[0.06] ring-1 ring-violet-400/40' : 'bg-violet-50 ring-1 ring-violet-200')
+                                  : (isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-gray-50')
+                              }`}>
+                            {({ isActive }) => (
+                              <>
+                                <span className={`text-sm font-semibold transition-colors ${
+                                  isActive
+                                    ? (isDark ? 'text-white' : 'text-black')
+                                    : (isDark ? 'text-gray-100 group-hover:text-white' : 'text-gray-900')
+                                }`}>
+                                  {it.label}
+                                </span>
+                                <span className={`text-[11px] mt-0.5 ${isDark ? 'text-gray-500 group-hover:text-gray-400' : 'text-gray-500'}`}>
+                                  {it.desc}
+                                </span>
+                              </>
+                            )}
+                          </NavLink>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ))}
               </div>
             </>
@@ -189,13 +240,23 @@ const Navbar = () => {
             </NavLink>
           ))}
 
-          {/* More */}
-          <div className={`text-[10px] uppercase tracking-wider font-semibold px-2 pt-3 pb-1 ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>Demos</div>
-          {moreLinks.map(l => (
-            <NavLink key={l.to} to={l.to} className={({ isActive }) =>
-              `py-2.5 px-2 text-sm font-medium rounded-lg ${isActive ? 'text-purple-400 bg-purple-500/10' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              {l.label}
-            </NavLink>
+          {/* AI Studios + Play groups */}
+          {moreGroups.map(g => (
+            <div key={g.title}>
+              <div className={`text-[10px] uppercase tracking-wider font-semibold px-2 pt-3 pb-1 ${g.accent}`}>
+                {g.title}
+              </div>
+              {g.items.map(it => (
+                <NavLink key={it.to} to={it.to} className={({ isActive }) =>
+                  `flex flex-col py-2.5 px-2 rounded-lg ${isActive
+                    ? 'text-violet-300 bg-violet-500/10'
+                    : isDark ? 'text-gray-300' : 'text-gray-700'
+                  }`}>
+                  <span className="text-sm font-medium">{it.label}</span>
+                  <span className="text-[11px] text-gray-500">{it.desc}</span>
+                </NavLink>
+              ))}
+            </div>
           ))}
 
           <a href="/resume.pdf" target="_blank" rel="noreferrer"
