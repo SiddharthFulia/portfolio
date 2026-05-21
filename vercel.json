@@ -1,10 +1,6 @@
 {
   "rewrites": [
-    {
-      "//": "Only rewrite paths that aren't real files. The negative lookahead skips anything with a dot in the last segment (e.g. /laserhands.html, /assets/index-abc.js, favicon.ico) so Vercel serves them as-is instead of returning index.html. The catch-all `/(.*)` rewrite we had before caused MIME-type errors on mobile when a JS chunk request raced the file-system check and got the SPA shell back.",
-      "source": "/((?!.*\\.).*)",
-      "destination": "/index.html"
-    }
+    { "source": "/((?!.*\\.).*)", "destination": "/index.html" }
   ],
   "headers": [
     {
