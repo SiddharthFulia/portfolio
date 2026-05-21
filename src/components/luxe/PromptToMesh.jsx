@@ -312,21 +312,64 @@ export default function PromptToMesh() {
               disabled={isWorking}
             />
 
-            {/* Steps slider */}
+            {/* Model picker */}
             <div className="mt-3">
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-[10px] uppercase tracking-wider text-gray-500">
-                  Steps · quality vs speed
-                </label>
-                <span className="text-[10px] font-mono text-gray-400">{steps}</span>
+              <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">
+                Model
+              </label>
+              <div className="grid grid-cols-2 gap-1.5">
+                <button type="button" onClick={() => setModel('shap-e')}
+                  disabled={isWorking}
+                  className={`text-left p-2.5 rounded-lg border transition-all ${
+                    model === 'shap-e'
+                      ? 'border-amber-400/60 bg-amber-500/10 ring-1 ring-amber-400/40'
+                      : 'border-gray-800 bg-gray-900/40 hover:border-gray-700'
+                  }`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-white">Shap-E</span>
+                    <span className="text-[9px] uppercase tracking-wider text-gray-500">Solid</span>
+                  </div>
+                  <div className="text-[10px] text-gray-400 mt-0.5">
+                    Pure text → 3D · ~30-60s · abstract-friendly
+                  </div>
+                </button>
+                <button type="button" onClick={() => setModel('tripo')}
+                  disabled={isWorking}
+                  className={`text-left p-2.5 rounded-lg border transition-all ${
+                    model === 'tripo'
+                      ? 'border-fuchsia-400/60 bg-fuchsia-500/10 ring-1 ring-fuchsia-400/40'
+                      : 'border-gray-800 bg-gray-900/40 hover:border-gray-700'
+                  }`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-white">TripoSR</span>
+                    <span className="text-[9px] uppercase tracking-wider text-fuchsia-300">🔥 Beast</span>
+                  </div>
+                  <div className="text-[10px] text-gray-400 mt-0.5">
+                    Flux image → 3D · ~10-15s · better fidelity
+                  </div>
+                </button>
               </div>
-              <input
-                type="range" min={16} max={64} step={1}
-                value={steps}
-                disabled={isWorking}
-                onChange={e => setSteps(parseInt(e.target.value, 10))}
-                className="w-full accent-amber-400" />
             </div>
+
+            {/* Steps slider — only meaningful for Shap-E. TripoSR uses
+                marching-cubes resolution which is fixed at 256 in the
+                worker; exposing that would be confusing for the user. */}
+            {model === 'shap-e' && (
+              <div className="mt-3">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] uppercase tracking-wider text-gray-500">
+                    Steps · quality vs speed
+                  </label>
+                  <span className="text-[10px] font-mono text-gray-400">{steps}</span>
+                </div>
+                <input
+                  type="range" min={16} max={64} step={1}
+                  value={steps}
+                  disabled={isWorking}
+                  onChange={e => setSteps(parseInt(e.target.value, 10))}
+                  className="w-full accent-amber-400" />
+              </div>
+            )}
 
             <div className="flex items-center justify-between mt-3 gap-2">
               <span className="text-[10px] text-gray-500">
