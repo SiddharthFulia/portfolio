@@ -1,0 +1,251 @@
+/* ===================================================================
+ * Luxe Design System
+ * -------------------------------------------------------------------
+ * Tokens + utility classes sourced from the ui-ux-pro-max skill:
+ *   - "Modern Dark (Cinema)" → deep blacks, indigo accent, ambient blobs,
+ *     frosted-glass surfaces, expo-out easing
+ *   - "Liquid Glass" → morphing iridescent gradients, backdrop blur
+ *
+ * Apply by:
+ *   1. Wrap a section in `.luxe-stage` for the cinematic backdrop
+ *   2. Use `<AmbientBlobs />` for slow-drifting ambient light
+ *   3. Use `<GlassCard />` (or `.glass` / `.glass-card`) for surfaces
+ *   4. `.luxe-title` for hero text with the iridescent gradient
+ *   5. `.luxe-pill` for status / category pills
+ *   6. `.luxe-press` for the haptic-feeling 0.97 scale press
+ *
+ * All effects respect prefers-reduced-motion. All sizes scale on phone.
+ * =================================================================== */
+
+:root {
+  /* Backgrounds — avoid pure #000 (OLED smear). Deep, layered. */
+  --luxe-bg-deep:     #020203;
+  --luxe-bg-base:     #050506;
+  --luxe-bg-elevated: #0a0a0c;
+
+  /* Surfaces — translucent so the ambient blobs read through */
+  --luxe-surface:     rgba(255, 255, 255, 0.045);
+  --luxe-surface-hi:  rgba(255, 255, 255, 0.08);
+
+  /* Foreground + accent */
+  --luxe-fg:        #ededef;
+  --luxe-fg-muted:  #8a8f98;
+  --luxe-fg-dim:    #5a5f68;
+
+  /* Accent colors — indigo lead (Linear-style) + the portfolio's
+     existing cyan/violet/amber for the iridescent treatments. */
+  --luxe-accent:        #5e6ad2;
+  --luxe-accent-glow:   rgba(94, 106, 210, 0.22);
+  --luxe-cyan:          #22d3ee;
+  --luxe-violet:        #8b5cf6;
+  --luxe-amber:         #f59e0b;
+  --luxe-rose:          #ec4899;
+
+  /* Hairline borders — 1px is too loud on dark; use translucent white */
+  --luxe-border:       rgba(255, 255, 255, 0.08);
+  --luxe-border-hi:    rgba(255, 255, 255, 0.14);
+
+  /* Geometry + motion */
+  --luxe-radius:       16px;
+  --luxe-radius-lg:    24px;
+  --luxe-radius-pill:  9999px;
+  --luxe-easing:       cubic-bezier(0.16, 1, 0.3, 1);  /* expo.out */
+  --luxe-dur-fast:     180ms;
+  --luxe-dur-base:     320ms;
+  --luxe-dur-slow:     520ms;
+
+  /* Blur strengths — heavier blur on bigger surfaces */
+  --luxe-blur-sm:  10px;
+  --luxe-blur-md:  18px;
+  --luxe-blur-lg:  28px;
+}
+
+/* ── Page stage ─────────────────────────────────────────────────── */
+/* A "luxe-stage" is a section that sets the cinematic backdrop —
+   layered gradient from elevated (top) → deep (bottom). Drop the
+   AmbientBlobs component inside for the slow drifting light. */
+.luxe-stage {
+  position: relative;
+  background:
+    radial-gradient(1200px 800px at 80% -10%, rgba(94, 106, 210, 0.10), transparent 60%),
+    radial-gradient(900px 600px at -10% 110%, rgba(34, 211, 238, 0.07), transparent 60%),
+    linear-gradient(180deg, var(--luxe-bg-elevated) 0%, var(--luxe-bg-deep) 100%);
+  isolation: isolate;
+}
+
+/* ── Glass surfaces ──────────────────────────────────────────────── */
+/* `.glass` is the lightweight version for chips and inline pills;
+   `.glass-card` is the heavier surface used for actual cards. */
+.glass {
+  background: var(--luxe-surface);
+  border: 1px solid var(--luxe-border);
+  backdrop-filter: blur(var(--luxe-blur-sm)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--luxe-blur-sm)) saturate(160%);
+  border-radius: var(--luxe-radius);
+}
+
+.glass-card {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015)),
+    rgba(10, 10, 12, 0.55);
+  border: 1px solid var(--luxe-border);
+  backdrop-filter: blur(var(--luxe-blur-md)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--luxe-blur-md)) saturate(180%);
+  border-radius: var(--luxe-radius);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.04) inset,                /* top-edge sheen */
+    0 24px 60px -28px rgba(0, 0, 0, 0.7),                      /* far shadow  */
+    0 8px 24px -10px rgba(0, 0, 0, 0.5);                       /* near shadow */
+}
+
+/* Iridescent border accent — slides on hover */
+.glass-card-glow {
+  position: relative;
+}
+.glass-card-glow::before {
+  content: "";
+  position: absolute; inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg,
+    rgba(94, 106, 210, 0.55),
+    rgba(34, 211, 238, 0.35) 35%,
+    rgba(139, 92, 246, 0.45) 55%,
+    rgba(245, 158, 11, 0.35));
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  opacity: 0;
+  transition: opacity var(--luxe-dur-base) var(--luxe-easing);
+  pointer-events: none;
+}
+.glass-card-glow:hover::before { opacity: 1; }
+
+/* ── Hero text ──────────────────────────────────────────────────── */
+.luxe-title {
+  background: linear-gradient(135deg,
+    #fafafa 0%,
+    #d4d4d8 30%,
+    var(--luxe-violet) 65%,
+    var(--luxe-cyan) 100%);
+  -webkit-background-clip: text;
+          background-clip: text;
+  color: transparent;
+  letter-spacing: -0.02em;
+}
+.luxe-title-iridescent {
+  background: linear-gradient(135deg,
+    var(--luxe-cyan) 0%,
+    var(--luxe-violet) 38%,
+    var(--luxe-rose) 62%,
+    var(--luxe-amber) 100%);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+          background-clip: text;
+  color: transparent;
+  animation: luxe-shift 12s ease-in-out infinite;
+}
+@keyframes luxe-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+
+/* ── Pills + buttons ────────────────────────────────────────────── */
+.luxe-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--luxe-radius-pill);
+  background: rgba(94, 106, 210, 0.10);
+  border: 1px solid rgba(94, 106, 210, 0.35);
+  color: #c7cbe6;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  backdrop-filter: blur(var(--luxe-blur-sm));
+}
+
+.luxe-cta {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border: none;
+  border-radius: var(--luxe-radius);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #fff;
+  background: linear-gradient(135deg, var(--luxe-cyan), var(--luxe-violet) 50%, var(--luxe-amber));
+  cursor: pointer;
+  box-shadow:
+    0 8px 32px -12px var(--luxe-accent-glow),
+    0 2px 0 0 rgba(255, 255, 255, 0.12) inset;
+  transition: transform var(--luxe-dur-fast) var(--luxe-easing),
+              box-shadow var(--luxe-dur-base) var(--luxe-easing);
+}
+.luxe-cta:hover  { transform: translateY(-1px); box-shadow: 0 12px 36px -10px var(--luxe-accent-glow), 0 2px 0 0 rgba(255, 255, 255, 0.18) inset; }
+.luxe-cta:active { transform: scale(0.97); }
+
+/* The haptic-feeling press. Apply to any clickable. */
+.luxe-press {
+  transition: transform var(--luxe-dur-fast) var(--luxe-easing);
+}
+.luxe-press:active { transform: scale(0.97); }
+
+/* ── Ambient blobs (rendered by AmbientBlobs.jsx) ──────────────── */
+.luxe-blob {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 9999px;
+  filter: blur(60px);
+  opacity: 0.5;
+  mix-blend-mode: screen;
+  will-change: transform;
+  animation: luxe-blob-drift 22s var(--luxe-easing) infinite alternate;
+}
+@keyframes luxe-blob-drift {
+  0%   { transform: translate(0%,   0%)  scale(1); }
+  50%  { transform: translate(-6%, 8%)   scale(1.15); }
+  100% { transform: translate(8%,  -6%)  scale(0.95); }
+}
+
+/* ── Section dividers ──────────────────────────────────────────── */
+.luxe-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--luxe-border-hi), transparent);
+}
+
+/* ── Reduced motion respect ────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .luxe-blob,
+  .luxe-title-iridescent {
+    animation: none !important;
+  }
+  .luxe-cta,
+  .luxe-press {
+    transition: none !important;
+  }
+}
+
+/* ── Mobile tightening ─────────────────────────────────────────── */
+@media (max-width: 640px) {
+  :root {
+    --luxe-radius:    14px;
+    --luxe-radius-lg: 20px;
+    --luxe-blur-md:   14px;
+    --luxe-blur-lg:   20px;
+  }
+  .luxe-pill { font-size: 9px; padding: 3px 8px; }
+  .glass-card {
+    /* less heavy on phone GPUs */
+    backdrop-filter: blur(var(--luxe-blur-sm)) saturate(150%);
+    -webkit-backdrop-filter: blur(var(--luxe-blur-sm)) saturate(150%);
+  }
+}
