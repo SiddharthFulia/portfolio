@@ -145,7 +145,32 @@ function createBoard() {
     history: [],       // array of move-undo data
     moveList: [],      // algebraic move list for display
     captured: { [WHITE]: [], [BLACK]: [] },
+    // Map<positionKey, count> — used to detect threefold repetition.
+    // A position key encodes board layout + side-to-move + castle rights +
+    // en-passant target, matching FIDE's repetition definition (same
+    // position with same player to move, same castling availability, and
+    // same en-passant possibilities counts as a repetition).
+    posCounts: new Map(),
   }
+}
+
+// Build the canonical FEN-style key for a position. Used as Map key in
+// posCounts. We don't include halfMove / fullMove counters since FIDE
+// repetition rule ignores them — repeated positions count as draw even
+// with different clocks.
+function positionKey(state) {
+  // 64-char piece layout. Lowercase for black, uppercase for white.
+  // EMPTY squares emit a dot (cheaper than RLE for a memoized key).
+  const glyphs = ['.', 'P', 'N', 'B', 'R', 'Q', 'K']
+  let board = ''
+  for (let i = 0; i < 64; i++) {
+    const sq = SQ120[i]
+    const p = state.board[sq]
+    if (p === EMPTY) { board += '.'; continue }
+    const g = glyphs[p] || '?'
+    board += state.colors[sq] === BLACK ? g.toLowerCase() : g
+  }
+  return `${board}|${state.side}|${state.castlePerm}|${state.enPas}`
 }
 
 // Castle permission bits
@@ -687,7 +712,40 @@ function cloneState(state) {
       [WHITE]: [...state.captured[WHITE]],
       [BLACK]: [...state.captured[BLACK]],
     },
+    posCounts: new Map(state.posCounts || []),
   }
+}
+
+// ─── Piece theme catalog ─────────────────────────────────────────────
+// Each theme returns CSS styles applied to the rendered piece span. Glyphs
+// stay as standard unicode (same chars on every theme) — what changes is
+// stroke / fill / shadow / colour so users get visual variety without
+// shipping SVG asset packs. Add more themes by adding entries here.
+const PIECE_THEMES = {
+  classic: {
+    label: 'Classic',
+    desc: 'Standard unicode pieces',
+    white: { color: '#ffffff', textShadow: '0 1px 2px rgba(0,0,0,0.5), 0 0 1px rgba(0,0,0,0.8)' },
+    black: { color: '#1a1a1a', textShadow: '0 1px 2px rgba(0,0,0,0.4)' },
+  },
+  outlined: {
+    label: 'Outlined',
+    desc: 'Stroked silhouettes',
+    white: { color: 'transparent', WebkitTextStroke: '1.5px #f1f5f9', textShadow: '0 2px 4px rgba(0,0,0,0.4)' },
+    black: { color: 'transparent', WebkitTextStroke: '1.5px #0f172a', textShadow: '0 2px 4px rgba(0,0,0,0.3)' },
+  },
+  neon: {
+    label: 'Neon',
+    desc: 'Cyber glow',
+    white: { color: '#67e8f9', textShadow: '0 0 8px #22d3ee, 0 0 16px #22d3ee' },
+    black: { color: '#f0abfc', textShadow: '0 0 8px #d946ef, 0 0 16px #c026d3' },
+  },
+  warm: {
+    label: 'Warm',
+    desc: 'Wood-board palette',
+    white: { color: '#fef3c7', textShadow: '0 2px 3px rgba(120,53,15,0.6)' },
+    black: { color: '#7c2d12', textShadow: '0 2px 3px rgba(0,0,0,0.3)' },
+  },
 }
 
 // ─── React Component ─────────────────────────────────────────────────────────
@@ -702,6 +760,17 @@ export default function ChessEngine() {
   const [aiInfo, setAiInfo] = useState({ depth: 0, nodes: 0, time: 0, score: 0 })
   const [gameOver, setGameOver] = useState(null) // null | 'checkmate' | 'stalemate' | 'draw'
   const [winner, setWinner] = useState(null) // WHITE | BLACK | null
+  // Tracks the specific draw cause so the modal can show the right copy
+  // ('50-move rule' / 'threefold repetition' / 'insufficient material').
+  const [drawReason, setDrawReason] = useState(null)
+  // Visual piece theme — purely cosmetic, no engine impact. Persists per
+  // user via localStorage so the choice survives reloads.
+  const [pieceTheme, setPieceTheme] = useState(() => {
+    try { return localStorage.getItem('sid-chess-theme') || 'classic' } catch { return 'classic' }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('sid-chess-theme', pieceTheme) } catch {}
+  }, [pieceTheme])
   const [promoSquare, setPromoSquare] = useState(null) // { from, to } if promotion choice needed
   const [showBestMoves, setShowBestMoves] = useState(false)
   const [bestMoves, setBestMoves] = useState([]) // top moves with eval
@@ -728,8 +797,17 @@ export default function ChessEngine() {
       }
       return true
     }
+    // 50-move rule
     if (state.halfMove >= 100) {
       setGameOver('draw')
+      setDrawReason('50-move rule')
+      return true
+    }
+    // Threefold repetition — current position has appeared at least 3 times
+    const curKey = positionKey(state)
+    if ((state.posCounts?.get(curKey) || 0) >= 3) {
+      setGameOver('draw')
+      setDrawReason('threefold repetition')
       return true
     }
     // Insufficient material check (K vs K, K+B vs K, K+N vs K)
@@ -744,14 +822,17 @@ export default function ChessEngine() {
     const bp = pieces[BLACK].filter(p => p !== KING)
     if (wp.length === 0 && bp.length === 0) {
       setGameOver('draw')
+      setDrawReason('insufficient material (K vs K)')
       return true
     }
     if (wp.length === 0 && bp.length === 1 && (bp[0] === BISHOP || bp[0] === KNIGHT)) {
       setGameOver('draw')
+      setDrawReason('insufficient material')
       return true
     }
     if (bp.length === 0 && wp.length === 1 && (wp[0] === BISHOP || wp[0] === KNIGHT)) {
       setGameOver('draw')
+      setDrawReason('insufficient material')
       return true
     }
     return false
@@ -769,6 +850,15 @@ export default function ChessEngine() {
     const alg = moveToAlg(move, newState)
     makeMove(newState, move)
     newState.moveList.push(alg)
+    // Track repetition. Increment count for the new position. Reset on
+    // any irreversible move (capture or pawn push) — those clear the
+    // repetition history per FIDE rules because the position can never
+    // recur once material disappears or a pawn advances.
+    if (move.captured !== EMPTY || newState.halfMove === 0) {
+      newState.posCounts = new Map()
+    }
+    const key = positionKey(newState)
+    newState.posCounts.set(key, (newState.posCounts.get(key) || 0) + 1)
     setLastMove({ from: move.from, to: move.to })
     setSelected(null)
     setLegalMoves([])
@@ -906,6 +996,7 @@ export default function ChessEngine() {
     setAiThinking(false)
     setGameOver(null)
     setWinner(null)
+    setDrawReason(null)
     setPromoSquare(null)
     setAiInfo({ depth: 0, nodes: 0, time: 0, score: 0 })
   }, [])
@@ -1106,6 +1197,22 @@ export default function ChessEngine() {
     const squares = []
     const legalTargets = new Set(legalMoves.map(m => m.to))
 
+    // Find the king-in-check square (if any) — render its tile in a
+    // pulsing fade-red so the player sees the threat immediately.
+    // Scan the board for the king of the side-to-move; check is by
+    // definition only relevant for the player about to move.
+    let checkSquare = -1
+    if (!gameOver && isInCheck(gameState)) {
+      const side = gameState.side
+      for (let i = 0; i < 64; i++) {
+        const sq = SQ120[i]
+        if (gameState.board[sq] === KING && gameState.colors[sq] === side) {
+          checkSquare = sq
+          break
+        }
+      }
+    }
+
     for (let row = 0; row < 8; row++) {
       for (let col = 0; col < 8; col++) {
         const idx64 = row * 8 + col
@@ -1118,11 +1225,15 @@ export default function ChessEngine() {
         const isLegalTarget = legalTargets.has(sq120)
         const isLastFrom = lastMove && sq120 === lastMove.from
         const isLastTo = lastMove && sq120 === lastMove.to
+        const isCheckSquare = sq120 === checkSquare
 
         const isHighlighted = highlights.some(h => h.row === row && h.col === col)
 
         let bgColor = isLight ? '#ebecd0' : '#779952'
-        if (isHighlighted) bgColor = isLight ? '#eb6a5a' : '#d44a3a'
+        // Check highlight takes priority over last-move/selected so the
+        // threat is unmissable. Light/dark variants keep tile contrast.
+        if (isCheckSquare) bgColor = isLight ? '#f87171' : '#dc2626'
+        else if (isHighlighted) bgColor = isLight ? '#eb6a5a' : '#d44a3a'
         else if (isSelected) bgColor = isLight ? '#f7f769' : '#bbcc44'
         else if (isLastFrom || isLastTo) bgColor = isLight ? '#f5f682' : '#b9ca43'
 
@@ -1182,21 +1293,22 @@ export default function ChessEngine() {
                 pointerEvents: 'none',
               }} />
             )}
-            {/* Piece */}
-            {pieceChar && (
-              <span style={{
-                fontSize: 'min(5.5vw, 46px)',
-                lineHeight: 1,
-                color: color === WHITE ? '#fff' : '#1a1a1a',
-                textShadow: color === WHITE
-                  ? '0 0 2px rgba(0,0,0,0.8), 0 1px 3px rgba(0,0,0,0.5), 1px 0 0 rgba(0,0,0,0.4), -1px 0 0 rgba(0,0,0,0.4), 0 -1px 0 rgba(0,0,0,0.4), 0 1px 0 rgba(0,0,0,0.4)'
-                  : '0 0 2px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.3)',
-                transition: 'transform 0.1s',
-                opacity: dragSq === sq120 ? 0.3 : 1,
-              }}>
-                {pieceChar}
-              </span>
-            )}
+            {/* Piece — pulls colour/shadow from the picked piece theme. */}
+            {pieceChar && (() => {
+              const themeDef = (PIECE_THEMES[pieceTheme] || PIECE_THEMES.classic)
+              const tone = color === WHITE ? themeDef.white : themeDef.black
+              return (
+                <span style={{
+                  fontSize: 'min(5.5vw, 46px)',
+                  lineHeight: 1,
+                  transition: 'transform 0.1s',
+                  opacity: dragSq === sq120 ? 0.3 : 1,
+                  ...tone,
+                }}>
+                  {pieceChar}
+                </span>
+              )
+            })()}
           </div>
         )
       }
@@ -1475,7 +1587,9 @@ export default function ChessEngine() {
                   {gameOver === 'draw' && 'Draw'}
                 </div>
                 <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
-                  {gameOver === 'checkmate' ? 'Checkmate' : gameOver === 'stalemate' ? 'No legal moves' : 'Insufficient material / 50 move rule'}
+                  {gameOver === 'checkmate' ? 'Checkmate'
+                    : gameOver === 'stalemate' ? 'Stalemate · no legal moves'
+                    : `Draw · ${drawReason || 'insufficient material / 50-move rule'}`}
                 </div>
                 <button
                   onClick={newGame}
@@ -1568,6 +1682,29 @@ export default function ChessEngine() {
                     }}
                   >
                     {d}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Piece theme picker — purely cosmetic. Persisted to localStorage. */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.75rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>Pieces:</span>
+              <div style={{ display: 'flex', gap: '4px', flex: 1 }}>
+                {Object.entries(PIECE_THEMES).map(([id, t]) => (
+                  <button
+                    key={id}
+                    onClick={() => setPieceTheme(id)}
+                    title={t.desc}
+                    style={{
+                      flex: 1, padding: '4px 0',
+                      background: id === pieceTheme ? '#7c3aed' : '#1e293b',
+                      border: id === pieceTheme ? '1px solid #a78bfa' : '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: '4px', color: id === pieceTheme ? '#fff' : '#94a3b8',
+                      fontWeight: 600, cursor: 'pointer', fontSize: '0.7rem',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {t.label}
                   </button>
                 ))}
               </div>
@@ -1685,7 +1822,7 @@ export default function ChessEngine() {
                 {gameOver === 'checkmate' && winner === WHITE && 'Checkmate - You win!'}
                 {gameOver === 'checkmate' && winner === BLACK && 'Checkmate - AI wins!'}
                 {gameOver === 'stalemate' && 'Stalemate - Draw'}
-                {gameOver === 'draw' && 'Draw by 50-move rule'}
+                {gameOver === 'draw' && `Draw — ${drawReason || '50-move rule'}`}
               </span>
             ) : isInCheck(gameState) ? (
               <span style={{ color: '#f87171' }}>Check!</span>
