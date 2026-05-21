@@ -3,6 +3,7 @@ import { Suspense, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { HomeInfo, Loader } from "../components";
+import AnimatedShaderHero from "../components/luxe/AnimatedShaderHero";
 import { Bird, Island, Plane, Sky } from "../models";
 
 const STAGE_ROUTES = { 2: '/about', 3: '/projects', 4: '/contact' };
@@ -94,10 +95,23 @@ const Home = () => {
   const route = STAGE_ROUTES[currentStage];
 
   return (
-    <section className='w-full h-screen relative'>
-      <div className='absolute top-28 left-0 right-0 z-10 flex items-center justify-center'>
-        {currentStage && <HomeInfo currentStage={currentStage} />}
-      </div>
+    <>
+      {/* Full-viewport WebGL shader hero — first thing visitors see.
+          Scroll down to reach the existing 3D island experience. */}
+      <AnimatedShaderHero
+        trustBadge={{ text: "Siddharth · Engineer + Creator", icons: ["✨"] }}
+        headline={{ line1: "Building things", line2: "that ship" }}
+        subtitle="Full-stack engineering + generative AI + 5090-powered creative tools."
+        buttons={{
+          primary: { text: "Explore projects", onClick: () => navigate('/projects') },
+          secondary: { text: "See live AI", onClick: () => navigate('/ai') },
+        }}
+      />
+
+      <section className='w-full h-screen relative'>
+        <div className='absolute top-28 left-0 right-0 z-10 flex items-center justify-center'>
+          {currentStage && <HomeInfo currentStage={currentStage} />}
+        </div>
 
       <Canvas
         className={`w-full h-screen bg-transparent ${
@@ -171,20 +185,21 @@ const Home = () => {
         </div>
       )}
 
-      {/* Stage dots indicator */}
-      <div className='absolute bottom-14 left-1/2 -translate-x-1/2 z-10 flex gap-2'>
-        {[1, 2, 3, 4].map(s => (
-          <div
-            key={s}
-            className={`w-2 h-2 rounded-full transition-all duration-300 ${
-              currentStage === s
-                ? 'bg-blue-400 scale-125 shadow-md shadow-blue-400/50'
-                : 'bg-white/30'
-            }`}
-          />
-        ))}
-      </div>
-    </section>
+        {/* Stage dots indicator */}
+        <div className='absolute bottom-14 left-1/2 -translate-x-1/2 z-10 flex gap-2'>
+          {[1, 2, 3, 4].map(s => (
+            <div
+              key={s}
+              className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                currentStage === s
+                  ? 'bg-blue-400 scale-125 shadow-md shadow-blue-400/50'
+                  : 'bg-white/30'
+              }`}
+            />
+          ))}
+        </div>
+      </section>
+    </>
   );
 };
 

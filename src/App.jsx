@@ -35,6 +35,7 @@ const ImageEnhancerDetail = lazy(() => import("./pages/ImageEnhancerDetail"));
 const LipsyncDetail = lazy(() => import("./pages/LipsyncDetail"));
 const AudioDetail = lazy(() => import("./pages/AudioDetail"));
 const CinemaDetail = lazy(() => import("./pages/CinemaDetail"));
+const Studio = lazy(() => import("./pages/Studio"));
 
 /* ── Skeleton building blocks ── */
 const B = "animate-pulse bg-slate-200 rounded";
@@ -176,8 +177,9 @@ const App = () => {
           <Route path='/explore/:module' element={<Suspense fallback={<DarkPageSkeleton />}><ExploreModule /></Suspense>} />
           <Route path='/ai' element={<Suspense fallback={<DarkPageSkeleton />}><AIChat /></Suspense>} />
           <Route path='/ai/:chatId' element={<Suspense fallback={<DarkPageSkeleton />}><AIChat /></Suspense>} />
-          {/* /studio merged into /vision — keep alias so old links don't 404 */}
-          <Route path='/studio' element={<Suspense fallback={<DarkPageSkeleton />}><FaceDetection /></Suspense>} />
+          {/* /studio — multi-modal AI gen showcase (Image / Video / 3D Avatar).
+              Demo only — each Generate button routes to the real lane. */}
+          <Route path='/studio' element={<Suspense fallback={<DarkPageSkeleton />}><Studio /></Suspense>} />
           {/* AI Video + Image Studio are fully public. Generate / browse / delete
               are all open. Only the "Save to Vault" toggle on the create UI
               prompts for the password (handled inline in each page). */}

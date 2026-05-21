@@ -1,4 +1,5 @@
 import { useState, lazy, Suspense } from 'react'
+import AuroraShader from '../components/luxe/AuroraShader'
 
 const FaceAI = lazy(() => import('../components/vision/FaceAI'))
 const ImageEdit = lazy(() => import('../components/vision/ImageEdit'))
@@ -94,8 +95,9 @@ const FaceDetection = () => {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
+      <AuroraShader fixed intensity={0.6} zIndex={0} className="opacity-30" />
       {/* Hero */}
-      <div className="relative overflow-hidden">
+      <div className="relative z-10 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-cyan-900/20 via-purple-900/10 to-pink-900/20 pointer-events-none" />
         <div className="absolute -top-40 -left-20 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -top-20 -right-20 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -113,7 +115,7 @@ const FaceDetection = () => {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-5 sm:px-6 pb-24">
+      <div className="relative z-10 max-w-6xl mx-auto px-5 sm:px-6 pb-24">
         {/* Tool cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mb-8">
           {TOOLS.map(t => {

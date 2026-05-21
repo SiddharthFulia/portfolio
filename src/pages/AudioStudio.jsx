@@ -7,6 +7,7 @@ import PromptHelper from '../components/PromptHelper'
 import { useTilt, TILT_STYLE } from '../components/useTilt'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
 import AudioRecorder from '../components/AudioRecorder'
+import AuroraShader from '../components/luxe/AuroraShader'
 
 const KINDS = [
   { value: 'music',    label: '🎵 Music',           blurb: 'Background tracks, soundtracks, loops. Best for video soundtracks.',  defaultModel: 'musicgen' },
@@ -272,7 +273,8 @@ export default function AudioStudio() {
 
   return (
     <div className="min-h-screen bg-black text-gray-100 pt-20 pb-16 px-3 sm:px-6">
-      <div className="max-w-4xl mx-auto">
+      <AuroraShader fixed intensity={0.6} zIndex={0} className="opacity-30" />
+      <div className="max-w-4xl mx-auto relative z-10">
         <header className="mb-8">
           <div className="flex items-center gap-2 mb-2">
             <CustomerServiceOutlined className="text-fuchsia-400 text-xl" />

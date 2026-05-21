@@ -42,6 +42,7 @@ const Navbar = () => {
   const featuredPills = [
     { to: '/ai-video',       label: 'AI Video',     color: 'from-cyan-500 via-purple-500 to-amber-500' },
     { to: '/image-enhancer', label: 'Image Studio', color: 'from-cyan-300 via-fuchsia-400 to-amber-300' },
+    { to: '/studio',         label: 'Studio',       color: 'from-fuchsia-400 via-violet-400 to-cyan-400' },
     { to: '/lipsync',        label: 'Lip Sync',     color: 'from-emerald-400 via-cyan-400 to-fuchsia-400' },
     { to: '/audio',          label: 'Audio',        color: 'from-fuchsia-400 via-amber-400 to-emerald-400' },
     // Cinema is now a tab inside AI Video — the old /cinema route

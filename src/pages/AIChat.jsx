@@ -15,6 +15,8 @@ import ChatInput from '../components/ChatInput'
 import DownloadMenu from '../components/DownloadMenu'
 import MessageImage from '../components/MessageImage'
 import AmbientBlobs from '../components/luxe/AmbientBlobs'
+import AnimatedAIChat from '../components/luxe/AnimatedAIChat'
+import AuroraShader from '../components/luxe/AuroraShader'
 import {
   listLocalModels, createConversation, getConversation, sendChatMessage,
   getChatJobStatus, updateConversation,
@@ -160,6 +162,10 @@ const AIChat = () => {
 
   const pollRef = useRef(null)
   const scrollRef = useRef(null)
+  // When the user submits from the AnimatedAIChat hero (no chatId yet)
+  // we create a chat, navigate to it, then this ref carries the message
+  // text so an effect fires the actual send once the new chat is open.
+  const pendingInitialSendRef = useRef(null)
 
   useEffect(() => { document.title = chatId ? `Chat · ${chatId.slice(0,8)} · Sid` : 'AI Chat · Sid' }, [chatId])
 
@@ -241,7 +247,11 @@ const AIChat = () => {
   // New chat button — always starts on Studio Pro with the first
   // available local model. Users can switch provider/model per-message
   // afterwards, but new chats land on the premium lane by default.
-  const handleNewChat = async () => {
+  //
+  // If `initialMessage` is provided (e.g. the user submitted from the
+  // AnimatedAIChat hero) we stash it in a ref so an effect can dispatch
+  // it once the new chatId is mounted.
+  const handleNewChat = async (initialMessage) => {
     const startProvider = '5090'
     const firstLocal = localModels
       .filter(m => !isEmbeddingModel(m.name))[0]?.name || null
@@ -256,6 +266,14 @@ const AIChat = () => {
     if (err || !data?.chatId) {
       notify.error(err || 'Could not create chat')
       return
+    }
+    if (typeof initialMessage === 'string' && initialMessage.trim()) {
+      pendingInitialSendRef.current = {
+        chatId: data.chatId,
+        content: initialMessage.trim(),
+        model: firstLocal,
+        provider: startProvider,
+      }
     }
     setSidebarRefresh(n => n + 1)
     navigate(`/ai/${encodeURIComponent(data.chatId)}`)
@@ -505,6 +523,21 @@ const AIChat = () => {
     }
   }
 
+  // When the AnimatedAIChat hero submits, `handleNewChat` creates the
+  // chat and stashes the intended first message in `pendingInitialSendRef`.
+  // Once the new chatId is in the URL AND a model is selected, fire the
+  // send and clear the ref. Guard against firing twice + against firing
+  // when the user navigated to a different chat in between.
+  useEffect(() => {
+    const pending = pendingInitialSendRef.current
+    if (!pending) return
+    if (!chatId || pending.chatId !== chatId) return
+    if (!model) return  // wait for model to be defaulted from availableModels
+    pendingInitialSendRef.current = null
+    handleSubmit({ content: pending.content })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId, model])
+
   // ─── Render ─────────────────────────────────────────────
   return (
     <div className="min-h-screen luxe-stage text-gray-100 pt-20 relative">
@@ -665,10 +698,23 @@ const AIChat = () => {
               inner scroll, the chat itself stays purely vertical). */}
           <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden px-3 sm:px-5 py-4 space-y-3">
             {!chatId ? (
-              <WelcomeHero
-                provider={provider} localModels={localModels} localOnline={localOnline}
-                onPickProvider={setProvider} onNewChat={handleNewChat}
-              />
+              // Empty state: the animated composer hero sits at the top.
+              // Submitting through it creates a chat + dispatches the
+              // first message via the pending-send ref. The existing
+              // provider grid + 5090 status panel still appear below it
+              // unchanged.
+              <>
+                <AnimatedAIChat
+                  heading="How can I help today?"
+                  subheading="Type a command or ask a question"
+                  placeholder="Ask anything — pick a brain below or just hit send"
+                  onSend={(text) => handleNewChat(text)}
+                />
+                <WelcomeHero
+                  provider={provider} localModels={localModels} localOnline={localOnline}
+                  onPickProvider={setProvider} onNewChat={handleNewChat}
+                />
+              </>
             ) : messages.length === 0 ? (
               <div className="text-center text-gray-500 py-12 text-sm">
                 Start the conversation — type below or tap 🎙 to speak.
@@ -732,8 +778,9 @@ const AIChat = () => {
 // ─── Welcoming empty state ──────────────────────────────────
 function WelcomeHero({ provider, localModels, localOnline, onPickProvider, onNewChat }) {
   return (
-    <div className="max-w-3xl mx-auto py-6 sm:py-12 px-2">
-      <div className="text-center mb-8">
+    <div className="relative max-w-3xl mx-auto py-6 sm:py-12 px-2">
+      <AuroraShader intensity={0.4} zIndex={0} className="opacity-25 rounded-3xl" />
+      <div className="relative z-10 text-center mb-8">
         <div className="flex justify-center mb-3">
           <ChatLogo size={56} glow />
         </div>
@@ -749,7 +796,7 @@ function WelcomeHero({ provider, localModels, localOnline, onPickProvider, onNew
       </div>
 
       {/* Provider grid — 3D tilt feel via translateY hover */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+      <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
         {PROVIDERS.map(p => {
           const active = provider === p.id
           return (
@@ -774,7 +821,7 @@ function WelcomeHero({ provider, localModels, localOnline, onPickProvider, onNew
 
       {/* 5090 lane status panel */}
       {provider === '5090' && (
-        <div className="rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/5 via-rose-500/5 to-fuchsia-500/5 p-4 mb-6">
+        <div className="relative z-10 rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/5 via-rose-500/5 to-fuchsia-500/5 p-4 mb-6">
           <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
             <h3 className="text-sm font-bold bg-gradient-to-r from-amber-300 via-rose-300 to-fuchsia-300 bg-clip-text text-transparent">
               ⚡ Studio Pro — {localOnline ? 'online' : 'offline'}
@@ -809,7 +856,7 @@ function WelcomeHero({ provider, localModels, localOnline, onPickProvider, onNew
       )}
 
       {/* CTA */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 justify-center">
+      <div className="relative z-10 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 justify-center">
         <Button type="primary" size="large" onClick={onNewChat}
           icon={<span className="inline-flex items-center"><ChatLogo size={18} /></span>}
           style={{ background: 'linear-gradient(135deg, #06b6d4, #7c3aed, #f59e0b)', border: 'none', fontWeight: 700, paddingLeft: 14 }}
@@ -819,7 +866,7 @@ function WelcomeHero({ provider, localModels, localOnline, onPickProvider, onNew
       </div>
 
       {/* Helper grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-8">
+      <div className="relative z-10 grid grid-cols-1 sm:grid-cols-3 gap-2 mt-8">
         <HelpCard icon="🎙" title="Speak it" body="Tap the mic in the input row — Whisper transcribes your voice straight into the prompt." />
         <HelpCard icon="📷" title="Attach an image" body="Vision models on 5090 (Qwen2.5-VL, Llama Vision) + Gemini accept images for OCR, charts, screenshots." />
         <HelpCard icon="📄" title="Drop a document" body="Plain text, markdown, JSON, CSV, logs — gets embedded into your message for analysis." />

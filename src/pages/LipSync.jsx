@@ -6,6 +6,7 @@ import { submitLipsync, getLipsyncStatus, fileToDataUrl, listLipsyncJobs, lipsyn
 import { useTilt, TILT_STYLE } from '../components/useTilt'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
 import AudioRecorder from '../components/AudioRecorder'
+import AuroraShader from '../components/luxe/AuroraShader'
 
 const MODELS = [
   { value: 'latentsync',   label: 'LatentSync 1.5',  blurb: 'Best mouth detail. ByteDance. ~1-3min for a 10s clip on 5090.' },
@@ -83,7 +84,8 @@ export default function LipSync() {
 
   return (
     <div className="min-h-screen bg-black text-gray-100 pt-20 pb-16 px-3 sm:px-6">
-      <div className="max-w-5xl mx-auto">
+      <AuroraShader fixed intensity={0.6} zIndex={0} className="opacity-30" />
+      <div className="max-w-5xl mx-auto relative z-10">
         <header className="mb-8">
           <div className="flex items-center gap-2 mb-2">
             <SoundOutlined className="text-emerald-400 text-xl" />

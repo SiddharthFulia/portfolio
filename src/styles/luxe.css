@@ -234,6 +234,235 @@
   }
 }
 
+/* ── Shader Hero animations (AnimatedShaderHero) ─────────────── */
+/* Prefixed keyframes + helper classes for the full-screen WebGL hero.
+   The component handles its own canvas; these only drive the overlay
+   text/CTA fade-in cascade and the CTA's slow gradient shift. */
+@keyframes shader-hero-fade-in-down {
+  from { opacity: 0; transform: translateY(-20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes shader-hero-fade-in-up {
+  from { opacity: 0; transform: translateY(30px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes shader-hero-gradient-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.shader-hero-fade-in-down {
+  animation: shader-hero-fade-in-down 0.8s ease-out forwards;
+}
+.shader-hero-fade-in-up {
+  animation: shader-hero-fade-in-up 0.8s ease-out forwards;
+  opacity: 0;
+}
+.shader-hero-delay-200 { animation-delay: 0.2s; }
+.shader-hero-delay-400 { animation-delay: 0.4s; }
+.shader-hero-delay-600 { animation-delay: 0.6s; }
+.shader-hero-delay-800 { animation-delay: 0.8s; }
+.shader-hero-gradient {
+  background-size: 200% 200%;
+  animation: shader-hero-gradient-shift 3s ease infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .shader-hero-fade-in-down,
+  .shader-hero-fade-in-up,
+  .shader-hero-gradient {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+}
+
+/* ── Animated AI Chat ripple keyframes ────────────────────────── */
+/* Used by the AnimatedAIChat composer's textarea focus indicator.
+   Renamed from the upstream `ripple` keyframe to `luxe-ripple-keyframes`
+   so it can't collide with any other ripple animation in the app. */
+@keyframes luxe-ripple-keyframes {
+  0%   { transform: scale(0.5); opacity: 0.6; }
+  100% { transform: scale(2);   opacity: 0;   }
+}
+
+/* ── Premium card surface ───────────────────────────────────────── */
+/* The default card across the app. Single shadow, hairline border,
+   subtle gradient sheen on top. `.luxe-card` is static; add
+   `.luxe-card-hover` for the recruiter-friendly lift on hover. */
+.luxe-card {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.01)),
+    rgba(10, 10, 13, 0.82);
+  border: 1px solid var(--luxe-border);
+  border-radius: var(--luxe-radius);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.04) inset,
+    0 12px 36px -18px rgba(0, 0, 0, 0.65),
+    0 4px 12px -6px rgba(0, 0, 0, 0.4);
+}
+.luxe-card-hover {
+  transition: transform var(--luxe-dur-base) var(--luxe-easing),
+              box-shadow var(--luxe-dur-base) var(--luxe-easing),
+              border-color var(--luxe-dur-base) var(--luxe-easing);
+}
+.luxe-card-hover:hover {
+  transform: translateY(-2px);
+  border-color: var(--luxe-border-hi);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.07) inset,
+    0 20px 50px -18px rgba(0, 0, 0, 0.75),
+    0 8px 20px -8px rgba(0, 0, 0, 0.5),
+    0 0 24px -8px var(--luxe-accent-glow);
+}
+
+/* ── Buttons ────────────────────────────────────────────────────── */
+/* One primary, one secondary, one ghost — recruiters know what to
+   click without thinking. Each uses the same easing + spacing so
+   they read as a system. */
+.luxe-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: var(--luxe-radius);
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1;
+  letter-spacing: 0.005em;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  border: 1px solid transparent;
+  transition: transform var(--luxe-dur-fast) var(--luxe-easing),
+              box-shadow var(--luxe-dur-base) var(--luxe-easing),
+              background-color var(--luxe-dur-base) var(--luxe-easing),
+              border-color var(--luxe-dur-base) var(--luxe-easing),
+              color var(--luxe-dur-fast) var(--luxe-easing);
+}
+.luxe-btn:active { transform: scale(0.97); }
+.luxe-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--luxe-accent-glow);
+}
+
+.luxe-btn-primary {
+  color: #fff;
+  background: var(--luxe-accent);
+  box-shadow:
+    0 8px 24px -10px var(--luxe-accent-glow),
+    0 1px 0 0 rgba(255, 255, 255, 0.18) inset;
+}
+.luxe-btn-primary:hover {
+  background: #6a76e0;
+  transform: translateY(-1px);
+  box-shadow:
+    0 14px 32px -10px var(--luxe-accent-glow),
+    0 1px 0 0 rgba(255, 255, 255, 0.22) inset;
+}
+
+.luxe-btn-secondary {
+  color: var(--luxe-fg);
+  background: var(--luxe-surface);
+  border-color: var(--luxe-border-hi);
+  backdrop-filter: blur(var(--luxe-blur-sm));
+  -webkit-backdrop-filter: blur(var(--luxe-blur-sm));
+}
+.luxe-btn-secondary:hover {
+  background: var(--luxe-surface-hi);
+  border-color: rgba(94, 106, 210, 0.4);
+  transform: translateY(-1px);
+}
+
+.luxe-btn-ghost {
+  color: var(--luxe-fg-muted);
+  background: transparent;
+}
+.luxe-btn-ghost:hover {
+  color: var(--luxe-fg);
+  background: var(--luxe-surface);
+}
+
+/* ── Inputs ─────────────────────────────────────────────────────── */
+.luxe-input,
+.luxe-textarea {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--luxe-surface);
+  border: 1px solid var(--luxe-border);
+  border-radius: var(--luxe-radius);
+  color: var(--luxe-fg);
+  font-size: 14px;
+  line-height: 1.5;
+  transition: border-color var(--luxe-dur-base) var(--luxe-easing),
+              box-shadow var(--luxe-dur-base) var(--luxe-easing),
+              background-color var(--luxe-dur-base) var(--luxe-easing);
+}
+.luxe-input::placeholder,
+.luxe-textarea::placeholder { color: var(--luxe-fg-dim); }
+.luxe-input:hover,
+.luxe-textarea:hover { background: var(--luxe-surface-hi); }
+.luxe-input:focus,
+.luxe-textarea:focus {
+  outline: none;
+  border-color: rgba(94, 106, 210, 0.55);
+  background: rgba(94, 106, 210, 0.06);
+  box-shadow: 0 0 0 3px var(--luxe-accent-glow);
+}
+.luxe-textarea { resize: vertical; min-height: 90px; line-height: 1.55; }
+
+/* ── Typography helpers ─────────────────────────────────────────── */
+/* Use these for hero / section headers so every page feels the same.
+     .luxe-eyebrow      — small uppercase label above a hero
+     .luxe-section-title — H2-class section heading
+     .luxe-body-muted   — secondary supporting copy */
+.luxe-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--luxe-fg-muted);
+}
+.luxe-section-title {
+  font-size: clamp(22px, 3vw, 32px);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--luxe-fg);
+  margin: 0;
+}
+.luxe-body-muted {
+  color: var(--luxe-fg-muted);
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+/* ── Skeleton shimmer (cleaner than the wide blue pulse) ─────── */
+.luxe-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--luxe-surface);
+  border-radius: var(--luxe-radius);
+}
+.luxe-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%,
+                              rgba(255, 255, 255, 0.05) 40%,
+                              rgba(255, 255, 255, 0.12) 50%,
+                              rgba(255, 255, 255, 0.05) 60%,
+                              transparent 100%);
+  animation: luxe-shimmer 1.6s infinite;
+}
+@keyframes luxe-shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
 /* ── Mobile tightening ─────────────────────────────────────────── */
 @media (max-width: 640px) {
   :root {
@@ -248,4 +477,12 @@
     backdrop-filter: blur(var(--luxe-blur-sm)) saturate(150%);
     -webkit-backdrop-filter: blur(var(--luxe-blur-sm)) saturate(150%);
   }
+  .luxe-btn { padding: 9px 14px; font-size: 12px; }
+  .luxe-section-title { font-size: 22px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .luxe-card-hover,
+  .luxe-btn { transition: none !important; }
+  .luxe-skeleton::after { animation: none !important; }
 }
