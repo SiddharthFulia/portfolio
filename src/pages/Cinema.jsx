@@ -6,7 +6,11 @@ import { submitCinema, listCinemaProjects, cinemaBulkAction } from '../api/ai'
 import PromptHelper from '../components/PromptHelper'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
 
-export default function Cinema() {
+// `embedded` mode (passed when Cinema lives inside the AI Video tabs):
+//   - drops the outer page wrapper (no extra pt-20 / min-h-screen)
+//   - skips the document.title bump so AIVideo's title stays in charge
+//   - tightens the header since AIVideo already shows its own hero
+export default function Cinema({ embedded = false }) {
   const navigate = useNavigate()
   const [masterPrompt, setMasterPrompt] = useState('')
   const [shotCount, setShotCount] = useState(4)
@@ -22,7 +26,9 @@ export default function Cinema() {
   const [coachError, setCoachError] = useState('')
   const [libraryRefresh, setLibraryRefresh] = useState(0)
 
-  useEffect(() => { document.title = 'Cinema · Sid' }, [])
+  useEffect(() => {
+    if (!embedded) document.title = 'Cinema · Sid'
+  }, [embedded])
 
   const plan = async () => {
     if (!masterPrompt.trim() || masterPrompt.trim().length < 5) {
@@ -59,22 +65,35 @@ export default function Cinema() {
     navigate(`/ai-video?${qs}`)
   }
 
+  // Page wrapper: standalone gets the full pt-20 + min-h-screen; embedded
+  // (inside the AIVideo tabs) just renders the inner content so the host
+  // tab pane controls layout.
+  const Outer = embedded
+    ? ({ children }) => <div>{children}</div>
+    : ({ children }) => (
+        <div className="min-h-screen bg-black text-gray-100 pt-20 pb-16 px-3 sm:px-6">
+          {children}
+        </div>
+      )
+
   return (
-    <div className="min-h-screen bg-black text-gray-100 pt-20 pb-16 px-3 sm:px-6">
-      <div className="max-w-5xl mx-auto">
-        <header className="mb-8">
-          <div className="flex items-center gap-2 mb-2">
-            <VideoCameraOutlined className="text-amber-400 text-xl" />
-            <h1 className="text-2xl sm:text-4xl font-bold leading-tight pb-1 bg-gradient-to-r from-amber-300 via-rose-400 to-fuchsia-300 bg-clip-text text-transparent">
-              Cinema
-            </h1>
-          </div>
-          <p className="text-sm text-gray-400 max-w-2xl">
-            Multi-shot orchestration. Type one master prompt → Groq breaks it
-            into N shot prompts → render each via the AI Video lane → stitch.
-            <span className="text-amber-300/80"> Beta — planning works; rendering is manual via /ai-video for now.</span>
-          </p>
-        </header>
+    <Outer>
+      <div className={embedded ? '' : 'max-w-5xl mx-auto'}>
+        {!embedded && (
+          <header className="mb-8">
+            <div className="flex items-center gap-2 mb-2">
+              <VideoCameraOutlined className="text-amber-400 text-xl" />
+              <h1 className="text-2xl sm:text-4xl font-bold leading-tight pb-1 bg-gradient-to-r from-amber-300 via-rose-400 to-fuchsia-300 bg-clip-text text-transparent">
+                Cinema
+              </h1>
+            </div>
+            <p className="text-sm text-gray-400 max-w-2xl">
+              Multi-shot orchestration. Type one master prompt → Groq breaks it
+              into N shot prompts → render each via the AI Video lane → stitch.
+              <span className="text-amber-300/80"> Beta — planning works; rendering is manual via /ai-video for now.</span>
+            </p>
+          </header>
+        )}
 
         {/* Master prompt */}
         <section className="mb-6 space-y-4">
@@ -226,7 +245,7 @@ export default function Cinema() {
           )}
         />
       </div>
-    </div>
+    </Outer>
   )
 }
 

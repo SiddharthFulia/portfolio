@@ -44,7 +44,8 @@ const Navbar = () => {
     { to: '/image-enhancer', label: 'Image Studio', color: 'from-cyan-300 via-fuchsia-400 to-amber-300' },
     { to: '/lipsync',        label: 'Lip Sync',     color: 'from-emerald-400 via-cyan-400 to-fuchsia-400' },
     { to: '/audio',          label: 'Audio',        color: 'from-fuchsia-400 via-amber-400 to-emerald-400' },
-    { to: '/cinema',         label: 'Cinema',       color: 'from-amber-400 via-rose-400 to-fuchsia-400' },
+    // Cinema is now a tab inside AI Video — the old /cinema route
+    // redirects to /ai-video?tab=cinema, so no top-level pill needed.
     { to: '/ai',             label: 'AI Chat',      color: 'from-blue-500 to-cyan-500' },
     { to: '/vision',         label: 'Vision AI',    color: 'from-purple-500 to-pink-600' },
     { to: '/hand',           label: 'Hand Tracking', color: 'from-cyan-400 via-violet-400 to-fuchsia-500' },

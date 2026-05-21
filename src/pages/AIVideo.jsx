@@ -1,6 +1,10 @@
-import { useState, useEffect, useRef } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Input, Button, Select, Switch, Tabs, Modal, Upload, message as antMessage } from 'antd'
+
+// Cinema lives inside this page as a tab. Lazy-loaded so the Cinema
+// bundle only ships when the user actually opens the tab.
+const Cinema = lazy(() => import('./Cinema'))
 import {
   VideoCameraOutlined, ThunderboltOutlined, CopyOutlined, CheckOutlined,
   DownloadOutlined, ReloadOutlined, LinkOutlined, InfoCircleOutlined, AppstoreOutlined,
@@ -1698,6 +1702,19 @@ const LibraryTab = ({ refreshKey }) => {
 const AIVideo = () => {
   const [today, setToday] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  // Active tab is mirrored to the URL (?tab=cinema) so links + browser
+  // back-button work intuitively. Default to 'generate' when nothing
+  // is in the URL.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const activeKey = ['generate', 'jobs', 'library', 'cinema'].includes(searchParams.get('tab'))
+    ? searchParams.get('tab')
+    : 'generate'
+  const onTabChange = (k) => {
+    const next = new URLSearchParams(searchParams)
+    if (k === 'generate') next.delete('tab')
+    else next.set('tab', k)
+    setSearchParams(next, { replace: false })
+  }
 
   useEffect(() => {
     getTodayVideo().then(({ data }) => setToday(data))
@@ -1714,26 +1731,45 @@ const AIVideo = () => {
         <div className="relative max-w-6xl mx-auto px-5 sm:px-6 pt-28 sm:pt-32 pb-8">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gray-800/60 border border-gray-700 backdrop-blur-sm mb-3">
             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-            <span className="text-[11px] uppercase tracking-wider text-gray-300 font-semibold">multi-provider · 5090 powered</span>
+            <span className="text-[11px] uppercase tracking-wider text-gray-300 font-semibold">
+              {activeKey === 'cinema' ? 'multi-shot orchestrator · 5090 powered' : 'multi-provider · 5090 powered'}
+            </span>
           </div>
           <h1 className="font-poppins font-black text-3xl sm:text-5xl md:text-6xl bg-gradient-to-r from-cyan-300 via-purple-300 to-amber-300 bg-clip-text text-transparent leading-tight pb-1 mb-2">
-            AI Video Studio
+            {activeKey === 'cinema' ? 'Cinema · Multi-shot' : 'AI Video Studio'}
           </h1>
           <p className="text-gray-400 text-sm sm:text-base max-w-xl">
-            Type a prompt → get a Reel-style video. ZSky for instant results, GPU Worker for queued open-source ComfyUI, or my 5090 Beast for fast text + image-to-video.
+            {activeKey === 'cinema'
+              ? 'One master prompt → Groq plans N shots → render each via the AI Video lane → stitch.'
+              : 'Type a prompt → get a Reel-style video. ZSky for instant results, GPU Worker for queued open-source ComfyUI, or my 5090 Beast for fast text + image-to-video.'
+            }
           </p>
         </div>
       </div>
 
       <div className="max-w-6xl mx-auto px-5 sm:px-6 pb-24">
         <Tabs
-          defaultActiveKey="generate"
+          activeKey={activeKey}
+          onChange={onTabChange}
           size="large"
           items={[
             {
               key: 'generate',
               label: <span><ThunderboltOutlined /> Generate</span>,
               children: <GenerateTab today={today} setToday={setToday} onJobCompleted={onCompleted} />,
+            },
+            {
+              key: 'cinema',
+              label: <span><VideoCameraOutlined /> Cinema</span>,
+              children: (
+                <Suspense fallback={
+                  <div className="py-10 flex items-center justify-center text-gray-500 text-sm">
+                    Loading Cinema…
+                  </div>
+                }>
+                  <Cinema embedded />
+                </Suspense>
+              ),
             },
             {
               key: 'jobs',

@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Route, BrowserRouter as Router, Routes, useLocation } from "react-router-dom";
+import { Route, BrowserRouter as Router, Routes, useLocation, Navigate } from "react-router-dom";
 import { ConfigProvider, theme } from "antd";
 import { Footer, Navbar } from "./components";
 import BackToTop from './components/BackToTop';
@@ -196,8 +196,10 @@ const App = () => {
           <Route path='/audio'           element={<Suspense fallback={<DarkPageSkeleton />}><AudioStudio /></Suspense>} />
           <Route path='/audio/:id'       element={<Suspense fallback={<DarkPageSkeleton />}><AudioDetail /></Suspense>} />
           <Route path='/audio-studio'    element={<Suspense fallback={<DarkPageSkeleton />}><AudioStudio /></Suspense>} />
-          <Route path='/cinema'          element={<Suspense fallback={<DarkPageSkeleton />}><Cinema /></Suspense>} />
-          <Route path='/cinema/:id'      element={<Suspense fallback={<DarkPageSkeleton />}><CinemaDetail /></Suspense>} />
+          {/* Cinema lives inside AI Video as a tab now — redirect the
+              standalone /cinema URL so old links still resolve. */}
+          <Route path='/cinema' element={<Navigate to="/ai-video?tab=cinema" replace />} />
+          <Route path='/cinema/:id' element={<Suspense fallback={<DarkPageSkeleton />}><CinemaDetail /></Suspense>} />
         </Routes>
         <ConditionalFooter />
       </Router>
