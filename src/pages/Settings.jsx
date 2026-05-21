@@ -1,9 +1,14 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Modal, message as antMessage, InputNumber, Select } from 'antd'
+import { Modal, message as antMessage, InputNumber, Select, Tabs, Segmented } from 'antd'
 import { LockOutlined, ReloadOutlined, DatabaseOutlined, CloudServerOutlined, ApiOutlined, ClusterOutlined } from '@ant-design/icons'
+import {
+  ResponsiveContainer, LineChart, Line, AreaChart, Area,
+  XAxis, YAxis, Tooltip, CartesianGrid, Legend,
+} from 'recharts'
 import VaultGate from '../components/VaultGate'
 import {
   adminServerStats, adminDbStats, adminQueueStats, adminWorkers, adminPurgeQueue,
+  adminActivity,
 } from '../api/ai'
 
 // /settings — Vault-gated admin dashboard. Intentionally NOT in the public
@@ -182,15 +187,291 @@ function SettingsInner() {
           )}
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <ServerCard data={server} />
-          <DatabaseCard data={dbStats} />
-          <QueuesCard data={queues} onPurge={confirmPurge} />
-          <WorkersCard rows={workers} />
-        </div>
+        <Tabs
+          defaultActiveKey="overview"
+          items={[
+            {
+              key: 'overview',
+              label: <span className="text-sm">🩺 Overview</span>,
+              children: (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <ServerCard data={server} />
+                  <DatabaseCard data={dbStats} />
+                  <QueuesCard data={queues} onPurge={confirmPurge} />
+                  <WorkersCard rows={workers} />
+                </div>
+              ),
+            },
+            {
+              key: 'visualize',
+              label: <span className="text-sm">📊 Visualize</span>,
+              children: <VisualizeTab pollMs={pollMs} />,
+            },
+          ]}
+        />
       </div>
     </div>
   )
+}
+
+// ─── Visualize tab ────────────────────────────────────────────
+// Polls /api/admin/activity at the same cadence as the Overview tab
+// (pollMs from the outer component). Renders one LineChart per
+// non-empty table + a stacked AreaChart of TOTAL activity per day.
+//
+// Days selector: 7 / 14 / 30. Empty state: "No activity in the last Nd."
+const TABLE_COLORS = {
+  jobs:            '#06b6d4', // cyan
+  videos:          '#d946ef', // fuchsia
+  enhanced_images: '#fbbf24', // amber
+  lipsync_jobs:    '#34d399', // emerald
+  audio_jobs:      '#fb7185', // rose
+  mesh_jobs:       '#06b6d4',
+  deepfake_jobs:   '#d946ef',
+  chess_games:     '#fbbf24',
+  chess_matches:   '#34d399',
+  games_scores:    '#fb7185',
+  chat_messages:   '#06b6d4',
+}
+const FALLBACK_PALETTE = ['#06b6d4', '#d946ef', '#fbbf24', '#34d399', '#fb7185']
+
+function colorForTable(table, idx) {
+  return TABLE_COLORS[table] || FALLBACK_PALETTE[idx % FALLBACK_PALETTE.length]
+}
+
+function fmtMd(day) {
+  // 'YYYY-MM-DD' → 'M/D'. Fallback to raw string on parse failure.
+  if (!day || typeof day !== 'string') return String(day || '')
+  const m = day.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (!m) return day
+  return `${parseInt(m[2], 10)}/${parseInt(m[3], 10)}`
+}
+
+function fmtLongDay(day) {
+  if (!day || typeof day !== 'string') return String(day || '')
+  const d = new Date(`${day}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return day
+  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
+function ChartTooltip({ active, payload, label }) {
+  if (!active || !payload || !payload.length) return null
+  return (
+    <div className="rounded-lg border border-gray-700 bg-gray-950/95 px-3 py-2 text-xs shadow-xl">
+      <p className="text-gray-400 mb-1">{fmtLongDay(label)}</p>
+      {payload.map((p, i) => (
+        <p key={i} className="font-mono" style={{ color: p.color || p.stroke || p.fill }}>
+          {p.name}: <span className="text-gray-100">{Number(p.value || 0).toLocaleString()}</span>
+        </p>
+      ))}
+    </div>
+  )
+}
+
+function VisualizeTab({ pollMs }) {
+  const [days, setDays] = useState(14)
+  const [activity, setActivity] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [err, setErr] = useState(null)
+  const timerRef = useRef(null)
+
+  const fetchActivity = async (n) => {
+    const { data, error: e } = await adminActivity(n)
+    if (e) {
+      setErr(e)
+    } else {
+      setErr(null)
+      setActivity(data)
+    }
+    setLoading(false)
+  }
+
+  // Refetch on days change + on the same poll interval as Overview.
+  useEffect(() => {
+    setLoading(true)
+    fetchActivity(days)
+    if (timerRef.current) clearInterval(timerRef.current)
+    timerRef.current = setInterval(() => fetchActivity(days), Math.max(1000, pollMs || 5000))
+    return () => { if (timerRef.current) clearInterval(timerRef.current) }
+  }, [days, pollMs])
+
+  const series = activity?.series || []
+  const nonEmpty = useMemo(
+    () => series.filter(s => Array.isArray(s.points) && s.points.length > 0),
+    [series],
+  )
+
+  // Build a unified day-axis for the stacked area chart so every series
+  // shares the same x-buckets — missing buckets get filled with 0.
+  const stackedData = useMemo(() => {
+    const dayMap = new Map() // day → { day, <table>: n, ... }
+    for (const s of nonEmpty) {
+      for (const p of s.points) {
+        const row = dayMap.get(p.day) || { day: p.day }
+        row[s.table] = (row[s.table] || 0) + Number(p.n || 0)
+        dayMap.set(p.day, row)
+      }
+    }
+    // Sort by day asc, ensure every table key is present (0 fill).
+    const sorted = Array.from(dayMap.values()).sort((a, b) => a.day.localeCompare(b.day))
+    for (const row of sorted) {
+      for (const s of nonEmpty) {
+        if (row[s.table] == null) row[s.table] = 0
+      }
+    }
+    return sorted
+  }, [nonEmpty])
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] uppercase tracking-wider text-gray-500">Window</span>
+          <Segmented
+            size="small"
+            value={days}
+            onChange={(v) => setDays(Number(v))}
+            options={[
+              { value: 7,  label: '7d' },
+              { value: 14, label: '14d' },
+              { value: 30, label: '30d' },
+            ]}
+          />
+        </div>
+        {loading && (
+          <span className="text-[10px] uppercase tracking-wider text-gray-500 flex items-center gap-1">
+            <ReloadOutlined spin /> loading
+          </span>
+        )}
+        {err && <span className="text-rose-400 text-xs font-mono">✗ {err}</span>}
+      </div>
+
+      {nonEmpty.length === 0 ? (
+        <Card icon={<DatabaseOutlined />} title="Activity" accent="cyan">
+          <p className="text-xs text-gray-500 py-8 text-center">
+            No activity in the last {days}d.
+          </p>
+        </Card>
+      ) : (
+        <>
+          {/* Stacked total — top card spans full width on lg as well. */}
+          <Card icon={<ApiOutlined />} title={`Total activity · last ${days}d`} accent="cyan">
+            <div style={{ width: '100%', height: 260 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={stackedData} margin={{ top: 6, right: 12, left: -8, bottom: 0 }}>
+                  <defs>
+                    {nonEmpty.map((s, i) => {
+                      const c = colorForTable(s.table, i)
+                      return (
+                        <linearGradient key={s.table} id={`g-${s.table}`} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%"  stopColor={c} stopOpacity={0.85} />
+                          <stop offset="95%" stopColor={c} stopOpacity={0.12} />
+                        </linearGradient>
+                      )
+                    })}
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                  <XAxis
+                    dataKey="day"
+                    tickFormatter={fmtMd}
+                    tick={{ fill: '#9ca3af', fontSize: 10 }}
+                    stroke="rgba(255,255,255,0.15)"
+                  />
+                  <YAxis
+                    tick={{ fill: '#9ca3af', fontSize: 10 }}
+                    stroke="rgba(255,255,255,0.15)"
+                    allowDecimals={false}
+                  />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 10, color: '#9ca3af' }} />
+                  {nonEmpty.map((s, i) => {
+                    const c = colorForTable(s.table, i)
+                    return (
+                      <Area
+                        key={s.table}
+                        type="monotone"
+                        dataKey={s.table}
+                        name={s.table}
+                        stackId="1"
+                        stroke={c}
+                        fill={`url(#g-${s.table})`}
+                        strokeWidth={1.5}
+                      />
+                    )
+                  })}
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
+          {/* One LineChart per non-empty table, 2-col responsive grid. */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {nonEmpty.map((s, i) => {
+              const c = colorForTable(s.table, i)
+              const total = s.points.reduce((sum, p) => sum + Number(p.n || 0), 0)
+              return (
+                <Card
+                  key={s.table}
+                  icon={<DatabaseOutlined />}
+                  title={
+                    <span className="flex items-center justify-between gap-2 w-full">
+                      <span className="font-mono normal-case tracking-normal text-xs">{s.table}</span>
+                      <span className="text-[10px] text-gray-400 font-mono">
+                        {total.toLocaleString()} total
+                      </span>
+                    </span>
+                  }
+                  accent={accentForTable(s.table, i)}
+                >
+                  <div style={{ width: '100%', height: 200 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={s.points} margin={{ top: 6, right: 12, left: -10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                        <XAxis
+                          dataKey="day"
+                          tickFormatter={fmtMd}
+                          tick={{ fill: '#9ca3af', fontSize: 10 }}
+                          stroke="rgba(255,255,255,0.15)"
+                        />
+                        <YAxis
+                          tick={{ fill: '#9ca3af', fontSize: 10 }}
+                          stroke="rgba(255,255,255,0.15)"
+                          allowDecimals={false}
+                          width={28}
+                        />
+                        <Tooltip content={<ChartTooltip />} />
+                        <Line
+                          type="monotone"
+                          dataKey="n"
+                          name={s.table}
+                          stroke={c}
+                          strokeWidth={2}
+                          dot={{ r: 2.5, fill: c }}
+                          activeDot={{ r: 4 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// Pick a card-chrome accent that roughly matches the line colour. Card
+// only has 4 hardcoded accents — we map cyan/fuchsia/amber/emerald in
+// rotation and let the rose-line cards fall back to fuchsia.
+function accentForTable(table, idx) {
+  const c = TABLE_COLORS[table] || FALLBACK_PALETTE[idx % FALLBACK_PALETTE.length]
+  if (c === '#06b6d4') return 'cyan'
+  if (c === '#d946ef') return 'fuchsia'
+  if (c === '#fbbf24') return 'amber'
+  if (c === '#34d399') return 'emerald'
+  return 'fuchsia' // rose → fuchsia (closest in the existing map)
 }
 
 // ─── Server card ──────────────────────────────────────────────

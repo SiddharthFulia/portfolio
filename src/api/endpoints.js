@@ -71,6 +71,7 @@ export const ENDPOINTS = {
   ADMIN_QUEUES:         '/api/admin/queues',
   ADMIN_WORKERS:        '/api/admin/workers',
   ADMIN_PURGE_QUEUE:    '/api/admin/queues/purge',
+  ADMIN_ACTIVITY:       '/api/admin/activity',
   JOB_LOGS:             '/api/job-logs',   // /:lane/:jobId?since=<ms>&limit=80
   EXPORT:               '/api/export',     // POST { format, rows|content, title, filename }
 

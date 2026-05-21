@@ -489,7 +489,7 @@ export default function ChessPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 pb-16 px-4 sm:px-6">
+    <div className="min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 pb-16 px-3 sm:px-6">
       {promotionPicker}
       <div className="max-w-6xl mx-auto">
         <Header engineHealth={engineHealth} onFullscreen={() => setFullscreen(true)} />
@@ -499,7 +499,7 @@ export default function ChessPage() {
           <LiveGamesLobby defaultOpen={false} />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5">
+        <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[1fr_320px]">
           {/* ── Board column ── */}
           <div className="space-y-3">
             <ModeBar
@@ -509,7 +509,7 @@ export default function ChessPage() {
               analyzeDepth={analyzeDepth} setAnalyzeDepth={setAnalyzeDepth}
             />
 
-            <div className="flex gap-2 sm:gap-3">
+            <div className="flex gap-2 sm:gap-3 touch-manipulation">
               {/* EvalBar — hidden on mobile to save horizontal space */}
               <div className="hidden sm:block">
                 <EvalBar score={evalLatest?.score} orientation={playerColor} />
@@ -527,7 +527,7 @@ export default function ChessPage() {
                   />
                 </div>
               )}
-              <div className="flex-1 max-w-[640px] min-w-0">
+              <div className="flex-1 min-w-0 max-w-[min(640px,calc(100vw-32px))] mx-auto">
                 <ChessBoard
                   chess={chessRef.current}
                   fen={fen}
@@ -566,8 +566,9 @@ export default function ChessPage() {
             <PgnDatabaseLoader onLoad={applyPgn} />
           </div>
 
-          {/* ── Sidebar ── */}
-          <div className="space-y-3">
+          {/* ── Sidebar ── On mobile this stacks below the board as a
+              single flex-column; on lg it becomes the 320px right rail. */}
+          <div className="flex flex-col gap-3">
             <EnginePanel telemetry={telemetry} status={status} thinking={thinking} />
             {engineMode === 'analyze' && variations.length > 0 && (
               <div className="hidden md:block">
@@ -590,7 +591,7 @@ export default function ChessPage() {
                 modal. Was inline in the sidebar but that ate vertical
                 space and the user wanted it tucked behind a small button. */}
             <button onClick={() => setLibraryOpen(true)}
-              className="w-full text-left luxe-card p-3 hover:border-amber-500/40 transition-colors flex items-center justify-between gap-2">
+              className="w-full text-left luxe-card p-3 min-h-[40px] hover:border-amber-500/40 transition-colors flex items-center justify-between gap-2">
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-gray-500">Saved games</p>
                 <p className="text-xs text-gray-200 mt-0.5">Browse your library</p>
@@ -646,7 +647,7 @@ function Header({ engineHealth, onFullscreen }) {
   return (
     <header className="mb-6">
       <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
-        <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-amber-300 via-rose-400 to-fuchsia-400 bg-clip-text text-transparent">
+        <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-amber-300 via-rose-400 to-fuchsia-400 bg-clip-text text-transparent">
           ♛ Chess
         </h1>
         <div className="flex items-center gap-2 text-[10px]">
@@ -749,30 +750,33 @@ function StatusBar({ status, thinking, isGameOver, gameOverReason, onUndo, onFli
         {status.text}
         {isGameOver && ` · ${gameOverReason}`}
       </span>
-      <div className="flex items-center gap-1.5 flex-wrap">
+      {/* Action buttons — wrap to a second row on mobile so they don't
+          cram into a single line on narrow screens. Each button has a
+          40×40 minimum tap target on mobile per Apple HIG / Material. */}
+      <div className="flex flex-wrap items-center gap-1.5">
         <button onClick={onUndo}
-          className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 rounded-full border border-gray-800 hover:border-gray-600 text-gray-300">
+          className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 min-h-[40px] sm:min-h-0 rounded-full border border-gray-800 hover:border-gray-600 text-gray-300">
           ↶ Undo
         </button>
         <button onClick={onFlip}
-          className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 rounded-full border border-gray-800 hover:border-gray-600 text-gray-300">
+          className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 min-h-[40px] sm:min-h-0 rounded-full border border-gray-800 hover:border-gray-600 text-gray-300">
           ⇅ Flip
         </button>
         <button onClick={onReset}
-          className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20">
+          className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 min-h-[40px] sm:min-h-0 rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20">
           ⟲ New game
         </button>
         <button onClick={onCopyPgn}
-          className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20">
+          className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 min-h-[40px] sm:min-h-0 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20">
           ⎘ Copy PGN
         </button>
         <button onClick={onSave}
-          className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20">
+          className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 min-h-[40px] sm:min-h-0 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20">
           💾 Save game
         </button>
         {onChallenge && (
           <button onClick={onChallenge}
-            className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 rounded-full border border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-300 hover:bg-fuchsia-500/20">
+            className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 min-h-[40px] sm:min-h-0 rounded-full border border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-300 hover:bg-fuchsia-500/20">
             🎯 Challenge
           </button>
         )}
