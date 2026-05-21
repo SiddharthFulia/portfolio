@@ -64,15 +64,6 @@ const Dragon3D = () => {
                 </div>
               </div>
             </div>
-            <p className="luxe-body-muted text-xs mt-3 text-center">
-              Showcase scene URL is configurable —
-              swap <code className="bg-gray-900/80 border border-gray-800 rounded px-1.5 py-0.5 text-[11px] text-gray-300">SHOWCASE_SCENE_URL</code> in{' '}
-              <code className="bg-gray-900/80 border border-gray-800 rounded px-1.5 py-0.5 text-[11px] text-gray-300">src/pages/Dragon3D.jsx</code>
-              {' '}for any{' '}
-              <a href="https://app.spline.design" target="_blank" rel="noreferrer" className="text-violet-300 hover:underline">
-                Spline
-              </a>{' '}export.
-            </p>
           </>
         )}
       </div>
