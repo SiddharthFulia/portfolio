@@ -47,6 +47,7 @@ const Lab = lazyWithReload(() => import("./pages/Lab"));
 const Learn = lazyWithReload(() => import("./pages/Learn"));
 const Creative = lazyWithReload(() => import("./pages/Creative"));
 const ChessViz = lazyWithReload(() => import("./pages/ChessViz"));
+const ChessPage = lazyWithReload(() => import("./pages/Chess"));
 const Science = lazyWithReload(() => import("./pages/Science"));
 const ScienceModule = lazyWithReload(() => import("./pages/ScienceModule"));
 const FaceDetection = lazyWithReload(() => import("./pages/FaceDetection"));
@@ -221,7 +222,11 @@ const App = () => {
           <Route path='/lab' element={<Suspense fallback={<DarkPageSkeleton />}><Lab /></Suspense>} />
           <Route path='/learn' element={<Suspense fallback={<DarkPageSkeleton />}><Learn /></Suspense>} />
           <Route path='/creative' element={<Suspense fallback={<DarkPageSkeleton />}><Creative /></Suspense>} />
-          <Route path='/chess' element={<Suspense fallback={<DarkPageSkeleton />}><ChessViz /></Suspense>} />
+          {/* /chess — new Stockfish-backed page. Old custom-engine version
+              still reachable at /chess-classic in case the new one needs
+              triage during deploy. */}
+          <Route path='/chess'         element={<Suspense fallback={<DarkPageSkeleton />}><ChessPage /></Suspense>} />
+          <Route path='/chess-classic' element={<Suspense fallback={<DarkPageSkeleton />}><ChessViz /></Suspense>} />
           <Route path='/science' element={<Suspense fallback={<ScienceSkeleton />}><Science /></Suspense>} />
           <Route path='/science/:module' element={<Suspense fallback={<ScienceModuleSkeleton />}><ScienceModule /></Suspense>} />
           <Route path='/vision' element={<Suspense fallback={<DarkPageSkeleton />}><FaceDetection /></Suspense>} />

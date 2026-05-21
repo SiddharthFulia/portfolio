@@ -500,6 +500,32 @@ export async function getGameLeaderboard({ difficulty, limit = 50 } = {}) {
   } catch (err) { return { data: null, error: err.message }; }
 }
 
+// ─── Chess (Stockfish via BE) ─────────────────────────────────────
+export async function chessBestMove({ fen, depth = 14, thinkMs = 800 } = {}) {
+  try {
+    const data = await post(ENDPOINTS.CHESS_BEST_MOVE, { fen, depth, thinkMs }, { timeout: 15000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function chessAnalyze({ fen, multiPv = 3, depth = 12, thinkMs = 800 } = {}) {
+  try {
+    const data = await post(ENDPOINTS.CHESS_ANALYZE, { fen, multiPv, depth, thinkMs }, { timeout: 15000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function chessPlay({ fen, elo = 1500, thinkMs = 400 } = {}) {
+  try {
+    const data = await post(ENDPOINTS.CHESS_PLAY, { fen, elo, thinkMs }, { timeout: 10000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function chessEngineStatus() {
+  try {
+    const data = await get(ENDPOINTS.CHESS_STATUS, {}, { timeout: 4000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+
 // ─── Unified live-log tail (added 2026-05) ────────────────────────
 // Cursor-based — pass the ts of the last log you've seen so the BE only
 // returns new lines. Cheap enough to poll every 1.5s during a job without

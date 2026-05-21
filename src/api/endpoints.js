@@ -57,6 +57,11 @@ export const ENDPOINTS = {
   GAMES_PLAYERS:        '/api/games/players',
   GAMES_PLAYER:         '/api/games/players',   // /:idOrName appended at call site
   GAMES_SCORES:         '/api/games/scores',
+  // Chess (Stockfish via BE)
+  CHESS_BEST_MOVE:      '/api/chess/best-move',
+  CHESS_ANALYZE:        '/api/chess/analyze',
+  CHESS_PLAY:           '/api/chess/play',
+  CHESS_STATUS:         '/api/chess/status',
   JOB_LOGS:             '/api/job-logs',   // /:lane/:jobId?since=<ms>&limit=80
   EXPORT:               '/api/export',     // POST { format, rows|content, title, filename }
 
