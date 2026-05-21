@@ -472,6 +472,34 @@ export async function listDeepfakeJobs({ status, kind, limit = 24 } = {}) {
   } catch (err) { return { data: null, error: err.message }; }
 }
 
+// ─── Runner game (hand-gesture endless runner) ────────────────────
+export async function listGamePlayers({ limit = 200 } = {}) {
+  try {
+    const data = await get(ENDPOINTS.GAMES_PLAYERS, { limit }, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function createGamePlayer(name) {
+  try {
+    const data = await post(ENDPOINTS.GAMES_PLAYERS, { name }, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function submitGameScore({ playerName, score, distance, difficulty, revived = false } = {}) {
+  try {
+    const data = await post(ENDPOINTS.GAMES_SCORES,
+      { playerName, score, distance, difficulty, revived },
+      { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function getGameLeaderboard({ difficulty, limit = 50 } = {}) {
+  try {
+    const data = await get(ENDPOINTS.GAMES_SCORES, { difficulty, limit }, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+
 // ─── Unified live-log tail (added 2026-05) ────────────────────────
 // Cursor-based — pass the ts of the last log you've seen so the BE only
 // returns new lines. Cheap enough to poll every 1.5s during a job without

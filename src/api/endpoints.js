@@ -53,6 +53,10 @@ export const ENDPOINTS = {
   DEEPFAKE_GENERATE:    '/api/deepfake/generate',
   DEEPFAKE_STATUS:      '/api/deepfake/status',
   DEEPFAKE_LIST:        '/api/deepfake/list',
+  // Runner game — hand-gesture endless runner
+  GAMES_PLAYERS:        '/api/games/players',
+  GAMES_PLAYER:         '/api/games/players',   // /:idOrName appended at call site
+  GAMES_SCORES:         '/api/games/scores',
   JOB_LOGS:             '/api/job-logs',   // /:lane/:jobId?since=<ms>&limit=80
   EXPORT:               '/api/export',     // POST { format, rows|content, title, filename }
 
