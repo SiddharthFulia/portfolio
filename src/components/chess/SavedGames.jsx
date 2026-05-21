@@ -7,6 +7,7 @@
 //   onLoad(row)  — called when user picks a row to restore on the board
 
 import { useEffect, useState } from 'react'
+import { Modal } from 'antd'
 import { chessListGames, chessUpdateGame, chessDeleteGame } from '../../api/ai'
 
 const RESULT_TAG = {
@@ -46,9 +47,48 @@ export default function SavedGames({ refreshKey, onLoad }) {
     await chessUpdateGame(row.id, { name })
     setEditingId(null); refetch()
   }
-  const remove = async (row) => {
-    if (!window.confirm(`Delete "${row.name}"?`)) return
-    await chessDeleteGame(row.id); refetch()
+  // Two-step confirm so users can't nuke a 50-move masterclass on a
+  // mistap. Both modals are antd-styled — the second is the harder one
+  // to dismiss (autoFocusButton: 'cancel' so Enter cancels, not deletes).
+  const remove = (row) => {
+    Modal.confirm({
+      title: '🗑 Delete saved game?',
+      content: (
+        <div className="text-sm text-gray-300 mt-2">
+          About to delete <span className="text-amber-200 font-semibold">"{row.name}"</span>.
+          <div className="text-[11px] text-gray-500 mt-2">
+            {row.moveCount} ply · {row.engineName || row.mode} · result {row.result === '1/2-1/2' ? '½-½' : row.result}
+          </div>
+        </div>
+      ),
+      okText: 'Continue',
+      okButtonProps: { danger: true },
+      cancelText: 'Keep it',
+      centered: true,
+      autoFocusButton: 'cancel',
+      onOk: () => confirmDelete(row),
+    })
+  }
+  const confirmDelete = (row) => {
+    Modal.confirm({
+      title: '⚠ Are you sure? This is permanent.',
+      content: (
+        <div className="text-sm text-rose-200/90 mt-2 leading-relaxed">
+          Final confirmation. <span className="font-semibold">"{row.name}"</span> will be
+          removed from your library and there's no undo. The PGN and game
+          metadata get wiped from the database immediately.
+        </div>
+      ),
+      okText: '🗑 Delete forever',
+      okButtonProps: { danger: true },
+      cancelText: 'Cancel',
+      centered: true,
+      autoFocusButton: 'cancel',
+      onOk: async () => {
+        await chessDeleteGame(row.id)
+        refetch()
+      },
+    })
   }
 
   return (
