@@ -149,10 +149,12 @@ export default function ChessPage() {
     () => chessRef.current.turn() === 'w' ? 'white' : 'black',
     [fen],
   )
-  const isPlayerTurn = engineMode === 'human-vs-human' || turnColor === playerColor
-  const movableColor = engineMode === 'human-vs-human'
-    ? turnColor
-    : (isPlayerTurn ? playerColor : null)
+  // In analyze + pass-and-play, the user drives BOTH sides — movableColor
+  // follows whoever's turn it is. In play-vs-engine, lock to the player's
+  // chosen colour so they can't move for the engine.
+  const bothSidesMovable = engineMode === 'human-vs-human' || engineMode === 'analyze'
+  const isPlayerTurn = bothSidesMovable || turnColor === playerColor
+  const movableColor = bothSidesMovable ? turnColor : (isPlayerTurn ? playerColor : null)
 
   // Called by ChessBoard when the user finishes a drag/drop legal move.
   const onUserMove = useCallback((from, to) => {
