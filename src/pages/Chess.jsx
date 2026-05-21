@@ -55,6 +55,11 @@ export default function ChessPage() {
   const [telemetry, setTelemetry] = useState(null)
   // Saved-games refresh trigger — bump after save/delete to re-fetch list.
   const [savedRefresh, setSavedRefresh] = useState(0)
+  // Library modal — keeps the sidebar clean. A small button opens this
+  // and the user can browse / load / rename / delete saved games here.
+  const [libraryOpen, setLibraryOpen] = useState(false)
+  // PGN paste — paste any PGN to import a game (like FEN, but full move list).
+  const [pgnInput, setPgnInput] = useState('')
   // Pending promotion — set when the user drags a pawn to the last rank.
   // We hold the move until the user picks the piece in the modal so we
   // never auto-queen for them.
@@ -65,20 +70,6 @@ export default function ChessPage() {
   // Fullscreen board-only mode. Hides header + sidebar + nav so the
   // board can grow to the viewport. Back button restores normal layout.
   const [fullscreen, setFullscreen] = useState(false)
-  // Layout key — bumped on any change that resizes the board container
-  // (clocks toggling, fullscreen toggle, sidebar visibility). Passed to
-  // ChessBoard which calls cg.redrawAll() so hitboxes stay aligned.
-  const layoutKey = useMemo(
-    () => `${fullscreen ? 'fs' : 'win'}-${timeControl.id}`,
-    [fullscreen, timeControl.id],
-  )
-  // ESC key exits fullscreen, mirroring browser fullscreen behavior.
-  useEffect(() => {
-    if (!fullscreen) return
-    const onKey = (e) => { if (e.key === 'Escape') setFullscreen(false) }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [fullscreen])
   // Piece set — persists across reloads via localStorage.
   const [pieceSet, setPieceSet] = useState(() => {
     try { return localStorage.getItem('sid-chess-pieces') || 'cburnett' } catch { return 'cburnett' }
@@ -94,6 +85,20 @@ export default function ChessPage() {
   const [whiteMs, setWhiteMs] = useState(null)
   const [blackMs, setBlackMs] = useState(null)
   const [flagged, setFlagged] = useState(null)   // 'white' | 'black' on flag fall
+  // Layout key — bumped on any change that resizes the board container.
+  // MUST come after timeControl/fullscreen declarations or we hit TDZ
+  // and the page crashes with 'Cannot access timeControl before initialization'.
+  const layoutKey = useMemo(
+    () => `${fullscreen ? 'fs' : 'win'}-${timeControl.id}`,
+    [fullscreen, timeControl.id],
+  )
+  // ESC key exits fullscreen, mirroring browser fullscreen behavior.
+  useEffect(() => {
+    if (!fullscreen) return
+    const onKey = (e) => { if (e.key === 'Escape') setFullscreen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [fullscreen])
 
   // Tick the active side's clock once per 100ms. Pause when game-over,
   // not started (no clock), or paused (no activeSide).
@@ -353,6 +358,24 @@ export default function ChessPage() {
     setHistory(chess.history())
     setEvalHistory([]); setVariations([])
     setStatus({ kind: 'idle', text: `Loaded "${row.name}"` })
+    setLibraryOpen(false)
+  }
+  // Import via PGN paste — same shape as FEN import but with a full game.
+  const loadPgn = () => {
+    const trimmed = pgnInput.trim()
+    if (!trimmed) return
+    const chess = new Chess()
+    try { chess.loadPgn(trimmed) }
+    catch (err) {
+      setStatus({ kind: 'error', text: `Invalid PGN: ${err.message}` })
+      return
+    }
+    chessRef.current = chess
+    setFen(chess.fen())
+    setHistory(chess.history())
+    setEvalHistory([]); setVariations([])
+    setPgnInput('')
+    setStatus({ kind: 'idle', text: `Loaded ${chess.history().length}-ply PGN` })
   }
 
   const isGameOver = chessRef.current.isGameOver()
@@ -499,6 +522,9 @@ export default function ChessPage() {
             <FenImport
               value={fenInput} setValue={setFenInput} onLoad={loadFen} currentFen={fen}
             />
+            <PgnImport
+              value={pgnInput} setValue={setPgnInput} onLoad={loadPgn}
+            />
           </div>
 
           {/* ── Sidebar ── */}
@@ -519,10 +545,57 @@ export default function ChessPage() {
             )}
             <TimeControlPicker value={timeControl} onChange={setTimeControl} />
             <PieceSetPicker value={pieceSet} onChange={setPieceSet} />
-            <SavedGames refreshKey={savedRefresh} onLoad={loadSavedGame} />
+            {/* Library button — opens the full saved-games library in a
+                modal. Was inline in the sidebar but that ate vertical
+                space and the user wanted it tucked behind a small button. */}
+            <button onClick={() => setLibraryOpen(true)}
+              className="w-full text-left luxe-card p-3 hover:border-amber-500/40 transition-colors flex items-center justify-between gap-2">
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-gray-500">Saved games</p>
+                <p className="text-xs text-gray-200 mt-0.5">Browse your library</p>
+              </div>
+              <span className="text-base">📚</span>
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Save-game modal — replaces window.prompt with antd input */}
+      <Modal
+        open={saveModalOpen}
+        onCancel={() => setSaveModalOpen(false)}
+        onOk={confirmSaveGame}
+        title="Save game"
+        okText="Save"
+        okButtonProps={{ disabled: !saveName.trim() }}
+        cancelText="Cancel"
+      >
+        <div className="space-y-3 py-2">
+          <p className="text-xs text-gray-400">
+            Give this game a name. {history.length} ply, {chessRef.current.isGameOver() ? 'finished' : 'in progress'}.
+          </p>
+          <Input
+            size="large"
+            value={saveName}
+            onChange={e => setSaveName(e.target.value)}
+            onPressEnter={confirmSaveGame}
+            placeholder="e.g. Najdorf vs Stockfish 1500"
+            maxLength={80}
+            autoFocus
+          />
+        </div>
+      </Modal>
+
+      {/* Library modal — full SavedGames panel tucked behind a button */}
+      <Modal
+        open={libraryOpen}
+        onCancel={() => setLibraryOpen(false)}
+        footer={null}
+        title="Saved games"
+        width={520}
+      >
+        <SavedGames refreshKey={savedRefresh} onLoad={loadSavedGame} />
+      </Modal>
     </div>
   )
 }
@@ -727,6 +800,26 @@ function FenImport({ value, setValue, onLoad, currentFen }) {
         </button>
       </div>
       <p className="text-[10px] text-gray-500 font-mono truncate">Current: {currentFen}</p>
+    </div>
+  )
+}
+
+// ── PGN import box ──
+// Same shape as FEN import but textarea-sized for full game move lists.
+// PGN export already lives behind the 'Copy PGN' button on the status bar.
+function PgnImport({ value, setValue, onLoad }) {
+  return (
+    <div className="luxe-card p-3 space-y-2">
+      <label className="text-[10px] uppercase tracking-wider text-gray-500 block">Import PGN</label>
+      <textarea value={value} onChange={e => setValue(e.target.value)}
+        placeholder={'1. e4 e5 2. Nf3 Nc6 3. Bb5 ...'}
+        rows={3}
+        className="w-full bg-black/40 border border-gray-800 rounded-lg px-3 py-1.5 text-xs font-mono text-gray-200 focus:outline-none focus:border-amber-500/60 resize-y" />
+      <button onClick={onLoad}
+        disabled={!value.trim()}
+        className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-amber-500/40 bg-amber-500/15 text-amber-200 hover:bg-amber-500/25 disabled:opacity-40 disabled:cursor-not-allowed">
+        Load PGN
+      </button>
     </div>
   )
 }
