@@ -719,6 +719,7 @@ export async function chessJoinMatch(id, body = {}) { try { const data = await p
 export async function chessGetMatch(id) { try { const data = await get(`${ENDPOINTS.CHESS_MATCHES}/${id}`, {}, { timeout: 6000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 export async function chessMatchMove(id, body) { try { const data = await post(`${ENDPOINTS.CHESS_MATCHES}/${id}/move`, body, { timeout: 6000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 export async function chessResignMatch(id, body) { try { const data = await post(`${ENDPOINTS.CHESS_MATCHES}/${id}/resign`, body, { timeout: 6000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+export async function chessListLiveMatches() { try { const data = await get(`${ENDPOINTS.CHESS_MATCHES}/lobby/live`, {}, { timeout: 6000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 
 // ─── Vault-gated admin dashboard ──────────────────────────────────
 // All five endpoints sit behind requireVault on the BE. The Authorization

@@ -22,16 +22,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Chess } from 'chess.js'
+import { Modal } from 'antd'
 import 'chessground/assets/chessground.base.css'
 import 'chessground/assets/chessground.brown.css'
 
 import ChessBoard from '../components/chess/ChessBoard'
+import Clocks from '../components/chess/Clocks'
 import usePieceSet from '../components/chess/usePieceSet'
 import {
   chessGetMatch, chessJoinMatch, chessMatchMove, chessResignMatch,
 } from '../api/ai'
 
 const POLL_MS = 1500
+// Auto-retry config for /chess/m/:matchId when the match isn't there yet.
+// 30 retries × 1500ms ≈ 45s — covers a link shared moments before the
+// creator finishes hitting "Challenge".
+const NOTFOUND_RETRY_MS  = 1500
+const NOTFOUND_RETRY_MAX = 30
 
 const STARTING_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 
@@ -59,6 +66,18 @@ export default function ChessLive() {
   // Promotion pending — chessground hands us (from,to); if it's a pawn
   // hitting the last rank we open the picker before POSTing the move.
   const [pendingPromotion, setPendingPromotion] = useState(null)
+  // Share modal — bigger touch-target than the inline copy bar.
+  const [shareOpen, setShareOpen] = useState(false)
+  // 404 auto-retry tracking. Counts attempts and either backs off (gives
+  // up after MAX) or starts polling once the match shows up.
+  const [notFoundAttempts, setNotFoundAttempts] = useState(0)
+  const [givenUp, setGivenUp] = useState(false)
+  // Local clock interpolation — BE values are the anchor, FE just ticks
+  // down by elapsed-since-poll between fetches.
+  const [whiteMsLocal, setWhiteMsLocal] = useState(null)
+  const [blackMsLocal, setBlackMsLocal] = useState(null)
+  // Anchor timestamp — when the BE values were last received.
+  const clockAnchorRef = useRef({ ts: 0, white: null, black: null, side: null })
   // Piece set — read-only here (set by main Chess page); fall back to default.
   const pieceSet = (() => {
     try { return localStorage.getItem('sid-chess-pieces') || 'cburnett' } catch { return 'cburnett' }
@@ -90,16 +109,53 @@ export default function ChessLive() {
     if (!matchId) return null
     const { data, error: err } = await chessGetMatch(matchId)
     if (err) {
-      setError(err)
+      // 404 "match not found" — increment attempts; the retry effect
+      // below handles scheduling the next try. Don't surface 404 as a
+      // fatal error until we've exhausted retries.
+      const isNotFound = /not found/i.test(err)
+      if (isNotFound) {
+        setNotFoundAttempts(n => n + 1)
+      } else {
+        setError(err)
+      }
       return null
     }
     setError(null)
+    setNotFoundAttempts(0)
+    setGivenUp(false)
     setMatch(data)
+    // Anchor the clock to whatever the BE just returned.
+    if (data) {
+      clockAnchorRef.current = {
+        ts: Date.now(),
+        white: data.whiteMs ?? data.baseMs ?? null,
+        black: data.blackMs ?? data.baseMs ?? null,
+        side: data.sideToMove === 'w' ? 'white' : 'black',
+      }
+      setWhiteMsLocal(data.whiteMs ?? data.baseMs ?? null)
+      setBlackMsLocal(data.blackMs ?? data.baseMs ?? null)
+    }
     return data
   }, [matchId])
 
   // Initial load.
   useEffect(() => { fetchState() }, [fetchState])
+
+  // 404 auto-retry. If the FIRST fetch (or any subsequent re-fetch
+  // while we don't have match data) came back "match not found", retry
+  // every 1500ms — up to NOTFOUND_RETRY_MAX — so a share link opened
+  // moments before the creator finishes hitting "Challenge" still works.
+  // Stops cleanly the instant the match shows up or we give up.
+  useEffect(() => {
+    if (match) return
+    if (notFoundAttempts === 0) return
+    if (notFoundAttempts >= NOTFOUND_RETRY_MAX) {
+      setGivenUp(true)
+      return
+    }
+    const id = setTimeout(fetchState, NOTFOUND_RETRY_MS)
+    return () => clearTimeout(id)
+  }, [match, notFoundAttempts, fetchState])
 
   // Poll loop. Only runs while the match is waiting/active; once
   // completed there's nothing new to fetch so we stop hitting the BE.
@@ -109,6 +165,28 @@ export default function ChessLive() {
     const id = setInterval(fetchState, POLL_MS)
     return () => clearInterval(id)
   }, [match?.status, fetchState])
+
+  // Local clock interpolation — decrement the active side's clock
+  // between polls so the timer counts down visibly. BE values are
+  // re-anchored on every successful fetch/move.
+  useEffect(() => {
+    if (!match?.baseMs) return
+    if (match.status !== 'active') return
+    const tick = () => {
+      const anchor = clockAnchorRef.current
+      if (!anchor || !anchor.side) return
+      const elapsed = Date.now() - anchor.ts
+      if (anchor.side === 'white') {
+        const next = Math.max(0, (anchor.white ?? 0) - elapsed)
+        setWhiteMsLocal(next)
+      } else {
+        const next = Math.max(0, (anchor.black ?? 0) - elapsed)
+        setBlackMsLocal(next)
+      }
+    }
+    const id = setInterval(tick, 100)
+    return () => clearInterval(id)
+  }, [match?.status, match?.baseMs, match?.sideToMove])
 
   // Which side does this session control? null until we join (or if
   // session was lost / never set — e.g. someone else opening the link).
@@ -242,10 +320,43 @@ export default function ChessLive() {
   }
 
   // ── Render ──
-  if (!match && !error) {
+  // No match yet, but we're still trying (or first fetch hasn't come back).
+  if (!match && !error && !givenUp) {
     return (
       <div className="min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 pb-16 px-4 flex items-center justify-center">
-        <div className="text-sm text-gray-400">Loading match…</div>
+        <div className="luxe-card p-6 max-w-md w-full text-center space-y-2">
+          <div className="text-sm text-gray-300">
+            {notFoundAttempts > 0 ? 'Waiting for match to start…' : 'Loading match…'}
+          </div>
+          {notFoundAttempts > 0 && (
+            <p className="text-[11px] text-gray-500 font-mono">
+              The link is valid — retrying ({notFoundAttempts}/{NOTFOUND_RETRY_MAX}).
+            </p>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // Gave up after MAX retries — the wording matters: user asked for the
+  // refresh-to-try-again copy explicitly.
+  if (!match && givenUp) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 pb-16 px-4 flex items-center justify-center">
+        <div className="luxe-card p-6 max-w-md w-full text-center space-y-3">
+          <h2 className="text-lg font-bold text-rose-300">Match not found</h2>
+          <p className="text-xs text-gray-400">Refresh to try again.</p>
+          <div className="flex items-center justify-center gap-2">
+            <button onClick={() => { setNotFoundAttempts(0); setGivenUp(false); fetchState() }}
+              className="text-xs font-semibold px-4 py-2 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20">
+              🔄 Try again
+            </button>
+            <button onClick={() => navigate('/chess')}
+              className="text-xs font-semibold px-4 py-2 rounded-full border border-gray-700 bg-gray-900/60 text-gray-300 hover:border-gray-500">
+              ← Back to /chess
+            </button>
+          </div>
+        </div>
       </div>
     )
   }
@@ -257,7 +368,7 @@ export default function ChessLive() {
           <h2 className="text-lg font-bold text-rose-300">Match unavailable</h2>
           <p className="text-xs text-gray-400 font-mono break-all">{error}</p>
           <button onClick={() => navigate('/chess')}
-            className="text-xs font-semibold px-3 py-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20">
+            className="text-xs font-semibold px-4 py-2 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20">
             ← Back to /chess
           </button>
         </div>
@@ -345,17 +456,14 @@ export default function ChessLive() {
           <PlayerTag side="black" name={whoIsBlack} isTurn={turnSide === 'black' && isActive} align="right" />
         </div>
 
-        {/* Share link bar — visible while waiting OR active (so creator
-            can still send a friend the link if they lost it). */}
+        {/* Share button — opens a modal (touch-friendly, easier to read
+            the full URL on phones than a one-line truncated bar). */}
         {!isDone && (
-          <div className="luxe-card p-3 flex items-center gap-2">
-            <span className="text-[10px] uppercase tracking-wider text-gray-500 shrink-0">Share</span>
-            <code className="flex-1 text-[11px] font-mono text-gray-300 truncate bg-black/30 px-2 py-1 rounded border border-gray-800">
-              {shareUrl}
-            </code>
-            <button onClick={onCopyLink}
-              className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 shrink-0">
-              {copied ? '✓ Copied' : '⎘ Copy'}
+          <div className="luxe-card p-3 flex items-center gap-2 justify-between">
+            <span className="text-[11px] text-gray-400">Share this link so a friend can join.</span>
+            <button onClick={() => setShareOpen(true)}
+              className="text-xs font-semibold px-4 py-2 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 shrink-0">
+              🔗 Share link
             </button>
           </div>
         )}
@@ -363,12 +471,12 @@ export default function ChessLive() {
         {/* Join CTA — only when waiting and we don't already have a session */}
         {isWaiting && !session && (
           <div className="luxe-card p-4 flex items-center justify-between gap-3 flex-wrap border border-fuchsia-500/30 bg-fuchsia-500/5">
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-fuchsia-200">Someone challenged you to a chess game.</p>
               <p className="text-xs text-gray-400 mt-0.5">You'll be playing as Black.</p>
             </div>
             <button onClick={onJoin} disabled={joining}
-              className="text-xs font-semibold px-4 py-2 rounded-full border border-fuchsia-500/60 bg-fuchsia-500/15 text-fuchsia-200 hover:bg-fuchsia-500/25 disabled:opacity-50">
+              className="text-sm font-semibold px-5 py-3 rounded-full border border-fuchsia-500/60 bg-fuchsia-500/15 text-fuchsia-200 hover:bg-fuchsia-500/25 disabled:opacity-50 shrink-0">
               {joining ? 'Joining…' : '⚔️ Join as Black'}
             </button>
           </div>
@@ -381,8 +489,23 @@ export default function ChessLive() {
           </div>
         )}
 
+        {/* Clocks — only when a time control is configured on the match.
+            Tickdown is interpolated locally; BE values are re-anchored on
+            every poll / move response. */}
+        {match?.baseMs ? (
+          <div className="luxe-card p-3">
+            <div className="max-w-[640px] mx-auto">
+              <Clocks
+                white={whiteMsLocal} black={blackMsLocal}
+                activeSide={isActive ? turnSide : null}
+                orientation={orientation}
+              />
+            </div>
+          </div>
+        ) : null}
+
         {/* Board */}
-        <div className="luxe-card p-3">
+        <div className="luxe-card p-2 sm:p-3">
           <div className="max-w-[640px] mx-auto">
             <ChessBoard
               chess={chessRef.current}
@@ -400,10 +523,10 @@ export default function ChessLive() {
           <span className="text-[11px] text-gray-500 font-mono">
             {match?.moveCount || 0} {match?.moveCount === 1 ? 'move' : 'moves'} played
           </span>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             {isActive && session && (
               <button onClick={onResign}
-                className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20">
+                className="text-xs font-semibold px-3 py-2 rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20">
                 🏳️ Resign
               </button>
             )}
@@ -413,7 +536,7 @@ export default function ChessLive() {
                   <span className="text-xs font-semibold text-amber-300 mr-2">{youWonText}</span>
                 )}
                 <button onClick={onNewGame}
-                  className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20">
+                  className="text-xs font-semibold px-3 py-2 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20">
                   🔄 New game
                 </button>
               </>
@@ -429,6 +552,28 @@ export default function ChessLive() {
           </div>
         )}
       </div>
+
+      {/* Share modal — uses antd so the URL wraps + copy button is large
+          enough to tap comfortably on phones. */}
+      <Modal
+        open={shareOpen}
+        onCancel={() => setShareOpen(false)}
+        footer={null}
+        title="Share this match"
+      >
+        <div className="space-y-3 py-2">
+          <p className="text-xs text-gray-500">
+            Send this link to whoever you want to play. The first person to open it joins as Black.
+          </p>
+          <code className="block text-xs font-mono text-gray-700 break-all bg-gray-100 px-3 py-2 rounded border border-gray-200">
+            {shareUrl}
+          </code>
+          <button onClick={onCopyLink}
+            className="w-full text-sm font-semibold px-4 py-3 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20">
+            {copied ? '✓ Copied to clipboard' : '⎘ Copy link'}
+          </button>
+        </div>
+      </Modal>
     </div>
   )
 }

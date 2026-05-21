@@ -19,6 +19,7 @@ import Clocks           from '../components/chess/Clocks'
 import TimeControlPicker, { TIME_CONTROLS } from '../components/chess/TimeControl'
 import SavedGames       from '../components/chess/SavedGames'
 import PgnDatabaseLoader from '../components/chess/PgnDatabase'
+import LiveGamesLobby   from '../components/chess/LiveGamesLobby'
 import {
   chessBestMove, chessAnalyze, chessPlay, chessEngineStatus,
   chessSaveGame, chessLoadGame, chessCreateMatch,
@@ -493,6 +494,11 @@ export default function ChessPage() {
       <div className="max-w-6xl mx-auto">
         <Header engineHealth={engineHealth} onFullscreen={() => setFullscreen(true)} />
 
+        {/* Live lobby — collapsible. One-shot fetch on mount. */}
+        <div className="mb-5">
+          <LiveGamesLobby defaultOpen={false} />
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5">
           {/* ── Board column ── */}
           <div className="space-y-3">
@@ -503,12 +509,15 @@ export default function ChessPage() {
               analyzeDepth={analyzeDepth} setAnalyzeDepth={setAnalyzeDepth}
             />
 
-            <div className="flex gap-3">
-              <EvalBar score={evalLatest?.score} orientation={playerColor} />
+            <div className="flex gap-2 sm:gap-3">
+              {/* EvalBar — hidden on mobile to save horizontal space */}
+              <div className="hidden sm:block">
+                <EvalBar score={evalLatest?.score} orientation={playerColor} />
+              </div>
               {/* Clocks column — only when a time control is active.
                   Active side ticks; flagged side flashes red. */}
               {timeControl.baseMs != null && (
-                <div className="w-24">
+                <div className="w-20 sm:w-24 shrink-0">
                   <Clocks
                     white={whiteMs} black={blackMs}
                     activeSide={chessRef.current.isGameOver() || flagged ? null
@@ -518,7 +527,7 @@ export default function ChessPage() {
                   />
                 </div>
               )}
-              <div className="flex-1 max-w-[640px]">
+              <div className="flex-1 max-w-[640px] min-w-0">
                 <ChessBoard
                   chess={chessRef.current}
                   fen={fen}
@@ -561,14 +570,16 @@ export default function ChessPage() {
           <div className="space-y-3">
             <EnginePanel telemetry={telemetry} status={status} thinking={thinking} />
             {engineMode === 'analyze' && variations.length > 0 && (
-              <Variations variations={variations} chess={chessRef.current} />
+              <div className="hidden md:block">
+                <Variations variations={variations} chess={chessRef.current} />
+              </div>
             )}
             <div className="luxe-card p-3">
               <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Moves</p>
               <MoveList history={history} evalHistory={evalHistory} />
             </div>
             {evalHistory.some(e => e?.score) && (
-              <div className="luxe-card p-3">
+              <div className="luxe-card p-3 hidden md:block">
                 <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Eval over time</p>
                 <EvalGraph history={evalHistory} />
               </div>
@@ -738,30 +749,30 @@ function StatusBar({ status, thinking, isGameOver, gameOverReason, onUndo, onFli
         {status.text}
         {isGameOver && ` · ${gameOverReason}`}
       </span>
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 flex-wrap">
         <button onClick={onUndo}
-          className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-gray-800 hover:border-gray-600 text-gray-300">
+          className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 rounded-full border border-gray-800 hover:border-gray-600 text-gray-300">
           ↶ Undo
         </button>
         <button onClick={onFlip}
-          className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-gray-800 hover:border-gray-600 text-gray-300">
+          className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 rounded-full border border-gray-800 hover:border-gray-600 text-gray-300">
           ⇅ Flip
         </button>
         <button onClick={onReset}
-          className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20">
+          className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20">
           ⟲ New game
         </button>
         <button onClick={onCopyPgn}
-          className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20">
+          className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20">
           ⎘ Copy PGN
         </button>
         <button onClick={onSave}
-          className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20">
+          className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20">
           💾 Save game
         </button>
         {onChallenge && (
           <button onClick={onChallenge}
-            className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-300 hover:bg-fuchsia-500/20">
+            className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 rounded-full border border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-300 hover:bg-fuchsia-500/20">
             🎯 Challenge
           </button>
         )}
