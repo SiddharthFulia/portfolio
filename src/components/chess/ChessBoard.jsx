@@ -10,11 +10,14 @@
 
 import { useEffect, useRef } from 'react'
 import { Chessground } from 'chessground'
+// chess.js v1+ moved SQUARES from an instance property to a named module
+// export. Old v0.x code (`chess.SQUARES`) throws 'is not iterable' here.
+import { SQUARES } from 'chess.js'
 
 // chess.js .moves({square, verbose:true}) → chessground destination Map.
 function buildDests(chess) {
   const dests = new Map()
-  for (const sq of chess.SQUARES) {
+  for (const sq of SQUARES) {
     const moves = chess.moves({ square: sq, verbose: true })
     if (moves.length) dests.set(sq, moves.map(m => m.to))
   }
