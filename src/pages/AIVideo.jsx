@@ -292,8 +292,9 @@ const logTone = (text) => {
 const Skeleton = ({ jobId, status, job, paused = false, onTogglePause }) => {
   const [logsOpen, setLogsOpen] = useState(false)
   // Toggle between the classic flat log list and the AgentPlan tree view.
-  // Defaults to 'flat' so existing users see what they're used to.
-  const [logsView, setLogsView] = useState('flat')
+  // Default is 'plan' — same tree the deepfake / mesh / voice clones use,
+  // which scans cleanly and never cuts off content like the flat view did.
+  const [logsView, setLogsView] = useState('plan')
   // Auto-scroll the modal log list to the latest line whenever new entries arrive
   const modalScrollRef = useRef(null)
   useEffect(() => {
@@ -420,18 +421,20 @@ const Skeleton = ({ jobId, status, job, paused = false, onTogglePause }) => {
               {logsView === 'flat' && allLogs.length > 0 && (
                 <button type="button" onClick={() => setLogsOpen(true)}
                   className="block w-full text-left rounded-xl bg-gradient-to-b from-black/70 to-black/40 border border-gray-800/80 hover:border-cyan-500/40 transition-colors overflow-hidden group">
-                  <div className="max-h-72 sm:max-h-80 overflow-y-auto p-3">
+                  {/* Bumped max-h so 22 lines breathe. Old 72/80 (288/320px)
+                      cut off mid-message on long ComfyUI status lines. */}
+                  <div className="max-h-[28rem] sm:max-h-[34rem] overflow-y-auto p-3">
                     <ul className="space-y-1">
-                      {allLogs.slice(-22).map((entry, i) => (
+                      {allLogs.slice(-40).map((entry, i) => (
                         <li key={`${entry?.ts || i}-${i}`}
                             className={`text-[11px] font-mono leading-relaxed break-all ${logTone(entry?.msg || '')}`}>
                           {entry?.msg || ''}
                         </li>
                       ))}
                     </ul>
-                    {allLogs.length > 22 && (
+                    {allLogs.length > 40 && (
                       <p className="text-[10px] text-gray-500 mt-2 text-center group-hover:text-cyan-300 transition-colors">
-                        + {allLogs.length - 22} earlier events — click to view all
+                        + {allLogs.length - 40} earlier events — click to view all
                       </p>
                     )}
                   </div>
