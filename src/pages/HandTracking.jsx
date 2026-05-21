@@ -174,7 +174,7 @@ export default function HandTracking() {
 
   const [ready, setReady]   = useState(false)
   const [running, setRunning] = useState(false)
-  const [mode, setMode] = useState('view')        // view | draw | cursor | filters
+  const [mode, setMode] = useState('view')        // view | draw | cursor | filters | laser
   const [color, setColor] = useState(COLORS[0])
   const [brush, setBrush] = useState(6)
   const [fps, setFps] = useState(0)
@@ -607,6 +607,7 @@ export default function HandTracking() {
             { id: 'draw',    icon: <HighlightOutlined />, label: 'Draw',      color: 'from-violet-500 to-fuchsia-500' },
             ...(isTouch ? [] : [{ id: 'cursor', icon: <AimOutlined />, label: 'Cursor', color: 'from-amber-400 to-rose-500' }]),
             { id: 'filters', icon: <span>✨</span>,        label: 'Filters',   color: 'from-pink-500 via-fuchsia-500 to-cyan-500' },
+            { id: 'laser',   icon: <span>⚡</span>,        label: 'Laser AR',  color: 'from-emerald-400 via-cyan-400 to-violet-500' },
           ].map(m => {
             const active = mode === m.id
             return (
@@ -646,13 +647,42 @@ export default function HandTracking() {
           </defs>
         </svg>
 
+        {/* Laser AR mode — drops in the standalone laserhands page via an
+            iframe. The iframe runs its OWN MediaPipe + camera (browser
+            grants nested camera access once permission is given), so the
+            parent's video/MediaPipe pipeline is irrelevant here. The
+            existing video element stays mounted so flipping back to other
+            modes is instant. */}
+        {mode === 'laser' && (
+          <div className="relative rounded-2xl overflow-hidden border border-emerald-500/40 bg-black shadow-xl shadow-emerald-500/10"
+            style={{ aspectRatio: '16 / 10' }}>
+            <iframe
+              title="Laser Hands AR"
+              src="/laserhands.html"
+              allow="camera; microphone; autoplay"
+              className="absolute inset-0 w-full h-full"
+              style={{ border: 0 }}
+            />
+            <div className="absolute top-3 left-3 inline-flex items-center gap-2 px-2.5 py-1
+                            rounded-full bg-emerald-500/15 border border-emerald-400/40 text-[10px] font-mono text-emerald-200">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Laser AR
+            </div>
+            <a href="/laserhands.html" target="_blank" rel="noopener noreferrer"
+              className="absolute top-3 right-3 inline-flex items-center gap-1.5 px-2.5 py-1
+                         rounded-full bg-gray-950/85 border border-gray-700 hover:border-emerald-400
+                         text-[10px] font-semibold text-gray-300 hover:text-emerald-200 transition-colors">
+              ↗ Open fullscreen
+            </a>
+          </div>
+        )}
+
         {/* Video stage. In whiteboard mode (draw tab only) we hide the
             camera so the canvas is the focal surface — the user paints
             on a clean dark canvas, not over their face. The video keeps
             playing in the background (kept off-screen, not paused) so
             MediaPipe still receives frames. */}
         <div className="relative rounded-2xl overflow-hidden border border-gray-800 bg-gray-950 shadow-xl shadow-black/40"
-          style={{ aspectRatio: '4 / 3' }}>
+          style={{ aspectRatio: '4 / 3', display: mode === 'laser' ? 'none' : 'block' }}>
           <video ref={videoRef}
             className="absolute inset-0 w-full h-full block object-cover"
             style={{

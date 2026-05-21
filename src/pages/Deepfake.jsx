@@ -5,7 +5,7 @@ import VaultGate from '../components/VaultGate'
 import AudioRecorder from '../components/AudioRecorder'
 import CameraCapture from '../components/CameraCapture'
 import JobLogsAgentPlan from '../components/JobLogsAgentPlan'
-import { submitDeepfakeJob, getDeepfakeStatus, fileToDataUrl } from '../api/ai'
+import { submitDeepfakeJob, getDeepfakeStatus, listDeepfakeJobs, fileToDataUrl } from '../api/ai'
 
 // /deepfake — Vault-gated lane. Behind the same sid-vault-token gate as
 // the rest of the AI Studio. Two tabs:
@@ -54,9 +54,29 @@ function DeepfakeInner() {
   const [job, setJob] = useState(null)
   const [error, setError] = useState(null)
   const pollRef = useRef(null)
+  // Library state — past saved deepfakes (face-swap images + voice-any audio).
+  // Loads on mount and refreshes after each successful submission.
+  const [library, setLibrary] = useState([])
+  const [libraryFilter, setLibraryFilter] = useState('all')   // 'all' | 'face-swap' | 'voice-any'
+  const [libraryRefresh, setLibraryRefresh] = useState(0)
 
   useEffect(() => { document.title = 'Deepfake · Sid' }, [])
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
+
+  // Pull the library on mount + after every successful submission. Filter
+  // is applied server-side via the `kind` query param when set.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const { data } = await listDeepfakeJobs({
+        kind: libraryFilter === 'all' ? undefined : libraryFilter,
+        limit: 60,
+      })
+      if (cancelled) return
+      setLibrary(data?.items || [])
+    })()
+    return () => { cancelled = true }
+  }, [libraryFilter, libraryRefresh])
 
   const startPolling = (jobId) => {
     if (pollRef.current) clearInterval(pollRef.current)
@@ -68,6 +88,8 @@ function DeepfakeInner() {
         clearInterval(pollRef.current); pollRef.current = null
         setWorking(false)
         if (data.status === 'failed') setError(data.error || 'Generation failed')
+        // Refresh library so the new output appears in the gallery
+        if (data.status === 'completed') setLibraryRefresh(k => k + 1)
       }
     }, 1500)
   }
@@ -317,8 +339,90 @@ function DeepfakeInner() {
             {working ? 'Working…' : tab === 'face-swap' ? 'Swap faces' : 'Generate voice'}
           </button>
         </div>
+
+        {/* Library — past deepfakes (Vault-gated, persisted in deepfake_jobs). */}
+        <DeepfakeLibrary
+          items={library}
+          filter={libraryFilter} setFilter={setLibraryFilter}
+        />
       </div>
     </div>
+  )
+}
+
+// ─── Library panel ─────────────────────────────────────────────
+function DeepfakeLibrary({ items, filter, setFilter }) {
+  const fmtDate = (iso) => {
+    if (!iso) return ''
+    const d = new Date(iso)
+    return `${d.toLocaleDateString()} · ${d.toTimeString().slice(0, 5)}`
+  }
+  return (
+    <section className="mt-10">
+      <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+        <h2 className="text-lg font-bold bg-gradient-to-r from-rose-300 via-fuchsia-400 to-amber-300 bg-clip-text text-transparent">
+          Your private library
+        </h2>
+        <div className="flex items-center gap-1.5">
+          {[
+            { id: 'all',        label: 'All' },
+            { id: 'face-swap',  label: '🎭 Face' },
+            { id: 'voice-any',  label: '🎤 Voice' },
+          ].map(f => (
+            <button key={f.id} onClick={() => setFilter(f.id)}
+              className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${
+                filter === f.id
+                  ? 'border-rose-400/60 bg-rose-500/10 text-rose-300'
+                  : 'border-gray-800 bg-gray-900/40 text-gray-400 hover:text-gray-200'
+              }`}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {items.length === 0 ? (
+        <p className="text-xs text-gray-500 text-center py-8 border border-dashed border-gray-800 rounded-xl">
+          Nothing yet — your generated deepfakes will land here.
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {items.map(item => (
+            <div key={item.jobId}
+              className="rounded-xl border border-gray-800 bg-gray-900/40 overflow-hidden hover:border-rose-500/40 transition-colors">
+              {item.kind === 'face-swap' && item.outputUrl ? (
+                <img src={item.outputUrl} alt="swap" className="w-full h-44 object-cover" />
+              ) : item.kind === 'voice-any' && item.outputUrl ? (
+                <div className="p-3 bg-gradient-to-br from-rose-500/10 via-fuchsia-500/5 to-amber-500/5 h-44 flex flex-col justify-center gap-2">
+                  <p className="text-[11px] text-gray-300 line-clamp-3 leading-snug">
+                    {item.prompt || '(no text)'}
+                  </p>
+                  <audio src={item.outputUrl} controls className="w-full" />
+                </div>
+              ) : (
+                <div className="h-44 flex items-center justify-center text-[10px] text-gray-600">
+                  {item.status === 'failed' ? '✗ failed' : item.status}
+                </div>
+              )}
+              <div className="px-3 py-2 flex items-center justify-between gap-2 border-t border-gray-800/60">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-fuchsia-300">
+                    {item.kind === 'face-swap' ? '🎭 Face Swap' : '🎤 Voice Clone'}
+                  </p>
+                  <p className="text-[9px] text-gray-500 font-mono">{fmtDate(item.createdAt)}</p>
+                </div>
+                {item.outputUrl && (
+                  <a href={item.outputUrl} download target="_blank" rel="noopener noreferrer"
+                    className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/40">
+                    ↓
+                  </a>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   )
 }
 
