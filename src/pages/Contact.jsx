@@ -189,7 +189,7 @@ const Contact = () => {
                   </span>
                 </a>
 
-                <a href='https://wa.me/917973849099'
+                <a href='https://wa.me/918877663311?text=Hi%20Siddharth!%20I%20found%20your%20portfolio%20and%20would%20love%20to%20connect.'
                   target='_blank' rel='noreferrer'
                   className='flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/[0.04] transition-colors group'>
                   <span className='w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-gray-300 group-hover:text-emerald-300 transition-colors'>
@@ -200,7 +200,22 @@ const Contact = () => {
                   <span className='flex flex-col min-w-0'>
                     <span className='text-[10px] uppercase tracking-wider text-gray-500'>WhatsApp</span>
                     <span className='text-sm text-gray-200 group-hover:text-white transition-colors truncate'>
-                      +91 79738 49099
+                      +91 88776 63311
+                    </span>
+                  </span>
+                </a>
+
+                <a href='tel:+918877663311'
+                  className='flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/[0.04] transition-colors group'>
+                  <span className='w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-gray-300 group-hover:text-amber-300 transition-colors'>
+                    <svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'>
+                      <path d='M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z' />
+                    </svg>
+                  </span>
+                  <span className='flex flex-col min-w-0'>
+                    <span className='text-[10px] uppercase tracking-wider text-gray-500'>Phone</span>
+                    <span className='text-sm text-gray-200 group-hover:text-white transition-colors truncate'>
+                      +91 88776 63311
                     </span>
                   </span>
                 </a>
@@ -233,22 +248,6 @@ const Contact = () => {
                     <span className='text-[10px] uppercase tracking-wider text-gray-500'>LinkedIn</span>
                     <span className='text-sm text-gray-200 group-hover:text-white transition-colors truncate'>
                       siddharth-fulia
-                    </span>
-                  </span>
-                </a>
-
-                <a href='https://x.com/SiddharthFulia'
-                  target='_blank' rel='noreferrer'
-                  className='flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/[0.04] transition-colors group'>
-                  <span className='w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-gray-300 group-hover:text-white transition-colors'>
-                    <svg width='13' height='13' viewBox='0 0 24 24' fill='currentColor'>
-                      <path d='M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z' />
-                    </svg>
-                  </span>
-                  <span className='flex flex-col min-w-0'>
-                    <span className='text-[10px] uppercase tracking-wider text-gray-500'>X · Twitter</span>
-                    <span className='text-sm text-gray-200 group-hover:text-white transition-colors truncate'>
-                      @SiddharthFulia
                     </span>
                   </span>
                 </a>
