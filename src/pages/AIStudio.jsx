@@ -9,8 +9,8 @@ const P = 'animate-pulse bg-gray-800 rounded-xl'
 
 // ─── Image Generation ───
 const PROVIDERS = [
-  { id: 'cloudflare', label: 'Cloudflare', desc: 'FLUX.1-schnell • 10k/day free' },
-  { id: 'huggingface', label: 'Hugging Face', desc: 'FLUX.1-schnell • monthly credits' },
+  { id: 'cloudflare', label: '⚡ Instant', desc: 'Sub-second · best for iterations' },
+  { id: 'huggingface', label: '🎨 Quality', desc: 'Slightly slower · richer detail' },
 ]
 
 const ImageGen = () => {

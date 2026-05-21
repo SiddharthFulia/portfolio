@@ -109,7 +109,7 @@ const ImageEdit = () => {
     <div className="space-y-6 max-w-3xl mx-auto">
       <div className="rounded-xl border border-gray-700 bg-gray-900/40 p-4">
         <p className="text-gray-400 text-xs">
-          Upload a photo and describe how you want it changed. Powered by Cloudflare Workers AI (Stable Diffusion img2img).
+          Upload a photo and describe how you want it changed.
         </p>
       </div>
 

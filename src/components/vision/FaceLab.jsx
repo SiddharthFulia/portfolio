@@ -5,8 +5,8 @@ import { generateImage, geminiVision } from '../../api/ai'
 import { analyzeFace } from '../../api/face'
 
 const IMAGE_PROVIDERS = [
-  { id: 'cloudflare', label: 'Cloudflare', desc: '10k/day free' },
-  { id: 'huggingface', label: 'Hugging Face', desc: 'monthly credits' },
+  { id: 'cloudflare', label: '⚡ Instant', desc: 'Sub-second' },
+  { id: 'huggingface', label: '🎨 Quality', desc: 'Slightly slower' },
 ]
 
 const STYLES = [

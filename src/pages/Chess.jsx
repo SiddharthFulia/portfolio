@@ -17,6 +17,7 @@ import usePieceSet      from '../components/chess/usePieceSet'
 import Clocks           from '../components/chess/Clocks'
 import TimeControlPicker, { TIME_CONTROLS } from '../components/chess/TimeControl'
 import SavedGames       from '../components/chess/SavedGames'
+import PgnDatabaseLoader from '../components/chess/PgnDatabase'
 import {
   chessBestMove, chessAnalyze, chessPlay, chessEngineStatus,
   chessSaveGame, chessLoadGame,
@@ -360,9 +361,11 @@ export default function ChessPage() {
     setStatus({ kind: 'idle', text: `Loaded "${row.name}"` })
     setLibraryOpen(false)
   }
-  // Import via PGN paste — same shape as FEN import but with a full game.
-  const loadPgn = () => {
-    const trimmed = pgnInput.trim()
+  // Apply a PGN string to the board. Used by both the textarea paste
+  // ('Load PGN' button) and the file-upload picker. Decoupled from
+  // pgnInput state so callers can hand us a string directly.
+  const applyPgn = (raw) => {
+    const trimmed = String(raw || '').trim()
     if (!trimmed) return
     const chess = new Chess()
     try { chess.loadPgn(trimmed) }
@@ -374,8 +377,11 @@ export default function ChessPage() {
     setFen(chess.fen())
     setHistory(chess.history())
     setEvalHistory([]); setVariations([])
-    setPgnInput('')
     setStatus({ kind: 'idle', text: `Loaded ${chess.history().length}-ply PGN` })
+  }
+  const loadPgn = () => {
+    applyPgn(pgnInput)
+    setPgnInput('')
   }
 
   const isGameOver = chessRef.current.isGameOver()
@@ -525,6 +531,10 @@ export default function ChessPage() {
             <PgnImport
               value={pgnInput} setValue={setPgnInput} onLoad={loadPgn}
             />
+            {/* Multi-game files open a picker; single-game files load
+                straight away. Either way the chosen PGN is passed to
+                applyPgn (decoupled from the textarea's pgnInput state). */}
+            <PgnDatabaseLoader onLoad={applyPgn} />
           </div>
 
           {/* ── Sidebar ── */}

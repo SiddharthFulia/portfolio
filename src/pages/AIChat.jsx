@@ -1138,8 +1138,8 @@ function GenerationSettings({
               }))}
             />
             <p className="text-[10px] text-gray-500 mt-1.5 leading-snug">
-              When on, asking the chat for an image triggers a real render via
-              Cloudflare AI — typically 3–8s, free tier.
+              When on, asking the chat for an image triggers a real render —
+              typically 3–8s.
             </p>
           </>
         ) : (

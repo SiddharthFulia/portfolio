@@ -14,10 +14,14 @@ import CameraCapture from './CameraCapture'
 
 const P = 'animate-pulse bg-gray-800 rounded-xl'
 
-// ─── Fast Image Gen (Cloudflare + HuggingFace) ───
+// ─── Fast Image Gen ───
+// Two routing tiers — neutral labels keep the user from caring about
+// which third-party host runs it. Internally still routed to Cloudflare
+// and HuggingFace respectively (`id` stays the same), only the label
+// the user sees changes.
 const PROVIDERS = [
-  { id: 'cloudflare',  label: 'Cloudflare',   desc: 'FLUX.1-schnell · 10k/day free' },
-  { id: 'huggingface', label: 'Hugging Face', desc: 'FLUX.1-schnell · monthly credits' },
+  { id: 'cloudflare',  label: '⚡ Instant',  desc: 'Sub-second · best for quick iterations' },
+  { id: 'huggingface', label: '🎨 Quality',  desc: 'Slightly slower · richer detail' },
 ]
 
 export function FastImageGen() {
