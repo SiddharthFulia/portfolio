@@ -45,6 +45,10 @@ export const ENDPOINTS = {
   CINEMA_STATUS:        '/api/cinema/status',
   CINEMA_LIST:          '/api/cinema/list',
   CINEMA_BULK:          '/api/cinema/bulk',
+  // 3D Mesh generation (Shap-E / Point-E on 5090)
+  MESH_GENERATE:        '/api/mesh/generate',
+  MESH_STATUS:          '/api/mesh/status',   // /:jobId appended at call site
+  MESH_LIST:            '/api/mesh/list',
   JOB_LOGS:             '/api/job-logs',   // /:lane/:jobId?since=<ms>&limit=80
   EXPORT:               '/api/export',     // POST { format, rows|content, title, filename }
 

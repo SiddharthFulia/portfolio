@@ -427,6 +427,28 @@ export async function cinemaBulkAction(action, ids) {
   } catch (err) { return { data: null, error: err.message }; }
 }
 
+// ─── 3D Mesh generation (Shap-E / Point-E on 5090) ────────────────
+// Async queue. Submit returns { jobId, status, prompt, model }; FE polls
+// getMeshStatus until status == 'completed' | 'failed'.
+export async function submitMeshJob(payload = {}) {
+  try {
+    const data = await post(ENDPOINTS.MESH_GENERATE, payload, { timeout: 30000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function getMeshStatus(jobId) {
+  try {
+    const data = await get(`${ENDPOINTS.MESH_STATUS}/${jobId}`, {}, { timeout: 6000 });
+    return { data: data?.data || null, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function listMeshJobs({ status = 'completed', visibility = 'public', page = 1, limit = 24 } = {}) {
+  try {
+    const data = await get(ENDPOINTS.MESH_LIST, { status, visibility, page, limit }, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+
 // ─── Unified live-log tail (added 2026-05) ────────────────────────
 // Cursor-based — pass the ts of the last log you've seen so the BE only
 // returns new lines. Cheap enough to poll every 1.5s during a job without
