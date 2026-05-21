@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { Modal, Input } from 'antd'
 import { Chess } from 'chess.js'
 import 'chessground/assets/chessground.base.css'
 import 'chessground/assets/chessground.brown.css'
@@ -54,6 +55,13 @@ export default function ChessPage() {
   const [telemetry, setTelemetry] = useState(null)
   // Saved-games refresh trigger — bump after save/delete to re-fetch list.
   const [savedRefresh, setSavedRefresh] = useState(0)
+  // Pending promotion — set when the user drags a pawn to the last rank.
+  // We hold the move until the user picks the piece in the modal so we
+  // never auto-queen for them.
+  const [pendingPromotion, setPendingPromotion] = useState(null)
+  // Save-game modal — replaces the browser prompt() with a real form.
+  const [saveModalOpen, setSaveModalOpen] = useState(false)
+  const [saveName, setSaveName] = useState('')
   // Fullscreen board-only mode. Hides header + sidebar + nav so the
   // board can grow to the viewport. Back button restores normal layout.
   const [fullscreen, setFullscreen] = useState(false)
@@ -157,16 +165,52 @@ export default function ChessPage() {
   const movableColor = bothSidesMovable ? turnColor : (isPlayerTurn ? playerColor : null)
 
   // Called by ChessBoard when the user finishes a drag/drop legal move.
+  // Detect promotions BEFORE applying the move so we can show the piece
+  // picker — chess.js needs the promotion piece in the move args, so
+  // we hold the move pending the user's choice.
   const onUserMove = useCallback((from, to) => {
     const chess = chessRef.current
+    const piece = chess.get(from)
+    // Promotion = pawn moving onto the last rank for its colour.
+    const toRank = to[1]
+    const isPromotion = piece && piece.type === 'p' &&
+      ((piece.color === 'w' && toRank === '8') || (piece.color === 'b' && toRank === '1'))
+    if (isPromotion) {
+      setPendingPromotion({ from, to, color: piece.color })
+      return
+    }
     try {
-      const move = chess.move({ from, to, promotion: 'q' })
+      const move = chess.move({ from, to })
       if (!move) return
     } catch { return }
     setFen(chess.fen())
     setHistory(chess.history())
     setEvalHistory(prev => [...prev, { score: null, depth: 0 }])
   }, [])
+
+  // User picked a promotion piece from the modal — apply the held move.
+  const completePromotion = useCallback((pieceChar) => {
+    const p = pendingPromotion
+    if (!p) return
+    const chess = chessRef.current
+    try {
+      chess.move({ from: p.from, to: p.to, promotion: pieceChar })
+    } catch {
+      setPendingPromotion(null)
+      return
+    }
+    setFen(chess.fen())
+    setHistory(chess.history())
+    setEvalHistory(prev => [...prev, { score: null, depth: 0 }])
+    setPendingPromotion(null)
+  }, [pendingPromotion])
+
+  const cancelPromotion = () => {
+    // Restore the board view to current chess.js state — chessground may
+    // have already animated the pawn forward; re-set fen pushes it back.
+    setPendingPromotion(null)
+    setFen(chessRef.current.fen())
+  }
 
   // Engine plays its turn (mode = 'play' + engine's colour).
   useEffect(() => {
@@ -263,14 +307,17 @@ export default function ChessPage() {
     }
   }
 
-  // Saved games — persist current PGN with metadata, and load a row back
-  // onto the board (reconstructing chess.js state from the PGN).
-  const saveCurrentGame = async () => {
+  // Open the Save-game modal pre-filled with a sensible default name.
+  // Actual API call happens in confirmSaveGame() once user confirms.
+  const openSaveModal = () => {
+    setSaveName(`${engineMode === 'play' ? `vs Stockfish ${engineElo}`
+                  : engineMode === 'analyze' ? 'Analysis'
+                  : 'Pass-and-play'} · ${new Date().toLocaleDateString()}`)
+    setSaveModalOpen(true)
+  }
+  const confirmSaveGame = async () => {
     const chess = chessRef.current
-    const name = prompt(
-      'Name this game',
-      `${engineMode === 'play' ? `vs Stockfish ${engineElo}` : engineMode === 'analyze' ? 'Analysis' : 'Pass-and-play'} · ${new Date().toLocaleDateString()}`
-    )
+    const name = saveName.trim()
     if (!name) return
     const result = chess.isCheckmate()
       ? (chess.turn() === 'w' ? '0-1' : '1-0')
@@ -288,6 +335,7 @@ export default function ChessPage() {
       result,
       moveCount: chess.history().length,
     })
+    setSaveModalOpen(false)
     if (err) setStatus({ kind: 'error', text: `Save failed: ${err}` })
     else { setStatus({ kind: 'idle', text: `Saved as "${name}"` }); setSavedRefresh(k => k + 1) }
   }
@@ -325,9 +373,21 @@ export default function ChessPage() {
   // No sidebar, no header. Footer is hidden via ConditionalFooter at the
   // App level (it already hides on '/'). We use position:fixed inset:0 so
   // the entire viewport becomes the board.
+  // Promotion picker — overlay rendered on top of the board (works both
+  // in normal layout AND fullscreen via z-50).
+  const promotionPicker = pendingPromotion && (
+    <PromotionPicker
+      color={pendingPromotion.color}
+      pieceSet={pieceSet}
+      onPick={completePromotion}
+      onCancel={cancelPromotion}
+    />
+  )
+
   if (fullscreen) {
     return (
       <div className="fixed inset-0 bg-[#0a0a0e] z-50 flex items-center justify-center p-3 sm:p-6">
+        {promotionPicker}
         {/* Back button — top-left corner, always visible */}
         <button onClick={() => setFullscreen(false)}
           className="absolute top-4 left-4 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full
@@ -381,6 +441,7 @@ export default function ChessPage() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 pb-16 px-4 sm:px-6">
+      {promotionPicker}
       <div className="max-w-6xl mx-auto">
         <Header engineHealth={engineHealth} onFullscreen={() => setFullscreen(true)} />
 
@@ -432,7 +493,7 @@ export default function ChessPage() {
               isGameOver={isGameOver} gameOverReason={gameOverReason}
               onUndo={undoMove} onFlip={flipBoard}
               onReset={resetBoard} onCopyPgn={copyPgn}
-              onSave={saveCurrentGame}
+              onSave={openSaveModal}
             />
 
             <FenImport
@@ -595,6 +656,56 @@ function StatusBar({ status, thinking, isGameOver, gameOverReason, onUndo, onFli
           className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20">
           💾 Save game
         </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Promotion picker ──
+// Centred modal with the 4 promotion pieces (Q R B N) rendered as SVGs
+// from the user's active piece set, so the picker matches the board look.
+// Click any piece to apply; click backdrop or × to cancel.
+function PromotionPicker({ color, pieceSet, onPick, onCancel }) {
+  // chess.js uses lowercase piece chars for moves.
+  const choices = [
+    { piece: 'q', label: 'Queen'  },
+    { piece: 'r', label: 'Rook'   },
+    { piece: 'b', label: 'Bishop' },
+    { piece: 'n', label: 'Knight' },
+  ]
+  // Filename letter for the SVG (cburnett etc. use uppercase role letters).
+  const colorLetter = color === 'w' ? 'w' : 'b'
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={onCancel}>
+      <div onClick={e => e.stopPropagation()}
+        className="luxe-card p-6 max-w-md w-full">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-base font-bold bg-gradient-to-r from-amber-300 to-fuchsia-400 bg-clip-text text-transparent">
+            Promote pawn
+          </h3>
+          <button onClick={onCancel}
+            className="text-xs text-gray-500 hover:text-gray-200 px-2 py-1 rounded border border-gray-800 hover:border-gray-600">
+            ✕ Cancel
+          </button>
+        </div>
+        <p className="text-xs text-gray-400 mb-4">Pick what your pawn becomes.</p>
+        <div className="grid grid-cols-4 gap-2">
+          {choices.map(c => (
+            <button key={c.piece}
+              onClick={() => onPick(c.piece)}
+              className="group aspect-square rounded-xl bg-gray-900/60 border-2 border-gray-800 hover:border-amber-400 hover:bg-amber-500/10 transition-all flex flex-col items-center justify-center p-1">
+              <img
+                src={`/piece/${pieceSet}/${colorLetter}${c.piece.toUpperCase()}.svg`}
+                alt={c.label}
+                className="w-full h-full max-w-[88px] max-h-[88px] object-contain transition-transform group-hover:scale-110"
+              />
+              <span className="text-[10px] uppercase tracking-wider text-gray-500 group-hover:text-amber-300 mt-1">
+                {c.label}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   )
