@@ -231,10 +231,40 @@ export default function HandTracking() {
   const [gestures, setGestures] = useState(null)  // { handed, fingers, pinch }
   const [activeFilter, setActiveFilter] = useState(null) // detected gesture in filters mode
   const [cursorStyle, setCursorStyle] = useState('bullseye')
+  const [whiteboard, setWhiteboard] = useState(false)  // hide video → canvas-only
+  const [facingMode, setFacingMode] = useState('user') // 'user' (front) | 'environment' (back) — relevant on phones
   const [error, setError] = useState(null)
+  // Coarse touch / narrow viewport detection — Cursor mode doesn't make
+  // sense on a touchscreen device, so we hide it there. Pure CSS media
+  // queries also stack the layout for us; this gate is just for the
+  // mode chip row.
+  const [isTouch, setIsTouch] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(hover: none), (max-width: 640px)')
+    const sync = () => setIsTouch(mq.matches)
+    sync()
+    mq.addEventListener?.('change', sync)
+    return () => mq.removeEventListener?.('change', sync)
+  }, [])
   // Used by the spotlight filter — needs the most recent index-tip in
   // canvas pixel coords; updated each frame inside the RAF loop.
   const filterStateRef = useRef({ tip: null, openCenter: null, t0: performance.now() })
+
+  // ── Hot-path refs ──
+  // setState fires React re-renders. Calling it every animation frame
+  // (60×/sec) tanks performance — went from 6fps before this refactor.
+  // We mirror the relevant state into refs so the RAF loop never
+  // touches React; an interval flushes refs → state at ~5Hz so the UI
+  // stays responsive without the re-render storm.
+  const modeRef         = useRef(mode)
+  const colorRef        = useRef(color)
+  const brushRef        = useRef(brush)
+  const gesturesRef     = useRef(null)
+  const fpsRef          = useRef(0)
+  const activeFilterRef = useRef(null)
+  useEffect(() => { modeRef.current = mode }, [mode])
+  useEffect(() => { colorRef.current = color }, [color])
+  useEffect(() => { brushRef.current = brush }, [brush])
 
   useEffect(() => { document.title = 'Hand Tracking · Sid' }, [])
 
@@ -283,12 +313,19 @@ export default function HandTracking() {
   const start = async () => {
     if (!ready || running) return
     try {
+      // 640×480 is plenty for hand tracking — MediaPipe downscales
+      // internally anyway. Going lower keeps the per-frame inference
+      // cheap and lets us stay near display refresh on modest GPUs
+      // and even more on phones.
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 960 }, height: { ideal: 720 } },
+        video: { facingMode, width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } },
         audio: false,
       })
       streamRef.current = stream
       videoRef.current.srcObject = stream
+      // iOS Safari requires playsInline (set in JSX) + a user gesture
+      // before play(). The Start button is that gesture; awaiting play()
+      // surfaces autoplay rejection cleanly.
       await videoRef.current.play()
       setRunning(true); setError(null)
       loop()
@@ -337,10 +374,11 @@ export default function HandTracking() {
 
   // Main per-frame work: detect → draw skeleton → handle mode-specific
   // interactions. Re-schedules itself via requestAnimationFrame.
-  let lastT = performance.now()
+  // CRITICAL: this function MUST NOT call setState — every call would
+  // trigger a re-render at 60Hz. Read from *Ref.current, write to
+  // *Ref.current. State sync happens via the flush interval below.
+  const lastTRef = useRef(performance.now())
   const loop = () => {
-    if (!running) {} // 'running' state read via closure; the cancel
-                     // above stops the chain
     rafRef.current = requestAnimationFrame(loop)
     const lm = landmarkerRef.current
     const v = videoRef.current
@@ -348,9 +386,9 @@ export default function HandTracking() {
     syncCanvasSize()
 
     const now = performance.now()
-    const dt = now - lastT
-    lastT = now
-    if (dt > 0) setFps((prev) => prev * 0.85 + (1000 / dt) * 0.15)
+    const dt = now - lastTRef.current
+    lastTRef.current = now
+    if (dt > 0) fpsRef.current = fpsRef.current * 0.85 + (1000 / dt) * 0.15
 
     let res
     try { res = lm.detectForVideo(v, now) } catch { return }
@@ -365,6 +403,7 @@ export default function HandTracking() {
 
     const hands = res?.landmarks || []
     const W = overlay.canvas.width, H = overlay.canvas.height
+    const mode = modeRef.current
 
     const summary = hands.map((pts, i) => {
       const fingers = fingersUp(pts)
@@ -410,13 +449,13 @@ export default function HandTracking() {
     })
 
     overlay.restore()
-    setGestures(summary[0] || null)
+    gesturesRef.current = summary[0] || null
 
     // Filters mode → classify the gesture + paint the matching effect
     // OUTSIDE the mirror transform (so coords match what the user sees).
     if (mode === 'filters') {
       const g = hands.length > 0 ? classifyGesture(summary[0].fingers) : null
-      if (g !== activeFilter) setActiveFilter(g)
+      activeFilterRef.current = g
       if (g && hands.length > 0) {
         // Index-tip pixel coords in mirrored (visible) space
         const tipX = (1 - hands[0][8].x) * W
@@ -424,8 +463,8 @@ export default function HandTracking() {
         const t = performance.now() - filterStateRef.current.t0
         drawFilter(overlay, g, tipX, tipY, W, H, t)
       }
-    } else if (activeFilter) {
-      setActiveFilter(null)
+    } else {
+      activeFilterRef.current = null
     }
 
     // ── Mode-specific behaviour ──
@@ -435,23 +474,25 @@ export default function HandTracking() {
       const pinching = isPinching(lm0)
       if (pinching) {
         const ctx = canvasRef.current.getContext('2d')
-        // Midpoint between thumb-tip and index-tip = pen tip
+        // Midpoint between thumb-tip and index-tip = pen tip.
+        // We DRAW at the un-mirrored landmark coords because the
+        // canvas itself has CSS `transform: scaleX(-1)` which mirrors
+        // the display. Mirroring here in JS too would double-mirror
+        // and make strokes go right-to-left when the user moves their
+        // hand left-to-right.
         const px = ((lm0[4].x + lm0[8].x) / 2) * canvasRef.current.width
         const py = ((lm0[4].y + lm0[8].y) / 2) * canvasRef.current.height
-        // Mirror the X so the drawing matches what the user sees
-        const mx = canvasRef.current.width - px
-        const my = py
-        ctx.strokeStyle = color
-        ctx.lineWidth = brush
+        ctx.strokeStyle = colorRef.current
+        ctx.lineWidth = brushRef.current
         ctx.lineCap = 'round'
         ctx.lineJoin = 'round'
         if (lastDrawPt.current) {
           ctx.beginPath()
           ctx.moveTo(lastDrawPt.current.x, lastDrawPt.current.y)
-          ctx.lineTo(mx, my)
+          ctx.lineTo(px, py)
           ctx.stroke()
         }
-        lastDrawPt.current = { x: mx, y: my }
+        lastDrawPt.current = { x: px, y: py }
       } else {
         lastDrawPt.current = null
       }
@@ -475,15 +516,31 @@ export default function HandTracking() {
     }
   }
 
-  // Restart the RAF loop whenever mode/running flip — closure captures
-  // need fresh references to the mode + run state.
+  // Start / stop the RAF loop on running flips ONLY. Mode / color /
+  // brush changes don't need a loop restart because the loop reads them
+  // from refs each frame.
   useEffect(() => {
     if (!running) return
-    lastT = performance.now()
+    lastTRef.current = performance.now()
     loop()
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [running, mode, color, brush])
+  }, [running])
+
+  // Sync refs → React state at 5Hz. This keeps the UI bits that depend
+  // on `gestures` / `fps` / `activeFilter` responsive without paying
+  // for a re-render every animation frame. 5Hz is fast enough that
+  // the FPS counter and the gesture chip feel live but slow enough
+  // that React's re-render cost is negligible.
+  useEffect(() => {
+    if (!running) return
+    const iv = setInterval(() => {
+      setGestures(gesturesRef.current)
+      setFps(fpsRef.current)
+      setActiveFilter((prev) => prev === activeFilterRef.current ? prev : activeFilterRef.current)
+    }, 200)
+    return () => clearInterval(iv)
+  }, [running])
 
   return (
     <div className="min-h-screen bg-black text-gray-100 pt-20 pb-16">
@@ -508,12 +565,14 @@ export default function HandTracking() {
           </p>
         </header>
 
-        {/* Mode chips — top-level tabs for the page */}
+        {/* Mode chips — top-level tabs for the page. Cursor mode is
+            hidden on touch devices since pointer-by-finger is pointless
+            on a touchscreen (the user can already touch the buttons). */}
         <div className="flex items-center justify-center gap-2 mb-4 flex-wrap">
           {[
             { id: 'view',    icon: <EyeOutlined />,       label: 'Skeleton',  color: 'from-cyan-500 to-blue-500' },
             { id: 'draw',    icon: <HighlightOutlined />, label: 'Draw',      color: 'from-violet-500 to-fuchsia-500' },
-            { id: 'cursor',  icon: <AimOutlined />,       label: 'Cursor',    color: 'from-amber-400 to-rose-500' },
+            ...(isTouch ? [] : [{ id: 'cursor', icon: <AimOutlined />, label: 'Cursor', color: 'from-amber-400 to-rose-500' }]),
             { id: 'filters', icon: <span>✨</span>,        label: 'Filters',   color: 'from-pink-500 via-fuchsia-500 to-cyan-500' },
           ].map(m => {
             const active = mode === m.id
@@ -552,17 +611,26 @@ export default function HandTracking() {
           </defs>
         </svg>
 
-        {/* Video stage */}
-        <div className="relative rounded-2xl overflow-hidden border border-gray-800 bg-gray-950 shadow-xl shadow-black/40">
+        {/* Video stage. In whiteboard mode (draw tab only) we hide the
+            camera so the canvas is the focal surface — the user paints
+            on a clean dark canvas, not over their face. The video keeps
+            playing in the background (kept off-screen, not paused) so
+            MediaPipe still receives frames. */}
+        <div className="relative rounded-2xl overflow-hidden border border-gray-800 bg-gray-950 shadow-xl shadow-black/40"
+          style={{ aspectRatio: '4 / 3' }}>
           <video ref={videoRef}
-            className="w-full h-auto block"
+            className="absolute inset-0 w-full h-full block object-cover"
             style={{
               transform: 'scaleX(-1)',
-              // Chromatic aberration only when peace sign drives the
-              // VHS filter — keeps the camera clean otherwise.
               filter: (mode === 'filters' && activeFilter === 'peace') ? 'url(#hand-vhs)' : 'none',
+              opacity: (mode === 'draw' && whiteboard) ? 0 : 1,
+              transition: 'opacity 200ms',
             }}
             playsInline muted />
+          {/* Whiteboard background — visible only when the video is hidden */}
+          {mode === 'draw' && whiteboard && (
+            <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-950 to-black" />
+          )}
           <canvas ref={canvasRef}
             className="absolute inset-0 w-full h-full pointer-events-none"
             style={{ transform: 'scaleX(-1)' }} />
@@ -575,6 +643,27 @@ export default function HandTracking() {
             <span className={`w-2 h-2 rounded-full ${running ? 'bg-emerald-400 animate-pulse' : 'bg-gray-500'}`} />
             {running ? `${fps.toFixed(0)} fps` : ready ? 'ready' : 'loading…'}
           </div>
+
+          {/* Flip-camera button — useful primarily on phones to swap
+              between front (selfie) and back camera. Hidden until the
+              stream is running. Restart logic stops + starts so the
+              new facing mode is picked up by getUserMedia. */}
+          {running && (
+            <button
+              onClick={async () => {
+                const next = facingMode === 'user' ? 'environment' : 'user'
+                setFacingMode(next)
+                stop()
+                setTimeout(() => start(), 250)
+              }}
+              title="Switch camera"
+              className="absolute bottom-3 right-3 w-10 h-10 inline-flex items-center justify-center
+                         rounded-full bg-gray-950/85 hover:bg-cyan-500/30 border border-gray-700
+                         hover:border-cyan-400 text-gray-200 hover:text-white backdrop-blur-sm
+                         shadow-lg shadow-black/40 transition-colors">
+              <ReloadOutlined />
+            </button>
+          )}
 
           {/* Live gesture chip */}
           {gestures && running && (
@@ -618,8 +707,16 @@ export default function HandTracking() {
           {/* Mode-specific tool panel */}
           {mode === 'draw' && (
             <div className="rounded-xl border border-violet-500/40 bg-gray-950/60 p-3">
-              <div className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-2">
-                ✍ Drawing — pinch index + thumb to draw
+              <div className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-2 flex items-center justify-between">
+                <span>✍ Drawing — pinch index + thumb to draw</span>
+                <button onClick={() => setWhiteboard(w => !w)}
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border transition-colors ${
+                    whiteboard
+                      ? 'bg-violet-500/25 border-violet-400 text-violet-100'
+                      : 'border-gray-700 bg-gray-900/60 text-gray-300 hover:border-gray-600'
+                  }`}>
+                  {whiteboard ? '◑ Whiteboard ON' : '◐ Whiteboard'}
+                </button>
               </div>
               <div className="flex items-center gap-1.5 mb-2 flex-wrap">
                 {COLORS.map(c => (
