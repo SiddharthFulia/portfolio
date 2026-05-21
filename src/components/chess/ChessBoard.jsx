@@ -41,6 +41,12 @@ export default function ChessBoard({
   // candidateMoves — array of UCI strings, in ranked order. Top-3 are
   // drawn as arrows with descending intensity.
   candidateMoves = [],
+  // layoutKey — bump from parent when surrounding layout shifts (clocks
+  // appearing, fullscreen toggle, sidebar collapse). Triggers a
+  // chessground.redrawAll() so click hitboxes stay aligned with the
+  // visible pieces. Without this, clicks land on the OLD square positions
+  // and the user 'selects rook' when hovering knight.
+  layoutKey,
 }) {
   const elRef = useRef(null)
   const cgRef = useRef(null)
@@ -77,6 +83,17 @@ export default function ChessBoard({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Whenever the parent says the layout shifted (clocks toggled,
+  // fullscreen on/off, sidebar collapse), force chessground to recompute
+  // its bounding rect — otherwise the cached square offsets misalign with
+  // the visible pieces and clicks land on the wrong square.
+  useEffect(() => {
+    if (!cgRef.current) return
+    // requestAnimationFrame so the layout has committed before redraw.
+    const id = requestAnimationFrame(() => cgRef.current?.redrawAll?.())
+    return () => cancelAnimationFrame(id)
+  }, [layoutKey])
 
   // Sync state from React → chessground on every change.
   useEffect(() => {

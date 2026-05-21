@@ -54,6 +54,23 @@ export default function ChessPage() {
   const [telemetry, setTelemetry] = useState(null)
   // Saved-games refresh trigger — bump after save/delete to re-fetch list.
   const [savedRefresh, setSavedRefresh] = useState(0)
+  // Fullscreen board-only mode. Hides header + sidebar + nav so the
+  // board can grow to the viewport. Back button restores normal layout.
+  const [fullscreen, setFullscreen] = useState(false)
+  // Layout key — bumped on any change that resizes the board container
+  // (clocks toggling, fullscreen toggle, sidebar visibility). Passed to
+  // ChessBoard which calls cg.redrawAll() so hitboxes stay aligned.
+  const layoutKey = useMemo(
+    () => `${fullscreen ? 'fs' : 'win'}-${timeControl.id}`,
+    [fullscreen, timeControl.id],
+  )
+  // ESC key exits fullscreen, mirroring browser fullscreen behavior.
+  useEffect(() => {
+    if (!fullscreen) return
+    const onKey = (e) => { if (e.key === 'Escape') setFullscreen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [fullscreen])
   // Piece set — persists across reloads via localStorage.
   const [pieceSet, setPieceSet] = useState(() => {
     try { return localStorage.getItem('sid-chess-pieces') || 'cburnett' } catch { return 'cburnett' }
@@ -302,10 +319,68 @@ export default function ChessPage() {
 
   const evalLatest = evalHistory[evalHistory.length - 1]
 
+  // ── Fullscreen render: just the board + eval bar + clocks + back button.
+  // No sidebar, no header. Footer is hidden via ConditionalFooter at the
+  // App level (it already hides on '/'). We use position:fixed inset:0 so
+  // the entire viewport becomes the board.
+  if (fullscreen) {
+    return (
+      <div className="fixed inset-0 bg-[#0a0a0e] z-50 flex items-center justify-center p-3 sm:p-6">
+        {/* Back button — top-left corner, always visible */}
+        <button onClick={() => setFullscreen(false)}
+          className="absolute top-4 left-4 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full
+                     bg-gray-900/80 backdrop-blur border border-gray-700 hover:border-amber-400/60
+                     text-gray-200 hover:text-amber-200 text-xs font-semibold transition-colors">
+          ← Back
+        </button>
+        {/* Status pill — fullscreen has no status bar, surface the basics */}
+        <div className="absolute top-4 right-4 z-10 flex items-center gap-2 text-[11px]">
+          <span className={`px-2 py-0.5 rounded-full border font-mono ${
+            status.kind === 'error' ? 'border-rose-400/40 bg-rose-500/10 text-rose-300'
+            : (thinking || status.kind === 'thinking' || status.kind === 'analyzing') ? 'border-cyan-400/40 bg-cyan-500/10 text-cyan-300'
+            : 'border-gray-700 bg-gray-900/60 text-gray-400'
+          }`}>
+            {(thinking || status.kind === 'thinking' || status.kind === 'analyzing') && <span className="inline-block w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse mr-1.5 align-middle" />}
+            {status.text}{isGameOver && ` · ${gameOverReason}`}
+          </span>
+        </div>
+        {/* Board + side rails. max-h ensures it scales to viewport height
+            even on tall windows; aspect-square inside keeps it a square. */}
+        <div className="flex gap-3 items-center w-full justify-center" style={{ height: 'min(100%, calc(100vh - 60px))' }}>
+          <EvalBar score={evalLatest?.score} orientation={playerColor} />
+          {timeControl.baseMs != null && (
+            <div className="w-24 sm:w-28">
+              <Clocks
+                white={whiteMs} black={blackMs}
+                activeSide={chessRef.current.isGameOver() || flagged ? null
+                            : history.length === 0 ? null
+                            : (chessRef.current.turn() === 'w' ? 'white' : 'black')}
+                orientation={playerColor}
+              />
+            </div>
+          )}
+          <div style={{ width: 'min(calc(100vh - 60px), 100%)', maxWidth: '100%' }}>
+            <ChessBoard
+              chess={chessRef.current}
+              fen={fen}
+              orientation={playerColor}
+              movableColor={movableColor}
+              onMove={onUserMove}
+              layoutKey={layoutKey}
+              candidateMoves={engineMode === 'analyze'
+                ? variations.slice(0, 3).map(v => v.pv?.[0]).filter(Boolean)
+                : []}
+            />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 pb-16 px-4 sm:px-6">
       <div className="max-w-6xl mx-auto">
-        <Header engineHealth={engineHealth} />
+        <Header engineHealth={engineHealth} onFullscreen={() => setFullscreen(true)} />
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5">
           {/* ── Board column ── */}
@@ -339,6 +414,7 @@ export default function ChessPage() {
                   orientation={playerColor}
                   movableColor={movableColor}
                   onMove={onUserMove}
+                  layoutKey={layoutKey}
                   // Top-3 candidate arrows — only in analyze mode so they
                   // don't spoil play-vs-engine. Each variation's first
                   // UCI move is the arrow's orig→dest.
@@ -389,7 +465,7 @@ export default function ChessPage() {
 }
 
 // ── Header ──
-function Header({ engineHealth }) {
+function Header({ engineHealth, onFullscreen }) {
   return (
     <header className="mb-6">
       <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
@@ -397,6 +473,11 @@ function Header({ engineHealth }) {
           ♛ Chess
         </h1>
         <div className="flex items-center gap-2 text-[10px]">
+          <button onClick={onFullscreen}
+            title="Fullscreen board (ESC to exit)"
+            className="px-2 py-1 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 font-semibold">
+            ⛶ Fullscreen
+          </button>
           {engineHealth?.status === 'ok' ? (
             <span className="px-2 py-0.5 rounded-full border border-emerald-400/40 bg-emerald-500/10 text-emerald-300">
               Stockfish online
