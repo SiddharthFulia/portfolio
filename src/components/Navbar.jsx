@@ -65,11 +65,14 @@ const Navbar = () => {
       ],
     },
     {
-      title: 'Play',
+      // 'Engineered' replaces 'Play' — both items here are full ground-up
+      // builds (chess engine + 3D runner), not casual demos. Chess goes
+      // first because it's the deeper engineering build.
+      title: 'Engineered',
       accent: 'text-cyan-300',
       items: [
-        { to: '/runner',     label: '🏃 Hand Runner',   desc: 'Subway-Surfers, hand-gesture-controlled' },
-        { to: '/chess',      label: '♛ Chess Engine',  desc: 'Stockfish · clocks · saved games' },
+        { to: '/chess',      label: '♛ Chess Engine',  desc: 'Stockfish · clocks · saved games · piece themes' },
+        { to: '/runner',     label: '🏃 Hand Runner',   desc: 'Three.js · MediaPipe · ramps · oncoming trains' },
       ],
     },
     {
