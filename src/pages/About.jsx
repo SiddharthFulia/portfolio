@@ -119,31 +119,31 @@ function ExpertiseCard({ item }) {
   return (
     <motion.div variants={fadeUp}>
       <AnimatedCard effect={EXPERTISE_EFFECTS[item.id] || 'default'}>
-      <div
-        className={`bg-white rounded-2xl border border-slate-100 shadow-md overflow-hidden
-                     transition-all duration-300 ${open ? 'shadow-xl ring-2 ring-blue-100' : 'hover:-translate-y-1 hover:shadow-lg'}`}
-      >
+      <div className={`luxe-card overflow-hidden transition-all duration-300 ${open ? 'border-violet-500/40' : ''}`}>
         {/* Header — always visible, clickable */}
         <button
           onClick={() => setOpen(o => !o)}
           className="w-full text-left"
         >
-          <div className={`bg-gradient-to-r ${item.color} p-5 flex items-center justify-between`}>
+          <div className="p-5 flex items-center justify-between border-b border-white/[0.06]">
             <div className="flex items-center gap-3">
               <span className="text-3xl">{item.icon}</span>
               <div>
                 <h4 className="text-white font-poppins font-bold text-lg">{item.title}</h4>
-                <p className="text-white/80 text-xs mt-0.5 max-w-md">{item.summary}</p>
+                <p className="luxe-body-muted text-xs mt-0.5 max-w-md">{item.summary}</p>
               </div>
             </div>
-            <span className={`text-white text-xl transition-transform duration-300 ${open ? 'rotate-45' : ''}`}>+</span>
+            <span className={`text-violet-300 text-xl transition-transform duration-300 ${open ? 'rotate-45' : ''}`}>+</span>
           </div>
         </button>
 
         {/* Tags — always visible */}
-        <div className="px-5 py-3 flex flex-wrap gap-1.5 border-b border-slate-100">
+        <div className="px-5 py-3 flex flex-wrap gap-1.5 border-b border-white/[0.06]">
           {item.tags.map(t => (
-            <span key={t} className="px-2.5 py-1 bg-slate-100 text-slate-600 text-xs font-semibold rounded-full">
+            <span
+              key={t}
+              className="border border-gray-800 bg-white/[0.03] text-gray-300 text-[10px] uppercase tracking-wider font-semibold px-2 py-1 rounded-md"
+            >
               {t}
             </span>
           ))}
@@ -156,8 +156,8 @@ function ExpertiseCard({ item }) {
         >
           <ul className="p-5 space-y-3">
             {item.details.map((d, i) => (
-              <li key={i} className="flex gap-2 text-sm text-slate-600 leading-relaxed">
-                <span className="text-blue-500 mt-0.5 shrink-0">▸</span>
+              <li key={i} className="flex gap-2 luxe-body-muted text-sm leading-relaxed">
+                <span className="text-violet-400 mt-0.5 shrink-0">▸</span>
                 <span>{d}</span>
               </li>
             ))}
@@ -169,298 +169,384 @@ function ExpertiseCard({ item }) {
   );
 }
 
+// ── Skill categorization derived from existing constants/skills ──
+const skillByName = (name) => skills.find(s => s.name === name);
+const LANGUAGES_NAMES   = ['JavaScript', 'TypeScript', 'Python', 'C++', 'CSS'];
+const FRAMEWORKS_NAMES  = ['React.js', 'Next.js', 'Node.js', 'Express.js', 'PyTorch', 'Tailwind CSS', 'Material UI', 'LangChain'];
+const TOOLS_NAMES       = ['MongoDB', 'PostgreSQL', 'MySQL', 'Redis', 'Docker', 'Git', 'GitHub', 'RabbitMQ', 'OpenAI API'];
+
+const SKILL_GROUPS = [
+  { key: 'languages',  label: 'Languages',  items: LANGUAGES_NAMES.map(skillByName).filter(Boolean) },
+  { key: 'frameworks', label: 'Frameworks', items: FRAMEWORKS_NAMES.map(skillByName).filter(Boolean) },
+  { key: 'tools',      label: 'Tools',      items: TOOLS_NAMES.map(skillByName).filter(Boolean) },
+];
+
+function SkillGroupCard({ group }) {
+  return (
+    <motion.div variants={fadeUp} className="luxe-card luxe-card-hover p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="luxe-eyebrow text-violet-300/80">{group.key}</p>
+          <h4 className="text-white font-semibold text-base mt-1">{group.label}</h4>
+        </div>
+        {/* tiny dark preview thumb — icon stack hint */}
+        <div className="flex -space-x-2 shrink-0">
+          {group.items.slice(0, 3).map((s) => (
+            <div
+              key={s.name}
+              title={s.name}
+              className="w-7 h-7 rounded-md bg-white/[0.04] border border-white/[0.08] flex items-center justify-center"
+            >
+              <img src={s.imageUrl} alt={s.name} className="w-4 h-4 object-contain opacity-90" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-1.5">
+        {group.items.map((s) => (
+          <span
+            key={s.name}
+            className="border border-gray-800 bg-white/[0.03] text-gray-300 text-xs px-2 py-1 rounded-md"
+          >
+            {s.name}
+          </span>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
 const About = () => {
   return (
-    <section className='max-container'>
+    <section className="min-h-screen bg-[#0a0a0e] text-gray-100 pt-28 pb-24 px-4 sm:px-6">
+      <div className="max-w-5xl mx-auto">
 
-      {/* ── Header ── */}
-      <motion.div initial="hidden" animate="show" variants={fadeUp}>
-        <h1 className='head-text'>
-          Hello, I'm{" "}
-          <span className='blue-gradient_text font-semibold drop-shadow'>Siddharth</span> 👋
-        </h1>
-        <div className='mt-5 flex flex-col gap-3 text-slate-500'>
-          <p>
+        {/* ── Header (not a hero) ── */}
+        <motion.div initial="hidden" animate="show" variants={fadeUp}>
+          <p className="luxe-eyebrow text-violet-300/80">— About</p>
+          <h1 className="luxe-section-title text-4xl sm:text-5xl text-white mt-3">
+            Engineer · creator · builder
+          </h1>
+          <p className="luxe-body-muted text-base mt-5 max-w-2xl">
             Founding Engineer & ML Researcher based in Mumbai, India. I build scalable
             full-stack products and AI-driven systems — from 100+ REST APIs at{" "}
             <a href="https://www.linkedin.com/company/getpassionfruit/posts/?feedView=all"
-               target="_blank" rel="noreferrer" className="text-blue-500 hover:underline font-medium">
+               target="_blank" rel="noreferrer"
+               className="text-violet-300 hover:text-violet-200 underline-offset-4 hover:underline font-medium">
               Passionfruit (NY)
             </a>{" "}
             to graph neural networks for blockchain phishing detection at{" "}
             <a href="https://www.iitp.ac.in" target="_blank" rel="noreferrer"
-               className="text-blue-500 hover:underline font-medium">IIT Patna</a>.{" "}
+               className="text-violet-300 hover:text-violet-200 underline-offset-4 hover:underline font-medium">
+              IIT Patna
+            </a>.{" "}
             B.Tech CE from DJS College (CGPA 9.1), 3 research publications, Meta Hacker Cup 2025{" "}
             <a href="https://www.linkedin.com/posts/siddharth-fulia_metahackercup2025-top200-round3-activity-7432281275920728066-5b8P?utm_source=share&utm_medium=member_desktop&rcm=ACoAADbS-ywBYuwbaIFL7brrtMs_7hHq9KiB_bw"
-               target="_blank" rel="noreferrer" className="text-blue-500 hover:underline font-medium">
+               target="_blank" rel="noreferrer"
+               className="text-violet-300 hover:text-violet-200 underline-offset-4 hover:underline font-medium">
               Global Rank 186
             </a>, and CodeChef 5★ (2114 rating).
           </p>
-        </div>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <a href="/resume.pdf" target="_blank" rel="noreferrer"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-white
-                       bg-gradient-to-r from-[#00c6ff] to-[#0072ff] shadow-md
-                       hover:scale-105 hover:shadow-lg transition-transform duration-200">
-            📄 View / Download Resume
-          </a>
-          <a href="https://www.linkedin.com/in/siddharth-fulia/" target="_blank" rel="noreferrer"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg font-semibold
-                       border-2 border-blue-500 text-blue-600 hover:bg-blue-50
-                       hover:scale-105 transition-transform duration-200">
-            💼 LinkedIn Profile
-          </a>
-        </div>
 
-        {/* Terminal */}
-        <div className="mt-8">
+          <div className="mt-6 flex flex-wrap gap-3">
+            <a href="/resume.pdf" target="_blank" rel="noreferrer"
+               className="luxe-btn luxe-btn-primary">
+              View / Download Resume
+            </a>
+            <a href="https://www.linkedin.com/in/siddharth-fulia/" target="_blank" rel="noreferrer"
+               className="luxe-btn luxe-btn-secondary">
+              LinkedIn Profile
+            </a>
+          </div>
+        </motion.div>
+
+        {/* ── Terminal ── */}
+        <motion.div
+          className="mt-10 luxe-card overflow-hidden"
+          initial="hidden" whileInView="show" variants={fadeUp} viewport={{ once: true }}
+        >
           <TypingTerminal />
-        </div>
+        </motion.div>
 
-        {/* GitHub Activity */}
-        <div className="mt-8 p-5 bg-gray-900 rounded-2xl border border-gray-800">
+        {/* ── GitHub contributions ── */}
+        <motion.div
+          className="mt-10 luxe-card p-5"
+          initial="hidden" whileInView="show" variants={fadeUp} viewport={{ once: true }}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-white font-semibold text-base">GitHub contributions</h3>
+            <span className="luxe-body-muted text-xs">@Sid-passion</span>
+          </div>
           <GitHubHeatmap username="Sid-passion" />
-        </div>
-      </motion.div>
-
-      {/* ── Work Experience ── */}
-      <div className='py-16'>
-        <motion.h3 className='subhead-text' initial="hidden" whileInView="show"
-          variants={fadeUp} viewport={{ once: true }}>Work Experience.</motion.h3>
-        <motion.p className='mt-5 text-slate-500' initial="hidden" whileInView="show"
-          variants={fadeUp} viewport={{ once: true }}>
-          Cutting-edge companies and research labs where I've shipped real impact:
-        </motion.p>
-        <div className='mt-12 flex'>
-          <VerticalTimeline>
-            {experiences.map((exp) => (
-              <VerticalTimelineElement key={exp.company_name} date={exp.date}
-                iconStyle={{ background: exp.iconBg }}
-                icon={
-                  <div className='flex justify-center items-center w-full h-full'>
-                    <img src={exp.icon} alt={exp.company_name} className='w-[60%] h-[60%] object-contain' />
-                  </div>
-                }
-                contentStyle={{ borderBottom: "8px", borderStyle: "solid", borderBottomColor: exp.iconBg, boxShadow: "none" }}>
-                <div>
-                  <h3 className='text-black text-xl font-poppins font-semibold'>{exp.title}</h3>
-                  <a href={exp.company_link} target="_blank" rel="noreferrer"
-                    className='text-blue-500 font-medium text-base hover:underline' style={{ margin: 0 }}>
-                    {exp.company_name} ↗
-                  </a>
-                </div>
-                <ul className='my-5 list-disc ml-5 space-y-2'>
-                  {exp.points.map((point, i) => (
-                    <li key={i} className='text-black-500/50 font-normal pl-1 text-sm'>{point}</li>
-                  ))}
-                </ul>
-              </VerticalTimelineElement>
-            ))}
-          </VerticalTimeline>
-        </div>
-      </div>
-
-      {/* ── Tech Expertise ── */}
-      <div className='py-16'>
-        <motion.h3 className='subhead-text' initial="hidden" whileInView="show"
-          variants={fadeUp} viewport={{ once: true }}>What I Build.</motion.h3>
-        <motion.p className='mt-5 text-slate-500' initial="hidden" whileInView="show"
-          variants={fadeUp} viewport={{ once: true }}>
-          Real-world systems I've designed and shipped — click each to see details.
-        </motion.p>
-        <motion.div className='mt-12 grid grid-cols-1 md:grid-cols-2 gap-6'
-          initial="hidden" whileInView="show" variants={stagger} viewport={{ once: true }}>
-          {EXPERTISE.map(item => (
-            <ExpertiseCard key={item.id} item={item} />
-          ))}
         </motion.div>
-      </div>
 
-      {/* ── Research & Publications ── */}
-      <div className='py-16'>
-        <motion.h3 className='subhead-text' initial="hidden" whileInView="show"
-          variants={fadeUp} viewport={{ once: true }}>Research & Publications.</motion.h3>
-        <motion.p className='mt-5 text-slate-500' initial="hidden" whileInView="show"
-          variants={fadeUp} viewport={{ once: true }}>
-          3 papers published / accepted in international journals and conferences.
-        </motion.p>
-        <motion.div className='mt-12 flex flex-col gap-8'
-          initial="hidden" whileInView="show" variants={stagger} viewport={{ once: true }}>
-          {publications.map((pub) => {
-            const CardWrapper = pub.link
-              ? ({ children }) => (
-                  <a href={pub.link} target="_blank" rel="noreferrer" className="block group">{children}</a>
-                )
-              : ({ children }) => <div className="group">{children}</div>;
+        {/* ── Skills & Experience (2-column layout) ── */}
+        <div className="mt-16 grid grid-cols-1 sm:grid-cols-2 gap-8">
 
-            return (
-              <motion.div key={pub.title} variants={fadeUp}>
-                <CardWrapper>
-                  <div className="relative bg-white rounded-2xl p-6 shadow-md border border-slate-100
-                                  transition-all duration-300 group-hover:-translate-y-2
-                                  group-hover:shadow-xl group-hover:border-blue-200">
-                    <div className="flex items-start justify-between gap-4 flex-wrap">
-                      <div className="flex items-center gap-3">
-                        <span className="text-3xl">{pub.emoji}</span>
-                        <div>
-                          <span className={`text-xs font-bold px-2 py-1 rounded-full ${pub.statusBg}`}>
-                            {pub.status}
-                          </span>
-                          <p className="text-xs text-slate-400 mt-1">{pub.conference}</p>
-                        </div>
+          {/* LEFT: Skills */}
+          <motion.div
+            initial="hidden" whileInView="show" variants={stagger} viewport={{ once: true }}
+          >
+            <p className="luxe-eyebrow text-violet-300/80">— Skills</p>
+            <h2 className="luxe-section-title text-2xl text-white mt-2">Tech stack</h2>
+            <p className="luxe-body-muted mt-2">
+              Languages, frameworks, and tools I reach for to ship production systems.
+            </p>
+
+            <div className="mt-6 flex flex-col gap-4">
+              {SKILL_GROUPS.map((g) => (
+                <SkillGroupCard key={g.key} group={g} />
+              ))}
+            </div>
+          </motion.div>
+
+          {/* RIGHT: Experience */}
+          <motion.div
+            initial="hidden" whileInView="show" variants={stagger} viewport={{ once: true }}
+          >
+            <p className="luxe-eyebrow text-violet-300/80">— Experience</p>
+            <h2 className="luxe-section-title text-2xl text-white mt-2">Where I've shipped</h2>
+            <p className="luxe-body-muted mt-2">
+              Cutting-edge companies and research labs where I've shipped real impact.
+            </p>
+
+            {/* Timeline rail */}
+            <div className="relative mt-6 pl-5">
+              <div
+                aria-hidden
+                className="absolute left-[6px] top-1 bottom-1 w-px"
+                style={{
+                  backgroundImage:
+                    'linear-gradient(to bottom, rgba(139,92,246,0.55) 0, rgba(139,92,246,0.55) 4px, transparent 4px, transparent 8px)',
+                  backgroundSize: '1px 8px',
+                  backgroundRepeat: 'repeat-y',
+                }}
+              />
+
+              <div className="flex flex-col gap-4">
+                {experiences.map((exp) => (
+                  <motion.div key={exp.company_name} variants={fadeUp} className="relative">
+                    {/* node */}
+                    <span
+                      aria-hidden
+                      className="absolute -left-5 top-5 w-3 h-3 rounded-full bg-[#0a0a0e] border-2"
+                      style={{ borderColor: '#8b5cf6', boxShadow: '0 0 0 3px rgba(139,92,246,0.12)' }}
+                    />
+                    <div className="luxe-card luxe-card-hover p-5">
+                      <div className="flex items-start justify-between gap-3 flex-wrap">
+                        <a
+                          href={exp.company_link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-white font-semibold hover:text-violet-200 transition-colors"
+                        >
+                          {exp.company_name} ↗
+                        </a>
+                        <span className="luxe-body-muted text-xs">{exp.date}</span>
                       </div>
-                      {pub.linkLabel && (
-                        <span className="text-blue-500 text-sm font-semibold group-hover:underline whitespace-nowrap">
-                          {pub.linkLabel} ↗
-                        </span>
-                      )}
+                      <p className="text-violet-300 text-sm font-medium mt-1">{exp.title}</p>
+                      <ul className="mt-3 space-y-2">
+                        {exp.points.map((point, i) => (
+                          <li key={i} className="flex gap-2 luxe-body-muted text-sm leading-relaxed">
+                            <span className="text-violet-400/70 mt-1.5 shrink-0 w-1 h-1 rounded-full bg-violet-400/70" />
+                            <span>{point}</span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
-                    <h4 className={`mt-4 font-poppins font-semibold text-base leading-snug transition-colors
-                                    ${pub.link ? 'group-hover:text-blue-600' : 'text-black'}`}>
-                      {pub.title}
-                    </h4>
-                    <ul className="mt-4 space-y-1">
-                      {pub.highlights.map((h, i) => (
-                        <li key={i} className="text-slate-500 text-sm flex gap-2">
-                          <span className="text-blue-400 mt-0.5">▸</span>
-                          <span>{h}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </CardWrapper>
-              </motion.div>
-            );
-          })}
-        </motion.div>
-      </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        </div>
 
-      {/* ── Achievements ── */}
-      <div className='py-16'>
-        <motion.h3 className='subhead-text' initial="hidden" whileInView="show"
-          variants={fadeUp} viewport={{ once: true }}>Achievements.</motion.h3>
-        <motion.p className='mt-5 text-slate-500' initial="hidden" whileInView="show"
-          variants={fadeUp} viewport={{ once: true }}>
-          Competitive programming, innovation challenges, and global rankings.
-        </motion.p>
-        <motion.div className='mt-12 grid grid-cols-1 md:grid-cols-3 gap-8'
-          initial="hidden" whileInView="show" variants={stagger} viewport={{ once: true }}>
-          {achievements.map((ach) => (
-            <motion.div key={ach.title} variants={fadeUp}>
-              <div className="block-container content-card w-full">
-                <div className={`btn-back rounded-2xl ${ach.theme}`} />
-                <div className="btn-front rounded-2xl p-6 flex flex-col gap-3">
+        {/* ── Tech Expertise ── */}
+        <div className="mt-20">
+          <motion.p className="luxe-eyebrow text-violet-300/80" initial="hidden" whileInView="show"
+            variants={fadeUp} viewport={{ once: true }}>— What I build</motion.p>
+          <motion.h2 className="luxe-section-title text-3xl text-white mt-2" initial="hidden" whileInView="show"
+            variants={fadeUp} viewport={{ once: true }}>Systems I've designed and shipped</motion.h2>
+          <motion.p className="luxe-body-muted mt-3 max-w-2xl" initial="hidden" whileInView="show"
+            variants={fadeUp} viewport={{ once: true }}>
+            Real-world systems across the stack — click each to see details.
+          </motion.p>
+          <motion.div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-6"
+            initial="hidden" whileInView="show" variants={stagger} viewport={{ once: true }}>
+            {EXPERTISE.map(item => (
+              <ExpertiseCard key={item.id} item={item} />
+            ))}
+          </motion.div>
+        </div>
+
+        {/* ── Research & Publications ── */}
+        <div className="mt-20">
+          <motion.p className="luxe-eyebrow text-violet-300/80" initial="hidden" whileInView="show"
+            variants={fadeUp} viewport={{ once: true }}>— Research</motion.p>
+          <motion.h2 className="luxe-section-title text-3xl text-white mt-2" initial="hidden" whileInView="show"
+            variants={fadeUp} viewport={{ once: true }}>Publications</motion.h2>
+          <motion.p className="luxe-body-muted mt-3 max-w-2xl" initial="hidden" whileInView="show"
+            variants={fadeUp} viewport={{ once: true }}>
+            3 papers published / accepted in international journals and conferences.
+          </motion.p>
+          <motion.div className="mt-10 flex flex-col gap-5"
+            initial="hidden" whileInView="show" variants={stagger} viewport={{ once: true }}>
+            {publications.map((pub) => {
+              const CardWrapper = pub.link
+                ? ({ children }) => (
+                    <a href={pub.link} target="_blank" rel="noreferrer" className="block group">{children}</a>
+                  )
+                : ({ children }) => <div className="group">{children}</div>;
+
+              return (
+                <motion.div key={pub.title} variants={fadeUp}>
+                  <CardWrapper>
+                    <div className="luxe-card luxe-card-hover p-6">
+                      <div className="flex items-start justify-between gap-4 flex-wrap">
+                        <div className="flex items-center gap-3">
+                          <span className="text-3xl">{pub.emoji}</span>
+                          <div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md
+                                             bg-violet-500/10 border border-violet-500/30 text-violet-200">
+                              {pub.status}
+                            </span>
+                            <p className="luxe-body-muted text-xs mt-1">{pub.conference}</p>
+                          </div>
+                        </div>
+                        {pub.linkLabel && (
+                          <span className="text-violet-300 text-sm font-semibold group-hover:underline whitespace-nowrap">
+                            {pub.linkLabel} ↗
+                          </span>
+                        )}
+                      </div>
+                      <h4 className={`mt-4 font-poppins font-semibold text-base leading-snug
+                                      ${pub.link ? 'text-white group-hover:text-violet-200' : 'text-white'}`}>
+                        {pub.title}
+                      </h4>
+                      <ul className="mt-4 space-y-1.5">
+                        {pub.highlights.map((h, i) => (
+                          <li key={i} className="luxe-body-muted text-sm flex gap-2">
+                            <span className="text-violet-400 mt-0.5">▸</span>
+                            <span>{h}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </CardWrapper>
+                </motion.div>
+              );
+            })}
+          </motion.div>
+        </div>
+
+        {/* ── Achievements ── */}
+        <div className="mt-20">
+          <motion.p className="luxe-eyebrow text-violet-300/80" initial="hidden" whileInView="show"
+            variants={fadeUp} viewport={{ once: true }}>— Achievements</motion.p>
+          <motion.h2 className="luxe-section-title text-3xl text-white mt-2" initial="hidden" whileInView="show"
+            variants={fadeUp} viewport={{ once: true }}>Competitive wins</motion.h2>
+          <motion.p className="luxe-body-muted mt-3 max-w-2xl" initial="hidden" whileInView="show"
+            variants={fadeUp} viewport={{ once: true }}>
+            Competitive programming, innovation challenges, and global rankings.
+          </motion.p>
+          <motion.div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-6"
+            initial="hidden" whileInView="show" variants={stagger} viewport={{ once: true }}>
+            {achievements.map((ach) => (
+              <motion.div key={ach.title} variants={fadeUp}>
+                <div className="luxe-card luxe-card-hover p-6 h-full flex flex-col gap-3">
                   <span className="text-4xl">{ach.emoji}</span>
                   <div>
-                    <h4 className="font-poppins font-bold text-base text-black leading-snug">{ach.title}</h4>
-                    <p className="mt-1 text-2xl font-poppins font-extrabold blue-gradient_text">{ach.rank}</p>
-                    <p className="text-slate-500 text-xs mt-2 leading-relaxed">{ach.sub}</p>
+                    <h4 className="font-poppins font-semibold text-base text-white leading-snug">{ach.title}</h4>
+                    <p className="mt-1 text-2xl font-poppins font-extrabold text-violet-300">{ach.rank}</p>
+                    <p className="luxe-body-muted text-xs mt-2 leading-relaxed">{ach.sub}</p>
                   </div>
-                  <div className="flex gap-3 flex-wrap pt-1">
+                  <div className="flex gap-3 flex-wrap pt-1 mt-auto">
                     <a href={ach.linkedinLink} target="_blank" rel="noreferrer"
-                      className="text-xs font-semibold text-blue-500 hover:underline">
+                       className="text-xs font-semibold text-violet-300 hover:text-violet-200 hover:underline">
                       LinkedIn Post ↗
                     </a>
                     <a href={ach.certLink} target="_blank" rel="noreferrer"
-                      className="text-xs font-semibold text-slate-400 hover:text-slate-600 hover:underline">
+                       className="text-xs font-semibold text-gray-400 hover:text-gray-200 hover:underline">
                       Certificate ↗
                     </a>
                   </div>
                 </div>
-              </div>
-            </motion.div>
-          ))}
-        </motion.div>
-      </div>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
 
-      {/* ── Competitive Programming ── */}
-      <div className='py-16'>
-        <motion.h3 className='subhead-text' initial="hidden" whileInView="show"
-          variants={fadeUp} viewport={{ once: true }}>Competitive Programming.</motion.h3>
-        <motion.p className='mt-5 text-slate-500' initial="hidden" whileInView="show"
-          variants={fadeUp} viewport={{ once: true }}>
-          Consistent competitor on CodeChef and Codeforces — strong in DSA, DP, and optimization.
-        </motion.p>
+        {/* ── Competitive Programming ── */}
+        <div className="mt-20">
+          <motion.p className="luxe-eyebrow text-violet-300/80" initial="hidden" whileInView="show"
+            variants={fadeUp} viewport={{ once: true }}>— Competitive programming</motion.p>
+          <motion.h2 className="luxe-section-title text-3xl text-white mt-2" initial="hidden" whileInView="show"
+            variants={fadeUp} viewport={{ once: true }}>CodeChef · Codeforces</motion.h2>
+          <motion.p className="luxe-body-muted mt-3 max-w-2xl" initial="hidden" whileInView="show"
+            variants={fadeUp} viewport={{ once: true }}>
+            Consistent competitor — strong in DSA, DP, and optimization.
+          </motion.p>
 
-        <motion.div className='mt-12 grid grid-cols-1 md:grid-cols-2 gap-8'
-          initial="hidden" whileInView="show" variants={stagger} viewport={{ once: true }}>
-          {competitiveProgramming.map((cp) => (
-            <motion.div key={cp.platform} variants={fadeUp}>
-              <div className={`bg-white rounded-2xl border ${cp.border} shadow-md overflow-hidden
-                               hover:-translate-y-2 hover:shadow-xl transition-all duration-300`}>
-                {/* Gradient header */}
-                <div className={`bg-gradient-to-r ${cp.color} p-5 flex items-center justify-between`}>
-                  <div className="flex items-center gap-3">
-                    <span className="text-4xl">{cp.emoji}</span>
-                    <div>
-                      <h4 className="text-white font-poppins font-bold text-xl">{cp.platform}</h4>
-                      {cp.stars && (
-                        <span className="text-white/90 text-sm font-semibold">{cp.stars} · {cp.rating}</span>
+          <motion.div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-6"
+            initial="hidden" whileInView="show" variants={stagger} viewport={{ once: true }}>
+            {competitiveProgramming.map((cp) => (
+              <motion.div key={cp.platform} variants={fadeUp}>
+                <div className="luxe-card luxe-card-hover overflow-hidden">
+                  {/* Header */}
+                  <div className="p-5 flex items-center justify-between border-b border-white/[0.06]">
+                    <div className="flex items-center gap-3">
+                      <span className="text-4xl">{cp.emoji}</span>
+                      <div>
+                        <h4 className="text-white font-poppins font-bold text-xl">{cp.platform}</h4>
+                        {cp.stars && (
+                          <span className="text-violet-300 text-sm font-semibold">{cp.stars} · {cp.rating}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-white font-extrabold text-xl">{cp.highlight}</p>
+                      <p className="luxe-body-muted text-xs">{cp.highlightSub}</p>
+                    </div>
+                  </div>
+
+                  {/* Stats row */}
+                  <div className="grid grid-cols-4 divide-x divide-white/[0.06] border-b border-white/[0.06]">
+                    {cp.stats.map((s) => (
+                      <div key={s.label} className="p-3 text-center">
+                        <p className="font-poppins font-bold text-lg text-white">{s.value}</p>
+                        <p className="luxe-body-muted text-[11px]">{s.label}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Description + links */}
+                  <div className="p-5">
+                    <p className="luxe-body-muted text-sm leading-relaxed">{cp.description}</p>
+                    <div className="mt-4 flex gap-3 flex-wrap">
+                      <a href={cp.profileLink} target="_blank" rel="noreferrer"
+                         className="luxe-btn luxe-btn-primary">
+                        View Profile ↗
+                      </a>
+                      {cp.linkedinLink && (
+                        <a href={cp.linkedinLink} target="_blank" rel="noreferrer"
+                           className="luxe-btn luxe-btn-secondary">
+                          LinkedIn Post ↗
+                        </a>
                       )}
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-white font-extrabold text-2xl">{cp.highlight}</p>
-                    <p className="text-white/80 text-xs">{cp.highlightSub}</p>
-                  </div>
                 </div>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
 
-                {/* Stats row */}
-                <div className="grid grid-cols-4 divide-x divide-slate-100 border-b border-slate-100">
-                  {cp.stats.map((s) => (
-                    <div key={s.label} className="p-3 text-center">
-                      <p className="font-poppins font-bold text-lg text-black">{s.value}</p>
-                      <p className="text-xs text-slate-400">{s.label}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Description + links */}
-                <div className="p-5">
-                  <p className="text-slate-500 text-sm leading-relaxed">{cp.description}</p>
-                  <div className="mt-4 flex gap-4 flex-wrap">
-                    <a href={cp.profileLink} target="_blank" rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-sm font-semibold text-white
-                                 bg-gradient-to-r from-[#00c6ff] to-[#0072ff] px-4 py-2 rounded-lg
-                                 hover:opacity-90 hover:scale-105 transition-transform duration-150">
-                      View Profile ↗
-                    </a>
-                    {cp.linkedinLink && (
-                      <a href={cp.linkedinLink} target="_blank" rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600
-                                   border border-blue-300 px-4 py-2 rounded-lg hover:bg-blue-50
-                                   hover:scale-105 transition-transform duration-150">
-                        LinkedIn Post ↗
-                      </a>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </motion.div>
+        <div className="luxe-divider mt-20" />
+        <div className="mt-12">
+          <CTA />
+        </div>
       </div>
-
-      {/* ── Skills ── */}
-      <div className='py-10 flex flex-col'>
-        <motion.h3 className='subhead-text' initial="hidden" whileInView="show"
-          variants={fadeUp} viewport={{ once: true }}>My Skills</motion.h3>
-        <motion.div className='mt-16 flex flex-wrap gap-12'
-          initial="hidden" whileInView="show" variants={stagger} viewport={{ once: true }}>
-          {skills.map((skill) => (
-            <motion.div key={skill.name} variants={fadeUp}
-              className='block-container w-20 h-20' title={skill.name}>
-              <div className='btn-back rounded-xl' />
-              <div className='btn-front rounded-xl flex justify-center items-center'>
-                <img src={skill.imageUrl} alt={skill.name} className='w-1/2 h-1/2 object-contain' />
-              </div>
-            </motion.div>
-          ))}
-        </motion.div>
-      </div>
-
-      <hr className='border-slate-200' />
-      <CTA />
     </section>
   );
 };

@@ -167,11 +167,17 @@ const AIChat = () => {
 
   useEffect(() => { document.title = chatId ? `Chat · ${chatId.slice(0,8)} · Sid` : 'AI Chat · Sid' }, [chatId])
 
-  // Auto-scroll to bottom on new messages
+  // Auto-scroll to bottom on new messages. Skip when there are zero
+  // messages — otherwise the WelcomeHero (which is taller than the
+  // visible scroll area) gets auto-scrolled past on first load and the
+  // user lands at the bottom seeing nothing useful.
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    if (!scrollRef.current) return
+    if (messages.length === 0) {
+      scrollRef.current.scrollTop = 0
+      return
     }
+    scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages.length])
 
   // Fetch installed 5090 Ollama models on mount + every 30s while on 5090 tab

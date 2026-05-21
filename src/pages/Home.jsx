@@ -3,7 +3,6 @@ import { Suspense, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { HomeInfo, Loader } from "../components";
-import AnimatedShaderHero from "../components/luxe/AnimatedShaderHero";
 import { Bird, Island, Plane, Sky } from "../models";
 
 const STAGE_ROUTES = { 2: '/about', 3: '/projects', 4: '/contact' };
@@ -96,17 +95,115 @@ const Home = () => {
 
   return (
     <>
-      {/* Full-viewport WebGL shader hero — first thing visitors see.
-          Scroll down to reach the existing 3D island experience. */}
-      <AnimatedShaderHero
-        trustBadge={{ text: "Siddharth · Engineer + Creator", icons: ["✨"] }}
-        headline={{ line1: "Building things", line2: "that ship" }}
-        subtitle="Full-stack engineering + generative AI + 5090-powered creative tools."
-        buttons={{
-          primary: { text: "Explore projects", onClick: () => navigate('/projects') },
-          secondary: { text: "See live AI", onClick: () => navigate('/ai') },
-        }}
-      />
+      {/* Premium dark "Linear/Vercel" hero — sits above the existing 3D island.
+          Pure CSS + inline SVG, no AmbientBlobs / aurora. */}
+      <section className='luxe-stage relative min-h-screen w-full overflow-hidden flex items-center'>
+        {/* Decorative bezier curve — sits behind the text, low opacity, violet glow. */}
+        <svg
+          className='pointer-events-none absolute inset-0 w-full h-full z-0'
+          viewBox='0 0 1440 900'
+          preserveAspectRatio='none'
+          aria-hidden='true'
+        >
+          <defs>
+            <filter id='heroCurveGlow' x='-20%' y='-20%' width='140%' height='140%'>
+              <feGaussianBlur stdDeviation='6' result='blur' />
+              <feMerge>
+                <feMergeNode in='blur' />
+                <feMergeNode in='SourceGraphic' />
+              </feMerge>
+            </filter>
+            <linearGradient id='heroCurveStroke' x1='0%' y1='100%' x2='100%' y2='0%'>
+              <stop offset='0%' stopColor='#8b5cf6' stopOpacity='0' />
+              <stop offset='35%' stopColor='#8b5cf6' stopOpacity='0.55' />
+              <stop offset='75%' stopColor='#5e6ad2' stopOpacity='0.75' />
+              <stop offset='100%' stopColor='#22d3ee' stopOpacity='0.45' />
+            </linearGradient>
+          </defs>
+          <path
+            d='M -50 820 C 280 760, 520 640, 760 440 S 1240 140, 1520 40'
+            fill='none'
+            stroke='url(#heroCurveStroke)'
+            strokeWidth='1.6'
+            strokeLinecap='round'
+            filter='url(#heroCurveGlow)'
+            opacity='0.85'
+          />
+          <path
+            d='M -50 860 C 320 800, 560 700, 820 500 S 1280 200, 1560 80'
+            fill='none'
+            stroke='url(#heroCurveStroke)'
+            strokeWidth='0.8'
+            strokeLinecap='round'
+            opacity='0.35'
+          />
+        </svg>
+
+        {/* Top brand pill (left) + nav row (right) */}
+        <div className='absolute top-6 left-0 right-0 z-20 flex items-center justify-between px-6 sm:px-10 lg:px-16'>
+          <div className='luxe-pill'>
+            <span className='inline-block w-1.5 h-1.5 rounded-full bg-violet-400 shadow-[0_0_8px_rgba(139,92,246,0.8)]' />
+            Sid · Engineer
+          </div>
+          <nav className='hidden md:flex items-center gap-1'>
+            <button onClick={() => navigate('/about')}    className='luxe-btn luxe-btn-ghost'>About</button>
+            <button onClick={() => navigate('/projects')} className='luxe-btn luxe-btn-ghost'>Work</button>
+            <button onClick={() => navigate('/lab')}      className='luxe-btn luxe-btn-ghost'>Lab</button>
+            <button onClick={() => navigate('/ai')}       className='luxe-btn luxe-btn-ghost'>AI</button>
+            <button onClick={() => navigate('/contact')}  className='luxe-btn luxe-btn-ghost'>Contact</button>
+          </nav>
+        </div>
+
+        {/* Hero content */}
+        <div className='relative z-10 w-full px-6 sm:px-10 lg:px-16 py-24 sm:py-32'>
+          <div className='max-w-4xl'>
+            <p className='luxe-eyebrow mb-6'>
+              <span className='inline-block w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)] animate-pulse' />
+              Currently building · 2026
+            </p>
+
+            <h1 className='font-poppins font-black text-white tracking-tight leading-[0.95] text-5xl sm:text-6xl md:text-7xl lg:text-8xl'>
+              Full-Stack
+              <br />
+              <span className='bg-gradient-to-br from-white via-zinc-200 to-violet-300 bg-clip-text text-transparent'>
+                AI Engineer
+              </span>
+            </h1>
+
+            <p className='mt-7 text-gray-400 text-base sm:text-lg leading-relaxed max-w-[540px]'>
+              Building intelligent applications &amp; scalable solutions — full-stack engineering,
+              generative AI, and 5090-powered creative tooling.
+            </p>
+
+            <div className='mt-10 flex flex-wrap items-center gap-3'>
+              <button
+                onClick={() => navigate('/projects')}
+                className='luxe-btn luxe-btn-primary !px-6 !py-3 !text-sm'
+              >
+                View Work
+                <span aria-hidden='true' className='ml-0.5'>→</span>
+              </button>
+              <button
+                onClick={() => navigate('/contact')}
+                className='luxe-btn luxe-btn-secondary !px-6 !py-3 !text-sm'
+              >
+                Get in Touch
+              </button>
+            </div>
+
+            <p className='luxe-body-muted !text-xs mt-6 flex items-center gap-2'>
+              <span className='inline-block w-1 h-1 rounded-full bg-gray-500' />
+              Open to opportunities · Indo connect · Remote-friendly
+            </p>
+          </div>
+        </div>
+
+        {/* Subtle scroll cue at the bottom */}
+        <div className='absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2 text-gray-500 pointer-events-none'>
+          <span className='text-[10px] tracking-[0.25em] uppercase'>Scroll</span>
+          <span className='block w-px h-8 bg-gradient-to-b from-gray-500 to-transparent' />
+        </div>
+      </section>
 
       <section className='w-full h-screen relative'>
         <div className='absolute top-28 left-0 right-0 z-10 flex items-center justify-center'>

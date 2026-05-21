@@ -219,7 +219,10 @@ export default function HandTracking() {
   const landmarkerRef = useRef(null)
   const rafRef      = useRef(null)
   const streamRef   = useRef(null)
-  const lastDrawPt  = useRef(null)
+  // Per-hand previous draw point so both hands can paint independently
+  // without snapping a stroke from hand-A's last position to hand-B's
+  // current position. Indexed by the hand index reported by MediaPipe.
+  const lastDrawPt  = useRef([null, null])
   const lastClickAt = useRef(0)
 
   const [ready, setReady]   = useState(false)
@@ -345,7 +348,7 @@ export default function HandTracking() {
   const clearDrawing = () => {
     const c = canvasRef.current; if (!c) return
     c.getContext('2d').clearRect(0, 0, c.width, c.height)
-    lastDrawPt.current = null
+    lastDrawPt.current = [null, null]
     notify.info('Canvas cleared', { title: 'Cleared' })
   }
 
@@ -421,8 +424,25 @@ export default function HandTracking() {
         overlay.beginPath()
         overlay.arc(pts[8].x * W, pts[8].y * H, 15, 0, Math.PI * 2)
         overlay.stroke()
+      } else if (mode === 'draw') {
+        // Draw mode: skip the full skeleton + knuckle dots — the user
+        // just needs a clear pen-tip marker. Halves the per-frame canvas
+        // work which is the biggest fps win when both hands are tracked.
+        const tipX = ((pts[4].x + pts[8].x) / 2) * W
+        const tipY = ((pts[4].y + pts[8].y) / 2) * H
+        overlay.fillStyle = pinch ? '#fbbf24' : 'rgba(255,255,255,0.9)'
+        overlay.beginPath()
+        overlay.arc(tipX, tipY, pinch ? 9 : 6, 0, Math.PI * 2)
+        overlay.fill()
+        if (pinch) {
+          overlay.lineWidth = 2
+          overlay.strokeStyle = 'rgba(251, 191, 36, 0.6)'
+          overlay.beginPath()
+          overlay.arc(tipX, tipY, 16, 0, Math.PI * 2)
+          overlay.stroke()
+        }
       } else {
-        // Full skeleton (View / Draw / Cursor modes).
+        // Full skeleton (View / Cursor modes).
         overlay.lineWidth = 3
         overlay.strokeStyle = pinch ? '#fbbf24' : '#22d3ee'
         overlay.beginPath()
@@ -468,34 +488,38 @@ export default function HandTracking() {
     }
 
     // ── Mode-specific behaviour ──
-    if (mode === 'draw' && hands.length > 0) {
-      const lm0 = hands[0]
-      // Drawing fires while index + thumb are pinched (clear, easy gesture)
-      const pinching = isPinching(lm0)
-      if (pinching) {
-        const ctx = canvasRef.current.getContext('2d')
-        // Midpoint between thumb-tip and index-tip = pen tip.
-        // We DRAW at the un-mirrored landmark coords because the
-        // canvas itself has CSS `transform: scaleX(-1)` which mirrors
-        // the display. Mirroring here in JS too would double-mirror
-        // and make strokes go right-to-left when the user moves their
-        // hand left-to-right.
-        const px = ((lm0[4].x + lm0[8].x) / 2) * canvasRef.current.width
-        const py = ((lm0[4].y + lm0[8].y) / 2) * canvasRef.current.height
-        ctx.strokeStyle = colorRef.current
-        ctx.lineWidth = brushRef.current
-        ctx.lineCap = 'round'
-        ctx.lineJoin = 'round'
-        if (lastDrawPt.current) {
+    // DRAW supports both hands — each tracked independently. Pinch the
+    // index + thumb of either (or both) hands to lay down a stroke.
+    if (mode === 'draw') {
+      const ctx = canvasRef.current.getContext('2d')
+      ctx.strokeStyle = colorRef.current
+      ctx.lineWidth = brushRef.current
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      // Up to 2 hands. We index by detection order, not handedness, so
+      // a hand swap doesn't reset the pen mid-stroke (close enough for
+      // a freehand drawing UX).
+      for (let i = 0; i < 2; i++) {
+        const lm = hands[i]
+        if (!lm) { lastDrawPt.current[i] = null; continue }
+        if (!isPinching(lm)) { lastDrawPt.current[i] = null; continue }
+        // Pen tip = midpoint of thumb + index. Canvas has CSS scaleX(-1)
+        // so we DON'T mirror in JS — it would double-mirror.
+        const px = ((lm[4].x + lm[8].x) / 2) * canvasRef.current.width
+        const py = ((lm[4].y + lm[8].y) / 2) * canvasRef.current.height
+        const prev = lastDrawPt.current[i]
+        if (prev) {
           ctx.beginPath()
-          ctx.moveTo(lastDrawPt.current.x, lastDrawPt.current.y)
+          ctx.moveTo(prev.x, prev.y)
           ctx.lineTo(px, py)
           ctx.stroke()
         }
-        lastDrawPt.current = { x: px, y: py }
-      } else {
-        lastDrawPt.current = null
+        lastDrawPt.current[i] = { x: px, y: py }
       }
+    } else {
+      // Reset both pens when leaving Draw mode so the next entry starts clean
+      lastDrawPt.current[0] = null
+      lastDrawPt.current[1] = null
     }
 
     if (mode === 'cursor' && hands.length > 0 && cursorRef.current) {
