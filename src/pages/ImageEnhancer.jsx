@@ -12,6 +12,7 @@ import {
   enhanceImage, getImageStatus, listEnhancedImages, deleteEnhancedImage, fileToDataUrl,
   promptCoach, imageBulkAction,
 } from '../api/ai'
+import { FastImageGen, VisionAI } from '../components/aitools'
 import { VaultLoginPanel, getVaultToken, setVaultToken } from '../components/VaultGate'
 import JobLogsAgentPlan from '../components/JobLogsAgentPlan'
 
@@ -844,6 +845,22 @@ export default function ImageEnhancer() {
               key: 'library',
               label: <span><AppstoreOutlined /> Library</span>,
               children: <ImageLibrary refreshKey={refreshKey} />,
+            },
+            {
+              // Fast image gen — Cloudflare FLUX-Schnell + HuggingFace
+              // fallback. Sub-second response vs the 5090 ComfyUI queue.
+              // Was previously a tab inside /ai-studio (now sunset).
+              key: 'fastgen',
+              label: <span>⚡ Fast Gen</span>,
+              children: <FastImageGen />,
+            },
+            {
+              // Gemini Vision image analysis. Was the /vision standalone
+              // page; consolidated here so the Image Studio is the
+              // one-stop image lane.
+              key: 'vision',
+              label: <span>👁 Vision AI</span>,
+              children: <VisionAI />,
             },
           ]}
         />

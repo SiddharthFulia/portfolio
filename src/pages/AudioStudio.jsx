@@ -8,15 +8,21 @@ import { useTilt, TILT_STYLE } from '../components/useTilt'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
 import AudioRecorder from '../components/AudioRecorder'
 import VoiceCloneAnalysis from '../components/VoiceCloneAnalysis'
+import { FastTTS } from '../components/aitools'
 
 const KINDS = [
+  { value: 'fast-tts',     label: '⚡ Fast TTS',          blurb: 'Instant TTS via Browser voice or Cloud — no queue, sub-second.',       defaultModel: 'browser-or-cloud' },
   { value: 'music',        label: '🎵 Music',            blurb: 'Background tracks, soundtracks, loops. Best for video soundtracks.',  defaultModel: 'musicgen' },
   { value: 'sfx',          label: '🔊 SFX / Ambience',   blurb: 'One-shot effects, foley, drones, ambient textures.',                   defaultModel: 'stable-audio' },
-  { value: 'tts',          label: '🗣 Text → Speech',    blurb: 'Voice cloning + multilingual TTS (Bark).',                             defaultModel: 'bark' },
+  { value: 'tts',          label: '🗣 Text → Speech',    blurb: 'Heavy-duty multilingual TTS via Bark on 5090.',                       defaultModel: 'bark' },
   { value: 'stt',          label: '✍️ Speech → Text',    blurb: 'Upload audio → transcript. Whisper, 99 languages, auto-detect.',      defaultModel: 'whisper' },
   { value: 'separate',     label: '🎚 Stem Split',       blurb: 'Split a song into vocals / drums / bass / other. Demucs on 5090.',    defaultModel: 'htdemucs' },
   { value: 'voice-clone',  label: '🎤 Voice Clone',      blurb: 'Upload a 6-30s clip + text → speech in that voice (XTTS-v2, 5090).',  defaultModel: 'xtts-v2' },
   { value: 'voice-sing',   label: '🎶 Cloned Singing',   blurb: 'Voice clone rides a melody track to sing your lyrics (XTTS+RVC).',     defaultModel: 'xtts-v2+rvc' },
+  // Lip sync was a standalone /lipsync page — now consolidated here as a
+  // kind. Render is an iframe so we don't have to refactor 600 lines of
+  // form into a sub-component. The /lipsync route still works directly.
+  { value: 'lipsync',      label: '👄 Lip Sync',         blurb: 'Audio + portrait → talking-head video. LatentSync · MuseTalk · LivePortrait.', defaultModel: 'latentsync' },
 ]
 
 const MODELS = {
@@ -390,7 +396,23 @@ export default function AudioStudio() {
             />
           </div>
 
-          {kind === 'separate' ? (
+          {kind === 'fast-tts' ? (
+            // Instant TTS via Browser SpeechSynthesis or Google Cloud
+            // (formerly lived in /ai-studio). No worker, no queue —
+            // renders inline and bypasses every backend pipeline.
+            <FastTTS />
+          ) : kind === 'lipsync' ? (
+            // Lip sync — the full /lipsync page renders fine standalone
+            // but absorbing 600+ lines into a sub-component would risk
+            // breakage. Iframe is the pragmatic move: same UX, lives
+            // inside the Audio Studio tab so users don't go hunting.
+            <div className="rounded-2xl border border-fuchsia-500/30 overflow-hidden bg-black"
+                 style={{ height: 'min(80vh, 900px)' }}>
+              <iframe title="Lip Sync" src="/lipsync"
+                allow="camera; microphone; autoplay"
+                className="w-full h-full" style={{ border: 0 }} />
+            </div>
+          ) : kind === 'separate' ? (
             // Stem-separation form: upload song + optional lyrics toggle.
             // Always runs on the 5090 (Demucs needs the GPU); no cloud
             // alternative wired up.
@@ -677,7 +699,9 @@ export default function AudioStudio() {
           )}
         </section>
 
-        {/* Output */}
+        {/* Output — hidden for fast-tts and lipsync (those embed their
+            own player / iframe and don't go through the audio queue). */}
+        {!['fast-tts', 'lipsync'].includes(kind) && (
         <section className="luxe-card p-4 mb-6">
           <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Output</p>
           {/* Stem-separation result — 4 audio players + optional lyrics */}
@@ -800,7 +824,9 @@ export default function AudioStudio() {
             <p className="text-xs text-gray-600 text-center py-8">Output will appear here</p>
           )}
         </section>
+        )}
 
+        {!['fast-tts', 'lipsync'].includes(kind) && (
         <div className="flex justify-end">
           {(() => {
             const audioRequired = kind === 'stt' || kind === 'separate'
@@ -833,6 +859,7 @@ export default function AudioStudio() {
             )
           })()}
         </div>
+        )}
 
         <StudioLibrary
           refreshKey={libraryRefresh}

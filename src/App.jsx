@@ -31,6 +31,7 @@ const AIStudio = lazy(() => import("./pages/AIStudio"));
 const Dragon3D = lazy(() => import("./pages/Dragon3D"));
 const Deepfake = lazy(() => import("./pages/Deepfake"));
 const Runner = lazy(() => import("./pages/Runner"));
+const SummarizerPage = lazy(() => import("./pages/SummarizerPage"));
 const HandTracking = lazy(() => import("./pages/HandTracking"));
 const LipSync = lazy(() => import("./pages/LipSync"));
 const AudioStudio = lazy(() => import("./pages/AudioStudio"));
@@ -218,6 +219,7 @@ const App = () => {
           {/* Hand-gesture endless runner — MediaPipe + Three.js */}
           <Route path='/runner'          element={<Suspense fallback={<DarkPageSkeleton />}><Runner /></Suspense>} />
           <Route path='/game'            element={<Suspense fallback={<DarkPageSkeleton />}><Runner /></Suspense>} />
+          <Route path='/summarizer'      element={<Suspense fallback={<DarkPageSkeleton />}><SummarizerPage /></Suspense>} />
           <Route path='/hand'            element={<Suspense fallback={<DarkPageSkeleton />}><HandTracking /></Suspense>} />
           <Route path='/hands'           element={<Suspense fallback={<DarkPageSkeleton />}><HandTracking /></Suspense>} />
           <Route path='/draw'            element={<Suspense fallback={<DarkPageSkeleton />}><HandTracking /></Suspense>} />

@@ -56,22 +56,24 @@ const Navbar = () => {
       title: 'AI Studios',
       accent: 'text-violet-300',
       items: [
-        { to: '/ai-studio', label: 'AI Studio',    desc: 'Image + TTS + Vision + Summariser' },
-        { to: '/lipsync',   label: 'Lip Sync',     desc: 'Talking-head video from audio' },
-        { to: '/audio',     label: 'Audio Studio', desc: 'Music · TTS · STT · stems' },
-        { to: '/vision',    label: 'Vision AI',    desc: 'Face · Object · OCR · Lab' },
-        { to: '/hand',      label: 'Hand Tracking', desc: '50 filters · 2-hand draw · cursor' },
+        // Image Studio now hosts Vision AI + Fast Image Gen as tabs (the
+        // old standalone /vision and /ai-studio pages are sunset).
+        { to: '/image-enhancer', label: 'Image Studio', desc: 'Enhance · Fast gen · Vision · T2I' },
+        // Audio Studio now hosts Lip Sync as a tab too.
+        { to: '/audio',          label: 'Audio Studio', desc: 'Music · TTS · STT · Voice clone · Lip sync' },
+        { to: '/hand',           label: 'Hand Tracking', desc: '50 filters · 2-hand draw · cursor · laser' },
       ],
     },
     {
       title: 'Play',
       accent: 'text-cyan-300',
       items: [
-        { to: '/runner',   label: '🏃 Hand Runner',   desc: 'Subway-Surfers, hand-gesture-controlled' },
-        { to: '/lab',      label: 'Interactive Lab', desc: '17 mini-demos · 7 categories' },
-        { to: '/creative', label: 'Creative UI',     desc: '13 UI experiments' },
-        { to: '/learn',    label: 'Learn DSA',       desc: 'Algorithms · system design · CP' },
-        { to: '/chess',    label: 'Chess Engine',    desc: 'Live engine visualiser' },
+        { to: '/runner',     label: '🏃 Hand Runner',   desc: 'Subway-Surfers, hand-gesture-controlled' },
+        { to: '/lab',        label: 'Interactive Lab',  desc: '17 mini-demos · 7 categories' },
+        { to: '/creative',   label: 'Creative UI',      desc: '13 UI experiments' },
+        { to: '/learn',      label: 'Learn DSA',        desc: 'Algorithms · system design · CP' },
+        { to: '/chess',      label: 'Chess Engine',     desc: 'Live engine visualiser' },
+        { to: '/summarizer', label: '✂ Summarizer',    desc: 'Paste long text · get a tight summary' },
       ],
     },
   ];
