@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, lazy, Suspense } from 'react'
 import AnimatedCard from '../components/explore/AnimatedCard'
+import ShaderLines from '../components/luxe/ShaderLines'
 
 /* ── Lazy imports — nothing loads until selected ── */
 const HolographicCard = lazy(() => import('../components/lab/HolographicCard'))
@@ -153,6 +154,14 @@ const Creative = () => {
                 <div className='text-xs text-gray-500 mt-0.5'>{l}</div>
               </div>
             ))}
+          </div>
+        </FadeIn>
+
+        {/* Animated shader divider */}
+        <FadeIn delay={0.22}>
+          <div className='relative mt-8 h-24 w-full rounded-xl overflow-hidden border border-pink-900/40 opacity-80'>
+            <ShaderLines className='absolute inset-0 w-full h-full' />
+            <div className='absolute inset-0 bg-gradient-to-r from-gray-950 via-transparent to-gray-950 pointer-events-none' />
           </div>
         </FadeIn>
 

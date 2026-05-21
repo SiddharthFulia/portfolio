@@ -1,10 +1,25 @@
 import { useState, useRef, useEffect } from 'react'
+import {
+  Binary,
+  GitBranch,
+  Layers,
+  List,
+  Network,
+  Brain,
+  TrendingUp,
+  Search,
+  Trophy,
+  Server,
+  Globe,
+  Code,
+} from 'lucide-react'
 import BSTVisualizer from '../components/lab/BSTVisualizer'
 import RedBlackTree from '../components/lab/RedBlackTree'
 import HeapVisualizer from '../components/lab/HeapVisualizer'
 import DPVisualizer from '../components/lab/DPVisualizer'
 import SortingVisualizer from '../components/lab/SortingVisualizer'
 import GraphTraversal from '../components/lab/GraphTraversal'
+import RadialTimeline from '../components/luxe/RadialTimeline'
 
 function FadeIn({ children, delay = 0, className = '' }) {
   const ref = useRef()
@@ -1777,6 +1792,205 @@ function TutorialCard({ tutorial, isOpen, onToggle, onComplete, completed }) {
   )
 }
 
+// Orbital timeline: high-level CS knowledge graph built from the tutorial topics above.
+// IDs are independent of the TUTORIALS array so we can include topics that aren't
+// (yet) full tutorials but matter for the visual map. Status reflects whether the
+// topic has a tutorial covering it on this page.
+const TIMELINE_DATA = [
+  {
+    id: 1,
+    title: 'Arrays',
+    date: 'Day 01',
+    content:
+      'Contiguous memory, O(1) random access. The foundation for nearly every other data structure — heaps, hash tables, dynamic programming tables all live in arrays.',
+    category: 'DSA',
+    icon: List,
+    relatedIds: [2, 3, 4, 8, 9],
+    status: 'in-progress',
+    energy: 95,
+  },
+  {
+    id: 2,
+    title: 'Linked List',
+    date: 'Day 02',
+    content:
+      'Pointer-based sequence. Insertion/deletion in O(1) given the node, but no random access. Underpins stacks, queues, and adjacency lists for graphs.',
+    category: 'DSA',
+    icon: GitBranch,
+    relatedIds: [1, 3, 4],
+    status: 'in-progress',
+    energy: 80,
+  },
+  {
+    id: 3,
+    title: 'Stack',
+    date: 'Day 03',
+    content:
+      'LIFO. Function calls, expression parsing, undo history, DFS, monotonic-stack tricks. Trivial to implement on top of an array or linked list.',
+    category: 'DSA',
+    icon: Layers,
+    relatedIds: [2, 4, 11],
+    status: 'in-progress',
+    energy: 75,
+  },
+  {
+    id: 4,
+    title: 'Queue',
+    date: 'Day 04',
+    content:
+      'FIFO. BFS traversal, scheduling, producer-consumer pipelines. Variants: deque (both ends), priority queue (heap-backed), circular buffer.',
+    category: 'DSA',
+    icon: Layers,
+    relatedIds: [2, 3, 5, 11],
+    status: 'in-progress',
+    energy: 70,
+  },
+  {
+    id: 5,
+    title: 'Binary Search Tree',
+    date: 'Day 05',
+    content:
+      'Ordered binary tree with O(log n) average search/insert/delete. Worst case O(n) degenerates to a linked list — fixed by self-balancing variants like AVL and Red-Black.',
+    category: 'DSA',
+    icon: GitBranch,
+    relatedIds: [6, 7, 11],
+    status: 'completed',
+    energy: 90,
+  },
+  {
+    id: 6,
+    title: 'Red-Black Tree',
+    date: 'Day 06',
+    content:
+      'Self-balancing BST with 5 color invariants. Used in std::map, TreeMap, the Linux kernel scheduler. O(log n) guaranteed for every operation.',
+    category: 'DSA',
+    icon: GitBranch,
+    relatedIds: [5, 7],
+    status: 'completed',
+    energy: 85,
+  },
+  {
+    id: 7,
+    title: 'Heap / Priority Queue',
+    date: 'Day 07',
+    content:
+      'Complete binary tree stored in an array. O(log n) insert and extract-min/max. Backs Dijkstra, heap sort, top-K problems, event-driven schedulers.',
+    category: 'DSA',
+    icon: Layers,
+    relatedIds: [4, 5, 9, 11],
+    status: 'completed',
+    energy: 88,
+  },
+  {
+    id: 8,
+    title: 'Hash Table',
+    date: 'Day 08',
+    content:
+      'O(1) average lookup via hashing. Collision handling: chaining vs open addressing. Powers dictionaries, caches, sets, memoization in DP.',
+    category: 'DSA',
+    icon: Binary,
+    relatedIds: [1, 10],
+    status: 'in-progress',
+    energy: 85,
+  },
+  {
+    id: 9,
+    title: 'Sorting',
+    date: 'Day 09',
+    content:
+      'Comparison-based lower bound: Ω(n log n). Merge sort (stable, O(n) extra), quick sort (in-place, randomized pivot), heap sort (in-place, O(n log n) worst case).',
+    category: 'Algorithms',
+    icon: TrendingUp,
+    relatedIds: [7, 10],
+    status: 'completed',
+    energy: 82,
+  },
+  {
+    id: 10,
+    title: 'Searching',
+    date: 'Day 10',
+    content:
+      'Linear O(n), binary O(log n) on sorted data. Binary search on the answer is a competitive programming superpower for monotonic predicates.',
+    category: 'Algorithms',
+    icon: Search,
+    relatedIds: [8, 9, 11, 13],
+    status: 'in-progress',
+    energy: 78,
+  },
+  {
+    id: 11,
+    title: 'Graph Algorithms',
+    date: 'Day 11',
+    content:
+      'BFS, DFS, Dijkstra, Bellman-Ford, Floyd-Warshall, topological sort, MST (Prim/Kruskal). Adjacency list vs matrix tradeoffs.',
+    category: 'Algorithms',
+    icon: Network,
+    relatedIds: [3, 4, 5, 7, 12],
+    status: 'completed',
+    energy: 92,
+  },
+  {
+    id: 12,
+    title: 'Dynamic Programming',
+    date: 'Day 12',
+    content:
+      'Overlapping subproblems + optimal substructure. Memoization (top-down) vs tabulation (bottom-up). Knapsack, LCS, edit distance, DP on trees and graphs.',
+    category: 'Algorithms',
+    icon: Brain,
+    relatedIds: [10, 11, 13],
+    status: 'completed',
+    energy: 95,
+  },
+  {
+    id: 13,
+    title: 'Competitive Programming',
+    date: 'Day 13',
+    content:
+      'Contest strategy, time management, STL mastery, common patterns: sliding window, two pointers, binary search on answer. Practice topics by difficulty.',
+    category: 'CP',
+    icon: Trophy,
+    relatedIds: [10, 11, 12],
+    status: 'completed',
+    energy: 80,
+  },
+  {
+    id: 14,
+    title: 'System Design',
+    date: 'Day 14',
+    content:
+      'URL shortener as a vehicle: requirements gathering, high-level architecture, database & hashing strategy, caching, load balancing, sharding.',
+    category: 'System Design',
+    icon: Server,
+    relatedIds: [11, 15, 16],
+    status: 'completed',
+    energy: 90,
+  },
+  {
+    id: 15,
+    title: 'REST APIs',
+    date: 'Day 15',
+    content:
+      'HTTP methods, status codes, Express routing and middleware, JWT authentication flow, full CRUD APIs. The backbone of most modern web apps.',
+    category: 'Web Dev',
+    icon: Code,
+    relatedIds: [14, 16],
+    status: 'completed',
+    energy: 75,
+  },
+  {
+    id: 16,
+    title: 'Next.js',
+    date: 'Day 16',
+    content:
+      'SSR vs SSG vs CSR — picking the right rendering strategy. App router vs pages router, server components, deployment and optimization.',
+    category: 'Web Dev',
+    icon: Globe,
+    relatedIds: [14, 15],
+    status: 'completed',
+    energy: 78,
+  },
+]
+
 export default function Learn() {
   const [activeCategory, setActiveCategory] = useState('All')
   const [openId, setOpenId] = useState(null)
@@ -1821,6 +2035,24 @@ export default function Learn() {
                 <div className="text-xs text-gray-500 mt-0.5">{l}</div>
               </div>
             ))}
+          </div>
+        </FadeIn>
+
+        {/* Radial Orbital Timeline — knowledge graph */}
+        <FadeIn delay={0.15}>
+          <div className="mt-12 mb-4">
+            <h2 className="font-poppins font-bold text-2xl md:text-3xl text-white">
+              Knowledge Orbit
+            </h2>
+            <p className="text-gray-500 text-sm mt-1">
+              Click a node to expand. Related topics pulse. Click empty space to resume rotation.
+            </p>
+          </div>
+          <div className="rounded-2xl overflow-hidden border border-white/10 bg-black mb-12">
+            <RadialTimeline
+              timelineData={TIMELINE_DATA}
+              className="h-[560px] md:h-[640px]"
+            />
           </div>
         </FadeIn>
 

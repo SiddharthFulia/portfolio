@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, lazy, Suspense } from 'react'
 import AnimatedCard from '../components/explore/AnimatedCard'
+import ShaderAnimation from '../components/luxe/ShaderAnimation'
 
 /* ── Lazy imports — nothing loads until the section is clicked ── */
 const SolarSystem3D = lazy(() => import('../components/lab/SolarSystem3D'))
@@ -254,7 +255,12 @@ const Lab = () => {
 
       {/* ── Hero ── */}
       <div className='relative max-w-6xl mx-auto px-6 pt-32 pb-6'>
-        <h1 className='font-poppins font-black text-5xl md:text-6xl bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-500 bg-clip-text text-transparent leading-tight'>
+        {/* Animated shader backdrop — sits behind the hero text */}
+        <div className='pointer-events-none absolute right-4 top-24 hidden md:block w-72 h-64 rounded-2xl overflow-hidden opacity-40 mix-blend-screen border border-cyan-900/40'>
+          <ShaderAnimation className='w-full h-full' />
+        </div>
+
+        <h1 className='font-poppins font-black text-5xl md:text-6xl bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-500 bg-clip-text text-transparent leading-tight relative'>
           Interactive Lab
         </h1>
         <p className='text-gray-400 mt-3 text-base max-w-xl'>

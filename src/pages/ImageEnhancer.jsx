@@ -14,6 +14,7 @@ import {
 } from '../api/ai'
 import { VaultLoginPanel, getVaultToken, setVaultToken } from '../components/VaultGate'
 import AmbientBlobs from '../components/luxe/AmbientBlobs'
+import JobLogsAgentPlan from '../components/JobLogsAgentPlan'
 
 // localStorage key — persists the in-flight enhancement across refreshes
 const INFLIGHT_KEY = 'sid-imgenh-inflight'
@@ -538,6 +539,8 @@ export default function ImageEnhancer() {
   // and opens the login modal so user can unlock + retry.
   const [nsfwBlocked, setNsfwBlocked] = useState(null)
   const [logsModalOpen, setLogsModalOpen] = useState(false)
+  // Toggle between the flat in-page log tail and the AgentPlan tree view.
+  const [logsView, setLogsView] = useState('flat')
   // Prompt helper modal — opens from the 💡 button next to the prompt textarea.
   // Surfaces sample prompts tuned to the selected checkpoint family + offers
   // an "ask AI" mode that calls /api/ai/prompt-coach to rewrite plain English
@@ -1350,6 +1353,15 @@ function GenerateSection({
                     </p>
                     {job?.imageId && <p className="text-[9px] text-gray-700 font-mono break-all">{job.imageId}</p>}
                   </div>
+                  {/* View toggle — flat tail ↔ AgentPlan tree. */}
+                  <button
+                    type="button"
+                    onClick={() => setLogsView(v => v === 'flat' ? 'plan' : 'flat')}
+                    className="flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-fuchsia-500/15 hover:bg-fuchsia-500/25 text-fuchsia-300 border border-fuchsia-500/40 transition-colors shrink-0"
+                    title={logsView === 'flat' ? 'Switch to Plan view' : 'Switch to Logs view'}
+                  >
+                    {logsView === 'flat' ? 'Plan' : 'Logs'}
+                  </button>
                   {/* Prominent View Logs button — always visible during processing */}
                   <button type="button" onClick={() => setLogsModalOpen(true)}
                     className="flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 transition-colors shrink-0">
@@ -1357,9 +1369,21 @@ function GenerateSection({
                     Live logs
                   </button>
                 </div>
+                {/* AgentPlan tree — polls /api/job-logs/image/:imageId itself. */}
+                {logsView === 'plan' && job?.imageId && (
+                  <div className="mt-1">
+                    <JobLogsAgentPlan
+                      lane="image"
+                      jobId={job.imageId}
+                      status={status}
+                      progressMessage={job?.progressMessage}
+                      error={job?.error}
+                    />
+                  </div>
+                )}
                 {/* Live log feed — Atelier path streams entries via /image-progress.
                     Click the panel or the Expand button to open the full-history modal. */}
-                {Array.isArray(job?.logs) && job.logs.length > 0 && (
+                {logsView === 'flat' && Array.isArray(job?.logs) && job.logs.length > 0 && (
                   <div className="mt-1">
                     <div className="flex items-center justify-between mb-1 px-1">
                       <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-400">

@@ -1,0 +1,222 @@
+import { useEffect, useRef, useState, useMemo } from 'react'
+import { fetchJobLogs } from '../api/ai'
+import AgentPlan from './luxe/AgentPlan'
+
+/**
+ * JobLogsAgentPlan — polls /api/job-logs/:lane/:jobId and renders the stream
+ * as an Agent-style task tree.
+ *
+ * Logs get bucketed into three groups:
+ *   1. Setup        — initial logs (queue / pull / init / load / checkpoint)
+ *   2. Generate     — main logs (steps / sampling / denoise / frame)
+ *   3. Post-process — final logs (upscale / encode / upload / save)
+ *
+ * Each group's status is derived from:
+ *   - outer job `status` (failed / completed → propagates to active group)
+ *   - whether that group has any logs yet
+ *   - whether later groups have already started (means this one is done)
+ */
+
+const SETUP_RE   = /\b(queue|queued|pull|pulling|init|initialis|initializ|load|loading|checkpoint|warmup|warm-up|warming|model)\b/i
+const GENERATE_RE = /\b(step|sampling|sample|denoise|denoising|frame|inference|generat|diffus)\b/i
+const POST_RE     = /\b(upscale|upscaling|encode|encoding|upload|uploading|save|saving|finaliz|post-?process|complete|done)\b/i
+
+const truncate = (s, n = 80) => {
+  if (!s) return ''
+  const str = String(s)
+  return str.length > n ? str.slice(0, n - 1) + '…' : str
+}
+
+const classifyLog = (msg = '') => {
+  if (POST_RE.test(msg))     return 'post'
+  if (GENERATE_RE.test(msg)) return 'generate'
+  if (SETUP_RE.test(msg))    return 'setup'
+  return null // unclassified — falls through to current active group
+}
+
+/**
+ * Bucket logs into the three groups in order. Unclassified lines fall into
+ * the "currently active" group based on the most recent classified line so
+ * the tree never has orphans. Returns { setup, generate, post } each = log[].
+ */
+const bucketLogs = (logs) => {
+  const groups = { setup: [], generate: [], post: [] }
+  let lastBucket = 'setup'
+  for (const entry of logs) {
+    const msg = entry?.msg || ''
+    const cls = classifyLog(msg)
+    const bucket = cls || lastBucket
+    groups[bucket].push(entry)
+    if (cls) lastBucket = cls
+  }
+  return groups
+}
+
+/**
+ * Pick a status for one group, given:
+ *   - whether the group has logs
+ *   - whether any later group has logs (→ this one is done)
+ *   - the outer job status
+ *   - is it the active group?
+ */
+const groupStatus = ({ hasLogs, laterHasLogs, jobStatus, isActiveGroup }) => {
+  if (jobStatus === 'failed' && isActiveGroup && hasLogs) return 'failed'
+  if (jobStatus === 'completed') return hasLogs || laterHasLogs ? 'completed' : 'pending'
+  if (laterHasLogs) return 'completed'
+  if (hasLogs) return 'in-progress'
+  return 'pending'
+}
+
+export default function JobLogsAgentPlan({
+  lane,
+  jobId,
+  status,           // outer job status: 'queued' | 'processing' | 'completed' | 'failed' | ...
+  progressMessage,  // optional headline from BE
+  error,            // optional outer error
+  pollIntervalMs = 1500,
+}) {
+  const [logs, setLogs] = useState([])
+  const sinceRef = useRef(0)
+  const timerRef = useRef(null)
+  const mountedRef = useRef(true)
+
+  // Reset on job/lane change
+  useEffect(() => {
+    setLogs([])
+    sinceRef.current = 0
+  }, [lane, jobId])
+
+  useEffect(() => {
+    mountedRef.current = true
+    if (!lane || !jobId) return undefined
+
+    const tick = async () => {
+      try {
+        const { data } = await fetchJobLogs(lane, jobId, sinceRef.current, 80)
+        if (!mountedRef.current) return
+        const incoming = Array.isArray(data?.logs) ? data.logs : []
+        if (incoming.length > 0) {
+          setLogs((prev) => [...prev, ...incoming])
+          // Server returns nextSince; fall back to last log ts.
+          const next =
+            typeof data?.nextSince === 'number'
+              ? data.nextSince
+              : incoming[incoming.length - 1]?.ts || sinceRef.current
+          sinceRef.current = next
+        } else if (typeof data?.nextSince === 'number') {
+          sinceRef.current = data.nextSince
+        }
+      } catch {
+        // Silent — the BE may briefly 5xx; next tick retries.
+      }
+    }
+
+    // Stop polling once we reach a terminal state — but still tick once
+    // to flush any final logs the BE may have emitted.
+    const terminal = status === 'completed' || status === 'failed'
+    tick()
+    if (!terminal) {
+      timerRef.current = setInterval(tick, pollIntervalMs)
+    }
+
+    return () => {
+      mountedRef.current = false
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+        timerRef.current = null
+      }
+    }
+  }, [lane, jobId, status, pollIntervalMs])
+
+  const tasks = useMemo(() => {
+    const buckets = bucketLogs(logs)
+    const setupCount    = buckets.setup.length
+    const generateCount = buckets.generate.length
+    const postCount     = buckets.post.length
+
+    // The active group is the latest one that has logs (or "setup" if none).
+    let activeGroup = 'setup'
+    if (postCount > 0)     activeGroup = 'post'
+    else if (generateCount > 0) activeGroup = 'generate'
+    else if (setupCount > 0)    activeGroup = 'setup'
+
+    const buildSubtasks = (entries) =>
+      entries.map((entry, idx) => ({
+        id: `${entry?.ts || 'log'}-${idx}`,
+        title: truncate(entry?.msg || '', 80),
+        description: entry?.msg || '',
+        status: 'completed', // a log line that's been emitted is "done"
+      }))
+
+    const setupStatus = groupStatus({
+      hasLogs: setupCount > 0,
+      laterHasLogs: generateCount > 0 || postCount > 0,
+      jobStatus: status,
+      isActiveGroup: activeGroup === 'setup',
+    })
+    const generateStatus = groupStatus({
+      hasLogs: generateCount > 0,
+      laterHasLogs: postCount > 0,
+      jobStatus: status,
+      isActiveGroup: activeGroup === 'generate',
+    })
+    const postStatus = groupStatus({
+      hasLogs: postCount > 0,
+      laterHasLogs: false,
+      jobStatus: status,
+      isActiveGroup: activeGroup === 'post',
+    })
+
+    return [
+      {
+        id: 'setup',
+        title: 'Setup',
+        description: 'Queue, model load, checkpoint init',
+        status: setupStatus,
+        subtasks: buildSubtasks(buckets.setup),
+      },
+      {
+        id: 'generate',
+        title: 'Generate',
+        description: 'Sampling, denoising, frames',
+        status: generateStatus,
+        subtasks: buildSubtasks(buckets.generate),
+      },
+      {
+        id: 'post',
+        title: 'Post-process',
+        description: 'Upscale, encode, upload',
+        status: postStatus,
+        subtasks: buildSubtasks(buckets.post),
+      },
+    ]
+  }, [logs, status])
+
+  // Expand the active group by default — whichever has logs most recently.
+  const defaultExpanded = useMemo(() => {
+    const last = tasks.find((t) => t.status === 'in-progress' || t.status === 'failed')
+    if (last) return [last.id]
+    // No active → expand the last completed (or fallback to setup)
+    const completed = [...tasks].reverse().find((t) => t.status === 'completed')
+    return [completed?.id || 'setup']
+  }, [tasks])
+
+  return (
+    <div className="rounded-xl border border-gray-800 bg-black/40 overflow-hidden">
+      {(progressMessage || error) && (
+        <div className="px-4 py-2 border-b border-gray-800/80 bg-gradient-to-r from-cyan-500/5 via-fuchsia-500/5 to-transparent">
+          {progressMessage && (
+            <p className="text-xs text-gray-300">{progressMessage}</p>
+          )}
+          {error && (
+            <p className="text-xs text-rose-400 mt-1">✗ {error}</p>
+          )}
+        </div>
+      )}
+      <AgentPlan
+        tasks={tasks}
+        defaultExpandedIds={defaultExpanded}
+      />
+    </div>
+  )
+}

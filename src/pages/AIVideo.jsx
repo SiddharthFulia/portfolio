@@ -19,6 +19,7 @@ import { UploadOutlined } from '@ant-design/icons'
 import { DeleteOutlined } from '@ant-design/icons'
 import PromptHelper from '../components/PromptHelper'
 import AmbientBlobs from '../components/luxe/AmbientBlobs'
+import JobLogsAgentPlan from '../components/JobLogsAgentPlan'
 
 const BE_URL = import.meta.env.VITE_BE_URL || 'http://localhost:4001'
 
@@ -291,6 +292,9 @@ const logTone = (text) => {
 
 const Skeleton = ({ jobId, status, job, paused = false, onTogglePause }) => {
   const [logsOpen, setLogsOpen] = useState(false)
+  // Toggle between the classic flat log list and the AgentPlan tree view.
+  // Defaults to 'flat' so existing users see what they're used to.
+  const [logsView, setLogsView] = useState('flat')
   // Auto-scroll the modal log list to the latest line whenever new entries arrive
   const modalScrollRef = useRef(null)
   useEffect(() => {
@@ -376,12 +380,24 @@ const Skeleton = ({ jobId, status, job, paused = false, onTogglePause }) => {
                     {paused ? 'paused' : 'live'} · {allLogs.length} {allLogs.length === 1 ? 'event' : 'events'}
                   </span>
                   <div className="flex items-center gap-1">
+                    {/* Logs view toggle — flips between the flat tail and the AgentPlan tree. */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setLogsView(v => v === 'flat' ? 'plan' : 'flat')
+                      }}
+                      className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-fuchsia-500/40 hover:border-fuchsia-400 bg-fuchsia-500/10 hover:bg-fuchsia-500/20 text-fuchsia-300 hover:text-fuchsia-200 transition-colors"
+                      title={logsView === 'flat' ? 'Switch to Plan view' : 'Switch to Logs view'}
+                    >
+                      {logsView === 'flat' ? 'Plan' : 'Logs'}
+                    </button>
                     <button type="button" onClick={(e) => { e.stopPropagation(); onTogglePause() }}
                       className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-gray-700 hover:border-gray-500 text-gray-300 hover:text-white transition-colors">
                       {paused ? <><CaretRightOutlined className="text-[9px]" /> Resume</>
                               : <><PauseOutlined className="text-[9px]" /> Pause</>}
                     </button>
-                    {allLogs.length > 0 && (
+                    {allLogs.length > 0 && logsView === 'flat' && (
                       <button type="button" onClick={(e) => { e.stopPropagation(); setLogsOpen(true) }}
                         className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-cyan-500/40 hover:border-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 hover:text-cyan-200 transition-colors">
                         <ExpandAltOutlined className="text-[9px]" /> Expand
@@ -390,7 +406,19 @@ const Skeleton = ({ jobId, status, job, paused = false, onTogglePause }) => {
                   </div>
                 </div>
               )}
-              {allLogs.length > 0 && (
+              {/* Plan view — synthesised AgentPlan tree powered by /api/job-logs. */}
+              {logsView === 'plan' && jobId && (
+                <div onClick={(e) => e.stopPropagation()}>
+                  <JobLogsAgentPlan
+                    lane="video"
+                    jobId={jobId}
+                    status={status}
+                    progressMessage={job?.progressMessage}
+                    error={job?.error}
+                  />
+                </div>
+              )}
+              {logsView === 'flat' && allLogs.length > 0 && (
                 <button type="button" onClick={() => setLogsOpen(true)}
                   className="block w-full text-left rounded-xl bg-gradient-to-b from-black/70 to-black/40 border border-gray-800/80 hover:border-cyan-500/40 transition-colors overflow-hidden group">
                   <div className="max-h-72 sm:max-h-80 overflow-y-auto p-3">
