@@ -65,11 +65,46 @@ const LIVE_PROJECTS = [
 ];
 
 // ── Small UI atom: tech tag chip ──
+// Mirrors the chess-engine telemetry pills: tabular-nums, mono, subtle
+// gradient backdrop, hover lifts the border. Cheap eye-candy, no JS.
 const TechChip = ({ children }) => (
-  <span className="border border-gray-800 bg-white/[0.03] text-gray-300 px-2 py-0.5 rounded-md text-[10px] tracking-wider uppercase font-medium">
+  <span className="border border-gray-800 bg-gradient-to-b from-white/[0.04] to-white/[0.01]
+                   text-gray-300 px-2 py-0.5 rounded-md text-[10px] tracking-wider uppercase
+                   font-medium font-mono transition-colors hover:border-amber-500/30 hover:text-amber-200">
     {children}
   </span>
 );
+
+// Section heading pill — same shape as the chess "Match active" / "Waiting"
+// pills. Tailwind's JIT only picks up class strings it can see literally,
+// so the dot/tone variants are concrete strings, not interpolated.
+const SectionPill = ({ children, dotColor, tone = 'gray' }) => {
+  const tones = {
+    gray:  'border-gray-700 bg-gray-900/60 text-gray-300',
+    amber: 'border-amber-500/40 bg-amber-500/10 text-amber-200',
+    rose:  'border-rose-500/40 bg-rose-500/10 text-rose-200',
+    cyan:  'border-cyan-500/40 bg-cyan-500/10 text-cyan-200',
+  };
+  const dots = {
+    emerald: { ping: 'bg-emerald-400', solid: 'bg-emerald-500' },
+    amber:   { ping: 'bg-amber-400',   solid: 'bg-amber-500'   },
+    rose:    { ping: 'bg-rose-400',    solid: 'bg-rose-500'    },
+    cyan:    { ping: 'bg-cyan-400',    solid: 'bg-cyan-500'    },
+  };
+  const d = dots[dotColor];
+  return (
+    <h2 className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border ${tones[tone] || tones.gray}
+                   font-poppins font-semibold text-[11px] tracking-[0.18em] uppercase`}>
+      {d && (
+        <span className="relative flex h-2 w-2">
+          <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${d.ping} opacity-75`} />
+          <span className={`relative inline-flex rounded-full h-2 w-2 ${d.solid}`} />
+        </span>
+      )}
+      {children}
+    </h2>
+  );
+};
 
 // ── Small UI atom: preview placeholder (used when project has no image) ──
 const PreviewPlaceholder = ({ label, gradient }) => {
@@ -100,13 +135,30 @@ const Projects = () => {
   const totalCount = LIVE_PROJECTS.length + projects.length;
 
   return (
-    <section className="min-h-screen bg-[#0a0a0e] text-gray-100 pt-28 pb-24 px-4 sm:px-6">
-      <div className="max-w-5xl mx-auto">
+    <section className="relative min-h-screen bg-[#0a0a0e] text-gray-100 pt-28 pb-24 px-4 sm:px-6 overflow-hidden">
+      {/* ── Ambient hero glow ──
+       * Same vocabulary as the VaultGate / chess-engine pages — a soft
+       * tri-colour orb behind the title, blurred to taste so it reads as
+       * atmosphere, not decoration. Pointer-events-none so it never
+       * intercepts clicks on the header text or chips.
+       */}
+      <div aria-hidden
+        className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[640px] h-[640px]
+                   rounded-full bg-gradient-to-br from-amber-500/15 via-rose-500/10 to-fuchsia-500/15 blur-3xl" />
+      <div aria-hidden
+        className="pointer-events-none absolute top-1/3 -right-20 w-[420px] h-[420px]
+                   rounded-full bg-gradient-to-br from-cyan-500/10 via-violet-500/8 to-transparent blur-3xl" />
+
+      <div className="relative max-w-5xl mx-auto">
 
         {/* ── Page header ── */}
         <motion.div initial="hidden" animate="show" variants={fadeUp}>
-          <p className="luxe-eyebrow text-violet-300/80">— Work · {totalCount} projects</p>
-          <h1 className="luxe-section-title text-4xl sm:text-5xl text-white mt-3">
+          <p className="luxe-eyebrow text-amber-300/80 font-mono tracking-[0.25em]">
+            — Work · <span className="tabular-nums">{totalCount}</span> projects
+          </p>
+          <h1 className="luxe-section-title text-4xl sm:text-5xl mt-3 bg-gradient-to-r
+                         from-amber-200 via-rose-300 to-fuchsia-300 bg-clip-text text-transparent
+                         leading-tight pb-1">
             Selected projects
           </h1>
           <p className="luxe-body-muted mt-3 max-w-xl">
@@ -123,14 +175,9 @@ const Projects = () => {
           variants={stagger}
           viewport={{ once: true, amount: 0.1 }}
         >
-          <motion.div variants={fadeUp} className="flex items-center gap-3 mb-2">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
-            </span>
-            <h2 className="font-poppins font-semibold text-sm tracking-wider uppercase text-gray-400">
-              Live · Interactive
-            </h2>
+          <motion.div variants={fadeUp} className="flex items-center gap-3 mb-3">
+            <SectionPill dotColor="emerald" tone="amber">Live · Interactive</SectionPill>
+            <span className="h-px flex-1 bg-gradient-to-r from-amber-500/30 via-rose-500/15 to-transparent" />
           </motion.div>
 
           {LIVE_PROJECTS.map(proj => (
@@ -222,11 +269,10 @@ const Projects = () => {
           variants={stagger}
           viewport={{ once: true, amount: 0.05 }}
         >
-          <motion.div variants={fadeUp} className="flex items-center gap-3 mb-2 mt-4">
-            <h2 className="font-poppins font-semibold text-sm tracking-wider uppercase text-gray-400">
-              All projects
-            </h2>
-            <span className="h-px flex-1 bg-gradient-to-r from-gray-800 to-transparent" />
+          <motion.div variants={fadeUp} className="flex items-center gap-3 mb-3 mt-4">
+            <SectionPill dotColor={null} tone="gray">All projects</SectionPill>
+            <span className="h-px flex-1 bg-gradient-to-r from-gray-800 via-gray-900 to-transparent" />
+            <span className="text-[10px] font-mono tracking-wider text-gray-600 tabular-nums">{projects.length} total</span>
           </motion.div>
 
           {projects.map((project) => {
