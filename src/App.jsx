@@ -12,23 +12,34 @@ import RouteErrorBoundary from './components/RouteErrorBoundary';
 // New build replaced those chunks with new hashes (-72ac1f00.js), so the
 // fetch 404s and `Failed to fetch dynamically imported module` throws.
 // One hard-reload pulls the new index.html which references the right
-// chunks. sessionStorage guard prevents an infinite reload loop if the
-// import legitimately fails for some other reason.
-const RELOAD_KEY = 'sid-chunk-reload-at';
-const CHUNK_RE = /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module/i;
+// chunks. We key the throttle off the FAILING CHUNK URL so navigating
+// through two stale routes back-to-back each gets its own reload chance
+// — a single global throttle burns through with one route and surfaces
+// the second as a crash, which is exactly what the user kept seeing.
+export const CHUNK_RE = /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module/i;
+const URL_RE = /https?:\/\/\S+?\.m?js\b/;
+const RELOAD_KEY_PREFIX = 'sid-chunk-reload:';
+
+export function tryChunkReload(err) {
+  const msg = err?.message || (typeof err === 'string' ? err : '');
+  if (!msg || !CHUNK_RE.test(msg)) return false;
+  const m = URL_RE.exec(msg);
+  const key = `${RELOAD_KEY_PREFIX}${m ? m[0] : 'unknown'}`;
+  const last = Number(sessionStorage.getItem(key) || '0');
+  // 5min per-URL cooldown — long enough that a genuine 404 doesn't loop,
+  // short enough that we'll retry after the next deploy if it happens.
+  if (Date.now() - last <= 5 * 60_000) return false;
+  sessionStorage.setItem(key, String(Date.now()));
+  window.location.reload();
+  return true;
+}
+
 const lazyWithReload = (importFn) => lazy(() =>
   importFn().catch((err) => {
-    if (err && typeof err.message === 'string' && CHUNK_RE.test(err.message)) {
-      const last = Number(sessionStorage.getItem(RELOAD_KEY) || '0');
-      const now = Date.now();
-      // Only reload once per 30s window — protects against real (non-deploy) issues.
-      if (now - last > 30_000) {
-        sessionStorage.setItem(RELOAD_KEY, String(now));
-        window.location.reload();
-        // Return a Promise that never resolves so React doesn't try to render
-        // a fallback in the millisecond before the reload actually fires.
-        return new Promise(() => {});
-      }
+    if (tryChunkReload(err)) {
+      // Never-resolving promise keeps the Suspense fallback up while the
+      // browser tears down for reload — React never sees the throw.
+      return new Promise(() => {});
     }
     throw err;
   })
