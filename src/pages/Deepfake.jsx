@@ -293,10 +293,14 @@ function DeepfakeInner() {
                 <div className="mt-3 flex items-center justify-between gap-2 flex-wrap">
                   <span className="text-[10px] text-gray-500 font-mono">{job.jobId}</span>
                   <div className="flex items-center gap-2 flex-wrap">
-                    {/* Hand the swapped image to /ai-video — pre-fills imageUrl
-                        so the user can animate the face-swap result in one click. */}
+                    {/* Hand the swapped image to /ai-video — pre-fills
+                        imageUrl AND auto-picks the 5090 'optimized'
+                        provider since that's the lane with image-to-video
+                        + decent face identity. AIVideo's existing mount
+                        effect already reads ?provider= and flips the
+                        selector for us, so the user lands ready-to-render. */}
                     <button
-                      onClick={() => navigate(`/ai-video?image=${encodeURIComponent(outputUrl)}&fromDeepfake=1`)}
+                      onClick={() => navigate(`/ai-video?image=${encodeURIComponent(outputUrl)}&fromDeepfake=1&provider=optimized`)}
                       className="text-xs font-semibold px-3 py-2 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20">
                       🎬 Send to Video Studio
                     </button>
