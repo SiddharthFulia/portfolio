@@ -50,8 +50,7 @@ export default function Leaderboard({ onBack }) {
     { title: '#',        dataIndex: 'rank', key: 'rank', width: 50, render: (_v, _r, idx) => <span className='font-mono text-gray-400'>{idx + 1}.</span> },
     { title: 'Player',   dataIndex: 'name', key: 'name', render: (v) => <span className='font-semibold text-gray-100'>{v}</span> },
     { title: 'Score',    dataIndex: 'score', key: 'score', align: 'right', render: (v) => <span className='font-mono tabular-nums text-amber-200'>{Number(v || 0).toLocaleString()}</span> },
-    { title: 'Coins',    dataIndex: 'coins', key: 'coins', align: 'right', responsive: ['sm'], render: (v) => <span className='font-mono tabular-nums text-gray-300'>{v || 0}</span> },
-    { title: 'Distance', dataIndex: 'distance', key: 'distance', align: 'right', responsive: ['md'], render: (v) => <span className='font-mono tabular-nums text-gray-400'>{Math.floor(Number(v || 0)).toLocaleString()} m</span> },
+    { title: 'Distance', dataIndex: 'distance', key: 'distance', align: 'right', responsive: ['sm'], render: (v) => <span className='font-mono tabular-nums text-gray-400'>{Math.floor(Number(v || 0)).toLocaleString()} m</span> },
     { title: 'Diff',     dataIndex: 'difficulty', key: 'difficulty', responsive: ['sm'], render: (v) => (
       <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border font-semibold ${DIFF_TONE[v] || 'border-gray-700 bg-gray-900/60 text-gray-400'}`}>{v || '—'}</span>
     )},

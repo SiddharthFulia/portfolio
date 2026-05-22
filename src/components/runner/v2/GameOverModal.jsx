@@ -21,11 +21,13 @@ export default function GameOverModal({ open, onPlayAgain, onLeaderboard, onClos
     if (!open || submitted || submitting) return
     if (!playerName || !score) return
     setSubmitting(true)
+    // BE wants `playerName` (not `name`) and doesn't track coins on the
+    // leaderboard — coin count is local-only score flavour. The helper
+    // signature also expects floored ints.
     submitGameScore({
-      name:       playerName,
-      score,
-      coins,
-      distance:   Math.floor(distance),
+      playerName,
+      score:    Math.floor(score),
+      distance: Math.floor(distance),
       difficulty,
     }).then(({ data, error }) => {
       setSubmitting(false)
