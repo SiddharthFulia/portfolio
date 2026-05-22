@@ -545,8 +545,10 @@ export default function ImageEnhancer() {
   // and opens the login modal so user can unlock + retry.
   const [nsfwBlocked, setNsfwBlocked] = useState(null)
   const [logsModalOpen, setLogsModalOpen] = useState(false)
-  // Toggle between the flat in-page log tail and the AgentPlan tree view.
-  const [logsView, setLogsView] = useState('flat')
+  // (logsView state lives inside GenerateSection — that's the only place
+  // that reads or writes it. Leaving it here threw "logsView is not
+  // defined" at runtime because the inner section was never wired with
+  // it as a prop.)
   // Prompt helper modal — opens from the 💡 button next to the prompt textarea.
   // Surfaces sample prompts tuned to the selected checkpoint family + offers
   // an "ask AI" mode that calls /api/ai/prompt-coach to rewrite plain English
@@ -1214,6 +1216,9 @@ function GenerateSection({
   familyFilter: familyFilterProp = 'all',
   setFamilyFilter,
 }) {
+  // Toggle between the flat in-page log tail and the AgentPlan tree view.
+  // Local to this section — nothing else on the page reads it.
+  const [logsView, setLogsView] = useState('flat')
   // Canvas transforms applied to the current sourceDataUrl in-place. Used
   // by the rotate L/R + mirror buttons that appear when a source image is
   // loaded. Wraps transformImage() (canvas-based, see CameraCapture.jsx).
