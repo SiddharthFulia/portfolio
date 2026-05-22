@@ -1,22 +1,25 @@
-// Spawner — generates rows of obstacles + coins ahead of the player
-// and moves them toward the camera at the world speed. Exposes
-// imperative getObstacles/getCoins/getPowerups (+ remove*) so the game
-// loop can run collision + pickup tests without paying React's rerender
-// cost.
+// Spawner — generates rows of obstacles + coins ahead of the player and
+// moves them toward the camera at the world speed. Replaces the v1
+// plain-box obstacles with composed entity groups: trains have windows
+// + headlights + wheels, barriers are striped warning posts, overhangs
+// are signed beams. Coins keep their torus + spin.
 
-import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { getLanes } from './Track'
 
-const FAR_Z       = -80
-const CULL_Z      = 5
-const COINS_PER_ARC = 5
+const FAR_Z          = -80
+const CULL_Z         = 5
+const COINS_PER_ARC  = 5
 const COIN_SPACING_Z = 1.0
 
+// Each obstacle keeps the same (w,h,d) hitbox the v1 spawner used so the
+// useGameLoop AABB collision code keeps working — only the rendered
+// meshes change.
 const OBSTACLE_TYPES = [
-  { type: 'train',    weight: 0.40, dim: [0.9, 2.4, 4.0], y: 1.2, color: '#475569' },
-  { type: 'barrier',  weight: 0.35, dim: [0.9, 0.6, 0.5], y: 0.3, color: '#f87171' },
-  { type: 'overhang', weight: 0.25, dim: [0.9, 0.5, 0.5], y: 1.9, color: '#fbbf24' },
+  { type: 'train',    weight: 0.40, dim: [0.9, 2.4, 4.0], y: 1.2 },
+  { type: 'barrier',  weight: 0.35, dim: [0.9, 0.6, 0.5], y: 0.3 },
+  { type: 'overhang', weight: 0.25, dim: [0.9, 0.5, 0.5], y: 1.9 },
 ]
 
 const pickObstacle = () => {
@@ -33,20 +36,23 @@ let _id = 1
 const nextId = () => _id++
 
 const Spawner = forwardRef(function Spawner({ speedRef, isPortrait }, ref) {
-  const groupRef = useRef(null)
-  // Pools — we keep React out of the hot path entirely and just push/pop
-  // meshes from a vanilla array. Refs get added to the scene graph via a
-  // useFrame hook that swaps them in.
-  const obstacles = useRef([])
-  const coins     = useRef([])
-  const powerups  = useRef([])
-  const lastSpawnZ = useRef(FAR_Z)
+  const obstacles    = useRef([])
+  const coins        = useRef([])
+  const powerups     = useRef([])
+  const lastSpawnZ   = useRef(FAR_Z)
+  const lanes        = getLanes(isPortrait)
 
-  const lanes = getLanes(isPortrait)
+  // 10Hz tick to re-render React tree so new spawns show. Per-frame
+  // position updates happen via per-mesh refs (no rerender).
+  const [, force] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => force(n => n + 1), 100)
+    return () => clearInterval(id)
+  }, [])
 
-  // Spawn one "row" of obstacles + opportunistic coin arc.
+  const meshMap = useMemo(() => new Map(), [])
+
   const spawnRow = (z) => {
-    // Decide how many lanes are blocked this row: 1 obstacle (70%) or 2 (30%).
     const numBlocked = Math.random() < 0.3 ? 2 : 1
     const laneIdxs = [0, 1, 2].sort(() => Math.random() - 0.5).slice(0, numBlocked)
     const blockedSet = new Set(laneIdxs)
@@ -57,29 +63,24 @@ const Spawner = forwardRef(function Spawner({ speedRef, isPortrait }, ref) {
         type: tpl.type,
         laneIdx,
         dim: tpl.dim,
-        color: tpl.color,
         position: { x: lanes[laneIdx], y: tpl.y, z },
         alive: true,
       })
     })
-    // Coins in any empty lane (pick one randomly to keep score-pacing sane).
     const emptyLanes = [0, 1, 2].filter(i => !blockedSet.has(i))
     if (emptyLanes.length) {
-      const chosenLane = emptyLanes[Math.floor(Math.random() * emptyLanes.length)]
-      // 1-in-30 powerup vs coin arc.
+      const chosen = emptyLanes[Math.floor(Math.random() * emptyLanes.length)]
       if (Math.random() < 1 / 30) {
         powerups.current.push({
-          id: nextId(),
-          laneIdx: chosenLane,
-          position: { x: lanes[chosenLane], y: 0.9, z },
+          id: nextId(), laneIdx: chosen,
+          position: { x: lanes[chosen], y: 0.9, z },
           alive: true,
         })
       } else {
         for (let i = 0; i < COINS_PER_ARC; i++) {
           coins.current.push({
-            id: nextId(),
-            laneIdx: chosenLane,
-            position: { x: lanes[chosenLane], y: 0.7, z: z - i * COIN_SPACING_Z },
+            id: nextId(), laneIdx: chosen,
+            position: { x: lanes[chosen], y: 0.7, z: z - i * COIN_SPACING_Z },
             alive: true,
           })
         }
@@ -91,7 +92,6 @@ const Spawner = forwardRef(function Spawner({ speedRef, isPortrait }, ref) {
     const speed = speedRef?.current ?? 0
     const dz = speed * delta
 
-    // Advance every alive item; cull past the camera.
     const advance = (arr) => {
       for (const item of arr) {
         if (!item.alive) continue
@@ -103,61 +103,11 @@ const Spawner = forwardRef(function Spawner({ speedRef, isPortrait }, ref) {
     advance(coins.current)
     advance(powerups.current)
 
-    // GC: keep arrays small by filtering when many are dead.
     if (obstacles.current.length > 60) obstacles.current = obstacles.current.filter(o => o.alive)
     if (coins.current.length > 200)    coins.current     = coins.current.filter(c => c.alive)
     if (powerups.current.length > 20)  powerups.current  = powerups.current.filter(p => p.alive)
 
-    // Decide whether to spawn a new row. Gap shrinks as speed grows.
-    const gap = Math.max(2.5, Math.min(8, 8 - speed * 0.15))
-    lastSpawnZ.current += dz   // last-spawn drifts with the world
-    if (lastSpawnZ.current > FAR_Z + gap) {
-      spawnRow(FAR_Z)
-      lastSpawnZ.current = FAR_Z
-    }
-  })
-
-  useImperativeHandle(ref, () => ({
-    getObstacles: () => obstacles.current,
-    getCoins:     () => coins.current,
-    getPowerups:  () => powerups.current,
-    removeObstacle(id) {
-      const it = obstacles.current.find(o => o.id === id); if (it) it.alive = false
-    },
-    removeCoin(id)     { const it = coins.current.find(c => c.id === id);    if (it) it.alive = false },
-    removePowerup(id)  { const it = powerups.current.find(p => p.id === id); if (it) it.alive = false },
-    reset() {
-      obstacles.current = []
-      coins.current     = []
-      powerups.current  = []
-      lastSpawnZ.current = FAR_Z
-    },
-  }), [])
-
-  return (
-    <group ref={groupRef}>
-      {/* Render meshes by mapping over the *current* item arrays. We
-          re-render on each tick via a state-less SpawnerMeshes helper
-          that uses useFrame to sync positions. To keep this simple
-          (and avoid a second hook layer) we just render straight from
-          the refs — React rerenders are driven by RefreshTick. */}
-      <SpawnerMeshes obstacles={obstacles} coins={coins} powerups={powerups} />
-    </group>
-  )
-})
-
-// Sub-component that owns the meshes. Re-runs render cheaply because we
-// use the ref arrays directly and three.js does the actual lifting.
-function SpawnerMeshes({ obstacles, coins, powerups }) {
-  const groupRef = useRef(null)
-  // Force a regular React rerender ~10x/sec so newly spawned items show.
-  // (Position updates between rerenders happen via per-mesh refs below.)
-  const [, force] = useTickState()
-
-  // Per-item mesh refs so we can write position each frame.
-  const meshMap = useMemo(() => new Map(), [])
-
-  useFrame(() => {
+    // Sync mesh world positions + coin spin.
     const apply = (arr) => {
       for (const item of arr) {
         const m = meshMap.get(item.id)
@@ -169,31 +119,40 @@ function SpawnerMeshes({ obstacles, coins, powerups }) {
     apply(obstacles.current)
     apply(coins.current)
     apply(powerups.current)
-    // Spin coins on Y.
     for (const c of coins.current) {
       const m = meshMap.get(c.id)
       if (m) m.rotation.z += 0.08
     }
+
+    const gap = Math.max(2.5, Math.min(8, 8 - speed * 0.15))
+    lastSpawnZ.current += dz
+    if (lastSpawnZ.current > FAR_Z + gap) {
+      spawnRow(FAR_Z)
+      lastSpawnZ.current = FAR_Z
+    }
   })
 
-  // Tick once on mount + periodically so React picks up new spawns.
-  // (Avoids the more invasive "re-render every frame" pattern.)
-  // 10Hz is fine for spawn cadence; positions update per frame anyway.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useTickInterval(() => force(n => n + 1), 100)
+  useImperativeHandle(ref, () => ({
+    getObstacles: () => obstacles.current,
+    getCoins:     () => coins.current,
+    getPowerups:  () => powerups.current,
+    removeObstacle(id) { const it = obstacles.current.find(o => o.id === id); if (it) it.alive = false },
+    removeCoin(id)     { const it = coins.current.find(c => c.id === id);    if (it) it.alive = false },
+    removePowerup(id)  { const it = powerups.current.find(p => p.id === id); if (it) it.alive = false },
+    reset() {
+      obstacles.current = []; coins.current = []; powerups.current = []
+      lastSpawnZ.current = FAR_Z
+    },
+  }), [])
 
   return (
-    <group ref={groupRef}>
+    <group>
       {obstacles.current.filter(o => o.alive).map(o => (
-        <mesh
+        <Obstacle
           key={o.id}
-          ref={(m) => { if (m) meshMap.set(o.id, m); else meshMap.delete(o.id) }}
-          position={[o.position.x, o.position.y, o.position.z]}
-          castShadow
-        >
-          <boxGeometry args={o.dim} />
-          <meshStandardMaterial color={o.color} roughness={0.6} />
-        </mesh>
+          o={o}
+          meshRef={(m) => { if (m) meshMap.set(o.id, m); else meshMap.delete(o.id) }}
+        />
       ))}
       {coins.current.filter(c => c.alive).map(c => (
         <mesh
@@ -203,31 +162,173 @@ function SpawnerMeshes({ obstacles, coins, powerups }) {
           rotation={[Math.PI / 2, 0, 0]}
         >
           <torusGeometry args={[0.18, 0.05, 8, 18]} />
-          <meshStandardMaterial color='#fbbf24' emissive='#92400e' metalness={0.7} roughness={0.2} />
+          <meshStandardMaterial color='#fbbf24' emissive='#a16207' metalness={0.7} roughness={0.2} />
         </mesh>
       ))}
       {powerups.current.filter(p => p.alive).map(p => (
-        <mesh
+        <group
           key={p.id}
           ref={(m) => { if (m) meshMap.set(p.id, m); else meshMap.delete(p.id) }}
           position={[p.position.x, p.position.y, p.position.z]}
         >
-          <boxGeometry args={[0.5, 0.2, 1.5]} />
-          <meshStandardMaterial color='#22d3ee' emissive='#0e7490' metalness={0.4} />
+          {/* Hoverboard powerup — neon deck with glowing trim */}
+          <mesh castShadow>
+            <boxGeometry args={[0.5, 0.18, 1.5]} />
+            <meshStandardMaterial color='#22d3ee' emissive='#06b6d4' emissiveIntensity={0.7} metalness={0.4} roughness={0.2} />
+          </mesh>
+          <mesh position={[0, -0.12, 0]}>
+            <boxGeometry args={[0.55, 0.04, 1.55]} />
+            <meshBasicMaterial color='#67e8f9' transparent opacity={0.6} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  )
+})
+
+// ── Composed obstacle entities ──
+function Obstacle({ o, meshRef }) {
+  const handleRef = (m) => {
+    if (typeof meshRef === 'function') meshRef(m)
+  }
+  if (o.type === 'train')    return <Train    o={o} bindRef={handleRef} />
+  if (o.type === 'barrier')  return <Barrier  o={o} bindRef={handleRef} />
+  if (o.type === 'overhang') return <Overhang o={o} bindRef={handleRef} />
+  return null
+}
+
+// Subway-Surfers-style train car. Long box with windows along the side,
+// chunky headlight on the front, wheel pairs at the base.
+function Train({ o, bindRef }) {
+  // Slight per-instance colour variety so a row of trains doesn't look stamped.
+  const palette = useMemo(() => {
+    const choices = ['#3b82f6', '#10b981', '#ef4444', '#a855f7', '#facc15']
+    return choices[Math.floor(o.id) % choices.length] || '#3b82f6'
+  }, [o.id])
+  return (
+    <group
+      ref={bindRef}
+      position={[o.position.x, o.position.y, o.position.z]}
+    >
+      {/* Body */}
+      <mesh castShadow>
+        <boxGeometry args={[o.dim[0], o.dim[1], o.dim[2]]} />
+        <meshStandardMaterial color={palette} roughness={0.6} metalness={0.3} />
+      </mesh>
+      {/* Roof beam */}
+      <mesh castShadow position={[0, o.dim[1] / 2 + 0.06, 0]}>
+        <boxGeometry args={[o.dim[0] + 0.08, 0.12, o.dim[2]]} />
+        <meshStandardMaterial color='#1f2937' roughness={0.7} />
+      </mesh>
+      {/* Window strip (long thin emissive box on each side) */}
+      <mesh position={[ o.dim[0] / 2 + 0.001, 0.4, 0]}>
+        <boxGeometry args={[0.02, 0.5, o.dim[2] - 0.6]} />
+        <meshStandardMaterial color='#fef9c3' emissive='#facc15' emissiveIntensity={0.6} />
+      </mesh>
+      <mesh position={[-o.dim[0] / 2 - 0.001, 0.4, 0]}>
+        <boxGeometry args={[0.02, 0.5, o.dim[2] - 0.6]} />
+        <meshStandardMaterial color='#fef9c3' emissive='#facc15' emissiveIntensity={0.6} />
+      </mesh>
+      {/* Window mullions — split the strip into 3 windows */}
+      {[-1, 0, 1].map((i) => (
+        <mesh key={i} position={[0, 0.4, i * (o.dim[2] / 3)]}>
+          <boxGeometry args={[o.dim[0] + 0.04, 0.6, 0.06]} />
+          <meshStandardMaterial color={palette} roughness={0.6} />
         </mesh>
+      ))}
+      {/* Front face — colored darker, plus 2 round headlights */}
+      <mesh position={[0, -0.2, -o.dim[2] / 2 - 0.001]}>
+        <boxGeometry args={[o.dim[0] - 0.05, o.dim[1] - 0.4, 0.04]} />
+        <meshStandardMaterial color='#0f172a' roughness={0.7} />
+      </mesh>
+      <mesh position={[-0.22, 0.0, -o.dim[2] / 2 - 0.04]}>
+        <cylinderGeometry args={[0.10, 0.10, 0.08, 16]} />
+        <meshStandardMaterial color='#fef3c7' emissive='#fde047' emissiveIntensity={1.2} />
+      </mesh>
+      <mesh position={[ 0.22, 0.0, -o.dim[2] / 2 - 0.04]}>
+        <cylinderGeometry args={[0.10, 0.10, 0.08, 16]} />
+        <meshStandardMaterial color='#fef3c7' emissive='#fde047' emissiveIntensity={1.2} />
+      </mesh>
+      {/* Wheels — pairs of small dark cylinders along the underside */}
+      {[-0.95, 0.95].map((zOff) => (
+        <group key={zOff} position={[0, -o.dim[1] / 2 + 0.15, zOff]}>
+          <mesh castShadow rotation={[0, 0, Math.PI / 2]} position={[-o.dim[0] / 2 - 0.02, 0, 0]}>
+            <cylinderGeometry args={[0.18, 0.18, 0.08, 14]} />
+            <meshStandardMaterial color='#111827' roughness={0.8} />
+          </mesh>
+          <mesh castShadow rotation={[0, 0, Math.PI / 2]} position={[ o.dim[0] / 2 + 0.02, 0, 0]}>
+            <cylinderGeometry args={[0.18, 0.18, 0.08, 14]} />
+            <meshStandardMaterial color='#111827' roughness={0.8} />
+          </mesh>
+        </group>
       ))}
     </group>
   )
 }
 
-// Tiny helpers — kept inline so this component file stays self-contained.
-import { useEffect, useState } from 'react'
-function useTickState() { return useState(0) }
-function useTickInterval(fn, ms) {
-  useEffect(() => {
-    const id = setInterval(fn, ms)
-    return () => clearInterval(id)
-  }, [fn, ms])
+// Striped warning barrier — short bench-height obstacle with diagonal hazard stripes.
+function Barrier({ o, bindRef }) {
+  return (
+    <group
+      ref={bindRef}
+      position={[o.position.x, o.position.y, o.position.z]}
+    >
+      <mesh castShadow>
+        <boxGeometry args={[o.dim[0], o.dim[1], o.dim[2]]} />
+        <meshStandardMaterial color='#fbbf24' roughness={0.6} />
+      </mesh>
+      {/* Black diagonal stripes — fake them as thin angled boxes */}
+      {[-0.25, 0, 0.25].map((zOff) => (
+        <mesh
+          key={zOff}
+          position={[0, 0, zOff]}
+          rotation={[0.4, 0, 0]}
+        >
+          <boxGeometry args={[o.dim[0] + 0.01, o.dim[1] - 0.05, 0.06]} />
+          <meshStandardMaterial color='#0f172a' roughness={0.7} />
+        </mesh>
+      ))}
+      {/* Tiny posts on each end */}
+      <mesh castShadow position={[-o.dim[0] / 2 - 0.05, 0.15, 0]}>
+        <boxGeometry args={[0.1, 0.9, 0.1]} />
+        <meshStandardMaterial color='#1f2937' roughness={0.7} />
+      </mesh>
+      <mesh castShadow position={[ o.dim[0] / 2 + 0.05, 0.15, 0]}>
+        <boxGeometry args={[0.1, 0.9, 0.1]} />
+        <meshStandardMaterial color='#1f2937' roughness={0.7} />
+      </mesh>
+    </group>
+  )
+}
+
+// Overhead obstacle — horizontal beam with hanging warning sign and supports.
+function Overhang({ o, bindRef }) {
+  return (
+    <group
+      ref={bindRef}
+      position={[o.position.x, o.position.y, o.position.z]}
+    >
+      {/* Beam */}
+      <mesh castShadow>
+        <boxGeometry args={[o.dim[0] + 0.4, o.dim[1], o.dim[2]]} />
+        <meshStandardMaterial color='#dc2626' roughness={0.6} />
+      </mesh>
+      {/* Yellow warning stripe along the front face */}
+      <mesh position={[0, 0, o.dim[2] / 2 + 0.01]}>
+        <boxGeometry args={[o.dim[0] + 0.4, o.dim[1] * 0.6, 0.02]} />
+        <meshStandardMaterial color='#fde047' emissive='#facc15' emissiveIntensity={0.3} />
+      </mesh>
+      {/* Two supports descending from the beam to suggest a frame */}
+      <mesh castShadow position={[-(o.dim[0] / 2 + 0.18), -0.3, 0]}>
+        <boxGeometry args={[0.08, 0.6, o.dim[2]]} />
+        <meshStandardMaterial color='#1f2937' roughness={0.7} />
+      </mesh>
+      <mesh castShadow position={[ (o.dim[0] / 2 + 0.18), -0.3, 0]}>
+        <boxGeometry args={[0.08, 0.6, o.dim[2]]} />
+        <meshStandardMaterial color='#1f2937' roughness={0.7} />
+      </mesh>
+    </group>
+  )
 }
 
 export default Spawner
