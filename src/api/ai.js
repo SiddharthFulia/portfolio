@@ -721,6 +721,38 @@ export async function chessMatchMove(id, body) { try { const data = await post(`
 export async function chessResignMatch(id, body) { try { const data = await post(`${ENDPOINTS.CHESS_MATCHES}/${id}/resign`, body, { timeout: 6000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 export async function chessListLiveMatches() { try { const data = await get(`${ENDPOINTS.CHESS_MATCHES}/lobby/live`, {}, { timeout: 6000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 
+// ─── YouTube downloader (yt-dlp wrapped on the BE) ─────────────────
+export async function ytdlCreate({ url, format, quality }) {
+  try {
+    const data = await post(ENDPOINTS.YTDL, { url, format, quality }, { timeout: 10000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function ytdlStatus(id) {
+  try {
+    const data = await get(`${ENDPOINTS.YTDL_STATUS}/${id}`, {}, { timeout: 6000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function ytdlList(limit = 30) {
+  try {
+    const data = await get(ENDPOINTS.YTDL_LIST, { limit }, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function ytdlDelete(id) {
+  try {
+    const data = await del(`${ENDPOINTS.YTDL}/${id}`, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+// Browser navigates here directly to trigger the download stream — the
+// BE writes Content-Disposition: attachment so the file saves.
+export function ytdlFileUrl(id) {
+  const base = import.meta.env.VITE_BE_URL || '';
+  return `${base}${ENDPOINTS.YTDL_FILE}/${id}`;
+}
+
 // ─── Vault-gated admin dashboard ──────────────────────────────────
 // All five endpoints sit behind requireVault on the BE. The Authorization
 // header is auto-attached by request.js when sid-vault-token is in

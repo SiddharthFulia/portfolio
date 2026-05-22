@@ -85,6 +85,7 @@ const Navbar = () => {
         { to: '/science',    label: '🛰 Explore Space', desc: '11 NASA modules · APOD · Mars · Asteroids' },
         { to: '/explore',    label: '🌐 Web Playground', desc: '9 APIs · Pokémon · Memes · Countries · Quotes' },
         { to: '/summarizer', label: '✂ Summarizer',    desc: 'Paste long text · get a tight summary' },
+        { to: '/yt-dl',      label: '🎬 YouTube DL',    desc: 'Paste a YouTube link · get MP3 or MP4 · 1hr+ works fine' },
         { to: '/settings',   label: '🔒 Settings',      desc: "Admin · Sid's monitoring panel · server / DB / queues" },
       ],
     },

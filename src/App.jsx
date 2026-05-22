@@ -74,6 +74,7 @@ const Deepfake = lazyWithReload(() => import("./pages/Deepfake"));
 const Settings = lazyWithReload(() => import("./pages/Settings"));
 const Runner = lazyWithReload(() => import("./pages/Runner"));
 const SummarizerPage = lazyWithReload(() => import("./pages/SummarizerPage"));
+const YoutubeDl = lazyWithReload(() => import("./pages/YoutubeDl"));
 const HandTracking = lazyWithReload(() => import("./pages/HandTracking"));
 const LipSync = lazyWithReload(() => import("./pages/LipSync"));
 const AudioStudio = lazyWithReload(() => import("./pages/AudioStudio"));
@@ -275,6 +276,8 @@ const App = () => {
           <Route path='/runner'          element={<Suspense fallback={<PageLoader />}><Runner /></Suspense>} />
           <Route path='/game'            element={<Suspense fallback={<PageLoader />}><Runner /></Suspense>} />
           <Route path='/summarizer'      element={<Suspense fallback={<PageLoader />}><SummarizerPage /></Suspense>} />
+          <Route path='/yt-dl'           element={<Suspense fallback={<PageLoader />}><YoutubeDl /></Suspense>} />
+          <Route path='/youtube'         element={<Suspense fallback={<PageLoader />}><YoutubeDl /></Suspense>} />
           <Route path='/hand'            element={<Suspense fallback={<PageLoader />}><HandTracking /></Suspense>} />
           <Route path='/hands'           element={<Suspense fallback={<PageLoader />}><HandTracking /></Suspense>} />
           <Route path='/draw'            element={<Suspense fallback={<PageLoader />}><HandTracking /></Suspense>} />

@@ -65,6 +65,11 @@ export const ENDPOINTS = {
   CHESS_GAMES:          '/api/chess/games',       // /:id appended at call site for one-game ops
   CHESS_COLLECTIONS:    '/api/chess/collections',
   CHESS_MATCHES:        '/api/chess/matches',     // /:id, /:id/join, /:id/move, /:id/resign appended at call site
+  // YouTube downloader (yt-dlp wrapped on the BE)
+  YTDL:                 '/api/yt-dl',
+  YTDL_STATUS:          '/api/yt-dl/status',      // /:id appended at call site
+  YTDL_LIST:            '/api/yt-dl/list',
+  YTDL_FILE:            '/api/yt-dl/file',        // /:id appended at call site
   // Vault-gated admin dashboard
   ADMIN_SERVER_STATS:   '/api/admin/server-stats',
   ADMIN_DB_STATS:       '/api/admin/db-stats',
