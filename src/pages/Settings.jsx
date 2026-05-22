@@ -10,6 +10,7 @@ import {
   adminServerStats, adminDbStats, adminQueueStats, adminWorkers, adminPurgeQueue,
   adminActivity,
 } from '../api/ai'
+import useQueryState from '../hooks/useQueryState'
 
 // /settings — Vault-gated admin dashboard. Intentionally NOT in the public
 // nav; only the password-holder navigates here directly. Mirrors the
@@ -44,6 +45,10 @@ function fmtDate(iso) {
 }
 
 function SettingsInner() {
+  // ?tab= mirrors the active Tabs key so refreshing or sharing the URL
+  // preserves which pane the user was viewing. Defaults to 'overview',
+  // which is omitted from the URL so /settings stays clean.
+  const [tab, setTab] = useQueryState('tab', 'overview', { allowed: ['overview', 'visualize'] })
   const [server, setServer] = useState(null)
   const [dbStats, setDbStats] = useState(null)
   const [queues, setQueues] = useState(null)
@@ -203,7 +208,8 @@ function SettingsInner() {
         </header>
 
         <Tabs
-          defaultActiveKey="overview"
+          activeKey={tab}
+          onChange={setTab}
           items={[
             {
               key: 'overview',
@@ -284,7 +290,12 @@ function ChartTooltip({ active, payload, label }) {
 }
 
 function VisualizeTab({ pollMs }) {
-  const [days, setDays] = useState(14)
+  // ?days= mirrors the window selector. 14 is the default and stays out
+  // of the URL; 7/30 round-trip through the query string.
+  const [days, setDays] = useQueryState('days', 14, {
+    parse: (s) => Number(s),
+    allowed: [7, 14, 30],
+  })
   const [activity, setActivity] = useState(null)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState(null)

@@ -559,12 +559,20 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
     const qMode     = params.get('mode')
     const qMusic    = params.get('music')
     const qMusicPrompt = params.get('musicPrompt')
+    // Deepfake → AI Video hand-off. The Deepfake page sends the swapped
+    // image URL here; we pre-fill imageUrl so the image-to-video flow is
+    // ready in one click. fromDeepfake=1 surfaces a small confirmation toast.
+    const qImage = params.get('image')
+    const fromDeepfake = params.get('fromDeepfake') === '1'
     if (qPrompt) setPrompt(qPrompt)
     if (qProvider && ['zsky', 'local', 'optimized'].includes(qProvider)) setProvider(qProvider)
     if (qMode && ['preview', 'balanced', 'quality'].includes(qMode)) setOptimizedMode(qMode)
     if (qMusic === '1' || qMusic === 'true') setWithMusic(true)
     if (qMusicPrompt) setMusicPrompt(qMusicPrompt)
-    if (qPrompt || qProvider) {
+    if (qImage) setImageUrl(qImage)
+    if (fromDeepfake) {
+      antMessage.info('Imported from Deepfake Studio — image pre-filled.')
+    } else if (qPrompt || qProvider) {
       antMessage.success('Prompt loaded — review and hit Generate Video')
     }
     // Strip query string so future refreshes don't re-trigger the prefill.

@@ -24,6 +24,7 @@ import {
   chessBestMove, chessAnalyze, chessPlay, chessEngineStatus,
   chessSaveGame, chessLoadGame, chessCreateMatch,
 } from '../api/ai'
+import useQueryState from '../hooks/useQueryState'
 
 // /chess — Stockfish-backed analysis board. chess.js owns the move state,
 // chessground (Lichess's board) renders, BE Stockfish provides engine
@@ -45,9 +46,15 @@ export default function ChessPage() {
   const [fen, setFen] = useState(STARTING_FEN)
   const [history, setHistory] = useState([])
   const [evalHistory, setEvalHistory] = useState([])
-  const [engineMode, setEngineMode] = useState('play')
+  // ?mode= mirrors the engine mode chip; ?elo= mirrors the strength slider.
+  // Defaults stay out of the URL so /chess keeps a clean landing path.
+  const [engineMode, setEngineMode] = useQueryState('mode', 'play', {
+    allowed: ['play', 'analyze', 'human-vs-human'],
+  })
   const [playerColor, setPlayerColor] = useState('white')
-  const [engineElo, setEngineElo] = useState(1500)
+  const [engineElo, setEngineElo] = useQueryState('elo', 1500, {
+    parse: (s) => parseInt(s, 10),
+  })
   const [analyzeDepth, setAnalyzeDepth] = useState(14)
   const [variations, setVariations] = useState([])
   const [thinking, setThinking] = useState(false)

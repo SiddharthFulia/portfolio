@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Upload, Input, Select, message as antMessage } from 'antd'
 import { UploadOutlined, ThunderboltOutlined, DownloadOutlined, SyncOutlined, LockOutlined, ReloadOutlined } from '@ant-design/icons'
 import VaultGate from '../components/VaultGate'
@@ -37,6 +38,7 @@ const XTTS_LANGUAGES = [
 ]
 
 function DeepfakeInner() {
+  const navigate = useNavigate()
   const [tab, setTab] = useState('face-swap')   // 'face-swap' | 'voice-any'
   // Face-swap state
   const [srcFile, setSrcFile] = useState(null)
@@ -288,12 +290,21 @@ function DeepfakeInner() {
             tab === 'face-swap' ? (
               <>
                 <img src={outputUrl} alt="swapped" className="w-full max-h-[60vh] object-contain rounded-lg" />
-                <div className="mt-3 flex items-center justify-between">
+                <div className="mt-3 flex items-center justify-between gap-2 flex-wrap">
                   <span className="text-[10px] text-gray-500 font-mono">{job.jobId}</span>
-                  <a href={outputUrl} download
-                    className="flex items-center gap-1 text-xs px-3 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40">
-                    <DownloadOutlined /> Download
-                  </a>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Hand the swapped image to /ai-video — pre-fills imageUrl
+                        so the user can animate the face-swap result in one click. */}
+                    <button
+                      onClick={() => navigate(`/ai-video?image=${encodeURIComponent(outputUrl)}&fromDeepfake=1`)}
+                      className="text-xs font-semibold px-3 py-2 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20">
+                      🎬 Send to Video Studio
+                    </button>
+                    <a href={outputUrl} download
+                      className="flex items-center gap-1 text-xs px-3 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40">
+                      <DownloadOutlined /> Download
+                    </a>
+                  </div>
                 </div>
               </>
             ) : (

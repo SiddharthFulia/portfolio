@@ -9,6 +9,7 @@ import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
 import AudioRecorder from '../components/AudioRecorder'
 import VoiceCloneAnalysis from '../components/VoiceCloneAnalysis'
 import { FastTTS } from '../components/aitools'
+import useQueryState from '../hooks/useQueryState'
 
 const KINDS = [
   { value: 'fast-tts',     label: '⚡ Fast TTS',          blurb: 'Instant TTS via Browser voice or Cloud — no queue, sub-second.',       defaultModel: 'browser-or-cloud' },
@@ -130,7 +131,11 @@ const BARK_VOICES = [
 ]
 
 export default function AudioStudio() {
-  const [kind, setKind] = useState('music')
+  // ?kind= mirrors the active audio lane so refresh / shared URLs land
+  // on the same tool. Default 'music' is omitted from the URL.
+  const [kind, setKind] = useQueryState('kind', 'music', {
+    allowed: KINDS.map(k => k.value),
+  })
   const [model, setModel] = useState('musicgen')
   const [prompt, setPrompt] = useState('')
   const [duration, setDuration] = useState(10)

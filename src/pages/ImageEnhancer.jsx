@@ -15,6 +15,7 @@ import {
 import { FastImageGen, VisionAI } from '../components/aitools'
 import { VaultLoginPanel, getVaultToken, setVaultToken } from '../components/VaultGate'
 import JobLogsAgentPlan from '../components/JobLogsAgentPlan'
+import useQueryState from '../hooks/useQueryState'
 
 // localStorage key — persists the in-flight enhancement across refreshes
 const INFLIGHT_KEY = 'sid-imgenh-inflight'
@@ -512,6 +513,11 @@ Negative constraints: no warping, no facial drift, no added or missing anatomy, 
 
 // ─── Page ───────────────────────────────────────────────────────
 export default function ImageEnhancer() {
+  // ?tab= mirrors the active Tabs key so a refresh / shared URL lands on
+  // the same pane. Default 'generate' is omitted from the URL.
+  const [tab, setTab] = useQueryState('tab', 'generate', {
+    allowed: ['generate', 't2i', 'library', 'fastgen', 'vision'],
+  })
   const [sourceFile, setSourceFile] = useState(null)
   const [sourceDataUrl, setSourceDataUrl] = useState('')
   const [selectedPreset, setSelectedPreset] = useState(PRESETS[0].id)
@@ -780,11 +786,12 @@ export default function ImageEnhancer() {
         </header>
 
         <Tabs
-          defaultActiveKey="generate"
+          activeKey={tab}
           size="large"
           // When user switches to T2I tab, force engine→atelier and pre-select
           // a t2i workflow so the form is immediately usable.
           onChange={(key) => {
+            setTab(key)
             if (key === 't2i') {
               if (engine !== 'atelier') setEngine('atelier')
               const cur = ATELIER_WORKFLOWS.find(w => w.id === atelierWorkflow)
