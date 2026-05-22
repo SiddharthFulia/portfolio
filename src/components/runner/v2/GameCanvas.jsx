@@ -43,10 +43,19 @@ const GameCanvas = forwardRef(function GameCanvas({ playerRef: externalPlayerRef
   const spawnerRef = useRef(null)
   const speedRef = useRef(0)
 
-  // Portrait: camera back + up, narrower FOV. Desktop: closer + standard.
+  // Portrait: camera further back + up, slightly wider FOV than before
+  // so distant trains stay in frame. Desktop: closer + standard FOV.
   const cameraProps = isPortrait
-    ? { position: [0, 5, 9], fov: 55, near: 0.1, far: 200 }
-    : { position: [0, 4, 7], fov: 65, near: 0.1, far: 200 }
+    ? { position: [0, 6, 10], fov: 62, near: 0.1, far: 260 }
+    : { position: [0, 4, 7],  fov: 65, near: 0.1, far: 220 }
+
+  // Fog is the atmosphere cue but it can't be denser than the spawn
+  // horizon, otherwise obstacles never enter visibility before they're
+  // basically on top of the player. Spawn at z=-80, so fog has to extend
+  // well past that on the camera's local axis (90+ units from player).
+  const fogArgs = isPortrait
+    ? ['#0a0a0e', 50, 170]
+    : ['#0a0a0e', 40, 150]
 
   return (
     <Canvas
@@ -56,7 +65,7 @@ const GameCanvas = forwardRef(function GameCanvas({ playerRef: externalPlayerRef
       style={{ position: 'absolute', inset: 0, touchAction: 'none' }}
     >
       <color attach='background' args={['#0a0a0e']} />
-      <fog attach='fog' args={['#0a0a0e', 30, 100]} />
+      <fog attach='fog' args={fogArgs} />
 
       <ambientLight intensity={0.55} />
       <directionalLight
