@@ -96,6 +96,12 @@ export default function ChessPage() {
   const [whiteMs, setWhiteMs] = useState(null)
   const [blackMs, setBlackMs] = useState(null)
   const [flagged, setFlagged] = useState(null)   // 'white' | 'black' on flag fall
+  // Eval visibility toggle — peeking at Stockfish's score while you're
+  // actively playing (vs engine OR pass-and-play with a friend) is
+  // basically cheating, so we default OFF in play/HvH and ON in analyze.
+  // Toggle stays in the same session but re-applies the mode default
+  // whenever the user switches modes — that's the expected behavior.
+  const [showEval, setShowEval] = useState(false)
   // Layout key — bumped on any change that resizes the board container.
   // MUST come after timeControl/fullscreen declarations or we hit TDZ
   // and the page crashes with 'Cannot access timeControl before initialization'.
@@ -163,6 +169,13 @@ export default function ChessPage() {
   }, [history.length])
 
   useEffect(() => { document.title = 'Chess · Sid' }, [])
+
+  // Re-apply the eval-visibility default whenever the mode changes —
+  // entering analyze auto-shows, returning to play/HvH auto-hides. User
+  // can still override via the eyeball toggle after any change.
+  useEffect(() => {
+    setShowEval(engineMode === 'analyze')
+  }, [engineMode])
 
   // Engine health probe on mount — surfaces "binary not installed".
   useEffect(() => {
@@ -465,7 +478,7 @@ export default function ChessPage() {
         {/* Board + side rails. max-h ensures it scales to viewport height
             even on tall windows; aspect-square inside keeps it a square. */}
         <div className="flex gap-3 items-center w-full justify-center" style={{ height: 'min(100%, calc(100vh - 60px))' }}>
-          <EvalBar score={evalLatest?.score} orientation={playerColor} />
+          {showEval && <EvalBar score={evalLatest?.score} orientation={playerColor} />}
           {timeControl.baseMs != null && (
             <div className="w-24 sm:w-28">
               <Clocks
@@ -517,10 +530,15 @@ export default function ChessPage() {
             />
 
             <div className="flex gap-2 sm:gap-3 touch-manipulation">
-              {/* EvalBar — hidden on mobile to save horizontal space */}
-              <div className="hidden sm:block">
-                <EvalBar score={evalLatest?.score} orientation={playerColor} />
-              </div>
+              {/* EvalBar — hidden on mobile to save horizontal space.
+                  Also gated by the showEval toggle (off by default in
+                  play / human-vs-human so peeking at Stockfish's eval
+                  isn't a way to cheat against yourself or a friend). */}
+              {showEval && (
+                <div className="hidden sm:block">
+                  <EvalBar score={evalLatest?.score} orientation={playerColor} />
+                </div>
+              )}
               {/* Clocks column — only when a time control is active.
                   Active side ticks; flagged side flashes red. */}
               {timeControl.baseMs != null && (
@@ -559,6 +577,8 @@ export default function ChessPage() {
               onReset={resetBoard} onCopyPgn={copyPgn}
               onSave={openSaveModal}
               onChallenge={onChallenge}
+              showEval={showEval}
+              onToggleEval={() => setShowEval(v => !v)}
             />
 
             <FenImport
@@ -586,7 +606,7 @@ export default function ChessPage() {
               <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Moves</p>
               <MoveList history={history} evalHistory={evalHistory} />
             </div>
-            {evalHistory.some(e => e?.score) && (
+            {showEval && evalHistory.some(e => e?.score) && (
               <div className="luxe-card p-3 hidden md:block">
                 <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Eval over time</p>
                 <EvalGraph history={evalHistory} />
@@ -745,7 +765,7 @@ function ModeBar({ engineMode, setEngineMode, playerColor, setPlayerColor, engin
 }
 
 // ── Status + action buttons row ──
-function StatusBar({ status, thinking, isGameOver, gameOverReason, onUndo, onFlip, onReset, onCopyPgn, onSave, onChallenge }) {
+function StatusBar({ status, thinking, isGameOver, gameOverReason, onUndo, onFlip, onReset, onCopyPgn, onSave, onChallenge, showEval, onToggleEval }) {
   return (
     <div className="luxe-card p-3 flex items-center justify-between gap-2 flex-wrap">
       <span className={`text-xs font-mono ${
@@ -768,6 +788,19 @@ function StatusBar({ status, thinking, isGameOver, gameOverReason, onUndo, onFli
         <button onClick={onFlip}
           className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 min-h-[40px] sm:min-h-0 rounded-full border border-gray-800 hover:border-gray-600 text-gray-300">
           ⇅ Flip
+        </button>
+        {/* Eval visibility toggle — off during play / human-vs-human so
+            Stockfish's score doesn't give away the answer; user can
+            still peek with one click. Auto-syncs to the mode default
+            (analyze=on, play/HvH=off) on mode change. */}
+        <button onClick={onToggleEval}
+          title={showEval ? 'Hide engine eval' : 'Show engine eval'}
+          className={`text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 min-h-[40px] sm:min-h-0 rounded-full border transition-colors ${
+            showEval
+              ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20'
+              : 'border-gray-800 hover:border-gray-600 text-gray-400'
+          }`}>
+          {showEval ? '👁 Eval' : '🙈 Eval'}
         </button>
         <button onClick={onReset}
           className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 min-h-[40px] sm:min-h-0 rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20">
