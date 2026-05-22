@@ -725,9 +725,13 @@ export async function chessListLiveMatches() { try { const data = await get(`${E
 // All five endpoints sit behind requireVault on the BE. The Authorization
 // header is auto-attached by request.js when sid-vault-token is in
 // localStorage. The /settings page polls server/db/queues/workers every 5s.
-export async function adminServerStats() { try { const data = await get(ENDPOINTS.ADMIN_SERVER_STATS, {}, { timeout: 6000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
-export async function adminDbStats() { try { const data = await get(ENDPOINTS.ADMIN_DB_STATS, {}, { timeout: 8000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
-export async function adminQueueStats() { try { const data = await get(ENDPOINTS.ADMIN_QUEUES, {}, { timeout: 6000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
-export async function adminWorkers() { try { const data = await get(ENDPOINTS.ADMIN_WORKERS, {}, { timeout: 6000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
-export async function adminPurgeQueue(queue) { try { const data = await post(ENDPOINTS.ADMIN_PURGE_QUEUE, { queue }, { timeout: 8000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
-export async function adminActivity(days = 14) { try { const data = await get(ENDPOINTS.ADMIN_ACTIVITY, { days }, { timeout: 10000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+// Generous timeouts — Oracle ARM's RabbitMQ checkQueue + SQLite COUNT
+// passes can take several seconds under load. With sub-second polling
+// from /settings, an aggressive timeout fires before the BE responds and
+// surfaces "signal timed out" in the UI.
+export async function adminServerStats() { try { const data = await get(ENDPOINTS.ADMIN_SERVER_STATS, {}, { timeout: 10000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+export async function adminDbStats() { try { const data = await get(ENDPOINTS.ADMIN_DB_STATS, {}, { timeout: 15000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+export async function adminQueueStats() { try { const data = await get(ENDPOINTS.ADMIN_QUEUES, {}, { timeout: 20000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+export async function adminWorkers() { try { const data = await get(ENDPOINTS.ADMIN_WORKERS, {}, { timeout: 10000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+export async function adminPurgeQueue(queue) { try { const data = await post(ENDPOINTS.ADMIN_PURGE_QUEUE, { queue }, { timeout: 15000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+export async function adminActivity(days = 14) { try { const data = await get(ENDPOINTS.ADMIN_ACTIVITY, { days }, { timeout: 20000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }

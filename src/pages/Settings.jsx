@@ -51,6 +51,11 @@ function SettingsInner() {
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState(null)
   const timerRef = useRef(null)
+  // Guard against overlapping ticks. With sub-second polling and the BE's
+  // RabbitMQ checkQueue pass taking several seconds under load, ticks
+  // would pile up and surface as "signal timed out" — this ref short-
+  // circuits any tick that fires while the previous one is still running.
+  const inFlightRef = useRef(false)
   // Poll-interval control. Stored as raw ms so the timer can use it
   // directly; the UI splits it into "value + unit" for display. Persists
   // across reloads so the user's preference sticks.
@@ -77,23 +82,33 @@ function SettingsInner() {
   useEffect(() => { document.title = 'Settings · Sid' }, [])
 
   const tick = async () => {
-    // Fire all four in parallel — each helper already returns { data, error }
-    // so a single failing endpoint doesn't break the others.
-    const [s, d, q, w] = await Promise.all([
-      adminServerStats(),
-      adminDbStats(),
-      adminQueueStats(),
-      adminWorkers(),
-    ])
-    if (s.data) setServer(s.data)
-    if (d.data) setDbStats(d.data)
-    if (q.data) setQueues(q.data)
-    if (w.data) setWorkers(w.data?.workers || [])
-    // Track the worst error so the user knows something's off, but keep
-    // rendering stale data from the cards that did succeed.
-    const firstErr = s.error || d.error || q.error || w.error || null
-    setErr(firstErr)
-    setLoading(false)
+    // Drop the tick if a previous one hasn't returned — happens when a
+    // slow BE response (queue check, big db count) outruns the poll
+    // interval. Without this guard the FE racks up overlapping requests
+    // and AbortSignal.timeout fires on whichever one loses the race.
+    if (inFlightRef.current) return
+    inFlightRef.current = true
+    try {
+      // Fire all four in parallel — each helper already returns { data, error }
+      // so a single failing endpoint doesn't break the others.
+      const [s, d, q, w] = await Promise.all([
+        adminServerStats(),
+        adminDbStats(),
+        adminQueueStats(),
+        adminWorkers(),
+      ])
+      if (s.data) setServer(s.data)
+      if (d.data) setDbStats(d.data)
+      if (q.data) setQueues(q.data)
+      if (w.data) setWorkers(w.data?.workers || [])
+      // Track the worst error so the user knows something's off, but keep
+      // rendering stale data from the cards that did succeed.
+      const firstErr = s.error || d.error || q.error || w.error || null
+      setErr(firstErr)
+      setLoading(false)
+    } finally {
+      inFlightRef.current = false
+    }
   }
 
   useEffect(() => {
@@ -274,24 +289,36 @@ function VisualizeTab({ pollMs }) {
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState(null)
   const timerRef = useRef(null)
+  const inFlightRef = useRef(false)
 
   const fetchActivity = async (n) => {
-    const { data, error: e } = await adminActivity(n)
-    if (e) {
-      setErr(e)
-    } else {
-      setErr(null)
-      setActivity(data)
+    // Same overlap-guard as Overview — the activity endpoint runs N table
+    // group-by queries and can take a few seconds on Oracle ARM.
+    if (inFlightRef.current) return
+    inFlightRef.current = true
+    try {
+      const { data, error: e } = await adminActivity(n)
+      if (e) {
+        setErr(e)
+      } else {
+        setErr(null)
+        setActivity(data)
+      }
+      setLoading(false)
+    } finally {
+      inFlightRef.current = false
     }
-    setLoading(false)
   }
 
-  // Refetch on days change + on the same poll interval as Overview.
+  // Refetch on days change + on the same poll interval as Overview, but
+  // never tighter than 5s — the activity timeseries is heavy and changes
+  // slowly, so polling it at 100ms would just waste BE cycles.
   useEffect(() => {
     setLoading(true)
     fetchActivity(days)
     if (timerRef.current) clearInterval(timerRef.current)
-    timerRef.current = setInterval(() => fetchActivity(days), Math.max(1000, pollMs || 5000))
+    const interval = Math.max(5000, pollMs || 5000)
+    timerRef.current = setInterval(() => fetchActivity(days), interval)
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [days, pollMs])
 
