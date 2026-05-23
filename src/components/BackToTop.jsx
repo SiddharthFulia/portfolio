@@ -1,5 +1,11 @@
 import { useState, useEffect } from 'react'
 
+// Floating scroll-back-up control. WCAG mobile spec calls for 44×44
+// tap targets; the previous 40×40 was just under the line. Hover gets
+// the rose glow shadow defined in the new shadow ramp; press scales
+// down 5% for tactile feedback. Hidden until the user has scrolled
+// 400px (otherwise it competes with above-the-fold actions).
+
 const BackToTop = () => {
   const [show, setShow] = useState(false)
 
@@ -14,10 +20,19 @@ const BackToTop = () => {
   return (
     <button
       onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-      className="fixed bottom-6 right-6 z-50 w-10 h-10 rounded-full bg-gray-800 border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-700 hover:border-gray-500 transition-all shadow-lg flex items-center justify-center"
+      className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-50
+                 w-11 h-11 sm:w-12 sm:h-12 rounded-full
+                 bg-surface-elevated border border-line-strong
+                 text-fg-secondary hover:text-fg-primary
+                 hover:bg-surface-overlay hover:border-amber-500/50 hover:shadow-glow
+                 active:scale-95
+                 transition-all duration-200
+                 shadow-elevated
+                 flex items-center justify-center
+                 backdrop-blur-sm"
       aria-label="Back to top"
     >
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+      <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
       </svg>
     </button>

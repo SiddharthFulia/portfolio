@@ -1,5 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useRef, useState, useEffect } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { logo } from "../assets/images";
 import sakura from "../assets/sakura.mp3";
 
@@ -227,16 +228,34 @@ const Navbar = () => {
         </button>
       </div>
 
-      {/* Mobile menu backdrop — closes menu on outside tap */}
-      {menuOpen && (
-        <div className="fixed inset-0 top-16 z-40 bg-black/40 lg:hidden"
-          onClick={() => setMenuOpen(false)} />
-      )}
+      {/* Mobile menu backdrop — closes menu on outside tap. Fades in/out
+          on the same Framer Motion timing as the panel so neither pops. */}
+      <AnimatePresence>
+        {menuOpen && (
+          <motion.div
+            key="backdrop"
+            className="fixed inset-0 top-16 z-40 bg-black/40 lg:hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            onClick={() => setMenuOpen(false)}
+          />
+        )}
+      </AnimatePresence>
 
-      {/* Mobile menu */}
-      {menuOpen && (
-        <div className={`absolute top-full left-0 right-0 z-50 py-4 px-6 flex flex-col gap-1 shadow-xl border-t
-          ${isDark ? 'bg-gray-950/95 border-gray-800' : 'bg-white/95 border-gray-200'}`}>
+      {/* Mobile menu — slides down from the top with a subtle ease + fades
+          out on close. Replaces the previous mount-on / unmount-off jump. */}
+      <AnimatePresence>
+        {menuOpen && (
+          <motion.div
+            key="menu"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
+            className={`absolute top-full left-0 right-0 z-50 py-4 px-6 flex flex-col gap-1 shadow-xl border-t
+              ${isDark ? 'bg-gray-950/95 border-gray-800' : 'bg-white/95 border-gray-200'}`}>
 
           {/* AI & Cool stuff first */}
           <div className={`text-[10px] uppercase tracking-wider font-semibold px-2 pt-2 pb-1 ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>AI & Tools</div>
@@ -280,8 +299,9 @@ const Navbar = () => {
                        bg-gradient-to-r from-[#00c6ff] to-[#0072ff] shadow-sm mt-3">
             Resume
           </a>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </header>
   );
 };

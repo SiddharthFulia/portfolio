@@ -486,3 +486,77 @@
   .luxe-btn { transition: none !important; }
   .luxe-skeleton::after { animation: none !important; }
 }
+
+/* ─── Design system v2 helpers (added 2026-05) ─────────────────────
+ * These are NEW classes that the Phase 2 token system depends on.
+ * Existing `luxe-*` classes are untouched — every page that already
+ * uses them keeps working. New pages should reach for these helpers
+ * first to stay on the same visual language.
+ */
+
+/* Gradient title text — the canonical hero/section heading look.
+   `gradient-text-amber` is the default brand pull. The cyan variant
+   is reserved for admin / settings / vault surfaces so they read as
+   a distinct lane. */
+.gradient-text-amber {
+  background-image: linear-gradient(to right, #fde68a, #fda4af, #f0abfc);
+  -webkit-background-clip: text;
+          background-clip: text;
+  color: transparent;
+  /* The clip-text trick eats the descender on glyphs like 'g/j/p/q' on
+     some Webkit builds. A tiny bottom padding restores them. */
+  padding-bottom: 0.05em;
+}
+.gradient-text-cyan {
+  background-image: linear-gradient(to right, #a5f3fc, #f0abfc, #fde68a);
+  -webkit-background-clip: text;
+          background-clip: text;
+  color: transparent;
+  padding-bottom: 0.05em;
+}
+
+/* Ambient background orb — large, blurred, hue-shifted dot used as a
+   visual anchor on hero sections. Always combine with `pointer-events-
+   none` + `aria-hidden` + an absolute position class. The orb itself
+   doesn't position; the parent does. */
+.ambient-orb {
+  position: absolute;
+  width: 640px;
+  height: 640px;
+  border-radius: 9999px;
+  filter: blur(60px);
+  background-image: radial-gradient(circle at 30% 30%,
+    rgba(251, 191, 36, 0.20),
+    rgba(251, 113, 133, 0.14) 40%,
+    rgba(217, 70, 239, 0.12) 70%,
+    transparent 100%);
+  pointer-events: none;
+}
+.ambient-orb-cool {
+  background-image: radial-gradient(circle at 30% 30%,
+    rgba(34, 211, 238, 0.18),
+    rgba(139, 92, 246, 0.12) 50%,
+    transparent 100%);
+}
+
+/* Eyebrow label — the small mono caption that sits ABOVE every
+   section title across the site. Standardised here so every page
+   reads the same. */
+.eyebrow-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: rgba(252, 211, 77, 0.8); /* amber-300 @ 80% */
+}
+
+/* Mobile-safe tap target — apply to interactive icons / chips that
+   would otherwise be < 44x44. Doesn't change visual size of the
+   content inside, just expands the hit area via padding + min-w/h. */
+.tap-44 {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
