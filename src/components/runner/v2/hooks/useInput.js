@@ -137,38 +137,41 @@ export default function useInput({
       if (kind === 'roll')  cbRef.current.onRoll?.()
     }
 
-    const classifyGesture = (landmarks) => {
-      // landmarks: 21 points, indices follow MediaPipe Hand spec.
-      // wrist=0, thumb tip=4, index pip=6 tip=8, middle pip=10 tip=12,
-      // ring pip=14 tip=16, pinky pip=18 tip=20.
-      const wrist = landmarks[0]
-      const tips  = [landmarks[8], landmarks[12], landmarks[16], landmarks[20]]
-      const pips  = [landmarks[6], landmarks[10], landmarks[14], landmarks[18]]
-      // "Curled" finger: tip y > pip y (lower in image == bigger y).
-      const curled = tips.map((t, i) => t.y > pips[i].y)
-      const allCurled  = curled.every(Boolean)
-      const allOpen    = curled.every(c => !c)
-      const indexOpen  = !curled[0]
-      const othersCurled = curled[1] && curled[2] && curled[3]
+    // Position-based single-hand control. The hand's wrist (landmark 0)
+    // is treated as a virtual joystick — we slice the camera frame into
+    // five zones and fire actions on zone TRANSITIONS so a held position
+    // doesn't continuously re-trigger.
+    //
+    //   y < 0.32     → 'up'     → onJump
+    //   y > 0.72     → 'down'   → onRoll
+    //   x < 0.32     → 'left'   → onLeft   (user's real-world left)
+    //   x > 0.68     → 'right'  → onRight  (user's real-world right)
+    //   otherwise    → 'center' → idle (acts as a reset between triggers)
+    //
+    // MediaPipe coords are NOT pre-mirrored. The selfie-view we render
+    // for the preview only flips the on-screen pixels, not the landmark
+    // x. So user's physical-left hand has small x in MP coords → onLeft,
+    // user's physical-right hand has large x → onRight. Feels natural
+    // because the user moves THEIR hand left/right, not the on-screen
+    // mirror image.
+    const X_LEFT_MAX  = 0.32
+    const X_RIGHT_MIN = 0.68
+    const Y_UP_MAX    = 0.32
+    const Y_DOWN_MIN  = 0.72
 
-      // Open palm pointing up → jump.
-      if (allOpen) {
-        const handAbove = tips.every(t => t.y < wrist.y)
-        if (handAbove) return 'jump'
-      }
-      // Closed fist → roll.
-      if (allCurled) return 'roll'
-      // Index extended, others curled → directional.
-      if (indexOpen && othersCurled) {
-        const indexTip = landmarks[8]
-        const dx = indexTip.x - wrist.x
-        if (Math.abs(dx) > 0.08) {
-          // Video is mirrored (selfie view), so swap: tip-LEFT in image
-          // means the user is pointing to their RIGHT in real life.
-          return dx < 0 ? 'right' : 'left'
-        }
-      }
-      return null
+    let lastZone = 'center'
+
+    const classifyZone = (landmarks) => {
+      const wrist = landmarks[0]
+      if (!wrist) return 'center'
+      // Y first so a raised hand at the edge still reads as 'up' rather
+      // than 'left' (more intuitive — vertical wins over horizontal when
+      // both fire).
+      if (wrist.y < Y_UP_MAX)    return 'up'
+      if (wrist.y > Y_DOWN_MIN)  return 'down'
+      if (wrist.x < X_LEFT_MAX)  return 'left'
+      if (wrist.x > X_RIGHT_MIN) return 'right'
+      return 'center'
     }
 
     const tickFrame = async () => {
@@ -178,11 +181,23 @@ export default function useInput({
         const ts = performance.now()
         try {
           const result = landmarker.detectForVideo(video, ts)
+          let zone = 'center'
           if (result?.landmarks?.length) {
-            // Pick the most-confident hand (the first one returned).
-            const gesture = classifyGesture(result.landmarks[0])
-            if (gesture) fire(gesture)
+            zone = classifyZone(result.landmarks[0])
           }
+          // Fire only on the zone TRANSITION — entering a directional
+          // zone from anywhere else triggers the action. Returning to
+          // 'center' is silent and just re-arms the trigger.
+          if (zone !== lastZone) {
+            lastZone = zone
+            if (zone === 'up')    fire('jump')
+            else if (zone === 'down')  fire('roll')
+            else if (zone === 'left')  fire('left')
+            else if (zone === 'right') fire('right')
+          }
+          // Expose the current zone on handStatus so the HUD preview can
+          // show "left" / "right" / "up" / "down" / "center" live.
+          setHandStatus(s => s.lastGesture === zone ? s : { ...s, active: true, lastGesture: zone })
         } catch {}
       }
       rafId = requestAnimationFrame(tickFrame)

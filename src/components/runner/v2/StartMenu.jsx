@@ -80,7 +80,7 @@ export default function StartMenu({ onPlay, onLeaderboard }) {
           <div className='flex items-center justify-between gap-3 rounded-xl border border-cyan-500/30 bg-cyan-500/5 px-4 py-3'>
             <div className='min-w-0'>
               <p className='text-sm font-semibold text-cyan-200'>✋ Hand tracking</p>
-              <p className='text-[11px] text-gray-400'>Use MediaPipe + your webcam to play with hand gestures.</p>
+              <p className='text-[11px] text-gray-400'>Single hand · move it in the air like a joystick. Center = idle, up = jump, down = roll, left/right = lane change.</p>
             </div>
             <Switch checked={handOn} onChange={setHandOn} />
           </div>
@@ -98,10 +98,11 @@ export default function StartMenu({ onPlay, onLeaderboard }) {
                 </tr>
               </thead>
               <tbody className='text-gray-300 font-mono'>
-                <tr><td>Left lane</td><td>← / A</td><td>swipe ←</td><td>index ←</td></tr>
-                <tr><td>Right lane</td><td>→ / D</td><td>swipe →</td><td>index →</td></tr>
-                <tr><td>Jump</td><td>↑ / W / Space</td><td>swipe ↑</td><td>open palm</td></tr>
-                <tr><td>Roll</td><td>↓ / S</td><td>swipe ↓</td><td>closed fist</td></tr>
+                <tr><td>Left lane</td><td>← / A</td><td>swipe ←</td><td>hand left</td></tr>
+                <tr><td>Right lane</td><td>→ / D</td><td>swipe →</td><td>hand right</td></tr>
+                <tr><td>Jump</td><td>↑ / W / Space</td><td>swipe ↑</td><td>hand up</td></tr>
+                <tr><td>Roll</td><td>↓ / S</td><td>swipe ↓</td><td>hand down</td></tr>
+                <tr><td>Reset</td><td>—</td><td>—</td><td>hand center</td></tr>
                 <tr><td>Pause</td><td>Esc / P</td><td>tap ⏸</td><td>—</td></tr>
               </tbody>
             </table>
