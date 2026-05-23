@@ -87,7 +87,8 @@ export default function YoutubeDl() {
         antMessage.success(`#${j.id} ready — click Download to save it`)
         notifiedRef.current.add(j.id)
       } else if (j.status === 'failed') {
-        antMessage.error(`#${j.id} failed: ${j.error || 'unknown'}`)
+        // Failed jobs render their own antd Alert card with retry — no
+        // toast from the top, that was just shouting the same thing twice.
         notifiedRef.current.add(j.id)
       }
     }
