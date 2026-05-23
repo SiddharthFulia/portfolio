@@ -267,13 +267,8 @@ export default function YoutubeDl() {
             YouTube Downloader
           </h1>
           <p className='mt-2 text-sm text-gray-400 max-w-2xl'>
-            Paste a link (video, short, or playlist URL — first video only). Pick MP3 for audio or MP4 for video. Server runs <code className='font-mono text-gray-300'>yt-dlp</code> + ffmpeg, then streams the file back to you. Hour-long videos render fine.
+            Paste any YouTube link. Save the video or just the audio.
           </p>
-          <div className='mt-3 flex flex-wrap gap-2 text-[10px] font-mono uppercase tracking-wider'>
-            <span className='px-2 py-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-200'>🛡 Auto-deleted on download</span>
-            <span className='px-2 py-1 rounded-full border border-gray-700 bg-gray-900/60 text-gray-400'>48h fallback sweep</span>
-            <span className='px-2 py-1 rounded-full border border-gray-700 bg-gray-900/60 text-gray-400'>3 concurrent max</span>
-          </div>
         </header>
 
         {/* ── Stat strip ── */}
@@ -339,32 +334,39 @@ export default function YoutubeDl() {
                 </div>
               </div>
 
-              <div>
-                <label className='block text-[11px] uppercase tracking-wider text-gray-400 mb-1.5'>Worker</label>
-                <Segmented
-                  block
-                  value={worker}
-                  onChange={setWorker}
-                  options={[
-                    { value: 'cobalt', label: <span>☁ Online · instant</span> },
-                    { value: 'home',   label: <span>⚡ 5090 · residential</span> },
-                  ]}
-                />
-                <p className='mt-1 text-[10px] text-gray-500 font-mono leading-snug'>
-                  {worker === 'cobalt'
-                    ? "Cobalt's public API. Fastest path — works for ~95% of YouTube URLs. No 5090 needed."
-                    : 'Routes through your 5090 worker over your home IP — bypasses YouTube\'s datacenter-IP anti-bot if Cobalt refuses. Slower (depends on your home upload).'}
-                </p>
-              </div>
+              {/* Worker selector is an advanced choice most users can't
+                  make intelligently — defaults to Cobalt, only surfaces
+                  the 5090 fallback inside a disclosure. The failed-job
+                  Alert auto-suggests retrying on 5090 when Cobalt hits
+                  the YouTube anti-bot wall, so the user discovers it at
+                  the moment it's actually useful. */}
+              <details className='text-[10px] font-mono text-gray-500'>
+                <summary className='cursor-pointer hover:text-gray-300 select-none py-1'>
+                  Advanced · worker = <span className='text-gray-300'>{worker === 'cobalt' ? 'Online' : '5090'}</span>
+                </summary>
+                <div className='mt-2'>
+                  <Segmented
+                    size='small'
+                    value={worker}
+                    onChange={setWorker}
+                    options={[
+                      { value: 'cobalt', label: '☁ Online (default)' },
+                      { value: 'home',   label: '⚡ 5090 — for tough videos' },
+                    ]}
+                  />
+                </div>
+              </details>
 
               <button
                 onClick={onSubmit}
                 disabled={submitting || !url.trim() || !isYtUrl(url)}
                 className='relative w-full overflow-hidden text-sm font-bold px-6 py-3.5 rounded-full border border-amber-500/50 bg-gradient-to-r from-amber-500/25 via-rose-500/25 to-fuchsia-500/25 text-amber-100 hover:from-amber-500/35 hover:to-fuchsia-500/35 disabled:opacity-50 min-h-[48px] transition-all'>
-                {submitting ? 'Queuing…' : '⬇  Start download'}
+                {submitting
+                  ? 'Queuing…'
+                  : `⬇  Download as ${format.toUpperCase()}${format === 'mp4' ? ` · ${quality === 'best' ? 'best quality' : quality + 'p'}` : ` · ${quality} kbps`}`}
               </button>
-              <p className='text-[10px] font-mono text-gray-600 leading-relaxed'>
-                File auto-deletes off the server as soon as your browser finishes saving it. Anything stuck around → nightly 04:30 IST sweep clears terminal rows + files older than 48h. Queue up as many as you want — BE runs 3 at a time and the rest wait.
+              <p className='text-[11px] text-emerald-400 text-center'>
+                🛡 File deletes from the server the moment you save it.
               </p>
             </div>
 
