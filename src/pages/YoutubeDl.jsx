@@ -54,6 +54,9 @@ export default function YoutubeDl() {
   const [url, setUrl] = useState('')
   const [format,  setFormat]  = useState('mp4')
   const [quality, setQuality] = useState('720')
+  // worker: 'cobalt' (online API, default — fast, no auth) | 'home' (5090
+  // worker on residential IP — bypasses YouTube anti-bot when Cobalt fails)
+  const [worker, setWorker] = useState('cobalt')
   const [submitting, setSubmitting] = useState(false)
   const [history, setHistory] = useState([])
   // Job IDs submitted from THIS browser. Persisted in localStorage so a
@@ -127,7 +130,7 @@ export default function YoutubeDl() {
     if (!trimmed) return antMessage.warning('Paste a YouTube URL first')
     if (!isYtUrl(trimmed)) return antMessage.warning('Not a YouTube URL')
     setSubmitting(true)
-    const { data, error } = await ytdlCreate({ url: trimmed, format, quality })
+    const { data, error } = await ytdlCreate({ url: trimmed, format, quality, worker })
     setSubmitting(false)
     if (error) { antMessage.error(error); return }
     setTrackedIds(prev => [...prev.filter(id => id !== data.jobId), data.jobId])
@@ -336,6 +339,24 @@ export default function YoutubeDl() {
                 </div>
               </div>
 
+              <div>
+                <label className='block text-[11px] uppercase tracking-wider text-gray-400 mb-1.5'>Worker</label>
+                <Segmented
+                  block
+                  value={worker}
+                  onChange={setWorker}
+                  options={[
+                    { value: 'cobalt', label: <span>☁ Online · instant</span> },
+                    { value: 'home',   label: <span>⚡ 5090 · residential</span> },
+                  ]}
+                />
+                <p className='mt-1 text-[10px] text-gray-500 font-mono leading-snug'>
+                  {worker === 'cobalt'
+                    ? "Cobalt's public API. Fastest path — works for ~95% of YouTube URLs. No 5090 needed."
+                    : 'Routes through your 5090 worker over your home IP — bypasses YouTube\'s datacenter-IP anti-bot if Cobalt refuses. Slower (depends on your home upload).'}
+                </p>
+              </div>
+
               <button
                 onClick={onSubmit}
                 disabled={submitting || !url.trim() || !isYtUrl(url)}
@@ -406,7 +427,7 @@ export default function YoutubeDl() {
                         action={
                           <div className='flex flex-col gap-1.5 ml-2'>
                             <button
-                              onClick={() => { setUrl(j.url); setFormat(j.format); setQuality(j.quality); requestDelete(j) }}
+                              onClick={() => { setUrl(j.url); setFormat(j.format); setQuality(j.quality); if (j.worker) setWorker(j.worker); requestDelete(j) }}
                               className='text-[10px] font-semibold px-2 py-1 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20'>
                               ↺ Retry
                             </button>

@@ -722,9 +722,9 @@ export async function chessResignMatch(id, body) { try { const data = await post
 export async function chessListLiveMatches() { try { const data = await get(`${ENDPOINTS.CHESS_MATCHES}/lobby/live`, {}, { timeout: 6000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 
 // ─── YouTube downloader (yt-dlp wrapped on the BE) ─────────────────
-export async function ytdlCreate({ url, format, quality }) {
+export async function ytdlCreate({ url, format, quality, worker = 'cobalt' }) {
   try {
-    const data = await post(ENDPOINTS.YTDL, { url, format, quality }, { timeout: 10000 });
+    const data = await post(ENDPOINTS.YTDL, { url, format, quality, worker }, { timeout: 10000 });
     return { data: data?.data || data, error: null };
   } catch (err) { return { data: null, error: err.message }; }
 }
