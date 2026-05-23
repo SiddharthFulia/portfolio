@@ -1,59 +1,82 @@
 // GameOverModal — antd modal shown when the run ends.
-// Submits the score to the existing BE leaderboard endpoint
-// automatically (no extra click) and offers "Play again" + "Leaderboard"
-// follow-ups.
+//
+// Score submission lives on the user's "I'm done" actions (Play Again /
+// Leaderboard / Close) rather than the modal's open effect, so a free
+// Continue doesn't accidentally submit a half-finished score that gets
+// followed by a higher one later.
+//
+// Continue: while the user still has their one free retry per run, the
+// modal shows a green Continue button as the primary action. The
+// Runner shell wires it to (a) trigger continueRun() on the game state
+// and (b) hit playerRef.activateHoverboard() so the killer obstacle
+// dies harmlessly during the 5s immunity window.
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Modal, message as antMessage } from 'antd'
 import { submitGameScore } from '../../../api/ai'
 import { useGameState } from './hooks/useGameState'
 
-export default function GameOverModal({ open, onPlayAgain, onLeaderboard, onClose }) {
-  const { score, coins, distance, highScore, playerName, difficulty } = useGameState()
+export default function GameOverModal({ open, onContinue, onPlayAgain, onLeaderboard, onClose }) {
+  const {
+    score, coins, distance, highScore, playerName, difficulty,
+    freeRetryUsed,
+  } = useGameState()
   const [submitting, setSubmitting] = useState(false)
   const [submitted,  setSubmitted]  = useState(false)
   const [submitError, setSubmitError] = useState(null)
 
   const isNewBest = score > 0 && score >= highScore
+  const canContinue = !freeRetryUsed && score > 0
 
-  // Submit the score exactly once when the modal opens.
-  useEffect(() => {
-    if (!open || submitted || submitting) return
-    if (!playerName || !score) return
+  // Submit lazily — only when the user proceeds away (Play Again /
+  // Leaderboard / Close). Continue doesn't submit. Idempotent: second
+  // proceed in the same modal lifecycle is a no-op.
+  const submitNow = async () => {
+    if (submitted || submitting) return
+    if (!playerName || !score)   return
     setSubmitting(true)
-    // BE wants `playerName` (not `name`) and doesn't track coins on the
-    // leaderboard — coin count is local-only score flavour. The helper
-    // signature also expects floored ints.
-    submitGameScore({
+    const { error } = await submitGameScore({
       playerName,
       score:    Math.floor(score),
       distance: Math.floor(distance),
       difficulty,
-    }).then(({ data, error }) => {
-      setSubmitting(false)
-      if (error) {
-        setSubmitError(error)
-        antMessage.error(`Score submit failed: ${error}`)
-      } else {
-        setSubmitted(true)
-        antMessage.success('Score submitted to leaderboard')
-      }
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
+    setSubmitting(false)
+    if (error) {
+      setSubmitError(error)
+      antMessage.error(`Score submit failed: ${error}`)
+    } else {
+      setSubmitted(true)
+      antMessage.success('Score submitted to leaderboard')
+    }
+  }
+
+  const wrap = (fn) => async () => {
+    await submitNow()
+    fn?.()
+  }
 
   return (
     <Modal
       open={open}
-      onCancel={onClose}
+      onCancel={wrap(onClose)}
       footer={null}
       centered
       maskClosable={false}
       width={420}
       title={null}
+      afterClose={() => {
+        // Reset internal submit flags so the next gameover modal opens
+        // fresh, not stuck in "already submitted" land.
+        setSubmitted(false)
+        setSubmitting(false)
+        setSubmitError(null)
+      }}
     >
       <div className='text-center space-y-4 py-2'>
-        <p className='text-[10px] uppercase tracking-[0.3em] text-gray-500 font-mono'>Run Complete</p>
+        <p className='text-[10px] uppercase tracking-[0.3em] text-gray-500 font-mono'>
+          {freeRetryUsed ? 'Run Complete (no retries left)' : 'You crashed'}
+        </p>
         <h2 className='text-3xl sm:text-4xl font-bold leading-tight pb-1 bg-gradient-to-r from-amber-300 via-rose-400 to-fuchsia-400 bg-clip-text text-transparent' style={{ fontVariantNumeric: 'tabular-nums' }}>
           {Math.floor(score).toLocaleString()}
         </h2>
@@ -62,8 +85,8 @@ export default function GameOverModal({ open, onPlayAgain, onLeaderboard, onClos
         )}
         <div className='grid grid-cols-3 gap-2 pt-2'>
           <Stat label='Distance' value={`${Math.floor(distance).toLocaleString()} m`} />
-          <Stat label='Coins' value={coins.toLocaleString()} icon='🪙' />
-          <Stat label='Best' value={Math.max(score, highScore).toLocaleString()} />
+          <Stat label='Coins'    value={coins.toLocaleString()} icon='🪙' />
+          <Stat label='Best'     value={Math.max(score, highScore).toLocaleString()} />
         </div>
         {submitError && (
           <p className='text-[11px] font-mono text-rose-400'>✗ {submitError}</p>
@@ -71,15 +94,31 @@ export default function GameOverModal({ open, onPlayAgain, onLeaderboard, onClos
         {submitting && (
           <p className='text-[11px] font-mono text-gray-500'>Submitting score…</p>
         )}
-        <div className='flex items-center justify-center gap-2 pt-2'>
+
+        {/* Free-retry path takes the primary slot when available. */}
+        {canContinue && (
           <button
-            onClick={onLeaderboard}
+            onClick={onContinue}
+            className='w-full text-sm font-bold px-6 py-3 rounded-full border border-emerald-500/60 bg-gradient-to-r from-emerald-500/25 to-cyan-500/25 text-emerald-700 hover:from-emerald-500/35 hover:to-cyan-500/35 min-h-[48px] inline-flex items-center justify-center gap-2'>
+            <span className='text-base'>💜</span>
+            Continue · one free revive
+            <span className='text-[10px] font-mono opacity-70'>5s shield</span>
+          </button>
+        )}
+
+        <div className='flex items-center justify-center gap-2 pt-1'>
+          <button
+            onClick={wrap(onLeaderboard)}
             className='text-xs font-semibold px-4 py-2.5 rounded-full border border-gray-300 hover:border-gray-500 text-gray-700 min-h-[44px]'>
             🏆 Leaderboard
           </button>
           <button
-            onClick={onPlayAgain}
-            className='text-sm font-bold px-6 py-2.5 rounded-full border border-amber-500/50 bg-gradient-to-r from-amber-500/20 to-rose-500/20 text-amber-700 hover:from-amber-500/30 hover:to-rose-500/30 min-h-[44px]'>
+            onClick={wrap(onPlayAgain)}
+            className={`text-sm font-bold px-6 py-2.5 rounded-full border min-h-[44px] ${
+              canContinue
+                ? 'border-gray-300 hover:border-gray-500 text-gray-700'
+                : 'border-amber-500/50 bg-gradient-to-r from-amber-500/20 to-rose-500/20 text-amber-700 hover:from-amber-500/30 hover:to-rose-500/30'
+            }`}>
             ▶ Play again
           </button>
         </div>

@@ -34,7 +34,7 @@ function RunnerInner() {
   const [view, setView] = useState('menu')           // 'menu' | 'game' | 'leaderboard'
   const [handEnabled, setHandEnabled] = useState(false)
 
-  const { status, start, pause, resume, reset, playerName, difficulty } = useGameState()
+  const { status, start, pause, resume, reset, continueRun, playerName, difficulty } = useGameState()
 
   // Touch-device detection — drives whether the HUD shows on-screen
   // D-pad buttons.
@@ -127,9 +127,17 @@ function RunnerInner() {
         </div>
       )}
 
-      {/* Game-over modal — auto-submits the score on open. */}
+      {/* Game-over modal — submits score on Play Again / Leaderboard /
+          Close. Continue does NOT submit (the run isn't really over) and
+          fires playerRef.activateHoverboard() so the killer obstacle
+          gets vaporised during the 5s immunity window when the player
+          resumes from the exact spot they died. */}
       <GameOverModal
         open={status === 'gameover'}
+        onContinue={() => {
+          playerRef.current?.activateHoverboard?.()
+          continueRun()
+        }}
         onPlayAgain={() => {
           reset()
           // Brief defer so the modal-close animation finishes before we

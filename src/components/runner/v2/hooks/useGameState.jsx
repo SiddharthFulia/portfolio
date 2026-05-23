@@ -25,11 +25,15 @@ const computeScore = (distance, coins) => Math.floor(distance) + coins * 50
 
 const initialState = (() => {
   let highScore = 0
-  let playerName = ''
+  // Default name is 'sid' so a first-time visitor can hit Play without
+  // typing. They can still overwrite it in the StartMenu; localStorage
+  // takes precedence if they've played before.
+  let playerName = 'sid'
   let difficulty = 'medium'
   try {
     highScore  = parseInt(localStorage.getItem(HIGH_KEY) || '0', 10) || 0
-    playerName = localStorage.getItem(NAME_KEY) || ''
+    const stored = localStorage.getItem(NAME_KEY)
+    if (stored) playerName = stored
     const d    = localStorage.getItem(DIFF_KEY)
     if (d && DIFFICULTIES[d]) difficulty = d
   } catch {}
@@ -42,6 +46,10 @@ const initialState = (() => {
     highScore,
     playerName,
     difficulty,
+    // Set to true the moment continueRun() fires. The GameOverModal
+    // hides the Continue button on the next death so the run can't be
+    // revived twice, and the final score lands on the leaderboard.
+    freeRetryUsed: false,
   }
 })()
 
@@ -59,7 +67,20 @@ function reducer(state, action) {
         speed: preset.speed,
         playerName: playerName ?? state.playerName,
         difficulty: difficulty ?? state.difficulty,
+        // Fresh run → fresh free retry.
+        freeRetryUsed: false,
       }
+    }
+    case 'CONTINUE_RUN': {
+      // One per run. Caller verifies status === 'gameover'; we double-
+      // guard so a stray dispatch can't bypass the cap. Keeps score /
+      // coins / distance / speed intact so the user picks up where
+      // they died. The Runner shell pairs this with an immediate
+      // playerRef.activateHoverboard() so the killer obstacle (still
+      // overlapping the player) gets vaporised harmlessly during
+      // hoverboard immunity.
+      if (state.status !== 'gameover' || state.freeRetryUsed) return state
+      return { ...state, status: 'playing', freeRetryUsed: true }
     }
     case 'PAUSE':
       return state.status === 'playing' ? { ...state, status: 'paused' } : state
@@ -110,6 +131,7 @@ export function GameStateProvider({ children }) {
   const resume         = useCallback(() => dispatch({ type: 'RESUME' }), [])
   const gameOver       = useCallback(() => dispatch({ type: 'GAME_OVER' }), [])
   const reset          = useCallback(() => dispatch({ type: 'RESET' }), [])
+  const continueRun    = useCallback(() => dispatch({ type: 'CONTINUE_RUN' }), [])
   const addCoin        = useCallback(() => dispatch({ type: 'ADD_COIN' }), [])
   const tick           = useCallback((delta) => dispatch({ type: 'TICK', delta }), [])
   const setPlayerName  = useCallback((value) => dispatch({ type: 'SET_NAME', value }), [])
@@ -118,7 +140,7 @@ export function GameStateProvider({ children }) {
 
   const value = {
     ...state,
-    start, pause, resume, gameOver, reset,
+    start, pause, resume, gameOver, reset, continueRun,
     addCoin, tick,
     setPlayerName, setDifficulty, setHighScore,
   }
