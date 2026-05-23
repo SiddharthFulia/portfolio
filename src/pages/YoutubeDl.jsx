@@ -6,7 +6,7 @@
 // over after 48h.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Input, Segmented, Select, Progress, Modal, message as antMessage, Tag, Tooltip } from 'antd'
+import { Input, Segmented, Select, Progress, Modal, Alert, message as antMessage, Tag, Tooltip } from 'antd'
 import { LinkOutlined, DownloadOutlined, DeleteOutlined, ReloadOutlined, FileTextOutlined, ClockCircleOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import { ytdlCreate, ytdlStatus, ytdlList, ytdlDelete, ytdlFileUrl } from '../api/ai'
 
@@ -208,6 +208,37 @@ export default function YoutubeDl() {
     () => history.filter(j => trackedIds.includes(j.id) && j.status === 'completed' && j.filePath !== null),
     [history, trackedIds]
   )
+  // Failed jobs the user submitted — surfaced as antd Alerts so the
+  // error is readable + the user has a one-click retry.
+  const failedJobs = useMemo(
+    () => history.filter(j => trackedIds.includes(j.id) && j.status === 'failed'),
+    [history, trackedIds]
+  )
+
+  // yt-dlp's error lines are very noisy ("ERROR: [youtube] ID:
+  // Sign in to confirm..."). Strip the cruft so the FE can show a clean
+  // human-readable first sentence + classify into a friendlier reason.
+  const humaniseError = (raw) => {
+    const text = String(raw || '').trim()
+    if (!text) return { title: 'Download failed', detail: '' }
+    if (/Sign in to confirm you.?re not a bot/i.test(text)) {
+      return { title: 'YouTube blocked the request', detail: 'This video has a per-video gate (age, region, members-only, or Premium) that the server\'s cookies don\'t satisfy. Open the URL in your normal browser to see which gate.' }
+    }
+    if (/Video unavailable/i.test(text)) {
+      return { title: 'Video unavailable', detail: 'YouTube reports the video is removed or private.' }
+    }
+    if (/Premieres in/i.test(text) || /upcoming/i.test(text)) {
+      return { title: 'Premiere not started yet', detail: 'This video hasn\'t aired — come back after it premieres.' }
+    }
+    if (/yt-dlp not available/i.test(text)) {
+      return { title: 'Server misconfigured', detail: 'yt-dlp + ffmpeg aren\'t installed on the BE. Ping Sid.' }
+    }
+    // Generic — keep the cleaned-up tail end of the error.
+    const cleaned = text
+      .replace(/^ERROR:\s*\[[^\]]+\]\s*[A-Za-z0-9_-]+:\s*/i, '')   // strip "ERROR: [youtube] ABC:"
+      .slice(0, 400)
+    return { title: 'Download failed', detail: cleaned }
+  }
 
   const stats = useMemo(() => {
     const done = history.filter(j => j.status === 'completed')
@@ -337,6 +368,58 @@ export default function YoutubeDl() {
                     </li>
                   ))}
                 </ul>
+              </div>
+            )}
+
+            {/* Failed jobs — antd Alerts with a friendlier message + retry. */}
+            {failedJobs.length > 0 && (
+              <div className='luxe-card p-5 sm:p-6'>
+                <div className='flex items-center justify-between gap-2 mb-3'>
+                  <p className='text-[10px] uppercase tracking-wider text-rose-300 font-mono'>✗ Failed · {failedJobs.length}</p>
+                  <button
+                    onClick={() => requestBulkDelete(failedJobs, 'Clear all failed')}
+                    className='text-[10px] font-semibold px-3 py-1 rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 inline-flex items-center gap-1'>
+                    <DeleteOutlined /> Clear all
+                  </button>
+                </div>
+                <div className='space-y-2'>
+                  {failedJobs.map(j => {
+                    const { title, detail } = humaniseError(j.error)
+                    return (
+                      <Alert
+                        key={j.id}
+                        type='error'
+                        showIcon
+                        message={
+                          <div className='flex items-center justify-between gap-2 flex-wrap'>
+                            <span className='font-semibold'>{title}</span>
+                            <span className='text-[10px] font-mono uppercase tracking-wider opacity-70'>#{j.id} · {j.format} · {j.quality}</span>
+                          </div>
+                        }
+                        description={
+                          <div className='space-y-1.5'>
+                            <p className='text-xs break-words'>{detail}</p>
+                            <p className='text-[10px] font-mono opacity-60 break-all'>{j.url}</p>
+                          </div>
+                        }
+                        action={
+                          <div className='flex flex-col gap-1.5 ml-2'>
+                            <button
+                              onClick={() => { setUrl(j.url); setFormat(j.format); setQuality(j.quality); requestDelete(j) }}
+                              className='text-[10px] font-semibold px-2 py-1 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20'>
+                              ↺ Retry
+                            </button>
+                            <button
+                              onClick={() => requestDelete(j)}
+                              className='text-[10px] font-semibold px-2 py-1 rounded-full border border-gray-300 hover:border-gray-500 text-gray-600'>
+                              dismiss
+                            </button>
+                          </div>
+                        }
+                      />
+                    )
+                  })}
+                </div>
               </div>
             )}
 
