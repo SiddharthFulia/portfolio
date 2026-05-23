@@ -113,6 +113,10 @@ export async function generateVideo(prompt, options = {}) {
         mode: options.mode,
         withMusic: !!options.withMusic,
         musicPrompt: options.musicPrompt || '',
+        // When the source image came from a Vault library item, the
+        // generated video should also land in Vault — BE honours this
+        // flag if a valid Vault token is on the request.
+        vault: !!options.vault,
       },
       { timeout }
     );

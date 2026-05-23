@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Modal, Upload, Tabs, Input, Select, Switch, Tooltip, message as antMessage } from 'antd'
 import CameraCapture, { transformImage } from '../components/CameraCapture'
 import {
@@ -1200,6 +1200,9 @@ function PresetCard({ preset: p, active, onSelect, onExpand }) {
 
 function GenerateSection({
   sourceDataUrl, reset, handleFile, setSourceDataUrl, resultUrl, status, working, engine, job,
+  // navigate is destructured per-render via useNavigate below — kept
+  // out of the props list since GenerateSection is rendered twice
+  // with the same prop shape and threading it everywhere is noise.
   activePreset, downloadResult, error, selectedPreset, setSelectedPreset,
   setExpandedPreset, enhance,
   atelierWorkflow, setAtelierWorkflow, tunings, setTunings,
@@ -1219,6 +1222,8 @@ function GenerateSection({
   // Toggle between the flat in-page log tail and the AgentPlan tree view.
   // Local to this section — nothing else on the page reads it.
   const [logsView, setLogsView] = useState('flat')
+  const navigate = useNavigate()
+
   // Canvas transforms applied to the current sourceDataUrl in-place. Used
   // by the rotate L/R + mirror buttons that appear when a source image is
   // loaded. Wraps transformImage() (canvas-based, see CameraCapture.jsx).
@@ -1356,10 +1361,25 @@ function GenerateSection({
                   <span className="text-[10px] text-gray-500">
                     {activePreset?.name} · {job?.engine === 'cloud' ? 'Gemini' : '5090 local'}
                   </span>
-                  <button onClick={downloadResult}
-                    className="flex items-center gap-1 text-xs px-3 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 transition-colors">
-                    <DownloadOutlined /> Download
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    {/* Animate hand-off: ship the result into /ai-video
+                        pre-filled on the 5090 'optimized' lane in
+                        balanced mode. Vault flag carries the source's
+                        privacy through to the generated video. */}
+                    <button
+                      onClick={() => {
+                        const isVault = job?.vault === 1 || job?.vault === true
+                        const url = encodeURIComponent(resultUrl)
+                        navigate(`/ai-video?image=${url}&fromImage=1&provider=optimized&mode=balanced${isVault ? '&vault=1' : ''}`)
+                      }}
+                      className="flex items-center gap-1 text-xs px-3 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 transition-colors">
+                      🎬 Animate
+                    </button>
+                    <button onClick={downloadResult}
+                      className="flex items-center gap-1 text-xs px-3 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 transition-colors">
+                      <DownloadOutlined /> Download
+                    </button>
+                  </div>
                 </div>
               </>
             ) : working ? (
@@ -2023,6 +2043,13 @@ function ImageLibrary({ refreshKey }) {
 
 function LibraryCard({ image, onDelete, selectMode = false, checked = false, onToggleSelect, loggedIn = false, onMoveToVault, onMakePublic }) {
   const url = image.outputUrl || image.sourceUrl
+  const navigate = useNavigate()
+  const animate = (e) => {
+    e.preventDefault(); e.stopPropagation()
+    if (!url) return
+    const isVault = image.vault === 1 || image.vault === true
+    navigate(`/ai-video?image=${encodeURIComponent(url)}&fromImage=1&provider=optimized&mode=balanced${isVault ? '&vault=1' : ''}`)
+  }
   const handleClick = (e) => {
     if (selectMode) { e.preventDefault(); onToggleSelect?.() }
   }
@@ -2083,6 +2110,13 @@ function LibraryCard({ image, onDelete, selectMode = false, checked = false, onT
           visibility (vault tab → "Make public", public tab → "Move to Vault"). */}
       {!selectMode && (
         <div className="absolute bottom-1.5 right-1.5 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+          {url && (
+            <button onClick={animate}
+              title="Animate this image (→ AI Video Studio)"
+              className="w-7 h-7 flex items-center justify-center rounded-full bg-black/70 hover:bg-amber-600 text-gray-200 hover:text-white text-xs">
+              🎬
+            </button>
+          )}
           {loggedIn && image.vault === 0 && onMoveToVault && (
             <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onMoveToVault() }}
               title="Move to Vault (private)"

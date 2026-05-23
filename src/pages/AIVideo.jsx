@@ -13,8 +13,9 @@ import {
 } from '@ant-design/icons'
 import {
   generateVideo, getJobStatus, getTodayVideo, getVideoProviders, listVideos, deleteVideo,
-  uploadSourceImage, listJobs,
+  uploadSourceImage, listJobs, listEnhancedImages,
 } from '../api/ai'
+import { getVaultToken } from '../components/VaultGate'
 import { UploadOutlined } from '@ant-design/icons'
 import { DeleteOutlined } from '@ant-design/icons'
 import PromptHelper from '../components/PromptHelper'
@@ -520,9 +521,17 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
   const [steps, setSteps] = useState(30)
   const [withCaption, setWithCaption] = useState(true)
   const [imageUrl, setImageUrl] = useState('')
+  // sourceIsVault — true when the source image came from a Vault library
+  // item (or arrived with ?vault=1). Propagated to the generate call so
+  // the resulting video lands in Vault rather than the public library.
+  // Auto-resets to false when the user clears the imageUrl.
+  const [sourceIsVault, setSourceIsVault] = useState(false)
   const [optimizedMode, setOptimizedMode] = useState('balanced')   // preview | balanced | quality
   const [withMusic, setWithMusic] = useState(false)
   const [musicPrompt, setMusicPrompt] = useState('')
+  // Image Studio library picker modal — opens from the "🖼 From Library"
+  // button next to the source-image Upload control.
+  const [libraryOpen, setLibraryOpen] = useState(false)
 
   // Prompt helper modal — same Groq coach the other lanes use (Cinema, Audio).
   // State lives here so the user can close + reopen without losing context.
@@ -559,19 +568,27 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
     const qMode     = params.get('mode')
     const qMusic    = params.get('music')
     const qMusicPrompt = params.get('musicPrompt')
-    // Deepfake → AI Video hand-off. The Deepfake page sends the swapped
-    // image URL here; we pre-fill imageUrl so the image-to-video flow is
-    // ready in one click. fromDeepfake=1 surfaces a small confirmation toast.
-    const qImage = params.get('image')
+    // Hand-offs: Deepfake + Image Studio both navigate here with the
+    // generated image's URL pre-filled. fromDeepfake / fromImage toast
+    // confirms which lane sent us. vault=1 marks the source as Vault so
+    // the resulting video lands in the private library.
+    const qImage      = params.get('image')
     const fromDeepfake = params.get('fromDeepfake') === '1'
+    const fromImage    = params.get('fromImage') === '1'
+    const qVault       = params.get('vault') === '1'
     if (qPrompt) setPrompt(qPrompt)
     if (qProvider && ['zsky', 'local', 'optimized'].includes(qProvider)) setProvider(qProvider)
     if (qMode && ['preview', 'balanced', 'quality'].includes(qMode)) setOptimizedMode(qMode)
     if (qMusic === '1' || qMusic === 'true') setWithMusic(true)
     if (qMusicPrompt) setMusicPrompt(qMusicPrompt)
     if (qImage) setImageUrl(qImage)
+    if (qVault) setSourceIsVault(true)
     if (fromDeepfake) {
       antMessage.info('Imported from Deepfake Studio — image pre-filled.')
+    } else if (fromImage) {
+      antMessage.info(qVault
+        ? 'Imported from Image Studio (Vault) — output will save to Vault.'
+        : 'Imported from Image Studio — image pre-filled.')
     } else if (qPrompt || qProvider) {
       antMessage.success('Prompt loaded — review and hit Generate Video')
     }
@@ -716,6 +733,10 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
       mode: provider === 'optimized' ? optimizedMode : undefined,
       withMusic: (provider === 'optimized' || provider === 'local') ? withMusic : false,
       musicPrompt: withMusic ? musicPrompt.trim() : '',
+      // Inherits the Vault flag from the source image (if it came from
+      // Image Studio's vault library) so the output video lands in
+      // Vault too. Honoured by the BE only when a Vault token is present.
+      vault: sourceIsVault && !!imageUrl.trim(),
     })
     if (err) { setLoading(false); setError(err); return }
 
@@ -975,26 +996,46 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
                     — {required ? 'required' : 'optional, animates a still photo'}
                   </span>
                 </label>
-                <div className="flex gap-2">
-                  <Input value={imageUrl} onChange={e => setImageUrl(e.target.value)}
-                    placeholder="paste a URL or upload from your device →" allowClear
+                <div className="flex gap-2 flex-wrap">
+                  <Input value={imageUrl}
+                    onChange={e => { setImageUrl(e.target.value); if (!e.target.value) setSourceIsVault(false) }}
+                    placeholder="paste a URL · upload · pick from Image Studio →" allowClear
                     status={required && !imageUrl.trim() ? 'warning' : undefined} />
                   <Upload
                     accept="image/*,.heic,.heif"
                     showUploadList={false}
-                    beforeUpload={handleImageUpload}>
+                    beforeUpload={(file) => { setSourceIsVault(false); return handleImageUpload(file) }}>
                     <Button icon={<UploadOutlined />} loading={uploadingImage}>
                       {uploadingImage ? 'Uploading' : 'Upload'}
                     </Button>
                   </Upload>
+                  <Button onClick={() => setLibraryOpen(true)}>
+                    🖼 From Library
+                  </Button>
                 </div>
                 {imageUrl && (
-                  <div className="mt-2 flex items-center gap-2">
+                  <div className="mt-2 flex items-center gap-2 flex-wrap">
                     <img src={imageUrl} alt="source preview"
                       className="w-16 h-16 object-cover rounded-md border border-gray-700"
                       onError={(e) => { e.currentTarget.style.display = 'none' }} />
                     <span className="text-[10px] text-gray-500 break-all">{imageUrl.slice(0, 80)}{imageUrl.length > 80 ? '…' : ''}</span>
+                    {sourceIsVault && (
+                      <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full border border-fuchsia-500/50 bg-fuchsia-500/10 text-fuchsia-300">
+                        🔒 Vault · output → Vault
+                      </span>
+                    )}
                   </div>
+                )}
+                {libraryOpen && (
+                  <LibraryPickerModal
+                    open={libraryOpen}
+                    onClose={() => setLibraryOpen(false)}
+                    onPick={(item) => {
+                      setImageUrl(item.outputUrl || item.sourceUrl || '')
+                      setSourceIsVault(item.vault === 1 || item.vault === true)
+                      setLibraryOpen(false)
+                    }}
+                  />
                 )}
                 <p className="text-[10px] text-gray-600 mt-1">
                   Accepts JPG, PNG, WEBP, HEIC, BMP — any image your browser can read.
@@ -1822,6 +1863,95 @@ const AIVideo = () => {
         />
       </div>
     </div>
+  )
+}
+
+// ── Image Studio library picker ─────────────────────────────────────
+// Opens from the "🖼 From Library" button next to the source-image
+// Upload control. Shows tiles from /api/image-enhance/list. Vault items
+// are only included when the user has a Vault token (the BE downgrades
+// visibility to 'public' otherwise); each tile carries its vault flag
+// so picking a Vault image marks sourceIsVault=true on the parent,
+// which propagates to the generated video.
+function LibraryPickerModal({ open, onClose, onPick }) {
+  const [tab, setTab] = useState('public')        // 'public' | 'vault' | 'all'
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState(null)
+  const hasVault = !!getVaultToken()
+
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    setLoading(true)
+    setErr(null)
+    listEnhancedImages({ status: 'completed', visibility: tab, limit: 48 })
+      .then(({ data, error }) => {
+        if (cancelled) return
+        setLoading(false)
+        if (error) { setErr(error); return }
+        setItems(Array.isArray(data?.items) ? data.items : [])
+      })
+  }, [open, tab])
+
+  return (
+    <Modal
+      open={open}
+      onCancel={onClose}
+      footer={null}
+      title="Pick an image from your library"
+      width={920}
+      centered
+    >
+      <div className='space-y-3'>
+        <Tabs
+          activeKey={tab}
+          onChange={setTab}
+          items={[
+            { key: 'public', label: '🌐 Public' },
+            ...(hasVault ? [
+              { key: 'vault', label: '🔒 Vault' },
+              { key: 'all',   label: 'All' },
+            ] : []),
+          ]}
+        />
+        {!hasVault && (
+          <p className='text-[11px] text-gray-500'>
+            🔒 Vault images are hidden — unlock the Vault on the Image Studio page first to see your private items here.
+          </p>
+        )}
+        {err && <p className='text-xs font-mono text-rose-400'>✗ {err}</p>}
+        {loading && <p className='text-xs text-gray-500'>Loading…</p>}
+        {!loading && !items.length && (
+          <p className='text-xs text-gray-500 py-6 text-center'>No images in this tab yet.</p>
+        )}
+        <div className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[60vh] overflow-y-auto'>
+          {items.map(item => {
+            const url = item.outputUrl || item.sourceUrl
+            if (!url) return null
+            const isVault = item.vault === 1 || item.vault === true
+            return (
+              <button
+                key={item.imageId || url}
+                type='button'
+                onClick={() => onPick(item)}
+                className='group relative aspect-square rounded-lg overflow-hidden border border-gray-700 hover:border-amber-400 transition-colors'
+              >
+                <img src={url} alt='' className='w-full h-full object-cover' onError={(e) => { e.currentTarget.style.opacity = 0.2 }} />
+                {isVault && (
+                  <span className='absolute top-1 right-1 text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-fuchsia-400/70 bg-fuchsia-900/70 text-fuchsia-100'>
+                    🔒 Vault
+                  </span>
+                )}
+                <span className='absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent text-[10px] px-2 py-1 text-gray-200 opacity-0 group-hover:opacity-100 transition-opacity truncate'>
+                  {(item.prompt || '').slice(0, 60) || 'pick'}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </Modal>
   )
 }
 
