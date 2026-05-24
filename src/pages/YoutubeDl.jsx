@@ -6,7 +6,7 @@
 // over after 48h.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Input, Segmented, Select, Progress, Modal, Alert, message as antMessage, Tag, Tooltip } from 'antd'
+import { Input, Segmented, Select, Progress, Modal, Alert, Tag, Tooltip } from 'antd'
 import { LinkOutlined, DownloadOutlined, DeleteOutlined, ReloadOutlined, FileTextOutlined, ClockCircleOutlined, ThunderboltOutlined, VideoCameraOutlined, CustomerServiceOutlined, CopyOutlined, CloudOutlined, CheckOutlined, CloseOutlined, LockOutlined, ClockCircleFilled } from '@ant-design/icons'
 import { ytdlCreate, ytdlStatus, ytdlList, ytdlDelete, ytdlFileUrl } from '../api/ai'
 
@@ -82,16 +82,13 @@ export default function YoutubeDl() {
     const { data } = await ytdlList(30)
     const items = Array.isArray(data?.items) ? data.items : []
     setHistory(items)
-    // Toast on terminal transitions for OUR jobs only.
+    // No toasts on terminal transitions — the job card flips to its
+    // "Save" / "Failed + Retry" state visually, which is enough signal.
+    // Still mark notified so any future logic that depends on it works.
     for (const j of items) {
       if (!trackedIds.includes(j.id)) continue
       if (notifiedRef.current.has(j.id)) continue
-      if (j.status === 'completed') {
-        antMessage.success(`#${j.id} ready — click Download to save it`)
-        notifiedRef.current.add(j.id)
-      } else if (j.status === 'failed') {
-        // Failed jobs render their own antd Alert card with retry — no
-        // toast from the top, that was just shouting the same thing twice.
+      if (j.status === 'completed' || j.status === 'failed') {
         notifiedRef.current.add(j.id)
       }
     }
@@ -117,24 +114,24 @@ export default function YoutubeDl() {
   const handlePaste = async () => {
     try {
       const txt = await navigator.clipboard.readText()
-      if (!txt) { antMessage.info('Clipboard is empty'); return }
+      if (!txt) return
       setUrl(txt.trim())
-      if (!isYtUrl(txt)) antMessage.warning('That doesn\'t look like a YouTube URL — paste a watch/short link')
+      // Invalid URLs surface via the form's error state on submit — no toast.
     } catch {
-      antMessage.warning('Clipboard unavailable — paste with Ctrl+V instead')
+      // Clipboard blocked — Ctrl+V still works.
     }
   }
 
   const onSubmit = async () => {
     const trimmed = (url || '').trim()
-    if (!trimmed) return antMessage.warning('Paste a YouTube URL first')
-    if (!isYtUrl(trimmed)) return antMessage.warning('Not a YouTube URL')
+    if (!trimmed || !isYtUrl(trimmed)) return
     setSubmitting(true)
     const { data, error } = await ytdlCreate({ url: trimmed, format, quality, worker })
     setSubmitting(false)
-    if (error) { antMessage.error(error); return }
+    if (error) return
     setTrackedIds(prev => [...prev.filter(id => id !== data.jobId), data.jobId])
-    antMessage.info(`Job #${data.jobId} queued — leave the tab open or come back later`)
+    // No "queued" toast — the new job card appears inline below, which is
+    // the only signal we need.
     setUrl('')
     loadHistory()
   }
@@ -157,8 +154,7 @@ export default function YoutubeDl() {
       centered: true,
       onOk: async () => {
         const { error } = await ytdlDelete(job.id)
-        if (error) { antMessage.error(error); return }
-        antMessage.success('Removed')
+        if (error) return
         setTrackedIds(prev => prev.filter(x => x !== job.id))
         notifiedRef.current.delete(job.id)
         loadHistory()
@@ -192,9 +188,8 @@ export default function YoutubeDl() {
         const ids = jobs.map(j => j.id)
         // Fire all deletes in parallel — they're independent.
         const results = await Promise.all(ids.map(id => ytdlDelete(id)))
-        const failed = results.filter(r => r.error).length
-        if (failed) antMessage.warning(`${ids.length - failed} removed · ${failed} failed`)
-        else        antMessage.success(`${ids.length} job(s) removed`)
+        // Silent — the job rows disappear from the list as loadHistory()
+        // runs at the end of this function, which is the only signal needed.
         setTrackedIds(prev => prev.filter(x => !ids.includes(x)))
         ids.forEach(id => notifiedRef.current.delete(id))
         loadHistory()

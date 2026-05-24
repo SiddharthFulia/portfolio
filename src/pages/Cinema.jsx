@@ -12,7 +12,17 @@ import CinemaRenderer from '../components/cinema/CinemaRenderer'
 //   - drops the outer page wrapper (no extra pt-20 / min-h-screen)
 //   - skips the document.title bump so AIVideo's title stays in charge
 //   - tightens the header since AIVideo already shows its own hero
-export default function Cinema({ embedded = false }) {
+//
+// `view` mode partitions what's rendered:
+//   - 'all'     (default) — planner section + renderer + library, the
+//                            standalone /cinema page experience
+//   - 'planner' — header + planner section + inline renderer only
+//   - 'library' — past projects only (StudioLibrary)
+//
+// This is what lets AIVideo expose two clean sibling tabs ("Cinema" and
+// "Cinema Library") instead of embedding the whole standalone Cinema
+// page as one nested-feeling tab.
+export default function Cinema({ embedded = false, view = 'all' }) {
   const [masterPrompt, setMasterPrompt] = useState('')
   const [shotCount, setShotCount] = useState(4)
   const [durationPerShot, setDurationPerShot] = useState(5)
@@ -78,6 +88,9 @@ export default function Cinema({ embedded = false }) {
   // the entire subtree below — which, on this page, fires StudioLibrary's
   // mount effect (= a /api/cinema/list refetch) on every slider drag.
   // Inline the wrapper element instead of wrapping in a synthetic component.
+  const showPlanner = view === 'all' || view === 'planner'
+  const showLibrary = view === 'all' || view === 'library'
+
   const content = (
     <div className={embedded ? '' : 'max-w-5xl mx-auto'}>
         {!embedded && (
@@ -99,6 +112,7 @@ export default function Cinema({ embedded = false }) {
 
         {/* Master prompt — wrapped in luxe-card so the form has surface
             chrome on the bare page; matches YoutubeDl + AI Video. */}
+        {showPlanner && (
         <section className="mb-6">
           <div className="luxe-card p-5 sm:p-6 space-y-5">
             <div>
@@ -177,6 +191,7 @@ export default function Cinema({ embedded = false }) {
             </div>
           </div>
         </section>
+        )}
 
         {/* Output — antd Alert with retry instead of the hand-rolled rose
             card; reads as "real error" to assistive tech now. */}
@@ -209,10 +224,11 @@ export default function Cinema({ embedded = false }) {
 
         {/* Inline multi-shot renderer — sequential chain with last-frame
             continuity, all client-driven. No redirect to /ai-video. */}
-        {project && Array.isArray(project.shotPrompts) && project.shotPrompts.length > 0 && (
+        {showPlanner && project && Array.isArray(project.shotPrompts) && project.shotPrompts.length > 0 && (
           <CinemaRenderer project={project} />
         )}
 
+        {showLibrary && (
         <StudioLibrary
           refreshKey={libraryRefresh}
           title="Your Cinema projects"
@@ -227,6 +243,7 @@ export default function Cinema({ embedded = false }) {
               onToggleSelect={onToggleSelect} onDelete={onDelete} />
           )}
         />
+        )}
       </div>
   )
 

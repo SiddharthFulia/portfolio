@@ -528,6 +528,19 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
   // Auto-resets to false when the user clears the imageUrl.
   const [sourceIsVault, setSourceIsVault] = useState(false)
   const [optimizedMode, setOptimizedMode] = useState('balanced')   // preview | balanced | quality
+
+  // Mirror major selections (provider / mode / model / music) into the URL
+  // as query params so the current configuration is shareable and other
+  // pages (Cinema, Lab) can deep-link in with the right preset already
+  // selected. `replace: true` so we don't bloat back-button history.
+  // Reads via `window.location.search` rather than the React Router
+  // `location.search` to avoid a re-render loop with `useLocation`.
+  const setUrlParam = (key, value) => {
+    const next = new URLSearchParams(window.location.search)
+    if (value != null && value !== '' && value !== false) next.set(key, String(value))
+    else next.delete(key)
+    navigate({ search: next.toString() ? `?${next.toString()}` : '' }, { replace: true })
+  }
   const [withMusic, setWithMusic] = useState(false)
   const [musicPrompt, setMusicPrompt] = useState('')
   // Image Studio library picker modal — opens from the "🖼 From Library"
@@ -593,8 +606,14 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
     } else if (qPrompt || qProvider) {
       antMessage.success('Prompt loaded — review and hit Generate Video')
     }
-    // Strip query string so future refreshes don't re-trigger the prefill.
-    navigate(location.pathname, { replace: true })
+    // Strip one-shot hand-off flags (fromDeepfake / fromImage) so a refresh
+    // doesn't re-toast. Keep prompt / provider / mode / music / model in the
+    // URL so the current configuration is visible + shareable.
+    const stripped = new URLSearchParams(location.search)
+    stripped.delete('fromDeepfake')
+    stripped.delete('fromImage')
+    stripped.delete('vault')
+    navigate({ search: stripped.toString() ? `?${stripped.toString()}` : '' }, { replace: true })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -809,7 +828,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
               const active = provider === p.id
               const isOnline = p.id === 'worker' ? workerOnline : p.id === 'local' ? localOnline : null
               return (
-                <button key={p.id} onClick={() => !p.disabled && setProvider(p.id)} type="button"
+                <button key={p.id} onClick={() => { if (p.disabled) return; setProvider(p.id); setUrlParam('provider', p.id) }} type="button"
                   aria-pressed={active}
                   aria-disabled={!!p.disabled}
                   disabled={!!p.disabled}
@@ -848,7 +867,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
           {provider === 'local' && (
             <div className="mt-3">
               <label className="text-[10px] text-gray-500 block mb-1 uppercase tracking-wider">Model</label>
-              <Select size="middle" value={model} onChange={setModel} style={{ width: '100%' }}
+              <Select size="middle" value={model} onChange={(v) => { setModel(v); setUrlParam('model', v) }} style={{ width: '100%' }}
                 popupMatchSelectWidth={false}
                 showSearch allowClear
                 placeholder="Search model…"
@@ -869,7 +888,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
                 {OPTIMIZED_MODES.map(m => {
                   const active = optimizedMode === m.id
                   return (
-                    <button key={m.id} onClick={() => setOptimizedMode(m.id)} type="button"
+                    <button key={m.id} onClick={() => { setOptimizedMode(m.id); setUrlParam('mode', m.id) }} type="button"
                       className={`p-2.5 rounded-lg border text-left transition-colors ${
                         active
                           ? 'border-cyan-300/70 bg-cyan-500/12'
@@ -907,7 +926,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
                   <span className="text-xs font-semibold text-gray-200">Add background music</span>
                   <span className="text-[10px] text-gray-500">+10-30s · MusicGen on 5090</span>
                 </span>
-                <Switch size="small" checked={withMusic} onChange={setWithMusic} />
+                <Switch size="small" checked={withMusic} onChange={(v) => { setWithMusic(v); setUrlParam('music', v ? '1' : null) }} />
               </label>
               {withMusic && (
                 <div className="mt-2 space-y-1">
@@ -1785,7 +1804,7 @@ const AIVideo = () => {
   // back-button work intuitively. Default to 'generate' when nothing
   // is in the URL.
   const [searchParams, setSearchParams] = useSearchParams()
-  const activeKey = ['generate', 'jobs', 'library', 'cinema', 'combine'].includes(searchParams.get('tab'))
+  const activeKey = ['generate', 'jobs', 'library', 'cinema', 'cinema-library', 'combine'].includes(searchParams.get('tab'))
     ? searchParams.get('tab')
     : 'generate'
   const onTabChange = (k) => {
@@ -1833,6 +1852,11 @@ const AIVideo = () => {
               children: <GenerateTab today={today} setToday={setToday} onJobCompleted={onCompleted} />,
             },
             {
+              key: 'library',
+              label: <span><AppstoreOutlined /> Library</span>,
+              children: <LibraryTab refreshKey={refreshKey} />,
+            },
+            {
               key: 'cinema',
               label: <span><VideoCameraOutlined /> Cinema</span>,
               children: (
@@ -1841,24 +1865,32 @@ const AIVideo = () => {
                     Loading Cinema…
                   </div>
                 }>
-                  <Cinema embedded />
+                  <Cinema embedded view="planner" />
                 </Suspense>
               ),
             },
             {
-              key: 'jobs',
-              label: <span><InfoCircleOutlined /> Jobs</span>,
-              children: <JobsTab refreshKey={refreshKey} />,
-            },
-            {
-              key: 'library',
-              label: <span><AppstoreOutlined /> Library</span>,
-              children: <LibraryTab refreshKey={refreshKey} />,
+              key: 'cinema-library',
+              label: <span><VideoCameraOutlined /> Cinema Library</span>,
+              children: (
+                <Suspense fallback={
+                  <div className="py-10 flex items-center justify-center text-gray-500 text-sm">
+                    Loading Cinema Library…
+                  </div>
+                }>
+                  <Cinema embedded view="library" />
+                </Suspense>
+              ),
             },
             {
               key: 'combine',
               label: <span><ToolOutlined /> Combine</span>,
               children: <VideoCombiner />,
+            },
+            {
+              key: 'jobs',
+              label: <span><InfoCircleOutlined /> Jobs</span>,
+              children: <JobsTab refreshKey={refreshKey} />,
             },
           ]}
         />
