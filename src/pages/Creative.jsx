@@ -128,15 +128,20 @@ const Creative = () => {
         style={{ backgroundImage: 'radial-gradient(circle, #ec4899 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
 
       {/* ── Hero ── */}
-      <div className='relative max-w-6xl mx-auto px-6 pt-32 pb-6'>
+      <div className='relative max-w-6xl mx-auto px-6 pt-32 pb-6 overflow-hidden'>
+        {/* Ambient orbs behind hero */}
+        <div aria-hidden className='ambient-orb -top-40 -left-32 opacity-70' />
+        <div aria-hidden className='ambient-orb ambient-orb-cool -top-24 right-0 opacity-50' />
+
         <FadeIn>
-          <h1 className='font-poppins font-black text-5xl md:text-6xl bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent leading-tight'>
+          <div className='eyebrow-mono mb-3'>// 13 browser-native experiments</div>
+          <h1 className='font-poppins font-black text-5xl md:text-6xl gradient-text-amber leading-tight'>
             Creative UI Showcase
           </h1>
         </FadeIn>
         <FadeIn delay={0.1}>
           <p className='text-gray-400 mt-3 text-base max-w-2xl'>
-            13 interactive experiments — holographic effects, particle physics, gradient builders, text animators, wave generators & more. All pure CSS & React, zero external libs.
+            13 interactive experiments — holographic effects, particle physics, gradient builders, text animators, wave generators &amp; more. All pure CSS &amp; React, zero external libs.
           </p>
         </FadeIn>
 
@@ -149,8 +154,8 @@ const Creative = () => {
               ['7', 'Visual Effects', 'text-pink-400'],
               ['100%', 'Browser-Native', 'text-yellow-400'],
             ].map(([n, l, c]) => (
-              <div key={l} className='luxe-card text-center px-5 py-3'>
-                <div className={`text-3xl font-black ${c}`}>{n}</div>
+              <div key={l} className='luxe-card luxe-card-hover text-center px-5 py-3'>
+                <div className={`text-3xl font-black tabular-nums ${c}`}>{n}</div>
                 <div className='text-xs text-gray-500 mt-0.5'>{l}</div>
               </div>
             ))}
@@ -191,7 +196,7 @@ const Creative = () => {
 
       {/* ── Demo selector grid ── */}
       <div className='relative max-w-6xl mx-auto px-6 pb-6'>
-        <div className='grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3'>
+        <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3'>
           {filteredDemos.map((d, i) => {
             const isActive = active === d.id
             const effectMap = { holographic:'ice', aurora:'grass', morphing:'psychic', cube:'fire', marquee:'electric', neon:'fire', magnetic:'dragon', gradient:'psychic', wave:'water', glitch:'dark', particles:'electric', textanim:'psychic', shadow:'ghost' }
@@ -235,6 +240,20 @@ const Creative = () => {
             )
           })}
         </div>
+
+        {filteredDemos.length === 0 && (
+          <div className="text-center py-16 luxe-card mt-6 p-8">
+            <div className="text-5xl mb-3" aria-hidden>🎨</div>
+            <p className="text-gray-300 font-semibold mb-1">Nothing matches that filter yet</p>
+            <p className="text-gray-500 text-sm mb-4">Try a different category.</p>
+            <button
+              onClick={() => setFilter('all')}
+              className="luxe-btn luxe-btn-secondary tap-44"
+            >
+              Show all 13
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Active demo content ── */}

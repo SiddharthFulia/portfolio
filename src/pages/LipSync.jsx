@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { Upload, Input, Select, message as antMessage } from 'antd'
+import { Upload, Input, Select, Modal, Alert, message as antMessage } from 'antd'
 import { UploadOutlined, SoundOutlined, ThunderboltOutlined, ReloadOutlined, DownloadOutlined, CheckOutlined, DeleteOutlined, SyncOutlined } from '@ant-design/icons'
 import { submitLipsync, getLipsyncStatus, fileToDataUrl, listLipsyncJobs, lipsyncBulkAction } from '../api/ai'
 import { useTilt, TILT_STYLE } from '../components/useTilt'
@@ -75,24 +75,47 @@ export default function LipSync() {
     startPolling(data.jobId)
   }
 
-  const reset = () => {
+  const doReset = () => {
     setAudioFile(null); setAudioDataUrl('')
     setPortraitFile(null); setPortraitDataUrl('')
     setJob(null); setError(null); setWorking(false)
     if (pollTimer.current) clearInterval(pollTimer.current)
   }
 
+  // Clear is destructive — both inputs go away + any in-flight job stops
+  // polling. Modal.confirm with red OK + cancel auto-focused so a phone
+  // mistap doesn't nuke an audio recording the user just made.
+  const reset = () => {
+    if (!audioDataUrl && !portraitDataUrl && !job) { doReset(); return }
+    Modal.confirm({
+      title: 'Clear everything?',
+      content: working
+        ? 'This stops polling the in-flight job (the BE keeps rendering, but you won\'t see the result here) and removes both uploads.'
+        : 'This removes the audio + portrait + any result on screen. The library entry is kept.',
+      okText: 'Clear',
+      okType: 'danger',
+      okButtonProps: { danger: true },
+      cancelText: 'Keep',
+      autoFocusButton: 'cancel',
+      centered: true,
+      onOk: doReset,
+    })
+  }
+
   return (
-    <div className="min-h-screen bg-black text-gray-100 pt-20 pb-16 px-3 sm:px-6">
-      <div className="max-w-5xl mx-auto">
+    <section className="relative min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 pb-16 px-4 sm:px-6 overflow-hidden">
+      <div aria-hidden className="ambient-orb ambient-orb-cool -top-32 left-1/2 -translate-x-1/2" />
+      <div aria-hidden className="ambient-orb -bottom-40 -right-32" />
+      <div className="relative max-w-5xl mx-auto">
         <header className="mb-8">
-          <div className="flex items-center gap-2 mb-2">
-            <SoundOutlined className="text-emerald-400 text-xl" />
-            <h1 className="text-2xl sm:text-4xl font-bold leading-tight pb-1 bg-gradient-to-r from-emerald-300 via-cyan-400 to-fuchsia-300 bg-clip-text text-transparent">
+          <p className="eyebrow-mono">— AI Studio · Lip Sync</p>
+          <div className="flex items-center gap-3 mt-2">
+            <SoundOutlined className="text-emerald-400 text-2xl" />
+            <h1 className="text-4xl sm:text-5xl font-bold leading-tight gradient-text-cyan">
               Lip Sync Studio
             </h1>
           </div>
-          <p className="text-sm text-gray-400 max-w-2xl">
+          <p className="mt-3 text-sm text-fg-secondary max-w-2xl leading-relaxed">
             Drop an audio clip + a portrait. Get a talking-head video where the
             mouth tracks the audio perfectly. Runs LatentSync on the 5090 — no
             cloud, no watermark.
@@ -228,25 +251,33 @@ export default function LipSync() {
               )}
             </div>
           ) : error ? (
-            <div className="py-6 text-center">
-              <p className="text-rose-400 text-sm font-mono mb-2">✗ {error}</p>
-              <button onClick={generate}
-                className="text-xs px-3 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300">
-                <ReloadOutlined /> Retry
-              </button>
-            </div>
+            <Alert
+              type="error"
+              showIcon
+              message="Lip sync failed"
+              description={error}
+              action={
+                <button onClick={generate}
+                  className="text-[11px] font-semibold px-3 py-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 inline-flex items-center gap-1">
+                  <ReloadOutlined /> Retry
+                </button>
+              }
+            />
           ) : (
             <p className="text-xs text-gray-600 text-center py-8">Result will appear here</p>
           )}
         </section>
 
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2">
           {(audioDataUrl || portraitDataUrl) && (
-            <button onClick={reset} className="text-xs text-gray-500 hover:text-gray-300 px-3 py-2">Clear</button>
+            <button onClick={reset}
+              className="tap-44 px-4 text-sm text-gray-400 hover:text-gray-200 border border-line hover:border-line-strong rounded-full transition-colors">
+              Clear
+            </button>
           )}
           <button onClick={generate}
             disabled={working || !audioDataUrl || !portraitDataUrl}
-            className={`luxe-btn luxe-btn-primary ${
+            className={`tap-44 luxe-btn luxe-btn-primary min-h-[48px] ${
               working || !audioDataUrl || !portraitDataUrl
                 ? 'opacity-50 cursor-not-allowed'
                 : ''
@@ -271,7 +302,7 @@ export default function LipSync() {
           )}
         />
       </div>
-    </div>
+    </section>
   )
 }
 

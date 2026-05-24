@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { Input, Select, Slider, Tooltip, Upload, message as antMessage } from 'antd'
+import { Input, Select, Slider, Tooltip, Upload, Alert, message as antMessage } from 'antd'
 import { CustomerServiceOutlined, ThunderboltOutlined, DownloadOutlined, ReloadOutlined, BulbOutlined, CheckOutlined, DeleteOutlined, UploadOutlined, CopyOutlined, SyncOutlined } from '@ant-design/icons'
 import { submitAudio, getAudioStatus, listAudioJobs, audioBulkAction, transcribeAudio, fileToDataUrl } from '../api/ai'
 import PromptHelper from '../components/PromptHelper'
@@ -360,16 +360,19 @@ export default function AudioStudio() {
   const kindObj = KINDS.find(k => k.value === kind)
 
   return (
-    <div className="min-h-screen bg-black text-gray-100 pt-20 pb-16 px-3 sm:px-6">
-      <div className="max-w-4xl mx-auto">
+    <section className="relative min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 pb-16 px-4 sm:px-6 overflow-hidden">
+      <div aria-hidden className="ambient-orb -top-32 left-1/2 -translate-x-1/2" />
+      <div aria-hidden className="ambient-orb ambient-orb-cool -bottom-40 -right-32" />
+      <div className="relative max-w-4xl mx-auto">
         <header className="mb-8">
-          <div className="flex items-center gap-2 mb-2">
-            <CustomerServiceOutlined className="text-fuchsia-400 text-xl" />
-            <h1 className="text-2xl sm:text-4xl font-bold leading-tight pb-1 bg-gradient-to-r from-fuchsia-300 via-amber-300 to-emerald-300 bg-clip-text text-transparent">
+          <p className="eyebrow-mono">— AI Studio · Audio</p>
+          <div className="flex items-center gap-3 mt-2">
+            <CustomerServiceOutlined className="text-fuchsia-400 text-2xl" />
+            <h1 className="text-4xl sm:text-5xl font-bold leading-tight gradient-text-amber">
               Audio Studio
             </h1>
           </div>
-          <p className="text-sm text-gray-400 max-w-2xl">
+          <p className="mt-3 text-sm text-fg-secondary max-w-2xl leading-relaxed">
             Generate music, sound effects, or voice from text prompts. MusicGen + Stable Audio Open + Bark TTS, all on the 5090.
           </p>
         </header>
@@ -819,12 +822,18 @@ export default function AudioStudio() {
               )}
             </div>
           ) : error ? (
-            <div className="py-6 text-center">
-              <p className="text-rose-400 text-sm font-mono mb-2">✗ {error}</p>
-              <button onClick={generate} className="text-xs px-3 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300">
-                <ReloadOutlined /> Retry
-              </button>
-            </div>
+            <Alert
+              type="error"
+              showIcon
+              message="Generation failed"
+              description={error}
+              action={
+                <button onClick={generate}
+                  className="text-[11px] font-semibold px-3 py-1.5 rounded-full border border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-700 hover:bg-fuchsia-500/20 inline-flex items-center gap-1">
+                  <ReloadOutlined /> Retry
+                </button>
+              }
+            />
           ) : (
             <p className="text-xs text-gray-600 text-center py-8">Output will appear here</p>
           )}
@@ -890,7 +899,7 @@ export default function AudioStudio() {
         onApply={(text) => { setPrompt(text); setHelperOpen(false) }}
         onAppend={(text) => setPrompt(prompt.trim() ? `${prompt.trim()}, ${text}` : text)}
       />
-    </div>
+    </section>
   )
 }
 

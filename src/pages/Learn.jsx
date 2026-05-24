@@ -2010,10 +2010,15 @@ export default function Learn() {
       <div className="fixed inset-0 pointer-events-none opacity-[0.03]"
         style={{ backgroundImage: 'radial-gradient(circle, #a855f7 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
 
-      <div className="relative max-w-6xl mx-auto px-6 pt-28 pb-8">
+      <div className="relative max-w-6xl mx-auto px-6 pt-28 pb-8 overflow-hidden">
+        {/* Ambient orbs behind hero */}
+        <div aria-hidden className="ambient-orb -top-40 -left-32 opacity-70" />
+        <div aria-hidden className="ambient-orb ambient-orb-cool -top-24 right-0 opacity-50" />
+
         {/* Hero */}
         <FadeIn>
-          <h1 className="font-poppins font-black text-5xl md:text-6xl bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent leading-tight">
+          <div className="eyebrow-mono mb-3">// DSA · System Design · Competitive Programming</div>
+          <h1 className="font-poppins font-black text-5xl md:text-6xl gradient-text-amber leading-tight">
             Learn CS
           </h1>
           <p className="text-gray-400 mt-3 text-base max-w-xl">
@@ -2031,7 +2036,7 @@ export default function Learn() {
               ['6', 'Live Demos', 'text-pink-400'],
             ].map(([n, l, color]) => (
               <div key={l} className="luxe-card luxe-card-hover text-center px-5 py-3">
-                <div className={`text-3xl font-black ${color}`}>{n}</div>
+                <div className={`text-3xl font-black tabular-nums ${color}`}>{n}</div>
                 <div className="text-xs text-gray-500 mt-0.5">{l}</div>
               </div>
             ))}
@@ -2083,7 +2088,7 @@ export default function Learn() {
 
       {/* Tutorial grid */}
       <div className="max-w-6xl mx-auto px-6 pb-24">
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
           {filtered.map((tutorial, idx) => (
             <FadeIn
               key={tutorial.id}
@@ -2102,8 +2107,16 @@ export default function Learn() {
         </div>
 
         {filtered.length === 0 && (
-          <div className="text-center py-20 text-gray-600">
-            No tutorials in this category yet.
+          <div className="text-center py-16 luxe-card mt-6 p-8">
+            <div className="text-5xl mb-3" aria-hidden>📚</div>
+            <p className="text-gray-300 font-semibold mb-1">No tutorials in this category yet</p>
+            <p className="text-gray-500 text-sm mb-4">More are on the way — try "All" for now.</p>
+            <button
+              onClick={() => setActiveCategory('All')}
+              className="luxe-btn luxe-btn-secondary tap-44"
+            >
+              Show all tutorials
+            </button>
           </div>
         )}
       </div>

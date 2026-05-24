@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Upload, Input, Select, message as antMessage } from 'antd'
+import { Upload, Input, Select, Alert, message as antMessage } from 'antd'
 import { UploadOutlined, ThunderboltOutlined, DownloadOutlined, SyncOutlined, LockOutlined, ReloadOutlined } from '@ant-design/icons'
 import VaultGate from '../components/VaultGate'
 import AudioRecorder from '../components/AudioRecorder'
@@ -147,19 +147,22 @@ function DeepfakeInner() {
   const outputUrl = job?.outputUrl
 
   return (
-    <div className="min-h-screen bg-black text-gray-100 pt-20 pb-16 px-3 sm:px-6">
-      <div className="max-w-5xl mx-auto">
+    <section className="relative min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 pb-16 px-4 sm:px-6 overflow-hidden">
+      <div aria-hidden className="ambient-orb -top-32 left-1/2 -translate-x-1/2" />
+      <div aria-hidden className="ambient-orb ambient-orb-cool -bottom-40 -right-32" />
+      <div className="relative max-w-5xl mx-auto">
         <header className="mb-8">
-          <div className="flex items-center gap-2 mb-2">
-            <LockOutlined className="text-rose-400 text-xl" />
-            <h1 className="text-2xl sm:text-4xl font-bold leading-tight pb-1 bg-gradient-to-r from-rose-300 via-fuchsia-400 to-amber-300 bg-clip-text text-transparent">
+          <p className="eyebrow-mono">— AI Studio · Vault</p>
+          <div className="flex items-center gap-3 mt-2 flex-wrap">
+            <LockOutlined className="text-rose-400 text-2xl" />
+            <h1 className="text-4xl sm:text-5xl font-bold leading-tight gradient-text-amber">
               Deepfake Studio
             </h1>
             <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-300">
               Vault · Private
             </span>
           </div>
-          <p className="text-sm text-gray-400 max-w-2xl">
+          <p className="mt-3 text-sm text-fg-secondary max-w-2xl leading-relaxed">
             Personal-use lane. Face swap + unrestricted voice clone. Behind the
             Vault password — not exposed to public visitors.
           </p>
@@ -343,12 +346,18 @@ function DeepfakeInner() {
               )}
             </div>
           ) : error ? (
-            <div className="py-6 text-center">
-              <p className="text-rose-400 text-sm font-mono mb-2">✗ {error}</p>
-              <button onClick={generate} className="text-xs px-3 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300">
-                <ReloadOutlined /> Retry
-              </button>
-            </div>
+            <Alert
+              type="error"
+              showIcon
+              message="Deepfake failed"
+              description={error}
+              action={
+                <button onClick={generate}
+                  className="text-[11px] font-semibold px-3 py-1.5 rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-700 hover:bg-rose-500/20 inline-flex items-center gap-1">
+                  <ReloadOutlined /> Retry
+                </button>
+              }
+            />
           ) : (
             <p className="text-xs text-gray-600 text-center py-8">Output will appear here</p>
           )}
@@ -356,7 +365,7 @@ function DeepfakeInner() {
 
         <div className="flex justify-end">
           <button onClick={generate} disabled={working}
-            className={`luxe-btn luxe-btn-primary ${working ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            className={`tap-44 luxe-btn luxe-btn-primary min-h-[48px] ${working ? 'opacity-50 cursor-not-allowed' : ''}`}>
             <ThunderboltOutlined />
             {working ? 'Working…' : tab === 'face-swap' ? 'Swap faces' : 'Generate voice'}
           </button>
@@ -368,7 +377,7 @@ function DeepfakeInner() {
           filter={libraryFilter} setFilter={setLibraryFilter}
         />
       </div>
-    </div>
+    </section>
   )
 }
 

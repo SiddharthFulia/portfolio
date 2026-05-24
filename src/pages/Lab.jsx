@@ -255,23 +255,39 @@ const Lab = () => {
 
       {/* ── Hero ── */}
       <div className='relative max-w-6xl mx-auto px-6 pt-32 pb-6'>
+        {/* Ambient orbs — sit behind hero on the index */}
+        <div aria-hidden className='ambient-orb -top-32 -left-40 opacity-70' />
+        <div aria-hidden className='ambient-orb ambient-orb-cool -top-20 right-0 opacity-60' />
+
         {/* Animated shader backdrop — sits behind the hero text */}
         <div className='pointer-events-none absolute right-4 top-24 hidden md:block w-72 h-64 rounded-2xl overflow-hidden opacity-40 mix-blend-screen border border-cyan-900/40'>
           <ShaderAnimation className='w-full h-full' />
         </div>
 
-        <h1 className='font-poppins font-black text-5xl md:text-6xl bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-500 bg-clip-text text-transparent leading-tight relative'>
+        <div className='eyebrow-mono mb-3'>// Interactive demos &amp; visualizers</div>
+        <h1 className='font-poppins font-black text-5xl md:text-6xl gradient-text-amber leading-tight relative'>
           Interactive Lab
         </h1>
         <p className='text-gray-400 mt-3 text-base max-w-xl'>
-          Interactive demos & tutorials — 3D worlds, algorithms, AI, fractals, SQL, code tools, and DSA learning.
+          17 hands-on demos across 7 categories — 3D worlds, algorithms, AI, fractals, SQL, code tools, and DSA learning. Pick a category to dive in.
         </p>
+
+        {/* Primary CTA */}
+        <div className='mt-5'>
+          <button
+            type='button'
+            onClick={() => handleClick('worlds')}
+            className='luxe-btn luxe-btn-primary tap-44'
+          >
+            Start Exploring →
+          </button>
+        </div>
 
         {/* Stats */}
         <div className='flex flex-wrap gap-8 mt-6'>
-          {[['17', 'Demos', 'text-cyan-400'], ['6', 'Categories', 'text-blue-400'], ['3', '3D Worlds', 'text-pink-400']].map(([n, l, c]) => (
+          {[['17', 'Demos', 'text-cyan-400'], ['7', 'Categories', 'text-blue-400'], ['3', '3D Worlds', 'text-pink-400']].map(([n, l, c]) => (
             <div key={l} className='text-center'>
-              <div className={`text-3xl font-black ${c}`}>{n}</div>
+              <div className={`text-3xl font-black tabular-nums ${c}`}>{n}</div>
               <div className='text-xs text-gray-500 mt-0.5'>{l}</div>
             </div>
           ))}

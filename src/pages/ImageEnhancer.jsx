@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Modal, Upload, Tabs, Input, Select, Switch, Tooltip, message as antMessage } from 'antd'
+import { Modal, Upload, Tabs, Input, Select, Switch, Tooltip, Alert, message as antMessage } from 'antd'
 import CameraCapture, { transformImage } from '../components/CameraCapture'
 import {
   UploadOutlined, ExpandAltOutlined, DownloadOutlined,
@@ -737,7 +737,7 @@ export default function ImageEnhancer() {
                   `text-xl sm:text-3xl lg:text-4xl` — three-step scale so the
                   title doesn't crowd the Vault pill + Engine toggle on the
                   same row at narrow viewports. */}
-              <h1 className="text-xl sm:text-3xl lg:text-4xl font-bold leading-tight pb-1 bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-amber-300 bg-clip-text text-transparent truncate">
+              <h1 className="text-xl sm:text-3xl lg:text-4xl font-bold leading-tight gradient-text-amber truncate">
                 Image Studio
               </h1>
               {/* Vault pill — full label + status dot. Clear professional
@@ -1497,12 +1497,19 @@ function GenerateSection({
                   <p className="text-[9px] text-gray-600 font-mono pt-1 break-all">{error}</p>
                 </div>
               ) : (
-                <div className="flex-1 flex flex-col items-center justify-center gap-2 py-8 text-center">
-                  <p className="text-rose-400 text-sm font-mono">✗ {error}</p>
-                  <button onClick={() => enhance()}
-                    className="text-xs px-3 py-1 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300">
-                    <ReloadOutlined /> Retry
-                  </button>
+                <div className="flex-1 flex flex-col justify-center py-4">
+                  <Alert
+                    type="error"
+                    showIcon
+                    message="Enhancement failed"
+                    description={error}
+                    action={
+                      <button onClick={() => enhance()}
+                        className="text-[11px] font-semibold px-3 py-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 inline-flex items-center gap-1">
+                        <ReloadOutlined /> Retry
+                      </button>
+                    }
+                  />
                 </div>
               )
             ) : (
@@ -2270,7 +2277,7 @@ function PromptHelperModal({
             }}
           />
           {coachError && (
-            <p className="text-rose-400 text-xs mt-2">✗ {coachError}</p>
+            <Alert type="error" showIcon message={coachError} className="!mt-2" />
           )}
           <div className="flex items-center justify-between gap-2 mt-2">
             <p className="text-[10px] text-gray-600">

@@ -203,28 +203,47 @@ const Science = () => {
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       {/* Hero */}
-      <div className="max-w-6xl mx-auto px-6 pt-32 pb-6">
+      <div className="relative max-w-6xl mx-auto px-6 pt-32 pb-6 overflow-hidden">
+        {/* Ambient orbs — behind hero text, cool variant matches the science palette */}
+        <div aria-hidden className="ambient-orb ambient-orb-cool -top-48 -left-32 opacity-70" />
+        <div aria-hidden className="ambient-orb -top-24 right-0 opacity-50" />
+
         <FadeIn>
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-cyan-400 text-xs font-medium mb-4">
+          <div className="eyebrow-mono mb-3 flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-            Live Space Data
+            // Live Space Data · 11 feeds
           </div>
         </FadeIn>
 
         <FadeIn delay={0.05}>
-          <h1 className="font-poppins font-black text-5xl md:text-7xl leading-tight">
-            <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-500 bg-clip-text text-transparent">
+          <h1 className="font-poppins font-black text-5xl md:text-7xl leading-tight relative">
+            <span className="gradient-text-amber">
               Space Science
             </span>
             <br />
-            <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent text-4xl md:text-5xl">
+            <span className="gradient-text-cyan text-4xl md:text-5xl">
               Explorer
             </span>
           </h1>
         </FadeIn>
 
+        <FadeIn delay={0.08}>
+          <p className="text-gray-400 mt-4 text-base max-w-2xl">
+            Eleven live feeds from NASA, NOAA &amp; CNEOS — picture of the day, asteroid trackers,
+            solar weather, Earth events, and a 30-year image archive. Pick a feed and dive in.
+          </p>
+        </FadeIn>
+
         <FadeIn delay={0.1}>
-          <div className="flex flex-wrap items-center gap-8 mt-6">
+          <div className="mt-5">
+            <Link to="/science/apod" className="luxe-btn luxe-btn-primary tap-44">
+              Start with today's APOD →
+            </Link>
+          </div>
+        </FadeIn>
+
+        <FadeIn delay={0.12}>
+          <div className="flex flex-wrap items-center gap-6 sm:gap-8 mt-6">
             {[
               ['11', 'Data Feeds', 'text-cyan-400'],
               ['7+', 'Live APIs', 'text-blue-400'],
@@ -232,7 +251,7 @@ const Science = () => {
               ['30yr+', 'Image Archive', 'text-purple-400'],
             ].map(([n, l, c]) => (
               <div key={l} className="text-center">
-                <div className={`text-2xl font-black ${c}`}>{n}</div>
+                <div className={`text-2xl font-black tabular-nums ${c}`}>{n}</div>
                 <div className="text-[10px] text-gray-500 mt-0.5">{l}</div>
               </div>
             ))}
@@ -256,46 +275,50 @@ const Science = () => {
       </div>
 
       {/* Category filter + module grid */}
-      <div className="max-w-6xl mx-auto px-6 pb-24">
+      <div className="max-w-6xl mx-auto px-6 pb-16">
         <FadeIn delay={0.2}>
+          <div className="eyebrow-mono mb-3">// Filter feeds</div>
           <div className="flex flex-wrap items-center gap-2 mb-6">
-            {CATEGORIES.map(c => (
-              <button
-                key={c.key}
-                onClick={() => setFilter(c.key)}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                  filter === c.key
-                    ? 'bg-cyan-600 text-white'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
-                }`}
-              >
-                {c.label}
-              </button>
-            ))}
-            <span className="text-gray-600 text-xs ml-2">{filtered.length} modules</span>
+            {CATEGORIES.map(c => {
+              const isActive = filter === c.key
+              return (
+                <button
+                  key={c.key}
+                  onClick={() => setFilter(c.key)}
+                  className={`luxe-press tap-44 px-4 py-2 rounded-full text-xs font-semibold border transition-colors ${
+                    isActive
+                      ? 'border-cyan-400/60 bg-cyan-500/15 text-cyan-200'
+                      : 'border-gray-800 bg-gray-900/40 text-gray-400 hover:border-gray-700 hover:text-gray-200'
+                  }`}
+                >
+                  {c.label}
+                </button>
+              )
+            })}
+            <span className="text-gray-600 text-xs ml-2 tabular-nums">{filtered.length} modules</span>
           </div>
         </FadeIn>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
           {filtered.map((s, i) => {
             const effectMap = { apod:'psychic', asteroids:'fire', weather:'electric', earth:'grass', epic:'water', media:'default', mars:'fire', tech:'ice', fireballs:'fire', satellites:'dragon', imagery:'grass' }
             return (
             <FadeIn key={s.id} delay={0.25 + i * 0.03}>
               <Link
                 to={`/science/${s.id}`}
-                className="group relative block"
+                className="group relative block h-full"
               >
                 <AnimatedCard effect={effectMap[s.id] || 'default'} className="h-full">
-                {/* Top gradient bar */}
-                <div className={`h-1 bg-gradient-to-r ${s.color} opacity-40 group-hover:opacity-100 transition-opacity`} />
+                <div className="luxe-card luxe-card-hover relative overflow-hidden h-full flex flex-col p-4 sm:p-5">
+                  {/* Top gradient bar */}
+                  <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${s.color} opacity-50 group-hover:opacity-100 transition-opacity`} />
 
-                <div className="p-5">
                   <div className="flex items-start gap-3">
-                    <div className="text-gray-500 group-hover:text-gray-300 transition-colors mt-0.5">
+                    <div className="text-gray-500 group-hover:text-cyan-300 transition-colors mt-0.5">
                       {ICONS[s.id]}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="text-white font-bold text-sm">{s.label}</span>
                         {s.retired && <span className="text-[9px] text-yellow-500 bg-yellow-900/30 px-1.5 py-0.5 rounded font-semibold">Retired</span>}
                       </div>
@@ -304,7 +327,7 @@ const Science = () => {
                   </div>
 
                   {/* Footer row with tags */}
-                  <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-800/60">
+                  <div className="flex items-center gap-2 mt-auto pt-3 border-t border-gray-800/60 flex-wrap">
                     <span className="text-[10px] text-gray-600 font-mono bg-gray-800/60 px-1.5 py-0.5 rounded">{s.api}</span>
                     {s.hasDate && (
                       <span className="text-[10px] text-purple-400/70 bg-purple-900/20 px-1.5 py-0.5 rounded">Date Filter</span>
@@ -326,6 +349,42 @@ const Science = () => {
             </FadeIn>
             )
           })}
+        </div>
+
+        {/* Empty state — when a category has no modules */}
+        {filtered.length === 0 && (
+          <div className="text-center py-20 luxe-card mt-6 p-8">
+            <div className="text-5xl mb-3" aria-hidden>🛰️</div>
+            <p className="text-gray-300 font-semibold mb-1">No feeds in this category yet</p>
+            <p className="text-gray-500 text-sm mb-4">Try a different filter or browse all eleven.</p>
+            <button
+              onClick={() => setFilter('all')}
+              className="luxe-btn luxe-btn-secondary tap-44"
+            >
+              View all feeds
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Footer CTA — pushes recruiters to the next layer */}
+      <div className="max-w-6xl mx-auto px-6 pb-24">
+        <div className="luxe-card p-6 sm:p-8 text-center relative overflow-hidden">
+          <div aria-hidden className="ambient-orb ambient-orb-cool -top-32 left-1/2 -translate-x-1/2 opacity-40" />
+          <div className="relative">
+            <div className="eyebrow-mono mb-2">// More to explore</div>
+            <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">
+              Beyond NASA — try the rest of the lab.
+            </h3>
+            <p className="text-gray-400 text-sm max-w-xl mx-auto mb-5">
+              17 interactive demos, 13 creative experiments, and 9 public-API modules. Everything is browser-native.
+            </p>
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              <Link to="/lab" className="luxe-btn luxe-btn-primary tap-44">Open Lab</Link>
+              <Link to="/explore" className="luxe-btn luxe-btn-secondary tap-44">Public APIs</Link>
+              <Link to="/creative" className="luxe-btn luxe-btn-ghost tap-44">Creative UI</Link>
+            </div>
+          </div>
         </div>
       </div>
     </div>

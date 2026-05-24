@@ -1,5 +1,6 @@
 import { lazy, Suspense, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import PageLoader from '../components/PageLoader'
 
 const COMPONENTS = {
   pokedex:   lazy(() => import('../components/explore/Pokedex')),
@@ -34,15 +35,8 @@ const META = {
     info: 'Random inspiring quotes in a masonry layout. Click Load More to add more quotes.' },
 }
 
-const P = 'animate-pulse bg-gray-800 rounded'
-const GridSkeleton = () => (
-  <div className="space-y-4">
-    <div className={`${P} h-12 w-full`} style={{borderRadius:12}} />
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-      {[...Array(12)].map((_, i) => <div key={i} className={`${P}`} style={{borderRadius:12, height: 140 + (i % 3) * 30}} />)}
-    </div>
-  </div>
-)
+// PageLoader is the canonical Suspense fallback site-wide; keep the
+// shimmer feel consistent with the rest of the lazy routes.
 
 const ModuleInfo = ({ text }) => {
   const [open, setOpen] = useState(false)
@@ -74,15 +68,16 @@ const ExploreModule = () => {
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       <div className="max-w-6xl mx-auto px-6 pt-28 pb-6">
-        <Link to="/explore" className="inline-flex items-center gap-2 text-gray-500 hover:text-white text-sm font-medium transition-colors mb-6">
+        <Link to="/explore" className="inline-flex items-center gap-2 tap-44 -ml-2 px-2 text-gray-500 hover:text-white text-sm font-medium transition-colors mb-4">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
           </svg>
           All Modules
         </Link>
-        <div className="flex items-center gap-3 mb-1">
+        <div className="eyebrow-mono mb-3">// Public API module</div>
+        <div className="flex items-center gap-3 mb-1 flex-wrap">
           <div className={`h-1 w-12 rounded-full bg-gradient-to-r ${meta.color}`} />
-          <h1 className="font-poppins font-black text-3xl md:text-4xl bg-gradient-to-r from-red-400 via-amber-400 to-yellow-400 bg-clip-text text-transparent">
+          <h1 className="font-poppins font-black text-3xl md:text-4xl gradient-text-amber">
             {meta.label}
           </h1>
           <ModuleInfo text={meta.info} />
@@ -90,7 +85,7 @@ const ExploreModule = () => {
         <div className="mt-4 h-px bg-gradient-to-r from-amber-900/40 via-red-900/20 to-transparent" />
       </div>
       <div className="max-w-6xl mx-auto px-6 pb-24">
-        <Suspense fallback={<GridSkeleton />}><Component /></Suspense>
+        <Suspense fallback={<PageLoader />}><Component /></Suspense>
       </div>
     </div>
   )

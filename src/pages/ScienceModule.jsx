@@ -137,16 +137,17 @@ const ScienceModule = () => {
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       <div className="max-w-6xl mx-auto px-6 pt-28 pb-6">
-        <Link to="/science" className="inline-flex items-center gap-2 text-gray-500 hover:text-white text-sm font-medium transition-colors mb-6">
+        <Link to="/science" className="inline-flex items-center gap-2 tap-44 -ml-2 px-2 text-gray-500 hover:text-white text-sm font-medium transition-colors mb-4">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
           </svg>
           All Modules
         </Link>
 
-        <div className="flex items-center gap-3 mb-1">
+        <div className="eyebrow-mono mb-3">// {meta.api} feed · live data</div>
+        <div className="flex items-center gap-3 mb-1 flex-wrap">
           <div className={`h-1 w-12 rounded-full bg-gradient-to-r ${meta.color}`} />
-          <h1 className="font-poppins font-black text-3xl md:text-4xl bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">
+          <h1 className="font-poppins font-black text-3xl md:text-4xl gradient-text-cyan">
             {meta.label}
           </h1>
           <span className="px-2 py-0.5 bg-gray-800 text-gray-500 text-xs rounded font-mono">{meta.api}</span>

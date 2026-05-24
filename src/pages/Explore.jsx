@@ -34,10 +34,15 @@ function FadeIn({ children, delay = 0, className = '' }) {
 
 const Explore = () => (
   <div className="min-h-screen bg-gray-950 text-white">
-    <div className="max-w-6xl mx-auto px-6 pt-32 pb-8">
+    <div className="relative max-w-6xl mx-auto px-6 pt-32 pb-8 overflow-hidden">
+      {/* Ambient orbs behind hero */}
+      <div aria-hidden className="ambient-orb -top-40 -left-32 opacity-70" />
+      <div aria-hidden className="ambient-orb ambient-orb-cool -top-20 right-0 opacity-50" />
+
       <FadeIn>
+        <div className="eyebrow-mono mb-3">// 9 public-API modules</div>
         <h1 className="font-poppins font-black text-5xl md:text-7xl leading-tight">
-          <span className="bg-gradient-to-r from-red-400 via-amber-400 to-yellow-400 bg-clip-text text-transparent">Explore</span>
+          <span className="gradient-text-amber">Explore</span>
         </h1>
       </FadeIn>
       <FadeIn delay={0.1}>
@@ -45,21 +50,28 @@ const Explore = () => (
           Interactive modules powered by public APIs — Pokemon, rockets, food, memes, card games, and more.
         </p>
       </FadeIn>
+      <FadeIn delay={0.15}>
+        <div className="mt-5">
+          <Link to="/explore/pokedex" className="luxe-btn luxe-btn-primary tap-44">
+            Open Pokedex →
+          </Link>
+        </div>
+      </FadeIn>
     </div>
 
     <div className="max-w-6xl mx-auto px-6 pb-24">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
         {MODULES.map((m, i) => {
           const effectMap = { pokedex:'fire', rickmorty:'grass', launches:'fire', mtg:'dragon', memes:'electric', food:'fire', dogs:'electric', countries:'grass', quotes:'psychic' }
           return (
           <FadeIn key={m.id} delay={0.2 + i * 0.03}>
             <Link to={`/explore/${m.id}`}
-              className="group relative block">
+              className="group relative block h-full">
               <AnimatedCard effect={effectMap[m.id] || 'default'} className="h-full">
-              <div className={`h-1 bg-gradient-to-r ${m.color} opacity-40 group-hover:opacity-100 transition-opacity`} />
-              <div className="p-5">
+              <div className="luxe-card luxe-card-hover relative overflow-hidden h-full p-4 sm:p-5">
+                <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${m.color} opacity-50 group-hover:opacity-100 transition-opacity`} />
                 <div className="flex items-start gap-3">
-                  <div className="text-gray-500 group-hover:text-gray-300 transition-colors mt-0.5">{ICONS[m.id]}</div>
+                  <div className="text-gray-500 group-hover:text-amber-300 transition-colors mt-0.5">{ICONS[m.id]}</div>
                   <div className="flex-1">
                     <span className="text-white font-bold text-sm">{m.label}</span>
                     <p className="text-gray-500 text-xs leading-relaxed mt-1">{m.desc}</p>

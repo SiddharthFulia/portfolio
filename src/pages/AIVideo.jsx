@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Input, Button, Select, Switch, Tabs, Modal, Upload, message as antMessage } from 'antd'
+import { Input, Button, Select, Switch, Tabs, Modal, Upload, Alert, message as antMessage } from 'antd'
 
 // Cinema lives inside this page as a tab. Lazy-loaded so the Cinema
 // bundle only ships when the user actually opens the tab.
@@ -1809,11 +1809,11 @@ const AIVideo = () => {
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-purple-900/30 via-cyan-900/10 to-amber-900/20 pointer-events-none" />
         <div className="relative max-w-6xl mx-auto px-5 sm:px-6 pt-28 sm:pt-32 pb-8">
-          <div className="luxe-eyebrow mb-3">
+          <div className="eyebrow-mono mb-3 inline-flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-            {activeKey === 'cinema' ? 'multi-shot orchestrator · 5090 powered' : 'multi-provider · 5090 powered'}
+            {activeKey === 'cinema' ? 'MULTI-SHOT ORCHESTRATOR · 5090 POWERED' : 'MULTI-PROVIDER · 5090 POWERED'}
           </div>
-          <h1 className="font-poppins font-black text-3xl sm:text-5xl md:text-6xl bg-gradient-to-r from-cyan-300 via-purple-300 to-amber-300 bg-clip-text text-transparent leading-tight pb-1 mb-2">
+          <h1 className="font-poppins font-black text-3xl sm:text-5xl md:text-6xl leading-tight gradient-text-amber mb-2">
             {activeKey === 'cinema' ? 'Cinema · Multi-shot' : 'AI Video Studio'}
           </h1>
           <p className="text-gray-400 text-sm sm:text-base max-w-xl">
@@ -1920,7 +1920,7 @@ function LibraryPickerModal({ open, onClose, onPick }) {
             🔒 Vault images are hidden — unlock the Vault on the Image Studio page first to see your private items here.
           </p>
         )}
-        {err && <p className='text-xs font-mono text-rose-400'>✗ {err}</p>}
+        {err && <Alert type='error' showIcon message={err} className='!mb-1' />}
         {loading && <p className='text-xs text-gray-500'>Loading…</p>}
         {!loading && !items.length && (
           <p className='text-xs text-gray-500 py-6 text-center'>No images in this tab yet.</p>

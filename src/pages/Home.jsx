@@ -98,6 +98,10 @@ const Home = () => {
       {/* Premium dark "Linear/Vercel" hero — sits above the existing 3D island.
           Pure CSS + inline SVG, no AmbientBlobs / aurora. */}
       <section className='luxe-stage relative min-h-screen w-full overflow-hidden flex items-center'>
+        {/* Ambient orbs — soft amber/rose anchor behind the hero text. */}
+        <div aria-hidden className='ambient-orb absolute -top-32 left-1/2 -translate-x-1/2 opacity-70' />
+        <div aria-hidden className='ambient-orb ambient-orb-cool absolute top-1/3 -right-40 opacity-60' />
+
         {/* Decorative bezier curve — sits behind the text, low opacity, violet glow. */}
         <svg
           className='pointer-events-none absolute inset-0 w-full h-full z-0'
@@ -152,20 +156,18 @@ const Home = () => {
         {/* Hero content */}
         <div className='relative z-10 w-full px-6 sm:px-10 lg:px-16 py-24 sm:py-32'>
           <div className='max-w-4xl'>
-            <p className='luxe-eyebrow mb-6'>
-              <span className='inline-block w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)] animate-pulse' />
+            <p className='eyebrow-mono mb-6 flex items-center gap-2'>
+              <span className='inline-block w-2 h-2 rounded-full bg-accent-emerald shadow-[0_0_10px_rgba(52,211,153,0.7)] animate-pulse' />
               Currently building · 2026
             </p>
 
-            <h1 className='font-poppins font-black text-white tracking-tight leading-[0.95] text-5xl sm:text-6xl md:text-7xl lg:text-8xl'>
+            <h1 className='gradient-text-amber font-poppins font-black tracking-tight leading-[0.95] text-5xl sm:text-6xl md:text-7xl lg:text-8xl'>
               Full-Stack
               <br />
-              <span className='bg-gradient-to-br from-white via-zinc-200 to-violet-300 bg-clip-text text-transparent'>
-                AI Engineer
-              </span>
+              AI Engineer
             </h1>
 
-            <p className='mt-7 text-gray-400 text-base sm:text-lg leading-relaxed max-w-[540px]'>
+            <p className='mt-7 max-w-2xl leading-relaxed text-fg-secondary text-base sm:text-lg'>
               Building intelligent applications &amp; scalable solutions — full-stack engineering,
               generative AI, and 5090-powered creative tooling.
             </p>
@@ -173,21 +175,21 @@ const Home = () => {
             <div className='mt-10 flex flex-wrap items-center gap-3'>
               <button
                 onClick={() => navigate('/projects')}
-                className='luxe-btn luxe-btn-primary !px-6 !py-3 !text-sm'
+                className='luxe-btn luxe-btn-primary !px-6 !py-3 !text-sm tap-44'
               >
                 View Work
                 <span aria-hidden='true' className='ml-0.5'>→</span>
               </button>
               <button
                 onClick={() => navigate('/contact')}
-                className='luxe-btn luxe-btn-secondary !px-6 !py-3 !text-sm'
+                className='luxe-btn luxe-btn-secondary !px-6 !py-3 !text-sm tap-44'
               >
                 Get in Touch
               </button>
             </div>
 
-            <p className='luxe-body-muted !text-xs mt-6 flex items-center gap-2'>
-              <span className='inline-block w-1 h-1 rounded-full bg-gray-500' />
+            <p className='text-fg-muted !text-xs mt-6 flex items-center gap-2'>
+              <span className='inline-block w-1 h-1 rounded-full bg-fg-muted' />
               Open to opportunities · Indo connect · Remote-friendly
             </p>
           </div>

@@ -144,7 +144,10 @@ function SettingsInner() {
       content: `This discards every message currently in ${queue}. Workers won't see them. This can't be undone.`,
       okText: 'Purge',
       okType: 'danger',
+      okButtonProps: { danger: true },
       cancelText: 'Cancel',
+      autoFocusButton: 'cancel',
+      centered: true,
       onOk: async () => {
         const { data, error } = await adminPurgeQueue(queue)
         if (error) {
@@ -161,9 +164,12 @@ function SettingsInner() {
     <div className="min-h-screen bg-black text-gray-100 pt-20 pb-16 px-3 sm:px-6" style={{ fontVariantNumeric: 'tabular-nums' }}>
       <div className="max-w-6xl mx-auto">
         <header className="mb-6">
+          <div className="eyebrow-mono mb-2 flex items-center gap-2">
+            <LockOutlined className="text-amber-300" />
+            // Admin · vault
+          </div>
           <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <LockOutlined className="text-cyan-400 text-xl" />
-            <h1 className="text-2xl sm:text-4xl font-bold leading-tight pb-1 bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-amber-300 bg-clip-text text-transparent">
+            <h1 className="text-2xl sm:text-4xl font-bold leading-tight pb-1 gradient-text-cyan">
               Settings
             </h1>
             <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border border-cyan-500/40 bg-cyan-500/10 text-cyan-300">

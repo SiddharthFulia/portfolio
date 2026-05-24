@@ -588,8 +588,7 @@ export default function HandTracking() {
             <span className="hidden sm:inline opacity-70">· runs in-browser, no upload</span>
           </div>
           <h1 className="text-2xl sm:text-4xl md:text-5xl font-black leading-tight pb-1
-                         bg-gradient-to-r from-cyan-300 via-violet-300 to-fuchsia-300
-                         bg-clip-text text-transparent">
+                         gradient-text-amber">
             Track hands. Draw with your finger.
           </h1>
           <p className="text-gray-400 text-[12px] sm:text-sm md:text-base mt-2

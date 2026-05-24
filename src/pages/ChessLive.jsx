@@ -475,9 +475,12 @@ export default function ChessLive() {
       <div className="max-w-3xl mx-auto space-y-4">
         {/* Header */}
         <header className="flex items-center justify-between gap-3 flex-wrap">
-          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-amber-300 via-rose-400 to-fuchsia-400 bg-clip-text text-transparent">
-            ♛ Live match
-          </h1>
+          <div>
+            <div className="eyebrow-mono mb-1">// Live online challenge</div>
+            <h1 className="text-2xl sm:text-3xl font-bold gradient-text-amber">
+              ♛ Live match
+            </h1>
+          </div>
           <div className="flex items-center gap-2 text-[10px]">
             <span className={`px-2 py-0.5 rounded-full border font-mono ${
               isDone ? 'border-amber-400/40 bg-amber-500/10 text-amber-300'

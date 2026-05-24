@@ -219,51 +219,86 @@ function SkillGroupCard({ group }) {
 
 const About = () => {
   return (
-    <section className="min-h-screen bg-[#0a0a0e] text-gray-100 pt-28 pb-24 px-4 sm:px-6">
-      <div className="max-w-5xl mx-auto">
+    <section className="relative min-h-screen bg-surface-base text-fg-primary pt-28 pb-24 px-4 sm:px-6 overflow-hidden">
+      {/* ── Ambient hero orbs — primary anchor behind the headline + cool secondary off-right ── */}
+      <div aria-hidden className="ambient-orb absolute -top-32 left-1/2 -translate-x-1/2" />
+      <div aria-hidden className="ambient-orb ambient-orb-cool absolute top-[40%] -right-40 opacity-70" />
 
-        {/* ── Header (not a hero) ── */}
+      <div className="relative max-w-5xl mx-auto">
+
+        {/* ── Flagship hero — recruiter dwell-time peaks here, so this is the keep-them-scrolling moment. ── */}
         <motion.div initial="hidden" animate="show" variants={fadeUp}>
-          <p className="luxe-eyebrow text-violet-300/80">— About</p>
-          <h1 className="luxe-section-title text-4xl sm:text-5xl text-white mt-3">
+          <p className="eyebrow-mono">— About</p>
+          <h1 className="gradient-text-amber luxe-section-title text-4xl sm:text-5xl md:text-6xl mt-3 leading-[1.05]">
             Engineer · creator · builder
           </h1>
-          <p className="luxe-body-muted text-base mt-5 max-w-2xl">
+
+          {/* Status pill — gives recruiters an at-a-glance signal. */}
+          <div className="mt-5 inline-flex items-center gap-2 px-3 py-1.5 rounded-full
+                          bg-surface-elevated/60 backdrop-blur-sm border border-line">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-emerald opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-accent-emerald" />
+            </span>
+            <span className="text-xs font-medium text-fg-secondary">Open to senior engineering roles · Mumbai / Remote</span>
+          </div>
+
+          <p className="mt-5 max-w-2xl leading-relaxed text-fg-secondary text-base">
             Founding Engineer & ML Researcher based in Mumbai, India. I build scalable
             full-stack products and AI-driven systems — from 100+ REST APIs at{" "}
             <a href="https://www.linkedin.com/company/getpassionfruit/posts/?feedView=all"
                target="_blank" rel="noreferrer"
-               className="text-violet-300 hover:text-violet-200 underline-offset-4 hover:underline font-medium">
+               className="text-accent-amber hover:text-amber-200 underline-offset-4 hover:underline font-medium">
               Passionfruit (NY)
             </a>{" "}
             to graph neural networks for blockchain phishing detection at{" "}
             <a href="https://www.iitp.ac.in" target="_blank" rel="noreferrer"
-               className="text-violet-300 hover:text-violet-200 underline-offset-4 hover:underline font-medium">
+               className="text-accent-amber hover:text-amber-200 underline-offset-4 hover:underline font-medium">
               IIT Patna
             </a>.{" "}
             B.Tech CE from DJS College (CGPA 9.1), 3 research publications, Meta Hacker Cup 2025{" "}
             <a href="https://www.linkedin.com/posts/siddharth-fulia_metahackercup2025-top200-round3-activity-7432281275920728066-5b8P?utm_source=share&utm_medium=member_desktop&rcm=ACoAADbS-ywBYuwbaIFL7brrtMs_7hHq9KiB_bw"
                target="_blank" rel="noreferrer"
-               className="text-violet-300 hover:text-violet-200 underline-offset-4 hover:underline font-medium">
+               className="text-accent-amber hover:text-amber-200 underline-offset-4 hover:underline font-medium">
               Global Rank 186
             </a>, and CodeChef 5★ (2114 rating).
           </p>
 
-          <div className="mt-6 flex flex-wrap gap-3">
+          {/* ── Stat strip — recruiter-readable proof points at a glance. ── */}
+          <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            {[
+              { value: '100+',  label: 'REST APIs shipped',  accent: 'text-accent-amber' },
+              { value: '3',     label: 'Publications',       accent: 'text-accent-rose' },
+              { value: '186',   label: 'Hacker Cup global',  accent: 'text-accent-fuchsia' },
+              { value: '5★',    label: 'CodeChef · 2114',    accent: 'text-accent-cyan' },
+            ].map((s) => (
+              <div key={s.label}
+                   className="luxe-card p-5 sm:p-6 flex flex-col gap-1 transition-transform hover:-translate-y-0.5">
+                <p className={`font-poppins font-extrabold text-2xl sm:text-3xl tabular-nums ${s.accent}`}>{s.value}</p>
+                <p className="text-fg-muted text-xs uppercase tracking-wider">{s.label}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-7 flex flex-wrap gap-3">
             <a href="/resume.pdf" target="_blank" rel="noreferrer"
-               className="luxe-btn luxe-btn-primary">
+               className="luxe-btn luxe-btn-primary tap-44">
               View / Download Resume
             </a>
             <a href="https://www.linkedin.com/in/siddharth-fulia/" target="_blank" rel="noreferrer"
-               className="luxe-btn luxe-btn-secondary">
+               className="luxe-btn luxe-btn-secondary tap-44">
               LinkedIn Profile
+            </a>
+            <a href="mailto:siddharthfulia7@gmail.com"
+               className="luxe-btn luxe-btn-secondary tap-44">
+              Email Me
             </a>
           </div>
         </motion.div>
 
         {/* ── Terminal ── */}
         <motion.div
-          className="mt-10 luxe-card overflow-hidden"
+          className="mt-12 luxe-card overflow-hidden"
           initial="hidden" whileInView="show" variants={fadeUp} viewport={{ once: true }}
         >
           <TypingTerminal />
@@ -271,12 +306,12 @@ const About = () => {
 
         {/* ── GitHub contributions ── */}
         <motion.div
-          className="mt-10 luxe-card p-5"
+          className="mt-10 luxe-card p-5 sm:p-6"
           initial="hidden" whileInView="show" variants={fadeUp} viewport={{ once: true }}
         >
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-white font-semibold text-base">GitHub contributions</h3>
-            <span className="luxe-body-muted text-xs">@Sid-passion</span>
+            <h3 className="text-fg-primary font-semibold text-base">GitHub contributions</h3>
+            <span className="text-fg-muted text-xs">@Sid-passion</span>
           </div>
           <GitHubHeatmap username="Sid-passion" />
         </motion.div>
@@ -288,9 +323,9 @@ const About = () => {
           <motion.div
             initial="hidden" whileInView="show" variants={stagger} viewport={{ once: true }}
           >
-            <p className="luxe-eyebrow text-violet-300/80">— Skills</p>
-            <h2 className="luxe-section-title text-2xl text-white mt-2">Tech stack</h2>
-            <p className="luxe-body-muted mt-2">
+            <p className="eyebrow-mono">— Skills</p>
+            <h2 className="luxe-section-title text-2xl text-fg-primary mt-2">Tech stack</h2>
+            <p className="text-fg-secondary leading-relaxed mt-2 max-w-2xl">
               Languages, frameworks, and tools I reach for to ship production systems.
             </p>
 
@@ -305,9 +340,9 @@ const About = () => {
           <motion.div
             initial="hidden" whileInView="show" variants={stagger} viewport={{ once: true }}
           >
-            <p className="luxe-eyebrow text-violet-300/80">— Experience</p>
-            <h2 className="luxe-section-title text-2xl text-white mt-2">Where I've shipped</h2>
-            <p className="luxe-body-muted mt-2">
+            <p className="eyebrow-mono">— Experience</p>
+            <h2 className="luxe-section-title text-2xl text-fg-primary mt-2">Where I've shipped</h2>
+            <p className="text-fg-secondary leading-relaxed mt-2 max-w-2xl">
               Cutting-edge companies and research labs where I've shipped real impact.
             </p>
 
@@ -333,23 +368,23 @@ const About = () => {
                       className="absolute -left-5 top-5 w-3 h-3 rounded-full bg-[#0a0a0e] border-2"
                       style={{ borderColor: '#8b5cf6', boxShadow: '0 0 0 3px rgba(139,92,246,0.12)' }}
                     />
-                    <div className="luxe-card luxe-card-hover p-5">
+                    <div className="luxe-card luxe-card-hover p-5 sm:p-6">
                       <div className="flex items-start justify-between gap-3 flex-wrap">
                         <a
                           href={exp.company_link}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-white font-semibold hover:text-violet-200 transition-colors"
+                          className="text-fg-primary font-semibold hover:text-accent-amber transition-colors"
                         >
                           {exp.company_name} ↗
                         </a>
-                        <span className="luxe-body-muted text-xs">{exp.date}</span>
+                        <span className="text-fg-muted text-xs">{exp.date}</span>
                       </div>
-                      <p className="text-violet-300 text-sm font-medium mt-1">{exp.title}</p>
+                      <p className="text-accent-rose text-sm font-medium mt-1">{exp.title}</p>
                       <ul className="mt-3 space-y-2">
                         {exp.points.map((point, i) => (
-                          <li key={i} className="flex gap-2 luxe-body-muted text-sm leading-relaxed">
-                            <span className="text-violet-400/70 mt-1.5 shrink-0 w-1 h-1 rounded-full bg-violet-400/70" />
+                          <li key={i} className="flex gap-2 text-fg-secondary text-sm leading-relaxed">
+                            <span className="mt-1.5 shrink-0 w-1 h-1 rounded-full bg-accent-amber/70" />
                             <span>{point}</span>
                           </li>
                         ))}
@@ -364,11 +399,11 @@ const About = () => {
 
         {/* ── Tech Expertise ── */}
         <div className="mt-20">
-          <motion.p className="luxe-eyebrow text-violet-300/80" initial="hidden" whileInView="show"
+          <motion.p className="eyebrow-mono" initial="hidden" whileInView="show"
             variants={fadeUp} viewport={{ once: true }}>— What I build</motion.p>
-          <motion.h2 className="luxe-section-title text-3xl text-white mt-2" initial="hidden" whileInView="show"
+          <motion.h2 className="luxe-section-title text-3xl text-fg-primary mt-2" initial="hidden" whileInView="show"
             variants={fadeUp} viewport={{ once: true }}>Systems I've designed and shipped</motion.h2>
-          <motion.p className="luxe-body-muted mt-3 max-w-2xl" initial="hidden" whileInView="show"
+          <motion.p className="mt-3 max-w-2xl leading-relaxed text-fg-secondary" initial="hidden" whileInView="show"
             variants={fadeUp} viewport={{ once: true }}>
             Real-world systems across the stack — click each to see details.
           </motion.p>
@@ -382,11 +417,11 @@ const About = () => {
 
         {/* ── Research & Publications ── */}
         <div className="mt-20">
-          <motion.p className="luxe-eyebrow text-violet-300/80" initial="hidden" whileInView="show"
+          <motion.p className="eyebrow-mono" initial="hidden" whileInView="show"
             variants={fadeUp} viewport={{ once: true }}>— Research</motion.p>
-          <motion.h2 className="luxe-section-title text-3xl text-white mt-2" initial="hidden" whileInView="show"
+          <motion.h2 className="luxe-section-title text-3xl text-fg-primary mt-2" initial="hidden" whileInView="show"
             variants={fadeUp} viewport={{ once: true }}>Publications</motion.h2>
-          <motion.p className="luxe-body-muted mt-3 max-w-2xl" initial="hidden" whileInView="show"
+          <motion.p className="mt-3 max-w-2xl leading-relaxed text-fg-secondary" initial="hidden" whileInView="show"
             variants={fadeUp} viewport={{ once: true }}>
             3 papers published / accepted in international journals and conferences.
           </motion.p>
@@ -442,11 +477,11 @@ const About = () => {
 
         {/* ── Achievements ── */}
         <div className="mt-20">
-          <motion.p className="luxe-eyebrow text-violet-300/80" initial="hidden" whileInView="show"
+          <motion.p className="eyebrow-mono" initial="hidden" whileInView="show"
             variants={fadeUp} viewport={{ once: true }}>— Achievements</motion.p>
-          <motion.h2 className="luxe-section-title text-3xl text-white mt-2" initial="hidden" whileInView="show"
+          <motion.h2 className="luxe-section-title text-3xl text-fg-primary mt-2" initial="hidden" whileInView="show"
             variants={fadeUp} viewport={{ once: true }}>Competitive wins</motion.h2>
-          <motion.p className="luxe-body-muted mt-3 max-w-2xl" initial="hidden" whileInView="show"
+          <motion.p className="mt-3 max-w-2xl leading-relaxed text-fg-secondary" initial="hidden" whileInView="show"
             variants={fadeUp} viewport={{ once: true }}>
             Competitive programming, innovation challenges, and global rankings.
           </motion.p>
@@ -479,11 +514,11 @@ const About = () => {
 
         {/* ── Competitive Programming ── */}
         <div className="mt-20">
-          <motion.p className="luxe-eyebrow text-violet-300/80" initial="hidden" whileInView="show"
+          <motion.p className="eyebrow-mono" initial="hidden" whileInView="show"
             variants={fadeUp} viewport={{ once: true }}>— Competitive programming</motion.p>
-          <motion.h2 className="luxe-section-title text-3xl text-white mt-2" initial="hidden" whileInView="show"
+          <motion.h2 className="luxe-section-title text-3xl text-fg-primary mt-2" initial="hidden" whileInView="show"
             variants={fadeUp} viewport={{ once: true }}>CodeChef · Codeforces</motion.h2>
-          <motion.p className="luxe-body-muted mt-3 max-w-2xl" initial="hidden" whileInView="show"
+          <motion.p className="mt-3 max-w-2xl leading-relaxed text-fg-secondary" initial="hidden" whileInView="show"
             variants={fadeUp} viewport={{ once: true }}>
             Consistent competitor — strong in DSA, DP, and optimization.
           </motion.p>

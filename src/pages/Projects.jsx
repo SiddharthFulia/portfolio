@@ -24,15 +24,17 @@ const ShareButtons = ({ url }) => {
         target="_blank"
         rel="noopener noreferrer"
         onClick={(e) => e.stopPropagation()}
-        className="text-gray-500 hover:text-violet-300 transition-colors"
+        className="tap-44 text-fg-muted hover:text-accent-rose transition-colors"
         title="Share on LinkedIn"
+        aria-label="Share on LinkedIn"
       >
         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
       </a>
       <button
         onClick={copyLink}
-        className={`transition-colors ${copied ? 'text-emerald-400' : 'text-gray-500 hover:text-violet-300'}`}
+        className={`tap-44 transition-colors ${copied ? 'text-accent-emerald' : 'text-fg-muted hover:text-accent-amber'}`}
         title="Copy link"
+        aria-label="Copy link to clipboard"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-2.939a4.5 4.5 0 00-1.242-7.244l-4.5-4.5a4.5 4.5 0 00-6.364 6.364L4.757 8.25" /></svg>
       </button>
@@ -135,33 +137,22 @@ const Projects = () => {
   const totalCount = LIVE_PROJECTS.length + projects.length;
 
   return (
-    <section className="relative min-h-screen bg-[#0a0a0e] text-gray-100 pt-28 pb-24 px-4 sm:px-6 overflow-hidden">
-      {/* ── Ambient hero glow ──
-       * Same vocabulary as the VaultGate / chess-engine pages — a soft
-       * tri-colour orb behind the title, blurred to taste so it reads as
-       * atmosphere, not decoration. Pointer-events-none so it never
-       * intercepts clicks on the header text or chips.
-       */}
-      <div aria-hidden
-        className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[640px] h-[640px]
-                   rounded-full bg-gradient-to-br from-amber-500/15 via-rose-500/10 to-fuchsia-500/15 blur-3xl" />
-      <div aria-hidden
-        className="pointer-events-none absolute top-1/3 -right-20 w-[420px] h-[420px]
-                   rounded-full bg-gradient-to-br from-cyan-500/10 via-violet-500/8 to-transparent blur-3xl" />
+    <section className="relative min-h-screen bg-surface-base text-fg-primary pt-28 pb-24 px-4 sm:px-6 overflow-hidden">
+      {/* ── Ambient hero glow — now uses the canonical `ambient-orb` helper. ── */}
+      <div aria-hidden className="ambient-orb absolute -top-24 left-1/2 -translate-x-1/2" />
+      <div aria-hidden className="ambient-orb ambient-orb-cool absolute top-1/3 -right-20 w-[420px] h-[420px] opacity-80" />
 
       <div className="relative max-w-5xl mx-auto">
 
         {/* ── Page header ── */}
         <motion.div initial="hidden" animate="show" variants={fadeUp}>
-          <p className="luxe-eyebrow text-amber-300/80 font-mono tracking-[0.25em]">
+          <p className="eyebrow-mono">
             — Work · <span className="tabular-nums">{totalCount}</span> projects
           </p>
-          <h1 className="luxe-section-title text-4xl sm:text-5xl mt-3 bg-gradient-to-r
-                         from-amber-200 via-rose-300 to-fuchsia-300 bg-clip-text text-transparent
-                         leading-tight pb-1">
+          <h1 className="gradient-text-amber luxe-section-title text-4xl sm:text-5xl mt-3 leading-tight">
             Selected projects
           </h1>
-          <p className="luxe-body-muted mt-3 max-w-xl">
+          <p className="mt-3 max-w-2xl leading-relaxed text-fg-secondary">
             A mix of production work, research, and full-stack experiments. Each card opens
             the live demo or repo.
           </p>
@@ -184,7 +175,7 @@ const Projects = () => {
             <motion.div key={proj.title} variants={fadeUp}>
               <div className="luxe-card luxe-card-hover overflow-hidden flex flex-col sm:flex-row">
                 {/* Left content */}
-                <div className="flex-1 p-6">
+                <div className="flex-1 p-5 sm:p-6">
                   <div className="flex items-center gap-2 flex-wrap mb-2">
                     <h3 className="text-xl font-semibold text-white">{proj.title}</h3>
                     <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md
@@ -280,7 +271,7 @@ const Projects = () => {
             const cardInner = (
               <div className="luxe-card luxe-card-hover overflow-hidden flex flex-col sm:flex-row">
                 {/* Left content */}
-                <div className="flex-1 p-6">
+                <div className="flex-1 p-5 sm:p-6">
                   <div className="flex items-center gap-2 flex-wrap mb-2">
                     <h3 className="text-xl font-semibold text-white">{project.name}</h3>
                     {project.tag && (

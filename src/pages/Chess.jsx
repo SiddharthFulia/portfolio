@@ -674,9 +674,12 @@ function Header({ engineHealth, onFullscreen }) {
   return (
     <header className="mb-6">
       <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
-        <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-amber-300 via-rose-400 to-fuchsia-400 bg-clip-text text-transparent">
-          ♛ Chess
-        </h1>
+        <div>
+          <div className="eyebrow-mono mb-1">// Stockfish analysis board</div>
+          <h1 className="text-2xl sm:text-3xl font-bold gradient-text-amber">
+            ♛ Chess
+          </h1>
+        </div>
         <div className="flex items-center gap-2 text-[10px]">
           <button onClick={onFullscreen}
             title="Fullscreen board (ESC to exit)"
