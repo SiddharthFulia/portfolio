@@ -960,25 +960,26 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
                 className="luxe-textarea"
                 autoSize={{ minRows: 3, maxRows: 6 }} maxLength={400} showCount />
 
+              {/* Saved prompts — searchable Antd Select. Replaces the 12-tile
+                  grid that ate vertical space and the cartoony green "✓ pass
+                  safety filter" tag. Pick to set the textarea; clear to wipe.
+                  Type to filter — handy as the preset list grows. */}
               <div className="mt-3">
-                <div className="flex items-center justify-between mb-1.5">
-                  <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider">Verified prompts</p>
-                  <span className="text-[9px] text-emerald-500 font-semibold">✓ pass safety filter</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                  {PROMPT_PRESETS.map(p => {
-                    const active = prompt === p
-                    return (
-                      <button key={p} onClick={() => setPrompt(p)}
-                        className={`px-3 py-2 text-left text-xs rounded-lg transition-colors break-words whitespace-normal leading-snug ${
-                          active ? 'bg-cyan-600/20 text-cyan-200 border border-cyan-500/50'
-                                 : 'bg-gray-800 hover:bg-gray-700 text-gray-300 border border-transparent'
-                        }`}>
-                        {p}
-                      </button>
-                    )
-                  })}
-                </div>
+                <label className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider mb-1.5 block">
+                  Saved prompts
+                </label>
+                <Select
+                  showSearch
+                  allowClear
+                  placeholder="Search a saved prompt…"
+                  value={PROMPT_PRESETS.includes(prompt) ? prompt : undefined}
+                  onChange={(value) => setPrompt(value || '')}
+                  options={PROMPT_PRESETS.map(presetText => ({ value: presetText, label: presetText }))}
+                  filterOption={(input, option) =>
+                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                  }
+                  style={{ width: '100%' }}
+                />
               </div>
             </>
           )}

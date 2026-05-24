@@ -1,18 +1,18 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Input, Select, Modal, Alert, message as antMessage } from 'antd'
-import { VideoCameraOutlined, ThunderboltOutlined, ReloadOutlined, CopyOutlined, BulbOutlined, DeleteOutlined, SendOutlined } from '@ant-design/icons'
+import { VideoCameraOutlined, ThunderboltOutlined, ReloadOutlined, BulbOutlined, DeleteOutlined } from '@ant-design/icons'
 import { submitCinema, listCinemaProjects, cinemaBulkAction } from '../api/ai'
 import PromptHelper from '../components/PromptHelper'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
 import { Button, Slider } from '../components/ui'
+import CinemaRenderer from '../components/cinema/CinemaRenderer'
 
 // `embedded` mode (passed when Cinema lives inside the AI Video tabs):
 //   - drops the outer page wrapper (no extra pt-20 / min-h-screen)
 //   - skips the document.title bump so AIVideo's title stays in charge
 //   - tightens the header since AIVideo already shows its own hero
 export default function Cinema({ embedded = false }) {
-  const navigate = useNavigate()
   const [masterPrompt, setMasterPrompt] = useState('')
   const [shotCount, setShotCount] = useState(4)
   const [durationPerShot, setDurationPerShot] = useState(5)
@@ -46,10 +46,6 @@ export default function Cinema({ embedded = false }) {
     antMessage.success(`Planned ${data.shotCount} shots — review and render below.`)
   }
 
-  const copy = async (text) => {
-    try { await navigator.clipboard.writeText(text); antMessage.success('Copied') } catch {}
-  }
-
   // Confirm before clearing a master prompt that has real content. Tiny
   // friction is worth it — losing 200 chars of careful prose to a stray
   // tap on a 12px chip is exactly the kind of micro-tragedy the new
@@ -69,22 +65,6 @@ export default function Cinema({ embedded = false }) {
       centered: true,
       onOk: () => setMasterPrompt(''),
     })
-  }
-
-  // Hand a prompt off to /ai-video preselecting the 5090 Optimized lane in
-  // Balanced mode (Wan 2.2 5B, 14 steps, ~60s). Background music is enabled
-  // by default so the video lands ready-to-share. The destination page reads
-  // these query args on mount, prefills the form, and scrubs them from the
-  // URL so reloading doesn't re-apply.
-  const sendToAIVideo = (text) => {
-    if (!text || !text.trim()) return
-    const qs = new URLSearchParams({
-      prompt: text.trim(),
-      provider: 'optimized',
-      mode: 'balanced',
-      music: '1',
-    }).toString()
-    navigate(`/ai-video?${qs}`)
   }
 
   // Page wrapper: standalone gets the full cinematic backdrop with ambient
@@ -133,13 +113,6 @@ export default function Cinema({ embedded = false }) {
                     className="tap-44 px-3 py-1.5 text-[11px] font-semibold rounded-full border border-amber-500/40 hover:border-amber-400 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-colors whitespace-nowrap inline-flex items-center gap-1.5">
                     <BulbOutlined className="text-[11px]" /> Help me write
                   </button>
-                  {masterPrompt.trim() && (
-                    <button type="button" onClick={() => sendToAIVideo(masterPrompt)}
-                      title="Skip planning — render this prompt directly in AI Video (5090 Optimized · Balanced · with music)"
-                      className="tap-44 px-3 py-1.5 text-[11px] font-semibold rounded-full border border-cyan-500/40 hover:border-cyan-400 bg-gradient-to-r from-cyan-500/15 to-fuchsia-500/15 hover:from-cyan-500/25 hover:to-fuchsia-500/25 text-cyan-200 transition-colors whitespace-nowrap inline-flex items-center gap-1.5">
-                      <SendOutlined className="text-[11px]" /> Render in AI Video
-                    </button>
-                  )}
                   {masterPrompt && (
                     <button type="button" onClick={requestClearPrompt}
                       className="tap-44 px-2 text-[11px] text-gray-500 hover:text-gray-300 transition-colors">
@@ -232,42 +205,10 @@ export default function Cinema({ embedded = false }) {
           onAppend={(text) => setMasterPrompt(masterPrompt.trim() ? `${masterPrompt.trim()} ${text}` : text)}
         />
 
+        {/* Inline multi-shot renderer — sequential chain with last-frame
+            continuity, all client-driven. No redirect to /ai-video. */}
         {project && Array.isArray(project.shotPrompts) && project.shotPrompts.length > 0 && (
-          <section className="luxe-card p-5 sm:p-6 mb-6 border-amber-500/30">
-            <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
-              <div>
-                <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80">— Planned</p>
-                <h3 className="mt-1 text-lg font-bold text-fg-primary tabular-nums">
-                  {project.shotPrompts.length} shots ready to render
-                </h3>
-              </div>
-              <span className="text-[10px] font-mono text-gray-500 break-all">{project.projectId}</span>
-            </div>
-            <ol className="space-y-2">
-              {project.shotPrompts.map((p, i) => (
-                <li key={i} className="luxe-card luxe-card-hover p-3 hover:border-amber-500/40">
-                  <div className="flex items-center justify-between mb-1.5 gap-2 flex-wrap">
-                    <span className="text-[10px] font-mono text-amber-400 font-bold tabular-nums">SHOT {String(i + 1).padStart(2, '0')}</span>
-                    <div className="flex items-center gap-1.5">
-                      <button onClick={() => copy(p)}
-                        className="tap-44 px-2.5 py-1 text-[11px] inline-flex items-center gap-1 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-300">
-                        <CopyOutlined /> Copy
-                      </button>
-                      <button onClick={() => sendToAIVideo(p)}
-                        title="Paste into AI Video, 5090 Optimized · Balanced, with background music"
-                        className="tap-44 px-2.5 py-1 text-[11px] inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-cyan-500/20 to-fuchsia-500/20 hover:from-cyan-500/30 hover:to-fuchsia-500/30 text-cyan-200 border border-cyan-500/40">
-                        <SendOutlined /> Render
-                      </button>
-                    </div>
-                  </div>
-                  <p className="text-[12px] text-gray-300 font-mono leading-relaxed">{p}</p>
-                </li>
-              ))}
-            </ol>
-            <p className="text-[11px] text-gray-500 mt-4 leading-snug">
-              <span className="text-amber-300/90">Beta:</span> render each shot manually in the <span className="text-cyan-300">AI Video</span> tab — copy each prompt, generate at <span className="font-mono tabular-nums">{durationPerShot}s · {aspectRatio} · {resolution}</span>, then stitch with ffmpeg. Automated render-+-stitch is queued for the next release.
-            </p>
-          </section>
+          <CinemaRenderer project={project} />
         )}
 
         <StudioLibrary
