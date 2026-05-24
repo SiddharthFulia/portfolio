@@ -269,24 +269,30 @@ function AIMultiModalGenDemo() {
   )
 
   // ── Tabs ──────────────────────────────────────────────────────────────
-  const TabBtn = ({ value, icon, label }) => (
-    <button
-      type="button"
-      onClick={() => handleModeChange(value)}
-      className={`flex-1 inline-flex items-center justify-center gap-2 py-2 text-xs font-medium rounded-md transition-colors ${
-        mode === value
-          ? 'bg-zinc-800 text-zinc-100 shadow-sm'
-          : 'text-zinc-400 hover:text-zinc-200'
-      }`}>
-      {icon}<span>{label}</span>
-    </button>
-  )
+  // Inlined .map over a static list so we never define a component inside
+  // the render body (that would re-mount each tab on every parent render —
+  // same anti-pattern as Cinema.jsx's `Outer`).
+  const TABS = [
+    { value: 'image',  icon: <ImageIcon className="w-4 h-4" />, label: 'Image' },
+    { value: 'video',  icon: <Film className="w-4 h-4" />,      label: 'Video' },
+    { value: 'avatar', icon: <Cube className="w-4 h-4" />,      label: '3D Avatar' },
+  ]
   const renderTabs = () => (
     <div className="w-full px-4">
       <div className="grid grid-cols-3 w-full p-1 rounded-lg bg-zinc-900/70 border border-zinc-800">
-        <TabBtn value="image"  icon={<ImageIcon className="w-4 h-4" />} label="Image" />
-        <TabBtn value="video"  icon={<Film className="w-4 h-4" />}      label="Video" />
-        <TabBtn value="avatar" icon={<Cube className="w-4 h-4" />}      label="3D Avatar" />
+        {TABS.map(({ value, icon, label }) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => handleModeChange(value)}
+            className={`flex-1 inline-flex items-center justify-center gap-2 py-2 text-xs font-medium rounded-md transition-colors ${
+              mode === value
+                ? 'bg-zinc-800 text-zinc-100 shadow-sm'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}>
+            {icon}<span>{label}</span>
+          </button>
+        ))}
       </div>
     </div>
   )

@@ -1,5 +1,24 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 
+// Module-scope so each render of <WaveGenerator> doesn't mint a new
+// component type at this position — that would unmount + remount the
+// slider on every parent re-render, causing the range input to lose
+// focus mid-drag. Same anti-pattern fix as Cinema.jsx's `Outer`.
+const Control = ({ label, value, min, max, step = 1, onChange, unit = '' }) => (
+  <div>
+    <div className="flex justify-between mb-1">
+      <span className="text-xs text-gray-400">{label}</span>
+      <span className="text-xs text-cyan-400 font-mono">{value}{unit}</span>
+    </div>
+    <input
+      type="range"
+      min={min} max={max} step={step} value={value}
+      onChange={e => onChange(Number(e.target.value))}
+      className="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+    />
+  </div>
+)
+
 const WAVE_TYPES = ['sine', 'triangle', 'square', 'sawtooth']
 const COLOR_SCHEMES = [
   { name: 'Neon Cyan', stroke: '#22d3ee', fill: 'rgba(34,211,238,0.15)', bg: '#0a0a1a' },
@@ -126,21 +145,6 @@ const WaveGenerator = () => {
       window.removeEventListener('resize', resize)
     }
   }, [amplitude, frequency, speed, waveType, layers, scheme, paused, showGrid, getWaveY])
-
-  const Control = ({ label, value, min, max, step = 1, onChange, unit = '' }) => (
-    <div>
-      <div className="flex justify-between mb-1">
-        <span className="text-xs text-gray-400">{label}</span>
-        <span className="text-xs text-cyan-400 font-mono">{value}{unit}</span>
-      </div>
-      <input
-        type="range"
-        min={min} max={max} step={step} value={value}
-        onChange={e => onChange(Number(e.target.value))}
-        className="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-cyan-500"
-      />
-    </div>
-  )
 
   return (
     <div className="space-y-4">
