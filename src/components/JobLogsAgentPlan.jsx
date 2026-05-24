@@ -204,12 +204,12 @@ export default function JobLogsAgentPlan({
   return (
     <div className="rounded-xl border border-gray-800 bg-black/40 overflow-hidden">
       {(progressMessage || error) && (
-        <div className="px-4 py-2 border-b border-gray-800/80 bg-gradient-to-r from-cyan-500/5 via-fuchsia-500/5 to-transparent">
+        <div className="px-4 py-2 border-b border-gray-800/80 bg-cyan-500/5">
           {progressMessage && (
             <p className="text-xs text-gray-300">{progressMessage}</p>
           )}
           {error && (
-            <p className="text-xs text-rose-400 mt-1">✗ {error}</p>
+            <p className="text-xs text-rose-400 mt-1">{error}</p>
           )}
         </div>
       )}

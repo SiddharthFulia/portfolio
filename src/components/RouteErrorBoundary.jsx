@@ -63,11 +63,11 @@ export default class RouteErrorBoundary extends Component {
           )}
           <div className="flex flex-wrap items-center gap-2">
             <button onClick={this.reset}
-              className="px-3 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-200 text-sm">
+              className="px-3 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/40 text-cyan-200 text-sm">
               Try again
             </button>
             <button onClick={() => window.location.reload()}
-              className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 text-sm">
+              className="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 text-amber-200 text-sm">
               Reload page
             </button>
           </div>

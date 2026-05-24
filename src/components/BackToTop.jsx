@@ -24,10 +24,10 @@ const BackToTop = () => {
                  w-11 h-11 sm:w-12 sm:h-12 rounded-full
                  bg-surface-elevated border border-line-strong
                  text-fg-secondary hover:text-fg-primary
-                 hover:bg-surface-overlay hover:border-amber-500/50 hover:shadow-glow
+                 hover:bg-surface-overlay hover:border-amber-500/50
                  active:scale-95
-                 transition-all duration-200
-                 shadow-elevated
+                 transition-colors duration-200
+                 shadow-sm
                  flex items-center justify-center
                  backdrop-blur-sm"
       aria-label="Back to top"

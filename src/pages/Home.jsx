@@ -148,7 +148,7 @@ const Home = () => {
             made the header noisy. */}
         <div className='absolute top-24 left-0 right-0 z-20 flex items-center px-6 sm:px-10 lg:px-16'>
           <div className='luxe-pill'>
-            <span className='inline-block w-1.5 h-1.5 rounded-full bg-violet-400 shadow-[0_0_8px_rgba(139,92,246,0.8)]' />
+            <span className='inline-block w-1.5 h-1.5 rounded-full bg-amber-400' />
             Sid · Engineer
           </div>
         </div>
@@ -157,7 +157,7 @@ const Home = () => {
         <div className='relative z-10 w-full px-6 sm:px-10 lg:px-16 py-24 sm:py-32'>
           <div className='max-w-4xl'>
             <p className='eyebrow-mono mb-6 flex items-center gap-2'>
-              <span className='inline-block w-2 h-2 rounded-full bg-accent-emerald shadow-[0_0_10px_rgba(52,211,153,0.7)] animate-pulse' />
+              <span className='inline-block w-2 h-2 rounded-full bg-accent-emerald animate-pulse' />
               Currently building · 2026
             </p>
 
@@ -203,11 +203,11 @@ const Home = () => {
             Scroll to explore
           </span>
           <div className='relative w-10 h-10 flex items-center justify-center'>
-            <span className='absolute inset-0 rounded-full border border-violet-400/40 animate-ping' />
-            <span className='absolute inset-1.5 rounded-full bg-violet-500/10 backdrop-blur-sm border border-violet-400/40' />
+            <span className='absolute inset-0 rounded-full border border-amber-400/40 animate-ping' />
+            <span className='absolute inset-1.5 rounded-full bg-amber-500/10 backdrop-blur-sm border border-amber-400/40' />
             <svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor'
               strokeWidth='2.5' strokeLinecap='round' strokeLinejoin='round'
-              className='relative text-violet-200 animate-bounce'>
+              className='relative text-amber-200 animate-bounce'>
               <path d='M6 9l6 6 6-6' />
             </svg>
           </div>
@@ -263,15 +263,13 @@ const Home = () => {
       {/* Drag hint — shows on first load */}
       {showHint && (
         <div className='absolute bottom-20 sm:bottom-24 left-0 right-0 z-10 flex justify-center pointer-events-none px-4'>
-          <div className='flex items-center gap-2 sm:gap-3 bg-white/90 backdrop-blur-sm px-4 sm:px-5 py-2.5 sm:py-3 rounded-full shadow-lg
+          <div className='flex items-center gap-2 sm:gap-3 bg-white/90 backdrop-blur-sm px-4 sm:px-5 py-2.5 sm:py-3 rounded-lg shadow-sm
                           animate-bounce max-w-[90vw]' style={{ animationDuration: '2s' }}>
-            <span className='text-xl sm:text-2xl shrink-0'>👆</span>
             <div className='text-xs sm:text-sm text-gray-700'>
               <span className='font-semibold'>Drag left or right</span> to explore
               <br />
               <span className='text-gray-400 text-[10px] sm:text-xs'>Stop at each station to learn more</span>
             </div>
-            <span className='text-base sm:text-lg shrink-0'>↔</span>
           </div>
         </div>
       )}
@@ -284,7 +282,7 @@ const Home = () => {
           </span>
           <div className='w-40 h-1 bg-white/20 rounded-full overflow-hidden backdrop-blur-sm'>
             <div
-              className='h-full bg-gradient-to-r from-blue-400 to-cyan-400 rounded-full'
+              className='h-full bg-cyan-400 rounded-full'
               style={{ width: `${navProgress}%`, transition: 'width 0.05s linear' }}
             />
           </div>
@@ -298,7 +296,7 @@ const Home = () => {
               key={s}
               className={`w-2 h-2 rounded-full transition-all duration-300 ${
                 currentStage === s
-                  ? 'bg-blue-400 scale-125 shadow-md shadow-blue-400/50'
+                  ? 'bg-amber-400 scale-125'
                   : 'bg-white/30'
               }`}
             />

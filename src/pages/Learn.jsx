@@ -1716,7 +1716,7 @@ function TutorialCard({ tutorial, isOpen, onToggle, onComplete, completed }) {
             </div>
             <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-purple-500 to-cyan-500 rounded-full transition-all duration-500"
+                className="h-full bg-amber-500 rounded-full transition-all duration-500"
                 style={{ width: `${progress}%` }}
               />
             </div>

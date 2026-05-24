@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Modal, Input, Tooltip, message as antMessage } from 'antd'
-import { BulbOutlined, CopyOutlined, CheckOutlined } from '@ant-design/icons'
+import { BulbOutlined, CopyOutlined, CheckOutlined, ReloadOutlined } from '@ant-design/icons'
 import { promptCoach } from '../api/ai'
 
 // ─── Family catalog ───────────────────────────────────────────────
@@ -156,7 +156,7 @@ export default function PromptHelper({
         body: { padding: 0 },
         mask: { backdropFilter: 'blur(6px)' },
       }}>
-      <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-gray-800/80 bg-gradient-to-r from-amber-500/10 via-fuchsia-500/5 to-transparent">
+      <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-gray-800/80 bg-amber-500/8">
         <div className="flex items-center gap-2 min-w-0">
           <BulbOutlined className="text-amber-400 shrink-0" />
           <div className="min-w-0">
@@ -170,8 +170,8 @@ export default function PromptHelper({
         <div className="flex items-center gap-1.5 shrink-0">
           {(idea || coachResult) && (
             <button onClick={() => { setIdea(''); setCoachResult(null); setCoachError('') }}
-              className="text-[10px] uppercase tracking-wider text-gray-500 hover:text-amber-300 px-2 py-1 rounded border border-gray-800 hover:border-amber-500/50">
-              ↻ Reset
+              className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-gray-500 hover:text-amber-300 px-2 py-1 rounded border border-gray-800 hover:border-amber-500/50">
+              <ReloadOutlined /> Reset
             </button>
           )}
           <button onClick={onClose}
@@ -185,8 +185,8 @@ export default function PromptHelper({
         {/* Ask AI */}
         <section>
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-[10px] uppercase tracking-wider text-fuchsia-300 font-semibold">
-              ✨ Describe what you want
+            <span className="text-[10px] uppercase tracking-wider text-amber-300 font-semibold">
+              Describe what you want
             </span>
             <span className="text-[9px] font-mono text-gray-600">powered by Groq · llama-3.3-70b</span>
           </div>
@@ -204,35 +204,35 @@ export default function PromptHelper({
             disabled={coachLoading} maxLength={500} showCount
             onPressEnter={(e) => { if (!e.shiftKey) { e.preventDefault(); askCoach() } }}
           />
-          {coachError && <p className="text-rose-400 text-xs mt-2">✗ {coachError}</p>}
+          {coachError && <p className="text-rose-400 text-xs mt-2">{coachError}</p>}
           <div className="flex items-center justify-between gap-2 mt-2">
             <p className="text-[10px] text-gray-600">
               Press <span className="font-mono text-gray-400">Enter</span> to ask · Shift+Enter for newline
             </p>
             <button onClick={askCoach} disabled={coachLoading || !idea.trim()}
-              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition-all ${
+              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors ${
                 coachLoading || !idea.trim()
                   ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-fuchsia-500 to-amber-500 text-black hover:scale-[1.02]'
+                  : 'bg-amber-500 text-black hover:bg-amber-400'
               }`}>
               {coachLoading ? (
                 <><span className="w-3 h-3 rounded-full border-2 border-black/30 border-t-black animate-spin" />Thinking…</>
-              ) : <>✨ Generate prompt</>}
+              ) : <>Generate prompt</>}
             </button>
           </div>
 
           {coachResult && (
-            <div className="mt-3 rounded-xl border border-fuchsia-500/40 bg-gradient-to-b from-fuchsia-500/10 to-transparent p-3 space-y-3">
+            <div className="mt-3 rounded-xl border border-amber-500/40 bg-amber-500/8 p-3 space-y-3">
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] uppercase tracking-wider text-fuchsia-300 font-semibold">Tuned prompt</span>
+                  <span className="text-[10px] uppercase tracking-wider text-amber-300 font-semibold">Tuned prompt</span>
                   <div className="flex items-center gap-1">
                     <button onClick={() => copy(coachResult.prompt)}
                       className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700">
                       <CopyOutlined /> Copy
                     </button>
                     <button onClick={() => onApply(coachResult.prompt, coachResult.negative)}
-                      className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-fuchsia-500/30 hover:bg-fuchsia-500/40 text-fuchsia-200 border border-fuchsia-500/50 font-semibold">
+                      className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/50 font-semibold">
                       <CheckOutlined /> Use {coachResult.negative ? 'both' : 'this'}
                     </button>
                   </div>
@@ -242,11 +242,11 @@ export default function PromptHelper({
                 </p>
               </div>
               {coachResult.negative && onApplyNegative && (
-                <div className="pt-2 border-t border-fuchsia-500/20">
+                <div className="pt-2 border-t border-amber-500/20">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-[10px] uppercase tracking-wider text-rose-300 font-semibold">Negative prompt (suggested)</span>
                     <button onClick={() => { onApplyNegative(coachResult.negative); antMessage.success('Negative prompt applied') }}
-                      className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/40 font-semibold">
+                      className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-200 border border-rose-500/40 font-semibold">
                       <CheckOutlined /> Apply
                     </button>
                   </div>
@@ -269,7 +269,7 @@ export default function PromptHelper({
             <section>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] uppercase tracking-wider text-cyan-300 font-semibold">
-                  📋 {samples.length} {tip.label} starters
+                  {samples.length} {tip.label} starters
                 </span>
               </div>
               <ul className="space-y-2">

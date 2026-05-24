@@ -55,7 +55,6 @@ const stagger = {
 // ── Live/featured project list (Chess engine has an interactive route) ──
 const LIVE_PROJECTS = [
   {
-    icon: '♟',
     title: 'Chess Engine',
     tag: 'Systems · C',
     gradient: 'from-amber-500 via-orange-500 to-red-600',
@@ -70,7 +69,7 @@ const LIVE_PROJECTS = [
 // Mirrors the chess-engine telemetry pills: tabular-nums, mono, subtle
 // gradient backdrop, hover lifts the border. Cheap eye-candy, no JS.
 const TechChip = ({ children }) => (
-  <span className="border border-gray-800 bg-gradient-to-b from-white/[0.04] to-white/[0.01]
+  <span className="border border-gray-800 bg-white/[0.03]
                    text-gray-300 px-2 py-0.5 rounded-md text-[10px] tracking-wider uppercase
                    font-medium font-mono transition-colors hover:border-amber-500/30 hover:text-amber-200">
     {children}
@@ -121,11 +120,10 @@ const PreviewPlaceholder = ({ label, gradient }) => {
 
   return (
     <div
-      className={`w-full h-40 sm:h-full sm:min-h-[180px] flex items-center justify-center
-                  bg-gradient-to-br ${gradient || 'from-violet-500/20 via-indigo-500/10 to-cyan-500/20'}
-                  border-l border-gray-800/60 relative overflow-hidden`}
+      className="w-full h-40 sm:h-full sm:min-h-[180px] flex items-center justify-center
+                  bg-amber-500/10
+                  border-l border-gray-800/60 relative overflow-hidden"
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(139,92,246,0.18),transparent_60%)]" />
       <span className="relative font-poppins text-3xl sm:text-4xl font-bold text-white/80 tracking-wider select-none">
         {short || '◆'}
       </span>
@@ -168,7 +166,7 @@ const Projects = () => {
         >
           <motion.div variants={fadeUp} className="flex items-center gap-3 mb-3">
             <SectionPill dotColor="emerald" tone="amber">Live · Interactive</SectionPill>
-            <span className="h-px flex-1 bg-gradient-to-r from-amber-500/30 via-rose-500/15 to-transparent" />
+            <span className="h-px flex-1 bg-amber-500/20" />
           </motion.div>
 
           {LIVE_PROJECTS.map(proj => (
@@ -199,7 +197,7 @@ const Projects = () => {
                   {/* Action row */}
                   <div className="flex flex-wrap gap-2 items-center mt-5">
                     <Link to={proj.route} className="luxe-btn luxe-btn-primary">
-                      ▶ Visualize Live
+                      Visualize Live
                     </Link>
                     <a
                       href={proj.github}
@@ -244,7 +242,7 @@ const Projects = () => {
                       className="w-full h-40 sm:h-full object-cover border-b sm:border-b-0 sm:border-l border-gray-800/60"
                     />
                   ) : (
-                    <PreviewPlaceholder label={proj.title} gradient={`${proj.gradient ? `from-amber-500/25 via-orange-500/15 to-red-600/25` : ''}`} />
+                    <PreviewPlaceholder label={proj.title} />
                   )}
                 </div>
               </div>
@@ -262,7 +260,7 @@ const Projects = () => {
         >
           <motion.div variants={fadeUp} className="flex items-center gap-3 mb-3 mt-4">
             <SectionPill dotColor={null} tone="gray">All projects</SectionPill>
-            <span className="h-px flex-1 bg-gradient-to-r from-gray-800 via-gray-900 to-transparent" />
+            <span className="h-px flex-1 bg-gray-800" />
             <span className="text-[10px] font-mono tracking-wider text-gray-600 tabular-nums">{projects.length} total</span>
           </motion.div>
 
@@ -276,7 +274,7 @@ const Projects = () => {
                     <h3 className="text-xl font-semibold text-white">{project.name}</h3>
                     {project.tag && (
                       <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md
-                                       bg-violet-500/10 text-violet-300 border border-violet-500/25
+                                       bg-amber-500/10 text-amber-300 border border-amber-500/25
                                        uppercase tracking-wider">
                         {project.tag}
                       </span>
@@ -304,7 +302,7 @@ const Projects = () => {
                     {isChess && (
                       <>
                         <Link to="/chess" className="luxe-btn luxe-btn-primary">
-                          ▶ Visualize Live
+                          Visualize Live
                         </Link>
                         <div className="relative group inline-flex">
                           <div className="w-7 h-7 rounded-full bg-amber-500/10 border border-amber-500/30
@@ -334,9 +332,8 @@ const Projects = () => {
                 <div className="w-full sm:w-72 shrink-0 order-first sm:order-last">
                   {project.iconUrl ? (
                     <div className="w-full h-40 sm:h-full sm:min-h-[180px] relative overflow-hidden
-                                    bg-gradient-to-br from-violet-500/15 via-indigo-500/8 to-cyan-500/15
+                                    bg-amber-500/10
                                     border-b sm:border-b-0 sm:border-l border-gray-800/60 flex items-center justify-center">
-                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(139,92,246,0.16),transparent_60%)]" />
                       <img
                         src={project.iconUrl}
                         alt={project.name}

@@ -19,19 +19,19 @@ const ShadowGenerator = lazy(() => import('../components/lab/ShadowGenerator'))
 
 /* ── Demo definitions ── */
 const DEMOS = [
-  { id: 'holographic',  label: 'Holographic Card',     icon: '💳', tags: ['3D Tilt', 'Rainbow Overlay', 'Mouse Tracking'],         color: 'from-blue-500 to-cyan-400',     interactive: false },
-  { id: 'aurora',       label: 'Aurora Borealis',       icon: '🌌', tags: ['CSS Animation', 'Starfield', 'Blend Modes', 'Pure CSS'], color: 'from-green-500 to-teal-400',    interactive: false },
-  { id: 'morphing',     label: 'Morphing Blob',         icon: '🫧', tags: ['Border-Radius', 'Frosted Glass', 'Mouse Reactive'],     color: 'from-purple-500 to-pink-500',   interactive: false },
-  { id: 'cube',         label: '3D Tech Cube',          icon: '🧊', tags: ['CSS 3D', 'Drag Rotate', 'preserve-3d', 'Touch'],        color: 'from-orange-500 to-red-500',    interactive: false },
-  { id: 'marquee',      label: 'Infinite Marquee',      icon: '📜', tags: ['Glassmorphism', 'Shimmer Borders', 'Hover Pause'],      color: 'from-yellow-500 to-orange-400', interactive: false },
-  { id: 'neon',         label: 'Neon Sign Text',        icon: '💡', tags: ['CSS Glow', 'Flicker', 'Letter Animation'],              color: 'from-pink-500 to-rose-500',     interactive: false },
-  { id: 'magnetic',     label: 'Magnetic Button',       icon: '🧲', tags: ['Cursor Tracking', 'Ripple', 'Gradient Border'],         color: 'from-indigo-500 to-violet-500', interactive: false },
-  { id: 'gradient',     label: 'Gradient Generator',    icon: '🎨', tags: ['Color Picker', 'Presets', 'Copy CSS', 'Custom Input'],  color: 'from-indigo-500 to-pink-500',   interactive: true },
-  { id: 'wave',         label: 'Wave Visualizer',       icon: '🌊', tags: ['Canvas', 'Sine/Triangle/Square', 'Controls', 'Layers'], color: 'from-cyan-500 to-blue-500',     interactive: true },
-  { id: 'glitch',       label: 'Glitch Text Effect',    icon: '📺', tags: ['Canvas', 'Custom Text', 'RGB Split', 'VHS Scanline'],   color: 'from-red-500 to-pink-500',      interactive: true },
-  { id: 'particles',    label: 'Particle Playground',   icon: '✨', tags: ['Canvas', 'Attract/Repel', 'Gravity Wells', 'Palettes'], color: 'from-cyan-400 to-green-400',    interactive: true },
-  { id: 'textanim',     label: 'Text Animator',         icon: '🔤', tags: ['8 Effects', 'Custom Text', 'Colors', 'Speed Control'],  color: 'from-purple-400 to-cyan-400',   interactive: true },
-  { id: 'shadow',       label: 'Shadow Generator',      icon: '🖼', tags: ['Multi-Layer', 'Presets', 'Copy CSS', 'Neumorphism'],    color: 'from-gray-400 to-blue-500',     interactive: true },
+  { id: 'holographic',  label: 'Holographic Card',     tags: ['3D Tilt', 'Rainbow Overlay', 'Mouse Tracking'],         color: 'bg-cyan-500',  interactive: false },
+  { id: 'aurora',       label: 'Aurora Borealis',       tags: ['CSS Animation', 'Starfield', 'Blend Modes', 'Pure CSS'], color: 'bg-emerald-500', interactive: false },
+  { id: 'morphing',     label: 'Morphing Blob',         tags: ['Border-Radius', 'Frosted Glass', 'Mouse Reactive'],     color: 'bg-amber-500', interactive: false },
+  { id: 'cube',         label: '3D Tech Cube',          tags: ['CSS 3D', 'Drag Rotate', 'preserve-3d', 'Touch'],        color: 'bg-rose-500',  interactive: false },
+  { id: 'marquee',      label: 'Infinite Marquee',      tags: ['Glassmorphism', 'Shimmer Borders', 'Hover Pause'],      color: 'bg-amber-500', interactive: false },
+  { id: 'neon',         label: 'Neon Sign Text',        tags: ['CSS Glow', 'Flicker', 'Letter Animation'],              color: 'bg-rose-500',  interactive: false },
+  { id: 'magnetic',     label: 'Magnetic Button',       tags: ['Cursor Tracking', 'Ripple', 'Gradient Border'],         color: 'bg-amber-500', interactive: false },
+  { id: 'gradient',     label: 'Gradient Generator',    tags: ['Color Picker', 'Presets', 'Copy CSS', 'Custom Input'],  color: 'bg-cyan-500',  interactive: true },
+  { id: 'wave',         label: 'Wave Visualizer',       tags: ['Canvas', 'Sine/Triangle/Square', 'Controls', 'Layers'], color: 'bg-cyan-500',  interactive: true },
+  { id: 'glitch',       label: 'Glitch Text Effect',    tags: ['Canvas', 'Custom Text', 'RGB Split', 'VHS Scanline'],   color: 'bg-rose-500',  interactive: true },
+  { id: 'particles',    label: 'Particle Playground',   tags: ['Canvas', 'Attract/Repel', 'Gravity Wells', 'Palettes'], color: 'bg-cyan-500',  interactive: true },
+  { id: 'textanim',     label: 'Text Animator',         tags: ['8 Effects', 'Custom Text', 'Colors', 'Speed Control'],  color: 'bg-cyan-500',  interactive: true },
+  { id: 'shadow',       label: 'Shadow Generator',      tags: ['Multi-Layer', 'Presets', 'Copy CSS', 'Neumorphism'],    color: 'bg-cyan-500',  interactive: true },
 ]
 
 const DEMO_COMPONENTS = {
@@ -203,20 +203,13 @@ const Creative = () => {
             return (
               <FadeIn key={d.id} delay={0.25 + i * 0.04}>
                 <AnimatedCard effect={effectMap[d.id] || 'default'} onClick={() => handleClick(d.id)} className="h-full w-full">
-                  <div
-                    className={`luxe-card-hover relative group text-left p-4 transition-all duration-300 w-full ${
-                      isActive
-                        ? 'shadow-lg shadow-pink-900/20'
-                        : ''
-                    }`}
-                  >
+                  <div className="luxe-card-hover relative group text-left p-4 transition-all duration-300 w-full">
                   {/* Active indicator bar */}
                   {isActive && (
-                    <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${d.color}`} />
+                    <div className={`absolute inset-x-0 top-0 h-1 ${d.color}`} />
                   )}
 
                   <div className='flex items-center gap-2.5 mb-2'>
-                    <span className='text-2xl'>{d.icon}</span>
                     <span className='text-white font-bold text-sm'>{d.label}</span>
                   </div>
                   <div className='flex flex-wrap gap-1 mb-3'>
@@ -229,9 +222,9 @@ const Creative = () => {
                   </div>
                   <div className='flex items-center justify-end'>
                     <span className={`text-xs font-semibold transition-colors ${
-                      isActive ? 'text-pink-400' : 'text-gray-600 group-hover:text-gray-400'
+                      isActive ? 'text-amber-400' : 'text-gray-600 group-hover:text-gray-400'
                     }`}>
-                      {isActive ? '▼ Close' : '→ Open'}
+                      {isActive ? 'Close' : 'Open'}
                     </span>
                   </div>
                   </div>
@@ -243,7 +236,6 @@ const Creative = () => {
 
         {filteredDemos.length === 0 && (
           <div className="text-center py-16 luxe-card mt-6 p-8">
-            <div className="text-5xl mb-3" aria-hidden>🎨</div>
             <p className="text-gray-300 font-semibold mb-1">Nothing matches that filter yet</p>
             <p className="text-gray-500 text-sm mb-4">Try a different category.</p>
             <button
@@ -262,8 +254,7 @@ const Creative = () => {
           {/* Section header */}
           <div className='pt-8 pb-6'>
             <div className='flex items-center gap-3 mb-1'>
-              <span className='text-3xl'>{activeDemo.icon}</span>
-              <h2 className='font-poppins font-black text-3xl bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent'>
+              <h2 className='font-poppins font-black text-3xl text-amber-300'>
                 {activeDemo.label}
               </h2>
               {activeDemo.interactive && (
@@ -275,10 +266,10 @@ const Creative = () => {
                 onClick={() => setActive(null)}
                 className='ml-auto px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white rounded-lg text-sm font-semibold transition-colors'
               >
-                ✕ Close
+                Close
               </button>
             </div>
-            <div className='mt-4 h-px bg-gradient-to-r from-pink-900/60 to-transparent' />
+            <div className='mt-4 h-px bg-amber-900/40' />
           </div>
 
           {/* Render the active demo */}

@@ -19,7 +19,7 @@ export default function SummarizerPage() {
             <FileTextOutlined className="text-amber-300" />
             // Quick utility · no queue, no auth
           </div>
-          <h1 className="text-2xl sm:text-4xl font-bold leading-tight pb-1 gradient-text-cyan">
+          <h1 className="text-2xl sm:text-4xl font-bold leading-tight pb-1 text-cyan-300">
             Summarizer
           </h1>
           <p className="text-sm text-gray-400 max-w-2xl mt-2">

@@ -42,10 +42,10 @@ const Navbar = () => {
   // long bar with every studio was overflowing on lg viewports; the
   // rest live in the More dropdown grouped by category.
   const featuredPills = [
-    { to: '/ai-video',       label: 'AI Video',     color: 'from-cyan-500 via-purple-500 to-amber-500' },
-    { to: '/image-enhancer', label: 'Image Studio', color: 'from-cyan-300 via-fuchsia-400 to-amber-300' },
-    { to: '/3d',             label: '3D',           color: 'from-violet-400 via-fuchsia-400 to-cyan-400' },
-    { to: '/ai',             label: 'AI Chat',      color: 'from-blue-500 to-cyan-500' },
+    { to: '/ai-video',       label: 'AI Video',     color: 'bg-amber-500' },
+    { to: '/image-enhancer', label: 'Image Studio', color: 'bg-amber-500' },
+    { to: '/3d',             label: '3D',           color: 'bg-cyan-500' },
+    { to: '/ai',             label: 'AI Chat',      color: 'bg-cyan-500' },
   ];
 
   // Mega-menu groups — AI lanes kept together, Play (non-AI demos)
@@ -55,7 +55,7 @@ const Navbar = () => {
   const moreGroups = [
     {
       title: 'AI Studios',
-      accent: 'text-violet-300',
+      accent: 'text-amber-300',
       items: [
         // Image Studio now hosts Vision AI + Fast Image Gen as tabs (the
         // old standalone /vision and /ai-studio pages are sunset).
@@ -72,8 +72,8 @@ const Navbar = () => {
       title: 'Engineered',
       accent: 'text-cyan-300',
       items: [
-        { to: '/chess',      label: '♛ Chess Engine',  desc: 'Stockfish · clocks · saved games · piece themes' },
-        { to: '/runner',     label: '🏃 Hand Runner',   desc: 'Three.js · MediaPipe · ramps · oncoming trains' },
+        { to: '/chess',      label: 'Chess Engine',  desc: 'Stockfish · clocks · saved games · piece themes' },
+        { to: '/runner',     label: 'Hand Runner',   desc: 'Three.js · MediaPipe · ramps · oncoming trains' },
       ],
     },
     {
@@ -83,11 +83,11 @@ const Navbar = () => {
         { to: '/lab',        label: 'Interactive Lab',  desc: '17 mini-demos · 7 categories' },
         { to: '/creative',   label: 'Creative UI',      desc: '13 UI experiments' },
         { to: '/learn',      label: 'Learn DSA',        desc: 'Algorithms · system design · CP' },
-        { to: '/science',    label: '🛰 Explore Space', desc: '11 NASA modules · APOD · Mars · Asteroids' },
-        { to: '/explore',    label: '🌐 Web Playground', desc: '9 APIs · Pokémon · Memes · Countries · Quotes' },
-        { to: '/summarizer', label: '✂ Summarizer',    desc: 'Paste long text · get a tight summary' },
-        { to: '/yt-dl',      label: '🎬 YouTube DL',    desc: 'Paste a YouTube link · get MP3 or MP4 · 1hr+ works fine' },
-        { to: '/settings',   label: '🔒 Settings',      desc: "Admin · Sid's monitoring panel · server / DB / queues" },
+        { to: '/science',    label: 'Explore Space',    desc: '11 NASA modules · APOD · Mars · Asteroids' },
+        { to: '/explore',    label: 'Web Playground',   desc: '9 APIs · Pokémon · Memes · Countries · Quotes' },
+        { to: '/summarizer', label: 'Summarizer',       desc: 'Paste long text · get a tight summary' },
+        { to: '/yt-dl',      label: 'YouTube DL',       desc: 'Paste a YouTube link · get MP3 or MP4 · 1hr+ works fine' },
+        { to: '/settings',   label: 'Settings',         desc: "Admin · Sid's monitoring panel · server / DB / queues" },
       ],
     },
   ];
@@ -109,13 +109,13 @@ const Navbar = () => {
           <NavLink key={l.to} to={l.to} className={({ isActive }) =>
             `group relative text-[12px] xl:text-sm px-1.5 xl:px-2 py-1 transition-colors ${
               isActive
-                ? 'text-violet-300'
+                ? 'text-amber-300'
                 : isDark ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-black'
             }`}>
             {({ isActive }) => (
               <>
                 <span>{l.label}</span>
-                <span className={`absolute left-1.5 right-1.5 -bottom-0.5 h-px bg-gradient-to-r from-violet-400 via-fuchsia-400 to-cyan-400 transition-transform origin-left ${
+                <span className={`absolute left-1.5 right-1.5 -bottom-0.5 h-px bg-amber-400 transition-transform origin-left ${
                   isActive ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
                 }`} />
               </>
@@ -130,7 +130,7 @@ const Navbar = () => {
           <NavLink key={l.to} to={l.to} className={({ isActive }) =>
             `text-[10px] xl:text-[11px] px-2 xl:px-2.5 py-1 xl:py-1.5 rounded-lg font-semibold transition-all whitespace-nowrap ${
               isActive
-                ? `text-white bg-gradient-to-r ${l.color} shadow-md`
+                ? `text-black ${l.color}`
                 : isDark
                   ? 'text-gray-400 hover:text-white bg-gray-800/80 hover:bg-gray-700'
                   : 'text-gray-600 hover:text-black bg-gray-100 hover:bg-gray-200'
@@ -145,9 +145,9 @@ const Navbar = () => {
             onClick={() => setMoreOpen(o => !o)}
             className={`group text-[10px] xl:text-[11px] px-2 xl:px-2.5 py-1 xl:py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1 whitespace-nowrap border ${
               moreOpen
-                ? 'text-white bg-gradient-to-r from-violet-500/20 to-cyan-500/20 border-violet-400/40 shadow-md'
+                ? 'text-white bg-amber-500/15 border-amber-400/40'
                 : isDark
-                  ? 'text-gray-300 hover:text-white bg-gray-800/60 border-gray-700 hover:border-violet-400/40 hover:bg-gray-800'
+                  ? 'text-gray-300 hover:text-white bg-gray-800/60 border-gray-700 hover:border-amber-400/40 hover:bg-gray-800'
                   : 'text-gray-600 hover:text-black bg-gray-100 border-gray-200 hover:bg-gray-200'
             }`}>
             More
@@ -176,7 +176,7 @@ const Navbar = () => {
                             className={({ isActive }) =>
                               `group flex flex-col px-3 py-2 rounded-lg transition-all ${
                                 isActive
-                                  ? (isDark ? 'bg-white/[0.06] ring-1 ring-violet-400/40' : 'bg-violet-50 ring-1 ring-violet-200')
+                                  ? (isDark ? 'bg-white/[0.06] ring-1 ring-amber-400/40' : 'bg-amber-50 ring-1 ring-amber-200')
                                   : (isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-gray-50')
                               }`}>
                             {({ isActive }) => (
@@ -207,9 +207,8 @@ const Navbar = () => {
         <div className={`w-px h-4 mx-0.5 xl:mx-1 ${isDark ? 'bg-gray-700' : 'bg-gray-300'}`} />
 
         <a href="/resume.pdf" target="_blank" rel="noreferrer"
-          className="text-[10px] xl:text-[11px] px-2 xl:px-3 py-1 xl:py-1.5 rounded-lg text-white font-semibold whitespace-nowrap
-                     bg-gradient-to-r from-[#00c6ff] to-[#0072ff]
-                     hover:opacity-90 transition-opacity">
+          className="text-[10px] xl:text-[11px] px-2 xl:px-3 py-1 xl:py-1.5 rounded-lg text-black font-semibold whitespace-nowrap
+                     bg-amber-400 hover:bg-amber-300 transition-colors">
           Resume
         </a>
         <MusicBtn playing={playing} toggleMusic={toggleMusic} isDark={isDark} />
@@ -284,7 +283,7 @@ const Navbar = () => {
               {g.items.map(it => (
                 <NavLink key={it.to} to={it.to} className={({ isActive }) =>
                   `flex flex-col py-2.5 px-2 rounded-lg ${isActive
-                    ? 'text-violet-300 bg-violet-500/10'
+                    ? 'text-amber-300 bg-amber-500/10'
                     : isDark ? 'text-gray-300' : 'text-gray-700'
                   }`}>
                   <span className="text-sm font-medium">{it.label}</span>
@@ -295,8 +294,8 @@ const Navbar = () => {
           ))}
 
           <a href="/resume.pdf" target="_blank" rel="noreferrer"
-            className="text-sm px-4 py-2.5 rounded-lg text-white font-semibold text-center
-                       bg-gradient-to-r from-[#00c6ff] to-[#0072ff] shadow-sm mt-3">
+            className="text-sm px-4 py-2.5 rounded-lg text-black font-semibold text-center
+                       bg-amber-400 hover:bg-amber-300 mt-3">
             Resume
           </a>
           </motion.div>
@@ -310,8 +309,8 @@ const MusicBtn = ({ playing, toggleMusic, isDark }) => (
   <button onClick={toggleMusic}
     className={`relative w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 shrink-0 ${
       playing
-        ? isDark ? 'bg-cyan-500/20 text-cyan-400 shadow-lg shadow-cyan-500/20'
-                 : 'bg-blue-100 text-blue-600 shadow-md shadow-blue-200'
+        ? isDark ? 'bg-cyan-500/20 text-cyan-400'
+                 : 'bg-blue-100 text-blue-600'
         : isDark ? 'bg-gray-800 text-gray-500 hover:text-gray-300 hover:bg-gray-700'
                  : 'bg-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-300'
     }`}

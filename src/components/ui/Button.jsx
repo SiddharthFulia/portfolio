@@ -42,9 +42,9 @@ const VARIANTS = {
   primary: {
     type: 'primary',
     className:
-      '!bg-gradient-to-r !from-amber-500 !to-rose-500 ' +
-      '!border-amber-400/60 hover:!from-amber-400 hover:!to-rose-400 ' +
-      '!text-white !shadow-lg !shadow-amber-500/20',
+      '!bg-amber-500 !border-amber-500 ' +
+      'hover:!bg-amber-400 hover:!border-amber-400 ' +
+      '!text-black',
   },
   secondary: {
     type: 'default',

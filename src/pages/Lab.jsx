@@ -24,13 +24,13 @@ import { Link } from 'react-router-dom'
 
 /* ── Section definitions ── */
 const SECTIONS = [
-  { id: 'worlds',     label: '3D Worlds',      icon: '🪐', count: 3, color: 'from-blue-600 to-cyan-500',   desc: 'Three.js & Canvas simulations' },
-  { id: 'algorithms', label: 'Algorithms',      icon: '⚡', count: 7, color: 'from-yellow-500 to-orange-500', desc: 'Step-by-step algorithm visualizers' },
-  { id: 'ai',         label: 'AI & Games',      icon: '🤖', count: 1, color: 'from-green-500 to-emerald-500', desc: 'Minimax & game theory AI' },
-  { id: 'math',       label: 'Mathematics',     icon: '🎨', count: 4, color: 'from-pink-500 to-rose-500',   desc: 'Fractals, automata & physics' },
-  { id: 'data',       label: 'Data & SQL',      icon: '🗄',  count: 1, color: 'from-indigo-500 to-blue-500', desc: 'In-browser SQL playground' },
-  { id: 'code',       label: 'Code',            icon: '💻', count: 1, color: 'from-gray-500 to-gray-600',   desc: 'JavaScript REPL' },
-  { id: 'learn',      label: 'Learn',           icon: '📚', count: 1, color: 'from-purple-500 to-indigo-500', desc: 'DSA tutorials & explanations' },
+  { id: 'worlds',     label: '3D Worlds',      count: 3, color: 'bg-cyan-500',   desc: 'Three.js & Canvas simulations' },
+  { id: 'algorithms', label: 'Algorithms',      count: 7, color: 'bg-amber-500', desc: 'Step-by-step algorithm visualizers' },
+  { id: 'ai',         label: 'AI & Games',      count: 1, color: 'bg-emerald-500', desc: 'Minimax & game theory AI' },
+  { id: 'math',       label: 'Mathematics',     count: 4, color: 'bg-rose-500',   desc: 'Fractals, automata & physics' },
+  { id: 'data',       label: 'Data & SQL',      count: 1, color: 'bg-cyan-500', desc: 'In-browser SQL playground' },
+  { id: 'code',       label: 'Code',            count: 1, color: 'bg-gray-500',   desc: 'JavaScript REPL' },
+  { id: 'learn',      label: 'Learn',           count: 1, color: 'bg-amber-500', desc: 'DSA tutorials & explanations' },
 ]
 
 /* ── Fade-in animation ── */
@@ -214,8 +214,8 @@ function LearnSection() {
   return (
     <div className="text-center py-8">
       <p className="text-gray-400 mb-4">DSA tutorials with step-by-step explanations, code examples, and interactive demos.</p>
-      <Link to="/learn" className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl transition-colors">
-        Open Tutorials →
+      <Link to="/learn" className="inline-flex items-center gap-2 px-6 py-3 bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-lg transition-colors">
+        Open Tutorials
       </Link>
     </div>
   )
@@ -279,7 +279,7 @@ const Lab = () => {
             onClick={() => handleClick('worlds')}
             className='luxe-btn luxe-btn-primary tap-44'
           >
-            Start Exploring →
+            Start Exploring
           </button>
         </div>
 
@@ -303,20 +303,15 @@ const Lab = () => {
             return (
               <AnimatedCard key={s.id} effect={effectMap[s.id] || 'default'} onClick={() => handleClick(s.id)} className="h-full">
                 <div
-                  className={`luxe-card luxe-card-hover relative group text-left p-4 transition-all duration-300 ${
-                    isActive
-                      ? 'shadow-lg shadow-cyan-900/20'
-                      : ''
-                  }`}
+                  className="luxe-card luxe-card-hover relative group text-left p-4 transition-all duration-300"
                   style={{ animationDelay: `${i * 60}ms` }}
                 >
                 {/* Active indicator bar */}
                 {isActive && (
-                  <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${s.color}`} />
+                  <div className={`absolute inset-x-0 top-0 h-1 ${s.color}`} />
                 )}
 
                 <div className='flex items-center gap-2.5 mb-2'>
-                  <span className='text-2xl'>{s.icon}</span>
                   <span className='text-white font-bold text-sm'>{s.label}</span>
                 </div>
                 <p className='text-gray-500 text-xs leading-relaxed'>{s.desc}</p>
@@ -325,7 +320,7 @@ const Lab = () => {
                   <span className={`text-xs font-semibold transition-colors ${
                     isActive ? 'text-cyan-400' : 'text-gray-600 group-hover:text-gray-400'
                   }`}>
-                    {isActive ? '▼ Close' : '→ Open'}
+                    {isActive ? 'Close' : 'Open'}
                   </span>
                 </div>
                 </div>
@@ -341,19 +336,18 @@ const Lab = () => {
           {/* Section header */}
           <div className='pt-8 pb-6'>
             <div className='flex items-center gap-3 mb-1'>
-              <span className='text-3xl'>{activeSection.icon}</span>
-              <h2 className='font-poppins font-black text-3xl bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent'>
+              <h2 className='font-poppins font-black text-3xl text-cyan-300'>
                 {activeSection.label}
               </h2>
               <button
                 onClick={() => setActive(null)}
                 className='ml-auto px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white rounded-lg text-sm font-semibold transition-colors'
               >
-                ✕ Close Section
+                Close Section
               </button>
             </div>
-            <p className='text-gray-500 text-sm ml-12'>{activeSection.desc}</p>
-            <div className='mt-4 h-px bg-gradient-to-r from-cyan-900/60 to-transparent' />
+            <p className='text-gray-500 text-sm'>{activeSection.desc}</p>
+            <div className='mt-4 h-px bg-cyan-900/40' />
           </div>
 
           {/* Render only the active section */}

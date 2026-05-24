@@ -20,6 +20,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Modal, Progress, message as antMessage } from 'antd'
+import { DownloadOutlined } from '@ant-design/icons'
 import { Button } from '../ui'
 import {
   generateVideo, getJobStatus, uploadSourceImage,
@@ -36,7 +37,7 @@ const PHASES = {
   rendering:  { label: 'Rendering shot',      tone: 'text-amber-300' },
   extracting: { label: 'Extracting frame',    tone: 'text-cyan-300' },
   uploading:  { label: 'Uploading frame',     tone: 'text-cyan-300' },
-  combining:  { label: 'Combining',           tone: 'text-violet-300' },
+  combining:  { label: 'Combining',           tone: 'text-amber-300' },
   done:       { label: 'Done',                tone: 'text-emerald-300' },
   failed:     { label: 'Failed',              tone: 'text-rose-300' },
   cancelled:  { label: 'Cancelled',           tone: 'text-fg-muted' },
@@ -449,7 +450,7 @@ export default function CinemaRenderer({ project }) {
                 {(shotRow.status === 'queued' || shotRow.status === 'processing') && (
                   <Progress
                     percent={shotRow.progressPercent || 0} size="small" showInfo={false}
-                    strokeColor={{ from: '#fbbf24', to: '#fb7185' }} trailColor="#1f2937"
+                    strokeColor="#fbbf24" trailColor="#1f2937"
                     className="!mt-2 !mb-0"
                   />
                 )}
@@ -473,18 +474,18 @@ export default function CinemaRenderer({ project }) {
         <div className="mt-4 pt-4 border-t border-line">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
-              <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-violet-300/80">— Final combine</p>
+              <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80">— Final combine</p>
               <h4 className="mt-1 text-sm font-semibold text-fg-primary tabular-nums">
                 {combineRow?.status === 'completed' ? 'Stitched mp4 ready' : `ffmpeg-concat #${combineJobId}`}
               </h4>
             </div>
             {phase === 'done' && finalDownloadHref ? (
               <a href={finalDownloadHref}
-                className="text-xs font-semibold px-3 py-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20">
-                ↓ Download final mp4
+                className="text-xs font-semibold px-3 py-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20 inline-flex items-center gap-1.5">
+                <DownloadOutlined /> Download final mp4
               </a>
             ) : (
-              <span className="text-[11px] font-mono text-violet-300 uppercase tracking-wider">
+              <span className="text-[11px] font-mono text-amber-300 uppercase tracking-wider">
                 {combineRow?.status || 'queued'} · {combineRow?.progress || 0}%
               </span>
             )}
@@ -492,7 +493,7 @@ export default function CinemaRenderer({ project }) {
           {(combineRow?.status === 'queued' || combineRow?.status === 'processing') && (
             <Progress
               percent={combineRow?.progress || 0} size="small" showInfo={false}
-              strokeColor={{ from: '#a78bfa', to: '#e879f9' }} trailColor="#1f2937"
+              strokeColor="#fbbf24" trailColor="#1f2937"
               className="!mt-2"
             />
           )}

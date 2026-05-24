@@ -22,7 +22,6 @@ const stagger = {
 const EXPERTISE = [
   {
     id: 'backend',
-    icon: '⚙️',
     title: 'Backend Architecture',
     color: 'from-blue-600 to-cyan-500',
     tags: ['Node.js', 'Express.js', 'REST APIs', 'RabbitMQ', 'Redis', 'PM2'],
@@ -37,7 +36,6 @@ const EXPERTISE = [
   },
   {
     id: 'frontend',
-    icon: '🎨',
     title: 'Frontend & UI',
     color: 'from-purple-600 to-pink-500',
     tags: ['React', 'Next.js 15', 'TailwindCSS', 'Ant Design', 'MUI', 'Framer Motion', 'Three.js'],
@@ -52,7 +50,6 @@ const EXPERTISE = [
   },
   {
     id: 'ai',
-    icon: '🤖',
     title: 'AI & ML Systems',
     color: 'from-green-600 to-emerald-500',
     tags: ['LangChain', 'OpenAI API', 'Anthropic SDK', 'Google Vertex AI', 'PyTorch', 'GNNs'],
@@ -67,7 +64,6 @@ const EXPERTISE = [
   },
   {
     id: 'database',
-    icon: '🗄️',
     title: 'Databases & Data',
     color: 'from-orange-600 to-yellow-500',
     tags: ['MongoDB', 'PostgreSQL', 'MySQL', 'Redis', 'Google BigQuery', 'Knex.js'],
@@ -82,7 +78,6 @@ const EXPERTISE = [
   },
   {
     id: 'devops',
-    icon: '🐳',
     title: 'DevOps & Cloud',
     color: 'from-cyan-600 to-blue-500',
     tags: ['Docker', 'Google Cloud', 'Puppeteer', 'Node-cron', 'CI/CD'],
@@ -97,7 +92,6 @@ const EXPERTISE = [
   },
   {
     id: 'sysdesign',
-    icon: '🏗️',
     title: 'System Design',
     color: 'from-red-600 to-rose-500',
     tags: ['Microservices', 'Message Queues', 'Caching', 'Rate Limiting', 'API Design'],
@@ -119,21 +113,18 @@ function ExpertiseCard({ item }) {
   return (
     <motion.div variants={fadeUp}>
       <AnimatedCard effect={EXPERTISE_EFFECTS[item.id] || 'default'}>
-      <div className={`luxe-card overflow-hidden transition-all duration-300 ${open ? 'border-violet-500/40' : ''}`}>
+      <div className={`luxe-card overflow-hidden transition-all duration-300 ${open ? 'border-amber-500/40' : ''}`}>
         {/* Header — always visible, clickable */}
         <button
           onClick={() => setOpen(o => !o)}
           className="w-full text-left"
         >
           <div className="p-5 flex items-center justify-between border-b border-white/[0.06]">
-            <div className="flex items-center gap-3">
-              <span className="text-3xl">{item.icon}</span>
-              <div>
-                <h4 className="text-white font-poppins font-bold text-lg">{item.title}</h4>
-                <p className="luxe-body-muted text-xs mt-0.5 max-w-md">{item.summary}</p>
-              </div>
+            <div>
+              <h4 className="text-white font-poppins font-bold text-lg">{item.title}</h4>
+              <p className="luxe-body-muted text-xs mt-0.5 max-w-md">{item.summary}</p>
             </div>
-            <span className={`text-violet-300 text-xl transition-transform duration-300 ${open ? 'rotate-45' : ''}`}>+</span>
+            <span className={`text-amber-300 text-xl transition-transform duration-300 ${open ? 'rotate-45' : ''}`}>+</span>
           </div>
         </button>
 
@@ -157,7 +148,7 @@ function ExpertiseCard({ item }) {
           <ul className="p-5 space-y-3">
             {item.details.map((d, i) => (
               <li key={i} className="flex gap-2 luxe-body-muted text-sm leading-relaxed">
-                <span className="text-violet-400 mt-0.5 shrink-0">▸</span>
+                <span className="text-amber-400 mt-0.5 shrink-0">▸</span>
                 <span>{d}</span>
               </li>
             ))}
@@ -186,7 +177,7 @@ function SkillGroupCard({ group }) {
     <motion.div variants={fadeUp} className="luxe-card luxe-card-hover p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="luxe-eyebrow text-violet-300/80">{group.key}</p>
+          <p className="luxe-eyebrow text-amber-300/80">{group.key}</p>
           <h4 className="text-white font-semibold text-base mt-1">{group.label}</h4>
         </div>
         {/* tiny dark preview thumb — icon stack hint */}
@@ -353,7 +344,7 @@ const About = () => {
                 className="absolute left-[6px] top-1 bottom-1 w-px"
                 style={{
                   backgroundImage:
-                    'linear-gradient(to bottom, rgba(139,92,246,0.55) 0, rgba(139,92,246,0.55) 4px, transparent 4px, transparent 8px)',
+                    'linear-gradient(to bottom, rgba(251,191,36,0.45) 0, rgba(251,191,36,0.45) 4px, transparent 4px, transparent 8px)',
                   backgroundSize: '1px 8px',
                   backgroundRepeat: 'repeat-y',
                 }}
@@ -366,7 +357,7 @@ const About = () => {
                     <span
                       aria-hidden
                       className="absolute -left-5 top-5 w-3 h-3 rounded-full bg-[#0a0a0e] border-2"
-                      style={{ borderColor: '#8b5cf6', boxShadow: '0 0 0 3px rgba(139,92,246,0.12)' }}
+                      style={{ borderColor: '#fbbf24' }}
                     />
                     <div className="luxe-card luxe-card-hover p-5 sm:p-6">
                       <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -439,30 +430,27 @@ const About = () => {
                   <CardWrapper>
                     <div className="luxe-card luxe-card-hover p-6">
                       <div className="flex items-start justify-between gap-4 flex-wrap">
-                        <div className="flex items-center gap-3">
-                          <span className="text-3xl">{pub.emoji}</span>
-                          <div>
-                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md
-                                             bg-violet-500/10 border border-violet-500/30 text-violet-200">
-                              {pub.status}
-                            </span>
-                            <p className="luxe-body-muted text-xs mt-1">{pub.conference}</p>
-                          </div>
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md
+                                           bg-amber-500/10 border border-amber-500/30 text-amber-200">
+                            {pub.status}
+                          </span>
+                          <p className="luxe-body-muted text-xs mt-1">{pub.conference}</p>
                         </div>
                         {pub.linkLabel && (
-                          <span className="text-violet-300 text-sm font-semibold group-hover:underline whitespace-nowrap">
+                          <span className="text-amber-300 text-sm font-semibold group-hover:underline whitespace-nowrap">
                             {pub.linkLabel} ↗
                           </span>
                         )}
                       </div>
                       <h4 className={`mt-4 font-poppins font-semibold text-base leading-snug
-                                      ${pub.link ? 'text-white group-hover:text-violet-200' : 'text-white'}`}>
+                                      ${pub.link ? 'text-white group-hover:text-amber-200' : 'text-white'}`}>
                         {pub.title}
                       </h4>
                       <ul className="mt-4 space-y-1.5">
                         {pub.highlights.map((h, i) => (
                           <li key={i} className="luxe-body-muted text-sm flex gap-2">
-                            <span className="text-violet-400 mt-0.5">▸</span>
+                            <span className="text-amber-400 mt-0.5">▸</span>
                             <span>{h}</span>
                           </li>
                         ))}
@@ -490,15 +478,14 @@ const About = () => {
             {achievements.map((ach) => (
               <motion.div key={ach.title} variants={fadeUp}>
                 <div className="luxe-card luxe-card-hover p-6 h-full flex flex-col gap-3">
-                  <span className="text-4xl">{ach.emoji}</span>
                   <div>
                     <h4 className="font-poppins font-semibold text-base text-white leading-snug">{ach.title}</h4>
-                    <p className="mt-1 text-2xl font-poppins font-extrabold text-violet-300">{ach.rank}</p>
+                    <p className="mt-1 text-2xl font-poppins font-extrabold text-amber-300">{ach.rank}</p>
                     <p className="luxe-body-muted text-xs mt-2 leading-relaxed">{ach.sub}</p>
                   </div>
                   <div className="flex gap-3 flex-wrap pt-1 mt-auto">
                     <a href={ach.linkedinLink} target="_blank" rel="noreferrer"
-                       className="text-xs font-semibold text-violet-300 hover:text-violet-200 hover:underline">
+                       className="text-xs font-semibold text-amber-300 hover:text-amber-200 hover:underline">
                       LinkedIn Post ↗
                     </a>
                     <a href={ach.certLink} target="_blank" rel="noreferrer"
@@ -530,14 +517,11 @@ const About = () => {
                 <div className="luxe-card luxe-card-hover overflow-hidden">
                   {/* Header */}
                   <div className="p-5 flex items-center justify-between border-b border-white/[0.06]">
-                    <div className="flex items-center gap-3">
-                      <span className="text-4xl">{cp.emoji}</span>
-                      <div>
-                        <h4 className="text-white font-poppins font-bold text-xl">{cp.platform}</h4>
-                        {cp.stars && (
-                          <span className="text-violet-300 text-sm font-semibold">{cp.stars} · {cp.rating}</span>
-                        )}
-                      </div>
+                    <div>
+                      <h4 className="text-white font-poppins font-bold text-xl">{cp.platform}</h4>
+                      {cp.stars && (
+                        <span className="text-amber-300 text-sm font-semibold">{cp.stars} · {cp.rating}</span>
+                      )}
                     </div>
                     <div className="text-right">
                       <p className="text-white font-extrabold text-xl">{cp.highlight}</p>

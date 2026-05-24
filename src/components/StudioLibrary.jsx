@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Modal, message as antMessage } from 'antd'
-import { DeleteOutlined, CheckOutlined, AppstoreOutlined, ReloadOutlined } from '@ant-design/icons'
+import { DeleteOutlined, CheckOutlined, AppstoreOutlined, ReloadOutlined, CheckSquareOutlined } from '@ant-design/icons'
 
 // Cheap structural compare: same length, same id order, same status per item.
 // Used so the library doesn't repaint card by card when polling returns the
@@ -143,12 +143,12 @@ export default function StudioLibrary({
             <ReloadOutlined /> Refresh
           </button>
           <button onClick={() => setSelectMode(s => !s)}
-            className={`px-3 py-1 text-[10px] rounded-full border transition-all ${
+            className={`flex items-center gap-1 px-3 py-1 text-[10px] rounded-full border transition-all ${
               selectMode
-                ? 'bg-amber-500/20 text-amber-200 border-amber-400/50'
+                ? 'bg-amber-500/15 text-amber-200 border-amber-400/50'
                 : 'bg-gray-900/60 text-gray-400 border-gray-800 hover:border-gray-700 hover:text-gray-200'
             }`}>
-            {selectMode ? `Selecting (${selCount})` : '☑ Select'}
+            <CheckSquareOutlined /> {selectMode ? `Selecting (${selCount})` : 'Select'}
           </button>
           {selectMode && (
             <>
@@ -166,7 +166,7 @@ export default function StudioLibrary({
               {selCount > 0 && (
                 <button onClick={doBulkDelete} disabled={bulkBusy}
                   title={`Delete ${selCount} selected`}
-                  className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/40 font-semibold disabled:opacity-50 transition-colors">
+                  className="flex items-center gap-1 text-[10px] px-3 py-1 rounded-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-200 border border-rose-500/40 font-semibold disabled:opacity-50 transition-colors">
                   <DeleteOutlined /> Delete {selCount}
                 </button>
               )}
@@ -183,7 +183,7 @@ export default function StudioLibrary({
               <button key={v} onClick={() => setFilter(v)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] rounded-lg border transition-colors ${
                   active
-                    ? 'bg-cyan-600/20 text-cyan-300 border-cyan-500/40'
+                    ? 'bg-cyan-500/10 text-cyan-300 border-cyan-500/40'
                     : 'bg-gray-800/60 hover:bg-gray-800 text-gray-400 border-transparent hover:border-gray-700'
                 }`}>
                 <span className="capitalize">{v}</span>
@@ -219,12 +219,12 @@ export default function StudioLibrary({
 
       {selectMode && selCount > 0 && (
         <div className="sticky bottom-3 z-30 mx-auto max-w-xl mt-4">
-          <div className={`rounded-2xl border bg-gradient-to-r from-gray-900/95 via-gray-950/95 to-gray-900/95 backdrop-blur p-3 shadow-2xl ${accentClasses} flex items-center justify-between gap-3 flex-wrap`}>
+          <div className={`rounded-lg border bg-gray-950/95 backdrop-blur p-3 shadow-sm ${accentClasses} flex items-center justify-between gap-3 flex-wrap`}>
             <span className="text-xs text-gray-300">
               <span className="font-mono text-cyan-300">{selCount}</span> selected
             </span>
             <button onClick={doBulkDelete} disabled={bulkBusy}
-              className="flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/40 font-semibold disabled:opacity-50">
+              className="flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-200 border border-rose-500/40 font-semibold disabled:opacity-50">
               <DeleteOutlined /> Delete {selCount}
             </button>
           </div>
@@ -238,9 +238,9 @@ export default function StudioLibrary({
 export function SelectCheckbox({ checked, onToggle }) {
   return (
     <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggle?.() }}
-      className={`absolute top-1.5 right-1.5 w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold transition-all z-20 ${
+      className={`absolute top-1.5 right-1.5 w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold transition-colors z-20 ${
         checked
-          ? 'bg-cyan-400 text-black shadow-md'
+          ? 'bg-cyan-400 text-black'
           : 'bg-black/70 text-gray-400 border border-white/20 hover:bg-black/90 hover:text-white'
       }`}>
       {checked ? <CheckOutlined className="text-[11px]" /> : ''}

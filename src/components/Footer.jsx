@@ -69,7 +69,7 @@ const Footer = () => {
           {/* ── Bio column ── */}
           <div>
             <Link to='/' className='inline-block mb-3'>
-              <span className='text-lg font-bold gradient-text-amber'>Siddharth Fulia</span>
+              <span className='text-lg font-bold text-amber-300'>Siddharth Fulia</span>
             </Link>
             <p className='text-sm text-fg-muted leading-relaxed max-w-xs'>
               Engineer + designer. Builds AI tools, chess engines, 3D toys, and the occasional Subway-Surfers clone.

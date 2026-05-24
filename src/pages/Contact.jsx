@@ -96,7 +96,7 @@ const Contact = () => {
                        user gets clear positive feedback, no toast guesswork. ── */
                 <div className='luxe-card p-6 sm:p-8 flex flex-col items-center text-center'>
                   <div className='w-16 h-16 rounded-full bg-accent-emerald/15 border border-accent-emerald/40
-                                  flex items-center justify-center mb-4 shadow-glow'>
+                                  flex items-center justify-center mb-4'>
                     <svg width='32' height='32' viewBox='0 0 24 24' fill='none' stroke='#34d399'
                          strokeWidth='3' strokeLinecap='round' strokeLinejoin='round'>
                       <polyline points='20 6 9 17 4 12' />
@@ -198,7 +198,7 @@ const Contact = () => {
                         onFocus={handleFocus}
                         onBlur={handleBlur}
                         style={{
-                          background: 'linear-gradient(to right, #fde68a, #fda4af, #f0abfc)',
+                          background: '#fbbf24',
                           border: 'none',
                           color: '#0a0a0e',
                           fontWeight: 600,
@@ -298,7 +298,7 @@ const Contact = () => {
                   <a href='https://github.com/Sid-passion'
                     target='_blank' rel='noreferrer'
                     className='tap-44 flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/[0.04] transition-colors group'>
-                    <span className='w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-fg-secondary group-hover:text-accent-fuchsia transition-colors'>
+                    <span className='w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-fg-secondary group-hover:text-accent-amber transition-colors'>
                       <svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'>
                         <rect x='3' y='4' width='18' height='16' rx='2' /><path d='M9 9h6M9 13h6M9 17h4' />
                       </svg>

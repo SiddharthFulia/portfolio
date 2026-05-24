@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Modal, message as antMessage, InputNumber, Select, Tabs, Segmented } from 'antd'
-import { LockOutlined, ReloadOutlined, DatabaseOutlined, CloudServerOutlined, ApiOutlined, ClusterOutlined } from '@ant-design/icons'
+import { LockOutlined, ReloadOutlined, DatabaseOutlined, CloudServerOutlined, ApiOutlined, ClusterOutlined, DashboardOutlined, BarChartOutlined } from '@ant-design/icons'
 import {
   ResponsiveContainer, LineChart, Line, AreaChart, Area,
   XAxis, YAxis, Tooltip, CartesianGrid, Legend,
@@ -172,7 +172,7 @@ function SettingsInner() {
             // Admin · vault
           </div>
           <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <h1 className="text-2xl sm:text-4xl font-bold leading-tight pb-1 gradient-text-cyan">
+            <h1 className="text-2xl sm:text-4xl font-bold leading-tight pb-1 text-cyan-300">
               Settings
             </h1>
             <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border border-cyan-500/40 bg-cyan-500/10 text-cyan-300">
@@ -212,7 +212,7 @@ function SettingsInner() {
             </span>
           </div>
           {err && (
-            <p className="text-rose-400 text-xs mt-2 font-mono">✗ {err}</p>
+            <p className="text-rose-400 text-xs mt-2 font-mono">{err}</p>
           )}
         </header>
 
@@ -222,7 +222,7 @@ function SettingsInner() {
           items={[
             {
               key: 'overview',
-              label: <span className="text-sm">🩺 Overview</span>,
+              label: <span className="text-sm inline-flex items-center gap-1.5"><DashboardOutlined /> Overview</span>,
               children: (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <ServerCard data={server} />
@@ -234,12 +234,12 @@ function SettingsInner() {
             },
             {
               key: 'storage',
-              label: <span className="text-sm">💾 Storage</span>,
+              label: <span className="text-sm inline-flex items-center gap-1.5"><DatabaseOutlined /> Storage</span>,
               children: <StorageCard data={diskStats} />,
             },
             {
               key: 'visualize',
-              label: <span className="text-sm">📊 Visualize</span>,
+              label: <span className="text-sm inline-flex items-center gap-1.5"><BarChartOutlined /> Visualize</span>,
               children: <VisualizeTab pollMs={pollMs} />,
             },
           ]}
@@ -395,7 +395,7 @@ function VisualizeTab({ pollMs }) {
             <ReloadOutlined spin /> loading
           </span>
         )}
-        {err && <span className="text-rose-400 text-xs font-mono">✗ {err}</span>}
+        {err && <span className="text-rose-400 text-xs font-mono">{err}</span>}
       </div>
 
       {nonEmpty.length === 0 ? (
@@ -548,7 +548,7 @@ function ServerCard({ data }) {
             </div>
             <div className="h-2 rounded-full bg-gray-800 overflow-hidden">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-cyan-400 via-fuchsia-400 to-amber-300 transition-[width] duration-500"
+                className="h-full rounded-full bg-cyan-400 transition-[width] duration-500"
                 style={{ width: `${Math.max(2, Math.min(100, used))}%` }}
               />
             </div>
@@ -572,10 +572,10 @@ function ServerCard({ data }) {
 //      the user thinks in terms of "how many chess games", so we expose
 //      both axes.
 const BUCKET_ACCENT = {
-  sqlite:   ['from-fuchsia-500/70 to-fuchsia-500/20', 'text-fuchsia-300'],
-  combined: ['from-amber-500/70   to-amber-500/20',   'text-amber-300'],
-  ytdl:     ['from-rose-500/70    to-rose-500/20',    'text-rose-300'],
-  other:    ['from-gray-500/70    to-gray-500/20',    'text-gray-300'],
+  sqlite:   ['bg-fuchsia-500/50', 'text-fuchsia-300'],
+  combined: ['bg-amber-500/50',   'text-amber-300'],
+  ytdl:     ['bg-rose-500/50',    'text-rose-300'],
+  other:    ['bg-gray-500/50',    'text-gray-300'],
 }
 
 function StorageCard({ data }) {
@@ -613,7 +613,7 @@ function StorageCard({ data }) {
             </div>
             <div className="w-full h-2 rounded-full bg-gray-900 overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-emerald-400 via-amber-400 to-rose-400 transition-all"
+                className="h-full bg-amber-400 transition-all"
                 style={{ width: `${diskPct || 0}%` }}
               />
             </div>
@@ -645,7 +645,7 @@ function StorageCard({ data }) {
                   <span className={`font-mono ${txt}`}>{fmtBytes(b.sizeBytes)}</span>
                 </div>
                 <div className="h-1.5 rounded-full bg-gray-900 overflow-hidden">
-                  <div className={`h-full bg-gradient-to-r ${grad} transition-all`} style={{ width: `${pct}%` }} />
+                  <div className={`h-full ${grad} transition-all`} style={{ width: `${pct}%` }} />
                 </div>
                 <div className="text-[10px] text-gray-600 mt-1">{b.fileCount.toLocaleString()} files</div>
               </div>
@@ -745,7 +745,7 @@ function QueuesCard({ data, onPurge }) {
                   <td className="py-1.5 text-right">
                     {q.messageCount > 0 ? (
                       <button onClick={() => onPurge(q.name)}
-                        className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300">
+                        className="text-[10px] font-semibold px-2 py-0.5 rounded-lg border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300">
                         Purge
                       </button>
                     ) : (
@@ -801,15 +801,15 @@ function WorkersCard({ rows }) {
 // ─── Generic card chrome ──────────────────────────────────────
 function Card({ icon, title, accent, children }) {
   const accentMap = {
-    cyan:    'from-cyan-500/20 via-cyan-500/5 to-transparent text-cyan-300 border-cyan-500/30',
-    fuchsia: 'from-fuchsia-500/20 via-fuchsia-500/5 to-transparent text-fuchsia-300 border-fuchsia-500/30',
-    amber:   'from-amber-500/20 via-amber-500/5 to-transparent text-amber-300 border-amber-500/30',
-    emerald: 'from-emerald-500/20 via-emerald-500/5 to-transparent text-emerald-300 border-emerald-500/30',
+    cyan:    'bg-cyan-500/8 text-cyan-300 border-cyan-500/30',
+    fuchsia: 'bg-fuchsia-500/8 text-fuchsia-300 border-fuchsia-500/30',
+    amber:   'bg-amber-500/8 text-amber-300 border-amber-500/30',
+    emerald: 'bg-emerald-500/8 text-emerald-300 border-emerald-500/30',
   }
   const a = accentMap[accent] || accentMap.cyan
   return (
-    <section className="rounded-2xl border border-gray-800 bg-gray-950/60 overflow-hidden">
-      <header className={`px-4 py-2.5 border-b border-gray-800 bg-gradient-to-r ${a} flex items-center gap-2`}>
+    <section className="rounded-lg border border-gray-800 bg-gray-950/60 overflow-hidden">
+      <header className={`px-4 py-2.5 border-b border-gray-800 ${a} flex items-center gap-2`}>
         <span className="text-base">{icon}</span>
         <h2 className="text-sm font-semibold uppercase tracking-wider">{title}</h2>
       </header>

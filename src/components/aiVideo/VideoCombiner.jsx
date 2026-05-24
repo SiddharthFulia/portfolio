@@ -22,7 +22,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Modal, Progress, Tag, Input, InputNumber, Pagination, Tabs, message as antMessage } from 'antd'
-import { DownloadOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons'
+import { DownloadOutlined, DeleteOutlined, ReloadOutlined, CheckOutlined, LockOutlined, GlobalOutlined, ToolOutlined, BookOutlined, ThunderboltOutlined, RocketOutlined, VideoCameraOutlined } from '@ant-design/icons'
 import {
   combineCreate, combineList, combineDelete, combineFileUrl,
   listVideos,
@@ -74,8 +74,8 @@ function PageSizeStrip({ pageSize, setPageSize }) {
         style={{ width: 80 }}
       />
       <button onClick={apply}
-        className='text-[10px] px-2 py-1 rounded border border-line hover:border-line-strong text-fg-muted'>
-        ✓
+        className='text-[10px] px-2 py-1 rounded border border-line hover:border-line-strong text-fg-muted inline-flex items-center'>
+        <CheckOutlined />
       </button>
     </span>
   )
@@ -100,14 +100,14 @@ function CombineCard({ job, logs, onDelete }) {
       <div className='flex items-center justify-between mb-1'>
         <span className='text-[10px] uppercase tracking-wider text-fg-muted font-mono'>
           #{job.id} · {job.strategy || job.status}
-          {job.vault ? <span className='ml-1.5 text-violet-300'>🔒 Vault</span> : null}
+          {job.vault ? <span className='ml-1.5 text-amber-300 inline-flex items-center gap-0.5'><LockOutlined /> Vault</span> : null}
         </span>
         <StatusTag status={job.status} />
       </div>
       <p className='text-xs text-fg-secondary font-mono truncate'>{job.title || `Combine #${job.id}`}</p>
       {(job.status === 'queued' || job.status === 'processing') && (
         <Progress percent={job.progress || 0} size='small' showInfo={false}
-          strokeColor={{ from: '#fbbf24', to: '#fb7185' }} trailColor='#1f2937'
+          strokeColor='#fbbf24' trailColor='#1f2937'
           className='!mb-0 !mt-2' />
       )}
       {logs?.length > 0 && (job.status === 'queued' || job.status === 'processing') && (
@@ -286,13 +286,13 @@ function BuildTab({
                   key={item.videoId}
                   type='button'
                   onClick={() => toggleSelect(item)}
-                  className={`relative aspect-video rounded-lg overflow-hidden border transition-all
-                    ${isPicked ? 'border-amber-400 ring-2 ring-amber-400/40 shadow-glow' : 'border-line hover:border-line-strong'}`}
+                  className={`relative aspect-video rounded-lg overflow-hidden border transition-colors
+                    ${isPicked ? 'border-amber-400 ring-2 ring-amber-400/40' : 'border-line hover:border-line-strong'}`}
                 >
                   <video src={item.videoUrl} className='w-full h-full object-cover' muted playsInline preload='metadata' />
                   {isPicked && (
-                    <span className='absolute top-1 right-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500 text-black'>
-                      ✓ {picked.findIndex(p => p.videoId === item.videoId) + 1}
+                    <span className='absolute top-1 right-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500 text-black inline-flex items-center gap-0.5'>
+                      <CheckOutlined /> {picked.findIndex(p => p.videoId === item.videoId) + 1}
                     </span>
                   )}
                   <span className='absolute inset-x-0 bottom-0 px-2 py-1 text-[10px] bg-gradient-to-t from-black/90 to-transparent text-fg-secondary truncate'>
@@ -378,19 +378,19 @@ function BuildTab({
               {estimate && (
                 <div className='rounded-lg border border-line bg-surface-overlay p-2.5 text-[10px] font-mono space-y-1' style={{ fontVariantNumeric: 'tabular-nums' }}>
                   <div className='flex items-center justify-between text-fg-secondary'>
-                    <span>📦 Output size</span>
+                    <span>Output size</span>
                     <span className='text-fg-primary'>~{fmtBytes(estimate.totalBytes)}</span>
                   </div>
                   <div className='flex items-center justify-between text-fg-secondary'>
-                    <span>⏱  Output length</span>
+                    <span>Output length</span>
                     <span className='text-fg-primary'>~{Math.round(estimate.totalSecs)}s</span>
                   </div>
                   <div className='flex items-center justify-between text-fg-secondary'>
-                    <span>🚀 ETA (fast path)</span>
+                    <span>ETA (fast path)</span>
                     <span className='text-emerald-300'>{fmtSeconds(estimate.optimisticSecs)}</span>
                   </div>
                   <div className='flex items-center justify-between text-fg-muted'>
-                    <span>🐢 ETA (re-encode)</span>
+                    <span>ETA (re-encode)</span>
                     <span>{fmtSeconds(estimate.pessimisticSecs)}</span>
                   </div>
                   {estimate.unknownClips > 0 && (
@@ -404,10 +404,10 @@ function BuildTab({
               <button
                 onClick={onSubmit}
                 disabled={submitting || picked.length < 2}
-                className='w-full text-sm font-bold px-5 py-2.5 rounded-full border border-amber-500/50 bg-gradient-to-r from-amber-500/25 to-rose-500/25 text-amber-100 hover:from-amber-500/35 hover:to-rose-500/35 disabled:opacity-50 min-h-[44px]'>
-                {submitting ? 'Queuing…' : `🎬 Combine ${picked.length} videos`}
+                className='w-full text-sm font-bold px-5 py-2.5 rounded-lg border border-amber-500/50 bg-amber-500/15 text-amber-100 hover:bg-amber-500/25 disabled:opacity-50 min-h-[44px] inline-flex items-center justify-center gap-1.5'>
+                {submitting ? 'Queuing…' : <><VideoCameraOutlined /> Combine {picked.length} videos</>}
               </button>
-              <p className='text-[10px] text-emerald-400 text-center'>🛡 Auto-deletes when you save the file</p>
+              <p className='text-[10px] text-emerald-400 text-center inline-flex items-center justify-center gap-1 w-full'><LockOutlined /> Auto-deletes when you save the file</p>
             </div>
           )}
         </div>
@@ -469,12 +469,12 @@ function LibraryTab({ onDelete, refreshKey }) {
               {['public', 'vault'].map(v => (
                 <button key={v}
                   onClick={() => { setVisibility(v); setPage(1) }}
-                  className={`text-[10px] font-semibold px-2.5 py-1 rounded-full border transition-all ${
+                  className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg border transition-colors inline-flex items-center gap-1 ${
                     visibility === v
-                      ? 'border-violet-400/60 bg-violet-500/15 text-violet-200'
+                      ? 'border-amber-400/60 bg-amber-500/15 text-amber-200'
                       : 'border-line text-fg-muted hover:border-line-strong'
                   }`}>
-                  {v === 'vault' ? '🔒 Vault' : '🌐 Public'}
+                  {v === 'vault' ? <><LockOutlined /> Vault</> : <><GlobalOutlined /> Public</>}
                 </button>
               ))}
             </div>
@@ -483,7 +483,7 @@ function LibraryTab({ onDelete, refreshKey }) {
               {['', 'queued', 'processing', 'completed', 'failed'].map(s => (
                 <button key={s || 'all'}
                   onClick={() => { setStatus(s); setPage(1) }}
-                  className={`text-[10px] px-2 py-1 rounded-full border transition-all ${
+                  className={`text-[10px] px-2 py-1 rounded-lg border transition-colors ${
                     status === s
                       ? 'border-amber-400/60 bg-amber-500/15 text-amber-200'
                       : 'border-line text-fg-muted hover:border-line-strong'
@@ -626,7 +626,7 @@ export default function VideoCombiner() {
     <div className='space-y-6'>
       <div>
         <p className='eyebrow-mono'>— Tools · combine</p>
-        <h2 className='gradient-text-amber text-h2 mt-2'>Combine videos</h2>
+        <h2 className='text-amber-300 text-h2 mt-2 font-bold'>Combine videos</h2>
         <p className='mt-2 text-fg-secondary max-w-2xl text-sm'>
           Stitch any 2–12 clips into one mp4. Pick from your library or paste URLs.
           Server-side ffmpeg with progress + live log tail. File auto-deletes from
@@ -641,7 +641,7 @@ export default function VideoCombiner() {
         items={[
           {
             key: 'build',
-            label: <span className='text-sm'>🛠 Build</span>,
+            label: <span className='text-sm inline-flex items-center gap-1.5'><ToolOutlined /> Build</span>,
             children: (
               <BuildTab
                 trackedIds={trackedIds}
@@ -655,7 +655,7 @@ export default function VideoCombiner() {
           },
           {
             key: 'library',
-            label: <span className='text-sm'>📚 Library</span>,
+            label: <span className='text-sm inline-flex items-center gap-1.5'><BookOutlined /> Library</span>,
             children: <LibraryTab onDelete={onDelete} refreshKey={libraryRefreshKey} />,
           },
         ]}
