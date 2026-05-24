@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Input, Select, Slider, Modal, Alert, message as antMessage } from 'antd'
+import { Input, Select, Modal, Alert, message as antMessage } from 'antd'
 import { VideoCameraOutlined, ThunderboltOutlined, ReloadOutlined, CopyOutlined, BulbOutlined, DeleteOutlined, SendOutlined } from '@ant-design/icons'
 import { submitCinema, listCinemaProjects, cinemaBulkAction } from '../api/ai'
 import PromptHelper from '../components/PromptHelper'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
+import { Button, Slider } from '../components/ui'
 
 // `embedded` mode (passed when Cinema lives inside the AI Video tabs):
 //   - drops the outer page wrapper (no extra pt-20 / min-h-screen)
@@ -168,13 +169,13 @@ export default function Cinema({ embedded = false }) {
                 <label className="text-[11px] uppercase tracking-wider text-gray-400 font-mono mb-2 block">
                   Shot count · <span className="text-amber-300">{shotCount}</span>
                 </label>
-                <Slider min={2} max={12} value={shotCount} onChange={setShotCount} />
+                <Slider accent="amber" min={2} max={12} value={shotCount} onChange={setShotCount} />
               </div>
               <div>
                 <label className="text-[11px] uppercase tracking-wider text-gray-400 font-mono mb-2 block">
                   Sec per shot · <span className="text-amber-300">{durationPerShot}s</span>
                 </label>
-                <Slider min={3} max={10} value={durationPerShot} onChange={setDurationPerShot} />
+                <Slider accent="amber" min={3} max={10} value={durationPerShot} onChange={setDurationPerShot} />
               </div>
               <div>
                 <label className="text-[11px] uppercase tracking-wider text-gray-400 font-mono mb-2 block">Aspect</label>
@@ -191,24 +192,17 @@ export default function Cinema({ embedded = false }) {
             {/* Plan button — full-width on phone, right-aligned auto on
                 tablet+. Min height 48 = comfortable thumb target. */}
             <div className="flex justify-end pt-1">
-              <button onClick={plan} disabled={working || !masterPrompt.trim()}
-                className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full font-bold text-sm transition-all min-h-[48px] ${
-                  working || !masterPrompt.trim()
-                    ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
-                    : 'border border-amber-500/50 bg-gradient-to-r from-amber-500/25 via-rose-500/25 to-fuchsia-500/25 text-amber-100 hover:from-amber-500/35 hover:to-fuchsia-500/35'
-                }`}>
-                {working ? (
-                  <>
-                    <span className="w-3 h-3 rounded-full border-2 border-amber-300/30 border-t-amber-300 animate-spin" />
-                    Planning…
-                  </>
-                ) : (
-                  <>
-                    <ThunderboltOutlined />
-                    Plan {shotCount} shots
-                  </>
-                )}
-              </button>
+              <Button
+                variant="primary"
+                size="large"
+                onClick={plan}
+                disabled={working || !masterPrompt.trim()}
+                loading={working}
+                icon={!working && <ThunderboltOutlined />}
+                className="w-full sm:w-auto !min-h-[48px] !rounded-full !font-bold"
+              >
+                {working ? 'Planning…' : `Plan ${shotCount} shots`}
+              </Button>
             </div>
           </div>
         </section>
