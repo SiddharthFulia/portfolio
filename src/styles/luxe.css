@@ -1,173 +1,139 @@
 /* ===================================================================
- * Luxe Design System
+ * Luxe Design System — flat-professional refresh (2026-05-25)
  * -------------------------------------------------------------------
- * Tokens + utility classes sourced from the ui-ux-pro-max skill:
- *   - "Modern Dark (Cinema)" → deep blacks, indigo accent, ambient blobs,
- *     frosted-glass surfaces, expo-out easing
- *   - "Liquid Glass" → morphing iridescent gradients, backdrop blur
+ * The OLD luxe.css leaned heavily on multi-stop gradients, glow shadows,
+ * iridescent text, hover-lift transforms, and ambient blobs. Recruiters
+ * read those as "cartoon" / "personal-blog" rather than "professional
+ * SaaS". This file replaces the entire helper layer with a flat,
+ * Linear/Stripe/Vercel-style aesthetic while keeping every class name
+ * the codebase already imports — so the 30+ pages using `luxe-card`,
+ * `gradient-text-amber`, `luxe-btn-primary`, etc. flatten in one go
+ * without per-page edits.
  *
- * Apply by:
- *   1. Wrap a section in `.luxe-stage` for the cinematic backdrop
- *   2. Use `<AmbientBlobs />` for slow-drifting ambient light
- *   3. Use `<GlassCard />` (or `.glass` / `.glass-card`) for surfaces
- *   4. `.luxe-title` for hero text with the iridescent gradient
- *   5. `.luxe-pill` for status / category pills
- *   6. `.luxe-press` for the haptic-feeling 0.97 scale press
+ * Rules baked in here:
+ *   - No multi-stop gradients on text or chrome. Solid colours only.
+ *   - No glow shadows. Max single 1px hairline border + optional
+ *     `shadow-sm`-equivalent (4px offset, 8% alpha).
+ *   - No hover-lift (translateY). Hover changes border colour only.
+ *   - Brand-restricted palette: amber primary, cyan secondary, rose
+ *     for danger/alerts, emerald for success. No fuchsia / violet
+ *     anywhere outside legacy keyframes.
+ *   - 8px border-radius (rounded-lg), never 9999 on rectangles.
+ *   - Ambient orbs are now no-ops (kept as classes so old wrappers
+ *     don't break, but they render nothing visible).
+ *   - Keep the keyframes (shader-hero-*, luxe-ripple-*) since some
+ *     pages reference them; they don't fire by default.
  *
- * All effects respect prefers-reduced-motion. All sizes scale on phone.
+ * Migration is opt-out: legacy pages that explicitly want the old
+ * loud chrome can wrap themselves in `.legacy-luxe` (intentionally
+ * undefined — no escape hatch, no exceptions).
  * =================================================================== */
 
 :root {
-  /* Backgrounds — avoid pure #000 (OLED smear). Deep, layered. */
-  --luxe-bg-deep:     #020203;
-  --luxe-bg-base:     #050506;
-  --luxe-bg-elevated: #0a0a0c;
+  /* Backgrounds — flat dark, no layered radial gradients. */
+  --luxe-bg-deep:     #050507;
+  --luxe-bg-base:     #0a0a0e;
+  --luxe-bg-elevated: #0f0f14;
 
-  /* Surfaces — translucent so the ambient blobs read through */
-  --luxe-surface:     rgba(255, 255, 255, 0.045);
-  --luxe-surface-hi:  rgba(255, 255, 255, 0.08);
+  /* Surfaces — solid, opaque. No backdrop blur (kills perf and reads as
+     mobile-app glass). */
+  --luxe-surface:     #11111a;
+  --luxe-surface-hi:  #17171f;
 
-  /* Foreground + accent */
+  /* Foreground — slate ramp, no chromatic shifts. */
   --luxe-fg:        #ededef;
-  --luxe-fg-muted:  #8a8f98;
-  --luxe-fg-dim:    #5a5f68;
+  --luxe-fg-muted:  #8e94a0;
+  --luxe-fg-dim:    #5a6070;
 
-  /* Accent colors — indigo lead (Linear-style) + the portfolio's
-     existing cyan/violet/amber for the iridescent treatments. */
-  --luxe-accent:        #5e6ad2;
-  --luxe-accent-glow:   rgba(94, 106, 210, 0.22);
+  /* Accent — amber is THE brand colour. Secondary cyan reserved for
+     admin/vault/system lanes. Don't reach for the others unless you're
+     in a Status pill (rose/emerald). */
+  --luxe-accent:        #f59e0b;  /* amber-500 */
+  --luxe-accent-hi:     #fbbf24;  /* amber-400 — hover */
+  --luxe-accent-soft:   #b16a00;  /* amber-700 — disabled / pressed */
+  --luxe-accent-on:     #0a0a0e;  /* ink on amber for text contrast */
+  --luxe-accent-glow:   transparent;  /* removed — kept for back-compat */
+
   --luxe-cyan:          #22d3ee;
-  --luxe-violet:        #8b5cf6;
-  --luxe-amber:         #f59e0b;
-  --luxe-rose:          #ec4899;
+  --luxe-emerald:       #34d399;
+  --luxe-rose:          #fb7185;
 
-  /* Hairline borders — 1px is too loud on dark; use translucent white */
-  --luxe-border:       rgba(255, 255, 255, 0.08);
-  --luxe-border-hi:    rgba(255, 255, 255, 0.14);
+  /* Borders — hairline, low contrast. */
+  --luxe-border:       #1f1f2a;
+  --luxe-border-hi:    #2a2a38;
 
   /* Geometry + motion */
-  --luxe-radius:       16px;
-  --luxe-radius-lg:    24px;
+  --luxe-radius:       8px;
+  --luxe-radius-lg:    12px;
   --luxe-radius-pill:  9999px;
-  --luxe-easing:       cubic-bezier(0.16, 1, 0.3, 1);  /* expo.out */
-  --luxe-dur-fast:     180ms;
-  --luxe-dur-base:     320ms;
-  --luxe-dur-slow:     520ms;
+  --luxe-easing:       cubic-bezier(0.4, 0, 0.2, 1);
+  --luxe-dur-fast:     120ms;
+  --luxe-dur-base:     180ms;
+  --luxe-dur-slow:     280ms;
 
-  /* Blur strengths — heavier blur on bigger surfaces */
-  --luxe-blur-sm:  10px;
-  --luxe-blur-md:  18px;
-  --luxe-blur-lg:  28px;
+  /* Blur strengths — kept as variables for back-compat; new chrome
+     doesn't use them (flat aesthetic). */
+  --luxe-blur-sm:  0px;
+  --luxe-blur-md:  0px;
+  --luxe-blur-lg:  0px;
 }
 
 /* ── Page stage ─────────────────────────────────────────────────── */
-/* A "luxe-stage" is a section that sets the cinematic backdrop —
-   layered gradient from elevated (top) → deep (bottom). Drop the
-   AmbientBlobs component inside for the slow drifting light. */
 .luxe-stage {
   position: relative;
-  background:
-    radial-gradient(1200px 800px at 80% -10%, rgba(94, 106, 210, 0.10), transparent 60%),
-    radial-gradient(900px 600px at -10% 110%, rgba(34, 211, 238, 0.07), transparent 60%),
-    linear-gradient(180deg, var(--luxe-bg-elevated) 0%, var(--luxe-bg-deep) 100%);
+  background: var(--luxe-bg-base);
   isolation: isolate;
 }
 
-/* ── Glass surfaces ──────────────────────────────────────────────── */
-/* `.glass` is the lightweight version for chips and inline pills;
-   `.glass-card` is the heavier surface used for actual cards. */
+/* ── Glass surfaces — now opaque, no blur ──────────────────────── */
 .glass {
   background: var(--luxe-surface);
   border: 1px solid var(--luxe-border);
-  backdrop-filter: blur(var(--luxe-blur-sm)) saturate(160%);
-  -webkit-backdrop-filter: blur(var(--luxe-blur-sm)) saturate(160%);
   border-radius: var(--luxe-radius);
 }
 
 .glass-card {
   position: relative;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015)),
-    rgba(10, 10, 12, 0.55);
+  background: var(--luxe-surface);
   border: 1px solid var(--luxe-border);
-  backdrop-filter: blur(var(--luxe-blur-md)) saturate(180%);
-  -webkit-backdrop-filter: blur(var(--luxe-blur-md)) saturate(180%);
   border-radius: var(--luxe-radius);
-  box-shadow:
-    0 1px 0 0 rgba(255, 255, 255, 0.04) inset,                /* top-edge sheen */
-    0 24px 60px -28px rgba(0, 0, 0, 0.7),                      /* far shadow  */
-    0 8px 24px -10px rgba(0, 0, 0, 0.5);                       /* near shadow */
 }
 
-/* Iridescent border accent — slides on hover */
-.glass-card-glow {
-  position: relative;
-}
-.glass-card-glow::before {
-  content: "";
-  position: absolute; inset: -1px;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(135deg,
-    rgba(94, 106, 210, 0.55),
-    rgba(34, 211, 238, 0.35) 35%,
-    rgba(139, 92, 246, 0.45) 55%,
-    rgba(245, 158, 11, 0.35));
-  -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-          mask-composite: exclude;
-  opacity: 0;
-  transition: opacity var(--luxe-dur-base) var(--luxe-easing);
-  pointer-events: none;
-}
-.glass-card-glow:hover::before { opacity: 1; }
+/* Glow-on-hover border — no-op'd. */
+.glass-card-glow { position: relative; }
+.glass-card-glow::before { content: none; }
+.glass-card-glow:hover::before { display: none; }
 
-/* ── Hero text ──────────────────────────────────────────────────── */
+/* ── Hero text — solid colours, no clip-text gradients ────────── */
 .luxe-title {
-  background: linear-gradient(135deg,
-    #fafafa 0%,
-    #d4d4d8 30%,
-    var(--luxe-violet) 65%,
-    var(--luxe-cyan) 100%);
-  -webkit-background-clip: text;
-          background-clip: text;
-  color: transparent;
-  letter-spacing: -0.02em;
+  color: var(--luxe-fg);
+  letter-spacing: -0.015em;
 }
 .luxe-title-iridescent {
-  background: linear-gradient(135deg,
-    var(--luxe-cyan) 0%,
-    var(--luxe-violet) 38%,
-    var(--luxe-rose) 62%,
-    var(--luxe-amber) 100%);
-  background-size: 200% 200%;
-  -webkit-background-clip: text;
-          background-clip: text;
-  color: transparent;
-  animation: luxe-shift 12s ease-in-out infinite;
+  color: var(--luxe-fg);
+  letter-spacing: -0.015em;
+  animation: none;
 }
 @keyframes luxe-shift {
+  /* kept for back-compat — body unused now */
   0%, 100% { background-position: 0% 50%; }
   50%      { background-position: 100% 50%; }
 }
 
-/* ── Pills + buttons ────────────────────────────────────────────── */
+/* ── Pills ─────────────────────────────────────────────────────── */
 .luxe-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  border-radius: var(--luxe-radius-pill);
-  background: rgba(94, 106, 210, 0.10);
-  border: 1px solid rgba(94, 106, 210, 0.35);
-  color: #c7cbe6;
+  border-radius: var(--luxe-radius);
+  background: var(--luxe-surface);
+  border: 1px solid var(--luxe-border);
+  color: var(--luxe-fg-muted);
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  backdrop-filter: blur(var(--luxe-blur-sm));
 }
 
 .luxe-cta {
@@ -176,53 +142,38 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 12px 20px;
-  border: none;
+  padding: 10px 18px;
+  border: 1px solid var(--luxe-accent);
   border-radius: var(--luxe-radius);
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  color: #fff;
-  background: linear-gradient(135deg, var(--luxe-cyan), var(--luxe-violet) 50%, var(--luxe-amber));
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--luxe-accent-on);
+  background: var(--luxe-accent);
   cursor: pointer;
-  box-shadow:
-    0 8px 32px -12px var(--luxe-accent-glow),
-    0 2px 0 0 rgba(255, 255, 255, 0.12) inset;
-  transition: transform var(--luxe-dur-fast) var(--luxe-easing),
-              box-shadow var(--luxe-dur-base) var(--luxe-easing);
+  transition: background var(--luxe-dur-fast) var(--luxe-easing),
+              border-color var(--luxe-dur-fast) var(--luxe-easing);
 }
-.luxe-cta:hover  { transform: translateY(-1px); box-shadow: 0 12px 36px -10px var(--luxe-accent-glow), 0 2px 0 0 rgba(255, 255, 255, 0.18) inset; }
-.luxe-cta:active { transform: scale(0.97); }
+.luxe-cta:hover  { background: var(--luxe-accent-hi); border-color: var(--luxe-accent-hi); }
+.luxe-cta:active { background: var(--luxe-accent-soft); }
 
-/* The haptic-feeling press. Apply to any clickable. */
-.luxe-press {
-  transition: transform var(--luxe-dur-fast) var(--luxe-easing);
-}
-.luxe-press:active { transform: scale(0.97); }
+/* Press feedback — kept but neutered (no scale transform). */
+.luxe-press { transition: opacity var(--luxe-dur-fast) var(--luxe-easing); }
+.luxe-press:active { opacity: 0.85; }
 
-/* ── Ambient blobs (rendered by AmbientBlobs.jsx) ──────────────── */
-.luxe-blob {
-  position: absolute;
-  pointer-events: none;
-  border-radius: 9999px;
-  filter: blur(60px);
-  opacity: 0.5;
-  mix-blend-mode: screen;
-  will-change: transform;
-  animation: luxe-blob-drift 22s var(--luxe-easing) infinite alternate;
-}
+/* ── Ambient blobs — no-op'd ───────────────────────────────────── */
+.luxe-blob { display: none !important; }
 @keyframes luxe-blob-drift {
   0%   { transform: translate(0%,   0%)  scale(1); }
   50%  { transform: translate(-6%, 8%)   scale(1.15); }
   100% { transform: translate(8%,  -6%)  scale(0.95); }
 }
 
-/* ── Section dividers ──────────────────────────────────────────── */
+/* ── Section dividers — flat hairline ──────────────────────────── */
 .luxe-divider {
   height: 1px;
-  background: linear-gradient(90deg, transparent, var(--luxe-border-hi), transparent);
+  background: var(--luxe-border);
 }
 
-/* ── Reduced motion respect ────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .luxe-blob,
   .luxe-title-iridescent {
@@ -234,10 +185,7 @@
   }
 }
 
-/* ── Shader Hero animations (AnimatedShaderHero) ─────────────── */
-/* Prefixed keyframes + helper classes for the full-screen WebGL hero.
-   The component handles its own canvas; these only drive the overlay
-   text/CTA fade-in cascade and the CTA's slow gradient shift. */
+/* ── Shader hero overlay animations ────────────────────────────── */
 @keyframes shader-hero-fade-in-down {
   from { opacity: 0; transform: translateY(-20px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -251,21 +199,13 @@
   50%  { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
-.shader-hero-fade-in-down {
-  animation: shader-hero-fade-in-down 0.8s ease-out forwards;
-}
-.shader-hero-fade-in-up {
-  animation: shader-hero-fade-in-up 0.8s ease-out forwards;
-  opacity: 0;
-}
-.shader-hero-delay-200 { animation-delay: 0.2s; }
-.shader-hero-delay-400 { animation-delay: 0.4s; }
-.shader-hero-delay-600 { animation-delay: 0.6s; }
-.shader-hero-delay-800 { animation-delay: 0.8s; }
-.shader-hero-gradient {
-  background-size: 200% 200%;
-  animation: shader-hero-gradient-shift 3s ease infinite;
-}
+.shader-hero-fade-in-down { animation: shader-hero-fade-in-down 0.6s ease-out forwards; }
+.shader-hero-fade-in-up   { animation: shader-hero-fade-in-up   0.6s ease-out forwards; opacity: 0; }
+.shader-hero-delay-200    { animation-delay: 0.1s; }
+.shader-hero-delay-400    { animation-delay: 0.2s; }
+.shader-hero-delay-600    { animation-delay: 0.3s; }
+.shader-hero-delay-800    { animation-delay: 0.4s; }
+.shader-hero-gradient     { animation: none; background-size: 100% 100%; }
 @media (prefers-reduced-motion: reduce) {
   .shader-hero-fade-in-down,
   .shader-hero-fade-in-up,
@@ -275,109 +215,80 @@
   }
 }
 
-/* ── Animated AI Chat ripple keyframes ────────────────────────── */
-/* Used by the AnimatedAIChat composer's textarea focus indicator.
-   Renamed from the upstream `ripple` keyframe to `luxe-ripple-keyframes`
-   so it can't collide with any other ripple animation in the app. */
 @keyframes luxe-ripple-keyframes {
   0%   { transform: scale(0.5); opacity: 0.6; }
   100% { transform: scale(2);   opacity: 0;   }
 }
 
-/* ── Premium card surface ───────────────────────────────────────── */
-/* The default card across the app. Single shadow, hairline border,
-   subtle gradient sheen on top. `.luxe-card` is static; add
-   `.luxe-card-hover` for the recruiter-friendly lift on hover. */
+/* ── Card — the single most-referenced helper ──────────────────── */
+/* Flat, opaque, single hairline border. No multi-shadow stack, no
+   inset highlight, no gradient sheen. Hover changes border colour
+   only (no transform — those caused the layout shimmer recruiters
+   read as "trying too hard"). */
 .luxe-card {
   position: relative;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.01)),
-    rgba(10, 10, 13, 0.82);
+  background: var(--luxe-surface);
   border: 1px solid var(--luxe-border);
   border-radius: var(--luxe-radius);
-  box-shadow:
-    0 1px 0 0 rgba(255, 255, 255, 0.04) inset,
-    0 12px 36px -18px rgba(0, 0, 0, 0.65),
-    0 4px 12px -6px rgba(0, 0, 0, 0.4);
 }
 .luxe-card-hover {
-  transition: transform var(--luxe-dur-base) var(--luxe-easing),
-              box-shadow var(--luxe-dur-base) var(--luxe-easing),
-              border-color var(--luxe-dur-base) var(--luxe-easing);
+  transition: border-color var(--luxe-dur-fast) var(--luxe-easing);
 }
 .luxe-card-hover:hover {
-  transform: translateY(-2px);
   border-color: var(--luxe-border-hi);
-  box-shadow:
-    0 1px 0 0 rgba(255, 255, 255, 0.07) inset,
-    0 20px 50px -18px rgba(0, 0, 0, 0.75),
-    0 8px 20px -8px rgba(0, 0, 0, 0.5),
-    0 0 24px -8px var(--luxe-accent-glow);
 }
 
-/* ── Buttons ────────────────────────────────────────────────────── */
-/* One primary, one secondary, one ghost — recruiters know what to
-   click without thinking. Each uses the same easing + spacing so
-   they read as a system. */
+/* ── Buttons — primary / secondary / ghost, flat ───────────────── */
 .luxe-btn {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 10px 18px;
+  padding: 8px 16px;
   border-radius: var(--luxe-radius);
   font-weight: 600;
   font-size: 13px;
   line-height: 1;
-  letter-spacing: 0.005em;
+  letter-spacing: 0;
   cursor: pointer;
   white-space: nowrap;
   user-select: none;
   border: 1px solid transparent;
-  transition: transform var(--luxe-dur-fast) var(--luxe-easing),
-              box-shadow var(--luxe-dur-base) var(--luxe-easing),
-              background-color var(--luxe-dur-base) var(--luxe-easing),
-              border-color var(--luxe-dur-base) var(--luxe-easing),
-              color var(--luxe-dur-fast) var(--luxe-easing);
+  transition: background-color var(--luxe-dur-fast) var(--luxe-easing),
+              border-color    var(--luxe-dur-fast) var(--luxe-easing),
+              color           var(--luxe-dur-fast) var(--luxe-easing);
 }
-.luxe-btn:active { transform: scale(0.97); }
+.luxe-btn:active { opacity: 0.85; }
 .luxe-btn:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--luxe-accent-glow);
+  outline: 2px solid var(--luxe-accent);
+  outline-offset: 2px;
 }
 
 .luxe-btn-primary {
-  color: #fff;
+  color: var(--luxe-accent-on);
   background: var(--luxe-accent);
-  box-shadow:
-    0 8px 24px -10px var(--luxe-accent-glow),
-    0 1px 0 0 rgba(255, 255, 255, 0.18) inset;
+  border-color: var(--luxe-accent);
 }
 .luxe-btn-primary:hover {
-  background: #6a76e0;
-  transform: translateY(-1px);
-  box-shadow:
-    0 14px 32px -10px var(--luxe-accent-glow),
-    0 1px 0 0 rgba(255, 255, 255, 0.22) inset;
+  background: var(--luxe-accent-hi);
+  border-color: var(--luxe-accent-hi);
 }
 
 .luxe-btn-secondary {
   color: var(--luxe-fg);
   background: var(--luxe-surface);
   border-color: var(--luxe-border-hi);
-  backdrop-filter: blur(var(--luxe-blur-sm));
-  -webkit-backdrop-filter: blur(var(--luxe-blur-sm));
 }
 .luxe-btn-secondary:hover {
   background: var(--luxe-surface-hi);
-  border-color: rgba(94, 106, 210, 0.4);
-  transform: translateY(-1px);
+  border-color: var(--luxe-fg-muted);
 }
 
 .luxe-btn-ghost {
   color: var(--luxe-fg-muted);
   background: transparent;
+  border-color: transparent;
 }
 .luxe-btn-ghost:hover {
   color: var(--luxe-fg);
@@ -388,59 +299,50 @@
 .luxe-input,
 .luxe-textarea {
   width: 100%;
-  padding: 10px 14px;
+  padding: 8px 12px;
   background: var(--luxe-surface);
   border: 1px solid var(--luxe-border);
   border-radius: var(--luxe-radius);
   color: var(--luxe-fg);
   font-size: 14px;
   line-height: 1.5;
-  transition: border-color var(--luxe-dur-base) var(--luxe-easing),
-              box-shadow var(--luxe-dur-base) var(--luxe-easing),
-              background-color var(--luxe-dur-base) var(--luxe-easing);
+  transition: border-color var(--luxe-dur-fast) var(--luxe-easing);
 }
 .luxe-input::placeholder,
 .luxe-textarea::placeholder { color: var(--luxe-fg-dim); }
 .luxe-input:hover,
-.luxe-textarea:hover { background: var(--luxe-surface-hi); }
+.luxe-textarea:hover { border-color: var(--luxe-border-hi); }
 .luxe-input:focus,
 .luxe-textarea:focus {
   outline: none;
-  border-color: rgba(94, 106, 210, 0.55);
-  background: rgba(94, 106, 210, 0.06);
-  box-shadow: 0 0 0 3px var(--luxe-accent-glow);
+  border-color: var(--luxe-accent);
 }
-.luxe-textarea { resize: vertical; min-height: 90px; line-height: 1.55; }
+.luxe-textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
 
-/* ── Typography helpers ─────────────────────────────────────────── */
-/* Use these for hero / section headers so every page feels the same.
-     .luxe-eyebrow      — small uppercase label above a hero
-     .luxe-section-title — H2-class section heading
-     .luxe-body-muted   — secondary supporting copy */
+/* ── Eyebrow ─────────────────────────────────────────────────── */
 .luxe-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--luxe-fg-muted);
 }
+
 .luxe-section-title {
-  font-size: clamp(22px, 3vw, 32px);
-  font-weight: 700;
+  font-size: 28px;
+  font-weight: 600;
   letter-spacing: -0.015em;
   color: var(--luxe-fg);
-  margin: 0;
-}
-.luxe-body-muted {
-  color: var(--luxe-fg-muted);
-  line-height: 1.6;
-  font-size: 14px;
+  line-height: 1.15;
 }
 
-/* ── Skeleton shimmer (cleaner than the wide blue pulse) ─────── */
+.luxe-body-muted {
+  color: var(--luxe-fg-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+/* ── Skeleton ────────────────────────────────────────────────── */
 .luxe-skeleton {
   position: relative;
   overflow: hidden;
@@ -448,111 +350,53 @@
   border-radius: var(--luxe-radius);
 }
 .luxe-skeleton::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent 0%,
-                              rgba(255, 255, 255, 0.05) 40%,
-                              rgba(255, 255, 255, 0.12) 50%,
-                              rgba(255, 255, 255, 0.05) 60%,
-                              transparent 100%);
-  animation: luxe-shimmer 1.6s infinite;
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.04),
+    transparent
+  );
+  transform: translateX(-100%);
+  animation: luxe-skeleton-shimmer 1.4s ease-in-out infinite;
 }
-@keyframes luxe-shimmer {
-  0%   { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-
-/* ── Mobile tightening ─────────────────────────────────────────── */
-@media (max-width: 640px) {
-  :root {
-    --luxe-radius:    14px;
-    --luxe-radius-lg: 20px;
-    --luxe-blur-md:   14px;
-    --luxe-blur-lg:   20px;
-  }
-  .luxe-pill { font-size: 9px; padding: 3px 8px; }
-  .glass-card {
-    /* less heavy on phone GPUs */
-    backdrop-filter: blur(var(--luxe-blur-sm)) saturate(150%);
-    -webkit-backdrop-filter: blur(var(--luxe-blur-sm)) saturate(150%);
-  }
-  .luxe-btn { padding: 9px 14px; font-size: 12px; }
-  .luxe-section-title { font-size: 22px; }
+@keyframes luxe-skeleton-shimmer {
+  to { transform: translateX(100%); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .luxe-card-hover,
-  .luxe-btn { transition: none !important; }
-  .luxe-skeleton::after { animation: none !important; }
-}
-
-/* ─── Design system v2 helpers (added 2026-05) ─────────────────────
- * These are NEW classes that the Phase 2 token system depends on.
- * Existing `luxe-*` classes are untouched — every page that already
- * uses them keeps working. New pages should reach for these helpers
- * first to stay on the same visual language.
- */
-
-/* Gradient title text — the canonical hero/section heading look.
-   `gradient-text-amber` is the default brand pull. The cyan variant
-   is reserved for admin / settings / vault surfaces so they read as
-   a distinct lane. */
+/* ── Gradient text helpers — now SOLID colours ─────────────────── */
+/* Kept the class names because dozens of pages import them. Output
+   is a single brand colour, not the rainbow clip-text trick. */
 .gradient-text-amber {
-  background-image: linear-gradient(to right, #fde68a, #fda4af, #f0abfc);
-  -webkit-background-clip: text;
-          background-clip: text;
-  color: transparent;
-  /* The clip-text trick eats the descender on glyphs like 'g/j/p/q' on
-     some Webkit builds. A tiny bottom padding restores them. */
-  padding-bottom: 0.05em;
+  color: var(--luxe-fg);
+  letter-spacing: -0.01em;
 }
 .gradient-text-cyan {
-  background-image: linear-gradient(to right, #a5f3fc, #f0abfc, #fde68a);
-  -webkit-background-clip: text;
-          background-clip: text;
-  color: transparent;
-  padding-bottom: 0.05em;
+  color: var(--luxe-fg);
+  letter-spacing: -0.01em;
 }
 
-/* Ambient background orb — large, blurred, hue-shifted dot used as a
-   visual anchor on hero sections. Always combine with `pointer-events-
-   none` + `aria-hidden` + an absolute position class. The orb itself
-   doesn't position; the parent does. */
+/* ── Ambient orb — no-op ──────────────────────────────────────── */
+/* Kept the rule so existing JSX with `<div aria-hidden className="ambient-orb">`
+   doesn't crash; renders nothing visible. */
 .ambient-orb {
-  position: absolute;
-  width: 640px;
-  height: 640px;
-  border-radius: 9999px;
-  filter: blur(60px);
-  background-image: radial-gradient(circle at 30% 30%,
-    rgba(251, 191, 36, 0.20),
-    rgba(251, 113, 133, 0.14) 40%,
-    rgba(217, 70, 239, 0.12) 70%,
-    transparent 100%);
-  pointer-events: none;
+  display: none !important;
 }
 .ambient-orb-cool {
-  background-image: radial-gradient(circle at 30% 30%,
-    rgba(34, 211, 238, 0.18),
-    rgba(139, 92, 246, 0.12) 50%,
-    transparent 100%);
+  display: none !important;
 }
 
-/* Eyebrow label — the small mono caption that sits ABOVE every
-   section title across the site. Standardised here so every page
-   reads the same. */
+/* ── Eyebrow mono — single source of truth ────────────────────── */
 .eyebrow-mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 10px;
-  letter-spacing: 0.3em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: rgba(252, 211, 77, 0.8); /* amber-300 @ 80% */
+  color: var(--luxe-fg-muted);
 }
 
-/* Mobile-safe tap target — apply to interactive icons / chips that
-   would otherwise be < 44x44. Doesn't change visual size of the
-   content inside, just expands the hit area via padding + min-w/h. */
+/* ── Mobile-safe tap target ───────────────────────────────────── */
 .tap-44 {
   min-width: 44px;
   min-height: 44px;
@@ -560,3 +404,44 @@
   align-items: center;
   justify-content: center;
 }
+
+/* ── shadow-glow helpers (legacy) — now no-op ─────────────────── */
+/* Old code uses `shadow-glow` as a Tailwind extension. We don't
+   define it as a Tailwind utility any more; if it shows up inline
+   the browser just ignores it. This rule explicitly nukes any
+   element trying to use it via direct class. */
+.shadow-glow { box-shadow: none !important; }
+
+/* ── h-ramp typography helpers (used by design-system v2 pages) ── */
+.text-h1 {
+  font-size: 32px;
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--luxe-fg);
+}
+.text-h2 {
+  font-size: 24px;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--luxe-fg);
+}
+.text-h3 {
+  font-size: 18px;
+  line-height: 1.3;
+  font-weight: 600;
+  color: var(--luxe-fg);
+}
+
+/* ── fg / line / surface helpers (used inline across components) ── */
+.text-fg-primary   { color: var(--luxe-fg); }
+.text-fg-secondary { color: #d1d5db; }
+.text-fg-muted     { color: var(--luxe-fg-muted); }
+.bg-surface-elevated { background: var(--luxe-surface-hi); }
+.bg-surface-overlay  { background: var(--luxe-bg-elevated); }
+.border-line         { border-color: var(--luxe-border); }
+.border-line-strong  { border-color: var(--luxe-border-hi); }
+.hover\:border-line-strong:hover { border-color: var(--luxe-border-hi); }
+
+/* End of luxe.css */
