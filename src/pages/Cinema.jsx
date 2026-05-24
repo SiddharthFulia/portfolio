@@ -91,19 +91,15 @@ export default function Cinema({ embedded = false }) {
   // orbs + max-width cap so 1440p+ doesn't sprawl; embedded (inside the
   // AIVideo tabs) just renders the inner content so the host tab pane
   // controls layout.
-  const Outer = embedded
-    ? ({ children }) => <div>{children}</div>
-    : ({ children }) => (
-        <section className="relative min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 pb-16 px-4 sm:px-6 overflow-hidden">
-          <div aria-hidden className="ambient-orb -top-32 left-1/2 -translate-x-1/2" />
-          <div aria-hidden className="ambient-orb ambient-orb-cool -bottom-40 -right-32" />
-          <div className="relative">{children}</div>
-        </section>
-      )
-
-  return (
-    <Outer>
-      <div className={embedded ? '' : 'max-w-5xl mx-auto'}>
+  //
+  // WARNING: Do NOT define `Outer` as a fresh component inside the render
+  // body. React reads a new function reference on every render as "a
+  // different component type at this position" and tears down + remounts
+  // the entire subtree below — which, on this page, fires StudioLibrary's
+  // mount effect (= a /api/cinema/list refetch) on every slider drag.
+  // Inline the wrapper element instead of wrapping in a synthetic component.
+  const content = (
+    <div className={embedded ? '' : 'max-w-5xl mx-auto'}>
         {!embedded && (
           <header className="mb-8">
             <p className="eyebrow-mono">— AI Studio · Cinema</p>
@@ -289,7 +285,15 @@ export default function Cinema({ embedded = false }) {
           )}
         />
       </div>
-    </Outer>
+  )
+
+  if (embedded) return <div>{content}</div>
+  return (
+    <section className="relative min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 pb-16 px-4 sm:px-6 overflow-hidden">
+      <div aria-hidden className="ambient-orb -top-32 left-1/2 -translate-x-1/2" />
+      <div aria-hidden className="ambient-orb ambient-orb-cool -bottom-40 -right-32" />
+      <div className="relative">{content}</div>
+    </section>
   )
 }
 
