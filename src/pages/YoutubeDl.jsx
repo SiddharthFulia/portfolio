@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Input, Segmented, Select, Progress, Modal, Alert, message as antMessage, Tag, Tooltip } from 'antd'
-import { LinkOutlined, DownloadOutlined, DeleteOutlined, ReloadOutlined, FileTextOutlined, ClockCircleOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import { LinkOutlined, DownloadOutlined, DeleteOutlined, ReloadOutlined, FileTextOutlined, ClockCircleOutlined, ThunderboltOutlined, VideoCameraOutlined, CustomerServiceOutlined, CopyOutlined, CloudOutlined, CheckOutlined, CloseOutlined, LockOutlined, ClockCircleFilled } from '@ant-design/icons'
 import { ytdlCreate, ytdlStatus, ytdlList, ytdlDelete, ytdlFileUrl } from '../api/ai'
 
 // Locally-tracked job IDs we care about. Persisted so a page refresh
@@ -255,15 +255,11 @@ export default function YoutubeDl() {
 
   return (
     <section className='relative min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 pb-16 px-4 sm:px-6 overflow-hidden'>
-      {/* Ambient atmosphere */}
-      <div aria-hidden className='pointer-events-none absolute -top-32 left-1/2 -translate-x-1/2 w-[640px] h-[640px] rounded-full bg-gradient-to-br from-rose-500/15 via-amber-500/10 to-fuchsia-500/15 blur-3xl' />
-      <div aria-hidden className='pointer-events-none absolute bottom-0 right-0 w-[420px] h-[420px] rounded-full bg-gradient-to-br from-cyan-500/12 via-violet-500/8 to-transparent blur-3xl' />
-
       <div className='relative max-w-5xl mx-auto'>
         {/* ── Hero ── */}
         <header className='mb-6'>
           <p className='text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80'>— Tools</p>
-          <h1 className='mt-2 text-4xl sm:text-5xl font-bold leading-tight pb-1 bg-gradient-to-r from-amber-200 via-rose-300 to-fuchsia-300 bg-clip-text text-transparent'>
+          <h1 className='mt-2 text-4xl sm:text-5xl font-bold leading-tight pb-1 text-white'>
             YouTube Downloader
           </h1>
           <p className='mt-2 text-sm text-gray-400 max-w-2xl'>
@@ -299,8 +295,8 @@ export default function YoutubeDl() {
                   <Tooltip title='Paste from clipboard'>
                     <button
                       onClick={handlePaste}
-                      className='shrink-0 text-xs font-semibold px-3 rounded-lg border border-gray-700 hover:border-gray-500 text-gray-300'>
-                      📋 Paste
+                      className='shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold px-3 rounded-lg border border-gray-700 hover:border-gray-500 text-gray-300'>
+                      <CopyOutlined /> Paste
                     </button>
                   </Tooltip>
                 </div>
@@ -317,8 +313,8 @@ export default function YoutubeDl() {
                     value={format}
                     onChange={setFormat}
                     options={[
-                      { value: 'mp4', label: <span>🎬 MP4 · video</span> },
-                      { value: 'mp3', label: <span>🎵 MP3 · audio</span> },
+                      { value: 'mp4', label: <span className='inline-flex items-center gap-1.5'><VideoCameraOutlined /> MP4 · video</span> },
+                      { value: 'mp3', label: <span className='inline-flex items-center gap-1.5'><CustomerServiceOutlined /> MP3 · audio</span> },
                     ]}
                   />
                 </div>
@@ -329,6 +325,9 @@ export default function YoutubeDl() {
                     style={{ width: '100%' }}
                     value={quality}
                     onChange={setQuality}
+                    showSearch allowClear
+                    placeholder='Pick quality…'
+                    filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
                     options={format === 'mp3' ? AUDIO_QUALITIES : VIDEO_QUALITIES}
                   />
                 </div>
@@ -350,8 +349,8 @@ export default function YoutubeDl() {
                     value={worker}
                     onChange={setWorker}
                     options={[
-                      { value: 'cobalt', label: '☁ Online (default)' },
-                      { value: 'home',   label: '⚡ 5090 — for tough videos' },
+                      { value: 'cobalt', label: <span className='inline-flex items-center gap-1.5'><CloudOutlined /> Online (default)</span> },
+                      { value: 'home',   label: <span className='inline-flex items-center gap-1.5'><ThunderboltOutlined /> 5090 — for tough videos</span> },
                     ]}
                   />
                 </div>
@@ -360,20 +359,20 @@ export default function YoutubeDl() {
               <button
                 onClick={onSubmit}
                 disabled={submitting || !url.trim() || !isYtUrl(url)}
-                className='relative w-full overflow-hidden text-sm font-bold px-6 py-3.5 rounded-full border border-amber-500/50 bg-gradient-to-r from-amber-500/25 via-rose-500/25 to-fuchsia-500/25 text-amber-100 hover:from-amber-500/35 hover:to-fuchsia-500/35 disabled:opacity-50 min-h-[48px] transition-all'>
+                className='relative w-full overflow-hidden text-sm font-bold px-6 py-3.5 rounded-lg border border-amber-500/50 bg-amber-500/15 text-amber-100 hover:bg-amber-500/20 disabled:opacity-50 min-h-[48px] transition-colors inline-flex items-center justify-center gap-2'>
                 {submitting
                   ? 'Queuing…'
-                  : `⬇  Download as ${format.toUpperCase()}${format === 'mp4' ? ` · ${quality === 'best' ? 'best quality' : quality + 'p'}` : ` · ${quality} kbps`}`}
+                  : (<><DownloadOutlined /> {`Download as ${format.toUpperCase()}${format === 'mp4' ? ` · ${quality === 'best' ? 'best quality' : quality + 'p'}` : ` · ${quality} kbps`}`}</>)}
               </button>
-              <p className='text-[11px] text-emerald-400 text-center'>
-                🛡 File deletes from the server the moment you save it.
+              <p className='text-[11px] text-emerald-400 text-center inline-flex items-center justify-center gap-1.5 w-full'>
+                <LockOutlined /> File deletes from the server the moment you save it.
               </p>
             </div>
 
             {/* Ready-to-grab jobs (completed but the user hasn't saved yet) */}
             {readyJobs.length > 0 && (
               <div className='luxe-card p-5 sm:p-6'>
-                <p className='text-[10px] uppercase tracking-wider text-emerald-300 font-mono mb-3'>✓ Ready · click to save</p>
+                <p className='text-[10px] uppercase tracking-wider text-emerald-300 font-mono mb-3 inline-flex items-center gap-1.5'><CheckOutlined /> Ready · click to save</p>
                 <ul className='space-y-2'>
                   {readyJobs.map(j => (
                     <li key={j.id} className='flex items-center justify-between gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 flex-wrap'>
@@ -386,7 +385,7 @@ export default function YoutubeDl() {
                       </div>
                       <a
                         href={ytdlFileUrl(j.id)}
-                        className='text-sm font-bold px-5 py-2 rounded-full border border-emerald-500/50 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30 min-h-[40px] inline-flex items-center gap-2'>
+                        className='text-sm font-bold px-5 py-2 rounded-lg border border-emerald-500/50 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30 min-h-[40px] inline-flex items-center gap-2'>
                         <DownloadOutlined /> Save
                       </a>
                     </li>
@@ -399,10 +398,10 @@ export default function YoutubeDl() {
             {failedJobs.length > 0 && (
               <div className='luxe-card p-5 sm:p-6'>
                 <div className='flex items-center justify-between gap-2 mb-3'>
-                  <p className='text-[10px] uppercase tracking-wider text-rose-300 font-mono'>✗ Failed · {failedJobs.length}</p>
+                  <p className='text-[10px] uppercase tracking-wider text-rose-300 font-mono inline-flex items-center gap-1.5'><CloseOutlined /> Failed · {failedJobs.length}</p>
                   <button
                     onClick={() => requestBulkDelete(failedJobs, 'Clear all failed')}
-                    className='text-[10px] font-semibold px-3 py-1 rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 inline-flex items-center gap-1'>
+                    className='text-[10px] font-semibold px-3 py-1 rounded-lg border border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 inline-flex items-center gap-1'>
                     <DeleteOutlined /> Clear all
                   </button>
                 </div>
@@ -430,12 +429,12 @@ export default function YoutubeDl() {
                           <div className='flex flex-col gap-1.5 ml-2'>
                             <button
                               onClick={() => { setUrl(j.url); setFormat(j.format); setQuality(j.quality); if (j.worker) setWorker(j.worker); requestDelete(j) }}
-                              className='text-[10px] font-semibold px-2 py-1 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20'>
-                              ↺ Retry
+                              className='text-[10px] font-semibold px-2 py-1 rounded-lg border border-amber-500/40 bg-amber-500/12 text-amber-300 hover:bg-amber-500/20 inline-flex items-center gap-1'>
+                              <ReloadOutlined /> Retry
                             </button>
                             <button
                               onClick={() => requestDelete(j)}
-                              className='text-[10px] font-semibold px-2 py-1 rounded-full border border-gray-300 hover:border-gray-500 text-gray-600'>
+                              className='text-[10px] font-semibold px-2 py-1 rounded-lg border border-gray-700 hover:border-gray-500 text-gray-400'>
                               dismiss
                             </button>
                           </div>
@@ -451,10 +450,10 @@ export default function YoutubeDl() {
             {inFlightJobs.length > 0 && (
               <div className='luxe-card p-5 sm:p-6'>
                 <div className='flex items-center justify-between gap-2 mb-3'>
-                  <p className='text-[10px] uppercase tracking-wider text-amber-300 font-mono'>⏳ In flight · {inFlightJobs.length}</p>
+                  <p className='text-[10px] uppercase tracking-wider text-amber-300 font-mono inline-flex items-center gap-1.5'><ClockCircleOutlined /> In flight · {inFlightJobs.length}</p>
                   <button
                     onClick={() => requestBulkDelete(inFlightJobs, 'Cancel all')}
-                    className='text-[10px] font-semibold px-3 py-1 rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 inline-flex items-center gap-1'>
+                    className='text-[10px] font-semibold px-3 py-1 rounded-lg border border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 inline-flex items-center gap-1'>
                     <DeleteOutlined /> Cancel all
                   </button>
                 </div>
@@ -470,7 +469,7 @@ export default function YoutubeDl() {
                         percent={j.progress || 0}
                         size='small'
                         showInfo={false}
-                        strokeColor={{ from: '#fbbf24', to: '#fb7185' }}
+                        strokeColor='#f59e0b'
                         trailColor='#1f2937'
                         className='!mb-0 !mt-2'
                       />
@@ -493,7 +492,7 @@ export default function YoutubeDl() {
               <div className='flex items-center justify-between mb-2'>
                 <h2 className='text-sm font-semibold tracking-wider uppercase text-gray-300'>Recent</h2>
                 <button onClick={loadHistory}
-                  className='text-[10px] font-semibold px-2 py-1 rounded-full border border-gray-800 hover:border-gray-600 text-gray-400 inline-flex items-center gap-1'>
+                  className='text-[10px] font-semibold px-2 py-1 rounded-lg border border-gray-800 hover:border-gray-600 text-gray-400 inline-flex items-center gap-1'>
                   <ReloadOutlined /> Refresh
                 </button>
               </div>
@@ -509,22 +508,22 @@ export default function YoutubeDl() {
                     {completed.length > 0 && (
                       <button
                         onClick={() => requestBulkDelete(completed, 'Clear completed')}
-                        className='text-[10px] font-semibold px-2 py-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20'>
-                        ✓ Clear {completed.length} done
+                        className='text-[10px] font-semibold px-2 py-1 rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20 inline-flex items-center gap-1'>
+                        <CheckOutlined /> Clear {completed.length} done
                       </button>
                     )}
                     {failed.length > 0 && (
                       <button
                         onClick={() => requestBulkDelete(failed, 'Clear failed')}
-                        className='text-[10px] font-semibold px-2 py-1 rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20'>
-                        ✗ Clear {failed.length} failed
+                        className='text-[10px] font-semibold px-2 py-1 rounded-lg border border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 inline-flex items-center gap-1'>
+                        <CloseOutlined /> Clear {failed.length} failed
                       </button>
                     )}
                     {all.length > 1 && (
                       <button
                         onClick={() => requestBulkDelete(all, 'Wipe all my jobs')}
-                        className='text-[10px] font-semibold px-2 py-1 rounded-full border border-rose-500/60 bg-rose-500/15 text-rose-200 hover:bg-rose-500/25'>
-                        🗑 Wipe all {all.length}
+                        className='text-[10px] font-semibold px-2 py-1 rounded-lg border border-rose-500/60 bg-rose-500/15 text-rose-200 hover:bg-rose-500/25 inline-flex items-center gap-1'>
+                        <DeleteOutlined /> Wipe all {all.length}
                       </button>
                     )}
                   </div>
@@ -532,7 +531,7 @@ export default function YoutubeDl() {
               })()}
               {!history.length && (
                 <div className='py-6 text-center'>
-                  <div aria-hidden className='text-3xl mb-1.5'>🎬</div>
+                  <VideoCameraOutlined aria-hidden className='text-2xl text-gray-600 mb-1.5' />
                   <p className='text-xs text-gray-500'>Nothing yet — paste a YouTube link above.</p>
                 </div>
               )}
@@ -549,7 +548,7 @@ export default function YoutubeDl() {
                         percent={j.progress || 0}
                         size='small'
                         showInfo={false}
-                        strokeColor={{ from: '#fbbf24', to: '#fb7185' }}
+                        strokeColor='#f59e0b'
                         trailColor='#1f2937'
                         className='!mb-0 !mt-1.5'
                       />
@@ -605,7 +604,7 @@ function StatBubble({ icon, label, value, accent = 'gray' }) {
     amber:   'border-amber-500/40   bg-amber-500/10     text-amber-200',
   }
   return (
-    <div className={`rounded-xl border ${accents[accent]} px-3 py-2.5`}>
+    <div className={`rounded-lg border ${accents[accent]} px-3 py-2.5`}>
       <div className='flex items-center gap-1.5 text-[10px] uppercase tracking-wider opacity-70'>
         {icon} {label}
       </div>

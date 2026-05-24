@@ -9,7 +9,8 @@ import {
   VideoCameraOutlined, ThunderboltOutlined, CopyOutlined, CheckOutlined,
   DownloadOutlined, ReloadOutlined, LinkOutlined, InfoCircleOutlined, AppstoreOutlined,
   PlayCircleOutlined, LeftOutlined, RightOutlined, ExpandAltOutlined, PauseOutlined,
-  CaretRightOutlined, BulbOutlined,
+  CaretRightOutlined, BulbOutlined, CustomerServiceOutlined, BookOutlined, ToolOutlined,
+  FullscreenOutlined, GlobalOutlined, LockOutlined, PictureOutlined,
 } from '@ant-design/icons'
 import {
   generateVideo, getJobStatus, getTodayVideo, getVideoProviders, listVideos, deleteVideo,
@@ -225,16 +226,16 @@ const Tag = ({ children, tone = 'gray' }) => {
 
 const VideoCard = ({ video, label = 'Latest', tone = 'cyan', compact = false }) => {
   const tones = {
-    cyan: 'from-cyan-400 to-purple-400',
-    pink: 'from-pink-400 to-amber-400',
+    cyan: 'bg-cyan-500',
+    pink: 'bg-amber-500',
   }
   if (!video?.videoUrl) return null
   return (
-    <div className="rounded-2xl overflow-hidden border border-gray-800 bg-gray-900/60 backdrop-blur-sm">
+    <div className="rounded-lg overflow-hidden border border-gray-800 bg-gray-900/60">
       <div className="relative bg-black">
         <video src={resolveVideoUrl(video.videoUrl)} controls playsInline loop muted={compact}
           className={`w-full ${compact ? 'aspect-[9/16] object-cover' : 'max-h-[70vh] object-contain'}`} />
-        <div className={`absolute top-2 left-2 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-gradient-to-r ${tones[tone]} text-black`}>
+        <div className={`absolute top-2 left-2 px-2.5 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider ${tones[tone]} text-black`}>
           {label}
         </div>
       </div>
@@ -286,7 +287,7 @@ const logTone = (text) => {
   if (text.startsWith('✓')) return 'text-emerald-400/80'
   if (text.startsWith('⚡')) return 'text-amber-300'
   if (text.startsWith('⏱')) return 'text-cyan-300'
-  if (text.startsWith('→') || text.startsWith('↑')) return 'text-fuchsia-300'
+  if (text.startsWith('→') || text.startsWith('↑')) return 'text-amber-300'
   if (text.startsWith('sampler')) return 'text-sky-300'
   return 'text-gray-400'
 }
@@ -309,7 +310,7 @@ const Skeleton = ({ jobId, status, job, paused = false, onTogglePause }) => {
   const copy = STATUS_COPY[status] || STATUS_COPY.queued
   const ringColor = {
     cyan: 'border-cyan-500/40 border-t-cyan-400',
-    fuchsia: 'border-fuchsia-500/40 border-t-fuchsia-400',
+    fuchsia: 'border-amber-500/40 border-t-amber-400',
     amber: 'border-amber-400/40 border-t-amber-300',
   }[copy.tone] || 'border-cyan-500/40 border-t-cyan-400'
 
@@ -326,16 +327,14 @@ const Skeleton = ({ jobId, status, job, paused = false, onTogglePause }) => {
     : null
 
   const barColor = {
-    cyan: 'from-cyan-500 to-blue-400',
-    fuchsia: 'from-fuchsia-500 to-pink-400',
-    amber: 'from-amber-400 via-rose-400 to-fuchsia-500',
-  }[copy.tone] || 'from-cyan-500 to-blue-400'
+    cyan: 'bg-cyan-500',
+    fuchsia: 'bg-amber-500',
+    amber: 'bg-amber-500',
+  }[copy.tone] || 'bg-cyan-500'
 
   return (
-    <div className="rounded-2xl border border-gray-800 bg-gray-900/40 overflow-hidden">
+    <div className="rounded-lg border border-gray-800 bg-gray-900/40 overflow-hidden">
       <div className="aspect-[9/16] sm:aspect-video bg-gray-800/60 flex items-center justify-center relative overflow-hidden">
-        {/* Subtle moving gradient backdrop */}
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-800/40 via-gray-900/40 to-gray-800/40 animate-pulse" />
         <div className="relative text-center space-y-3 px-6 max-w-sm w-full">
           <div className={`w-16 h-16 mx-auto rounded-full border-2 ${ringColor} animate-spin`} />
           <p className="text-gray-200 text-sm font-semibold">{copy.label}…</p>
@@ -349,7 +348,7 @@ const Skeleton = ({ jobId, status, job, paused = false, onTogglePause }) => {
           {pct != null && (
             <>
               <div className="w-full h-1.5 rounded-full bg-gray-800 overflow-hidden">
-                <div className={`h-full bg-gradient-to-r ${barColor} transition-all duration-1000 ease-linear`}
+                <div className={`h-full ${barColor} transition-all duration-1000 ease-linear`}
                   style={{ width: `${pct}%` }} />
               </div>
               <div className="flex justify-between text-[10px] text-gray-500 font-mono">
@@ -389,19 +388,19 @@ const Skeleton = ({ jobId, status, job, paused = false, onTogglePause }) => {
                         e.stopPropagation()
                         setLogsView(v => v === 'flat' ? 'plan' : 'flat')
                       }}
-                      className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-fuchsia-500/40 hover:border-fuchsia-400 bg-fuchsia-500/10 hover:bg-fuchsia-500/20 text-fuchsia-300 hover:text-fuchsia-200 transition-colors"
+                      className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg border border-amber-500/40 hover:border-amber-400 bg-amber-500/12 hover:bg-amber-500/20 text-amber-300 hover:text-amber-200 transition-colors"
                       title={logsView === 'flat' ? 'Switch to Plan view' : 'Switch to Logs view'}
                     >
                       {logsView === 'flat' ? 'Plan' : 'Logs'}
                     </button>
                     <button type="button" onClick={(e) => { e.stopPropagation(); onTogglePause() }}
-                      className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-gray-700 hover:border-gray-500 text-gray-300 hover:text-white transition-colors">
+                      className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg border border-gray-700 hover:border-gray-500 text-gray-300 hover:text-white transition-colors">
                       {paused ? <><CaretRightOutlined className="text-[9px]" /> Resume</>
                               : <><PauseOutlined className="text-[9px]" /> Pause</>}
                     </button>
                     {allLogs.length > 0 && logsView === 'flat' && (
                       <button type="button" onClick={(e) => { e.stopPropagation(); setLogsOpen(true) }}
-                        className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-cyan-500/40 hover:border-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 hover:text-cyan-200 transition-colors">
+                        className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg border border-cyan-500/40 hover:border-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 hover:text-cyan-200 transition-colors">
                         <ExpandAltOutlined className="text-[9px]" /> Expand
                       </button>
                     )}
@@ -422,7 +421,7 @@ const Skeleton = ({ jobId, status, job, paused = false, onTogglePause }) => {
               )}
               {logsView === 'flat' && allLogs.length > 0 && (
                 <button type="button" onClick={() => setLogsOpen(true)}
-                  className="block w-full text-left rounded-xl bg-gradient-to-b from-black/70 to-black/40 border border-gray-800/80 hover:border-cyan-500/40 transition-colors overflow-hidden group">
+                  className="block w-full text-left rounded-lg bg-black/60 border border-gray-800/80 hover:border-cyan-500/40 transition-colors overflow-hidden group">
                   {/* Bumped max-h so 22 lines breathe. Old 72/80 (288/320px)
                       cut off mid-message on long ComfyUI status lines. */}
                   <div className="max-h-[28rem] sm:max-h-[34rem] overflow-y-auto p-3">
@@ -458,7 +457,7 @@ const Skeleton = ({ jobId, status, job, paused = false, onTogglePause }) => {
             }}
             closeIcon={null}
             centered>
-            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-800/80 bg-gradient-to-r from-cyan-500/10 via-fuchsia-500/5 to-transparent">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-800/80 bg-cyan-500/8">
               <div className="flex items-center gap-2">
                 <span className={`w-2 h-2 rounded-full ${paused ? 'bg-amber-400' : 'bg-emerald-400 animate-pulse'}`} />
                 <h3 className="text-sm font-semibold text-white tracking-wide">
@@ -471,14 +470,15 @@ const Skeleton = ({ jobId, status, job, paused = false, onTogglePause }) => {
                 </span>
                 {onTogglePause && (
                   <button type="button" onClick={onTogglePause}
-                    className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full border border-gray-700 hover:border-gray-500 text-gray-300 hover:text-white transition-colors">
+                    className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg border border-gray-700 hover:border-gray-500 text-gray-300 hover:text-white transition-colors">
                     {paused ? <><CaretRightOutlined className="text-[9px]" /> Resume</>
                             : <><PauseOutlined className="text-[9px]" /> Pause</>}
                   </button>
                 )}
                 <button type="button" onClick={() => setLogsOpen(false)}
-                  className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded">
-                  ✕
+                  className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded inline-flex items-center"
+                  aria-label="Close">
+                  ×
                 </button>
               </div>
             </div>
@@ -817,17 +817,11 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
                     p.disabled
                       ? 'opacity-50 cursor-not-allowed grayscale'
                       : active
-                        ? `ring-2 ${p.border.replace('border-', 'ring-').replace('/60', '/70')} shadow-xl ${p.glow.replace('/20', '/40')} scale-[1.02]`
+                        ? `ring-2 ${p.border.replace('border-', 'ring-').replace('/60', '/70')}`
                         : ''
                   }`}>
-                  {p.luxe && (
-                    <div aria-hidden className={`absolute inset-0 pointer-events-none opacity-30 bg-gradient-to-br ${p.accent} mix-blend-overlay`} />
-                  )}
                   {active && (
-                    /* Was -top-2 -right-2 — the card has overflow-hidden so
-                       the badge was being clipped at the corner. Position
-                       inside the card instead. */
-                    <div className={`absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-gradient-to-br ${p.accent} flex items-center justify-center text-black shadow-md z-10`}>
+                    <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-lg bg-amber-500 flex items-center justify-center text-black z-10">
                       <CheckOutlined className="text-[9px] font-bold" />
                     </div>
                   )}
@@ -841,7 +835,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
                         <span title="Worker offline" className="w-1.5 h-1.5 rounded-full bg-gray-600" />
                       )}
                     </div>
-                    <span className={`text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-full bg-gradient-to-r ${p.accent} text-black whitespace-nowrap`}>
+                    <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-lg bg-amber-500/12 border border-amber-500/40 text-amber-200 whitespace-nowrap">
                       {p.badge}
                     </span>
                   </div>
@@ -856,6 +850,9 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
               <label className="text-[10px] text-gray-500 block mb-1 uppercase tracking-wider">Model</label>
               <Select size="middle" value={model} onChange={setModel} style={{ width: '100%' }}
                 popupMatchSelectWidth={false}
+                showSearch allowClear
+                placeholder="Search model…"
+                filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
                 options={MODELS_BY_PROVIDER.local} />
               <p className="text-[10px] text-gray-600 mt-1">
                 7 models live: LTX, Wan 2.1, Wan 2.1 I2V, Wan 2.2, Hunyuan, Mochi, SVD-XT.
@@ -873,9 +870,9 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
                   const active = optimizedMode === m.id
                   return (
                     <button key={m.id} onClick={() => setOptimizedMode(m.id)} type="button"
-                      className={`p-2.5 rounded-lg border text-left transition-all ${
+                      className={`p-2.5 rounded-lg border text-left transition-colors ${
                         active
-                          ? `border-cyan-300/70 bg-gradient-to-br ${m.accent} bg-opacity-10 shadow-md`
+                          ? 'border-cyan-300/70 bg-cyan-500/12'
                           : 'border-gray-800 bg-gray-900/40 hover:border-gray-700 hover:bg-gray-900'
                       }`}>
                       <div className="flex items-baseline justify-between mb-0.5">
@@ -906,7 +903,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
             <div className="mt-4 p-3 rounded-lg border border-gray-800 bg-gray-900/40">
               <label className="flex items-center justify-between gap-2 cursor-pointer">
                 <span className="flex items-center gap-2">
-                  <span className="text-base">🎵</span>
+                  <CustomerServiceOutlined className="text-base text-amber-300" />
                   <span className="text-xs font-semibold text-gray-200">Add background music</span>
                   <span className="text-[10px] text-gray-500">+10-30s · MusicGen on 5090</span>
                 </span>
@@ -928,7 +925,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
 
         <div>
           {provider === 'local' && MODEL_CAPS[model]?.prompt === false ? (
-            <div className="p-4 rounded-lg bg-gradient-to-br from-amber-500/5 to-rose-500/5 border border-amber-400/20 text-xs text-gray-300">
+            <div className="p-4 rounded-lg bg-amber-500/8 border border-amber-400/20 text-xs text-gray-300">
               <p className="font-semibold text-amber-200 mb-1">No prompt needed for SVD-XT</p>
               <p className="text-gray-400 leading-relaxed">
                 SVD-XT animates the source image directly using motion priors. Skip the prompt and
@@ -944,7 +941,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <button type="button" onClick={() => setHelperOpen(true)}
                     title="AI prompt helper + sample prompts"
-                    className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-amber-500/40 hover:border-amber-400 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-colors whitespace-nowrap">
+                    className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg border border-amber-500/40 hover:border-amber-400 bg-amber-500/12 hover:bg-amber-500/20 text-amber-300 transition-colors whitespace-nowrap">
                     <BulbOutlined className="text-[10px]" /> Help me write
                   </button>
                   {prompt && (
@@ -1011,8 +1008,8 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
                       {uploadingImage ? 'Uploading' : 'Upload'}
                     </Button>
                   </Upload>
-                  <Button onClick={() => setLibraryOpen(true)}>
-                    🖼 From Library
+                  <Button onClick={() => setLibraryOpen(true)} icon={<PictureOutlined />}>
+                    From Library
                   </Button>
                 </div>
                 {imageUrl && (
@@ -1022,8 +1019,8 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
                       onError={(e) => { e.currentTarget.style.display = 'none' }} />
                     <span className="text-[10px] text-gray-500 break-all">{imageUrl.slice(0, 80)}{imageUrl.length > 80 ? '…' : ''}</span>
                     {sourceIsVault && (
-                      <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full border border-fuchsia-500/50 bg-fuchsia-500/10 text-fuchsia-300">
-                        🔒 Vault · output → Vault
+                      <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-lg border border-amber-500/50 bg-amber-500/12 text-amber-300 inline-flex items-center gap-1">
+                        <LockOutlined /> Vault · output → Vault
                       </span>
                     )}
                   </div>
@@ -1139,16 +1136,14 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
           {loading ? 'Generating…' : 'Generate Video'}
         </Button>
 
-        <div className="relative overflow-hidden rounded-xl border border-amber-400/25 bg-gradient-to-br from-amber-500/[0.06] via-rose-500/[0.05] to-fuchsia-500/[0.06]">
-          <div aria-hidden className="absolute -top-12 -right-12 w-44 h-44 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
-          <div aria-hidden className="absolute -bottom-16 -left-12 w-44 h-44 bg-fuchsia-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative overflow-hidden rounded-lg border border-amber-400/25 bg-amber-500/8">
           <div className="relative p-3.5 flex items-start gap-3">
-            <div className="shrink-0 mt-0.5 w-7 h-7 rounded-full bg-gradient-to-br from-amber-300 via-rose-400 to-fuchsia-500 flex items-center justify-center shadow-md shadow-rose-500/20">
+            <div className="shrink-0 mt-0.5 w-7 h-7 rounded-lg bg-amber-500 flex items-center justify-center">
               <ThunderboltOutlined className="text-black text-xs" />
             </div>
             <div className="text-[11px] leading-relaxed">
               <p className="mb-0.5">
-                <span className="font-semibold bg-gradient-to-r from-amber-200 via-rose-200 to-fuchsia-300 bg-clip-text text-transparent tracking-wide">
+                <span className="font-semibold text-amber-200 tracking-wide">
                   5090 Beast
                 </span>
                 <span className="text-gray-500"> · the personal lane</span>
@@ -1295,9 +1290,9 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
 const LibraryCard = ({ video, onClick, onDelete, selectMode, isSelected, onToggleSelect }) => {
   const navigate = useNavigate()
   const provColor =
-    video.provider === 'zsky'  ? 'from-sky-500 to-blue-400' :
-    video.provider === 'local' ? 'from-amber-400 via-rose-400 to-fuchsia-500' :
-                                 'from-emerald-500 to-cyan-400'
+    video.provider === 'zsky'  ? 'bg-sky-500' :
+    video.provider === 'local' ? 'bg-amber-500' :
+                                 'bg-emerald-500'
   const date = new Date(video.createdAt)
   const dateLabel = isNaN(date.getTime()) ? '' : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
   const thumb = thumbFromVideo(resolveVideoUrl(video.videoUrl))
@@ -1318,7 +1313,7 @@ const LibraryCard = ({ video, onClick, onDelete, selectMode, isSelected, onToggl
         : ''
     }`}>
       <button onClick={handleClick} className="w-full text-left">
-        <div className="relative aspect-[9/16] bg-gradient-to-br from-gray-800/80 to-gray-950 overflow-hidden">
+        <div className="relative aspect-[9/16] bg-gray-900 overflow-hidden">
           {thumb ? (
             <img src={thumb} alt={video.prompt} loading="lazy"
               className={`w-full h-full object-cover transition-transform duration-300 ${
@@ -1329,25 +1324,25 @@ const LibraryCard = ({ video, onClick, onDelete, selectMode, isSelected, onToggl
               <PlayCircleOutlined className="text-4xl text-gray-700" />
             </div>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/0 to-black/30 opacity-100 group-hover:from-black/40 transition-opacity" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/0 to-black/30 opacity-100" />
           {!selectMode && (
             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <PlayCircleOutlined className="text-5xl text-white drop-shadow-lg" />
+              <PlayCircleOutlined className="text-5xl text-white" />
             </div>
           )}
-          <div className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-gradient-to-r ${provColor} text-black`}>
+          <div className={`absolute top-2 left-2 px-2 py-0.5 rounded-lg text-[9px] font-bold uppercase tracking-wider ${provColor} text-black`}>
             {video.provider}
           </div>
           {dateLabel && (
-            <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full text-[9px] bg-black/60 text-gray-300 border border-white/10">
+            <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-lg text-[9px] bg-black/60 text-gray-300 border border-white/10">
               {dateLabel}
             </div>
           )}
           {selectMode && (
-            <div className={`absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-md border-2 transition-all ${
+            <div className={`absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-md border-2 transition-colors ${
               isSelected
                 ? 'bg-cyan-400 border-cyan-400 text-black'
-                : 'bg-black/60 border-white/40 text-transparent'
+                : 'bg-black/60 border-white/40 text-white/0'
             }`}>
               <CheckOutlined className="text-[12px] font-bold" />
             </div>
@@ -1363,7 +1358,7 @@ const LibraryCard = ({ video, onClick, onDelete, selectMode, isSelected, onToggl
         <button
           onClick={(e) => { e.stopPropagation(); onDelete?.(video) }}
           title="Delete video"
-          className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full bg-black/60 hover:bg-rose-600 text-gray-300 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity z-10">
+          className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-lg bg-black/60 hover:bg-rose-600 text-gray-300 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity z-10">
           <DeleteOutlined className="text-xs" />
         </button>
       )}
@@ -1378,22 +1373,22 @@ const LibraryCard = ({ video, onClick, onDelete, selectMode, isSelected, onToggl
 // status filter change, page change, or every 4s if there are still active
 // jobs (queued/processing). Completed-only view = no polling at all.
 const JOB_STATUS_META = {
-  queued:     { tone: 'amber',   ring: 'border-amber-400/60',   chip: 'bg-amber-500/15 text-amber-300 border-amber-500/40',   icon: '⏳', label: 'Queued' },
-  processing: { tone: 'cyan',    ring: 'border-cyan-400/70',    chip: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/40',     icon: '⚡', label: 'Processing' },
-  completed:  { tone: 'emerald', ring: 'border-emerald-500/50', chip: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40', icon: '✓', label: 'Completed' },
-  failed:     { tone: 'rose',    ring: 'border-rose-500/60',    chip: 'bg-rose-500/15 text-rose-300 border-rose-500/40',     icon: '✗', label: 'Failed' },
+  queued:     { tone: 'amber',   ring: 'border-amber-400/60',   chip: 'bg-amber-500/15 text-amber-300 border-amber-500/40',   label: 'Queued' },
+  processing: { tone: 'cyan',    ring: 'border-cyan-400/70',    chip: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/40',     label: 'Processing' },
+  completed:  { tone: 'emerald', ring: 'border-emerald-500/50', chip: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40', label: 'Completed' },
+  failed:     { tone: 'rose',    ring: 'border-rose-500/60',    chip: 'bg-rose-500/15 text-rose-300 border-rose-500/40',     label: 'Failed' },
 }
 
 const LANE_COPY = {
-  optimized: { label: '5090 Optimized', bg: 'from-cyan-300 via-fuchsia-400 to-purple-500' },
-  local:     { label: '5090 Beast',     bg: 'from-amber-400 via-rose-400 to-fuchsia-500' },
-  worker:    { label: 'GPU Worker',     bg: 'from-emerald-500 to-cyan-400' },
-  zsky:      { label: 'ZSky',           bg: 'from-sky-500 to-blue-400' },
+  optimized: { label: '5090 Optimized', bg: 'bg-cyan-500' },
+  local:     { label: '5090 Beast',     bg: 'bg-amber-500' },
+  worker:    { label: 'GPU Worker',     bg: 'bg-emerald-500' },
+  zsky:      { label: 'ZSky',           bg: 'bg-sky-500' },
 }
 
 const JobCard = ({ job }) => {
   const meta = JOB_STATUS_META[job.status] || JOB_STATUS_META.queued
-  const lane = LANE_COPY[job.lane] || { label: job.lane || '?', bg: 'from-gray-500 to-gray-600' }
+  const lane = LANE_COPY[job.lane] || { label: job.lane || '?', bg: 'bg-gray-700' }
   const created = job.createdAt ? new Date(job.createdAt) : null
   const ago = created ? timeAgo(created) : ''
   const errShort = (job.error || '').slice(0, 120)
@@ -1407,14 +1402,14 @@ const JobCard = ({ job }) => {
             onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0 }}
             className="w-full h-full object-cover" />
         ) : (
-          <div className={`w-full h-full flex items-center justify-center bg-gradient-to-br ${lane.bg} opacity-30`}>
-            <span className="text-5xl opacity-60">{meta.icon}</span>
+          <div className={`w-full h-full flex items-center justify-center ${lane.bg} opacity-25`}>
+            <span className="text-[10px] uppercase tracking-wider font-mono text-black/80">{meta.label}</span>
           </div>
         )}
         <div className={`glass absolute top-2 left-2 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${meta.chip}`}>
-          {meta.icon} {meta.label}
+          {meta.label}
         </div>
-        <div className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-gradient-to-r ${lane.bg} text-black`}>
+        <div className={`absolute top-2 right-2 px-2 py-0.5 rounded-lg text-[9px] font-semibold uppercase tracking-wider ${lane.bg} text-black`}>
           {lane.label}
         </div>
       </div>
@@ -1428,7 +1423,7 @@ const JobCard = ({ job }) => {
         </div>
         {job.status === 'failed' && errShort && (
           <p className="text-[10px] text-rose-400/80 font-mono line-clamp-2 pt-1 border-t border-rose-500/20">
-            ✗ {errShort}
+            {errShort}
           </p>
         )}
       </div>
@@ -1809,13 +1804,12 @@ const AIVideo = () => {
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/30 via-cyan-900/10 to-amber-900/20 pointer-events-none" />
         <div className="relative max-w-6xl mx-auto px-5 sm:px-6 pt-28 sm:pt-32 pb-8">
           <div className="eyebrow-mono mb-3 inline-flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
             {activeKey === 'cinema' ? 'MULTI-SHOT ORCHESTRATOR · 5090 POWERED' : 'MULTI-PROVIDER · 5090 POWERED'}
           </div>
-          <h1 className="font-poppins font-black text-3xl sm:text-5xl md:text-6xl leading-tight gradient-text-amber mb-2">
+          <h1 className="font-poppins font-black text-3xl sm:text-5xl md:text-6xl leading-tight text-white mb-2">
             {activeKey === 'cinema' ? 'Cinema · Multi-shot' : 'AI Video Studio'}
           </h1>
           <p className="text-gray-400 text-sm sm:text-base max-w-xl">
@@ -1863,7 +1857,7 @@ const AIVideo = () => {
             },
             {
               key: 'combine',
-              label: <span>🎬 Combine</span>,
+              label: <span><ToolOutlined /> Combine</span>,
               children: <VideoCombiner />,
             },
           ]}
@@ -1874,7 +1868,7 @@ const AIVideo = () => {
 }
 
 // ── Image Studio library picker ─────────────────────────────────────
-// Opens from the "🖼 From Library" button next to the source-image
+// Opens from the "From Library" button next to the source-image
 // Upload control. Shows tiles from /api/image-enhance/list. Vault items
 // are only included when the user has a Vault token (the BE downgrades
 // visibility to 'public' otherwise); each tile carries its vault flag
@@ -1915,16 +1909,16 @@ function LibraryPickerModal({ open, onClose, onPick }) {
           activeKey={tab}
           onChange={setTab}
           items={[
-            { key: 'public', label: '🌐 Public' },
+            { key: 'public', label: <span className='inline-flex items-center gap-1.5'><GlobalOutlined /> Public</span> },
             ...(hasVault ? [
-              { key: 'vault', label: '🔒 Vault' },
+              { key: 'vault', label: <span className='inline-flex items-center gap-1.5'><LockOutlined /> Vault</span> },
               { key: 'all',   label: 'All' },
             ] : []),
           ]}
         />
         {!hasVault && (
-          <p className='text-[11px] text-gray-500'>
-            🔒 Vault images are hidden — unlock the Vault on the Image Studio page first to see your private items here.
+          <p className='text-[11px] text-gray-500 inline-flex items-center gap-1.5'>
+            <LockOutlined /> Vault images are hidden — unlock the Vault on the Image Studio page first to see your private items here.
           </p>
         )}
         {err && <Alert type='error' showIcon message={err} className='!mb-1' />}
@@ -1946,8 +1940,8 @@ function LibraryPickerModal({ open, onClose, onPick }) {
               >
                 <img src={url} alt='' className='w-full h-full object-cover' onError={(e) => { e.currentTarget.style.opacity = 0.2 }} />
                 {isVault && (
-                  <span className='absolute top-1 right-1 text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-fuchsia-400/70 bg-fuchsia-900/70 text-fuchsia-100'>
-                    🔒 Vault
+                  <span className='absolute top-1 right-1 text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded-lg border border-amber-400/70 bg-amber-900/70 text-amber-100 inline-flex items-center gap-1'>
+                    <LockOutlined /> Vault
                   </span>
                 )}
                 <span className='absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent text-[10px] px-2 py-1 text-gray-200 opacity-0 group-hover:opacity-100 transition-opacity truncate'>

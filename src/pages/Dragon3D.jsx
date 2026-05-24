@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ThunderboltOutlined, VideoCameraOutlined, BulbOutlined } from '@ant-design/icons'
 import SplineScene from '../components/luxe/SplineScene'
 import PromptToThree from '../components/luxe/PromptToThree'
 import PromptToMesh from '../components/luxe/PromptToMesh'
@@ -18,9 +19,9 @@ const SHOWCASE_SCENE_URL =
   'https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode'
 
 const tabs = [
-  { id: 'generate', label: '✨ Generate from prompt' },
-  { id: '5090',     label: '🔥 Studio Pro · real mesh' },
-  { id: 'showcase', label: '🎬 Spline showcase' },
+  { id: 'generate', label: 'Generate from prompt', icon: <BulbOutlined /> },
+  { id: '5090',     label: 'Studio Pro · real mesh', icon: <ThunderboltOutlined /> },
+  { id: 'showcase', label: 'Spline showcase', icon: <VideoCameraOutlined /> },
 ]
 
 const Dragon3D = () => {
@@ -31,7 +32,7 @@ const Dragon3D = () => {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <header className="text-center mb-6 sm:mb-10">
-          <p className="luxe-eyebrow text-violet-300/80">— Interactive 3D</p>
+          <p className="luxe-eyebrow text-cyan-300/80">— Interactive 3D</p>
           <h1 className="luxe-section-title text-4xl sm:text-5xl text-white mt-3">
             Generate a 3D scene
           </h1>
@@ -45,10 +46,10 @@ const Dragon3D = () => {
         <div className="flex items-center justify-center gap-2 mb-4 flex-wrap">
           {tabs.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
-              className={`luxe-btn text-xs sm:text-sm ${
+              className={`luxe-btn text-xs sm:text-sm inline-flex items-center gap-2 ${
                 tab === t.id ? 'luxe-btn-primary' : 'luxe-btn-secondary'
               }`}>
-              {t.label}
+              {t.icon}{t.label}
             </button>
           ))}
         </div>
@@ -62,7 +63,7 @@ const Dragon3D = () => {
               <SplineScene scene={SHOWCASE_SCENE_URL} className="!w-full !h-full" />
               <div className="absolute top-4 right-4 luxe-card px-3 py-2 text-[11px] text-gray-300">
                 <span className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
                   Drag · Scroll · Click
                 </span>
               </div>

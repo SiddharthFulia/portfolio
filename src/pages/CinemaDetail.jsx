@@ -28,7 +28,7 @@ function CinemaOutput({ job }) {
   return (
     <div className="rounded-2xl border border-amber-500/30 bg-gray-900/40 p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-amber-300">📜 {shots.length} planned shots</h3>
+        <h3 className="text-sm font-semibold text-amber-300">{shots.length} planned shots</h3>
         <span className="text-[10px] font-mono text-gray-500">
           {job.shotCount || shots.length} · {job.aspectRatio} · {job.resolution}
         </span>
@@ -49,7 +49,7 @@ function CinemaOutput({ job }) {
                   <CopyOutlined /> Copy
                 </button>
                 <button onClick={() => sendToAIVideo(p)}
-                  className="text-[10px] flex items-center gap-1 px-2 py-0.5 rounded bg-gradient-to-r from-cyan-500/20 to-fuchsia-500/20 hover:from-cyan-500/30 hover:to-fuchsia-500/30 text-cyan-200 border border-cyan-500/40">
+                  className="text-[10px] flex items-center gap-1 px-2 py-0.5 rounded bg-cyan-500/12 hover:bg-cyan-500/20 text-cyan-200 border border-cyan-500/40">
                   <SendOutlined /> Render
                 </button>
               </div>
@@ -66,7 +66,7 @@ export default function CinemaDetail() {
   return <JobDetailPage
     lane="cinema"
     title="Cinema"
-    accentClass="bg-gradient-to-r from-amber-300 via-rose-400 to-fuchsia-300 bg-clip-text text-transparent"
+    accentClass="text-white"
     backTo="/cinema"
     getStatus={getCinemaStatus}
     idKey="projectId"

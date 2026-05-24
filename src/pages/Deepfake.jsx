@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Upload, Input, Select, Alert, message as antMessage } from 'antd'
-import { UploadOutlined, ThunderboltOutlined, DownloadOutlined, SyncOutlined, LockOutlined, ReloadOutlined } from '@ant-design/icons'
+import { UploadOutlined, ThunderboltOutlined, DownloadOutlined, SyncOutlined, LockOutlined, ReloadOutlined, SmileOutlined, AudioOutlined, VideoCameraOutlined } from '@ant-design/icons'
 import VaultGate from '../components/VaultGate'
 import AudioRecorder from '../components/AudioRecorder'
 import CameraCapture from '../components/CameraCapture'
@@ -155,11 +155,11 @@ function DeepfakeInner() {
           <p className="eyebrow-mono">— AI Studio · Vault</p>
           <div className="flex items-center gap-3 mt-2 flex-wrap">
             <LockOutlined className="text-rose-400 text-2xl" />
-            <h1 className="text-4xl sm:text-5xl font-bold leading-tight gradient-text-amber">
+            <h1 className="text-4xl sm:text-5xl font-bold leading-tight text-white">
               Deepfake Studio
             </h1>
-            <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-300">
-              Vault · Private
+            <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-lg border border-rose-500/40 bg-rose-500/10 text-rose-300 inline-flex items-center gap-1">
+              <LockOutlined /> Vault · Private
             </span>
           </div>
           <p className="mt-3 text-sm text-fg-secondary max-w-2xl leading-relaxed">
@@ -171,12 +171,12 @@ function DeepfakeInner() {
         {/* Tabs */}
         <div className="flex items-center gap-2 mb-6 flex-wrap">
           {[
-            { id: 'face-swap', label: '🎭 Face Swap' },
-            { id: 'voice-any', label: '🎤 Voice (any)' },
+            { id: 'face-swap', label: 'Face Swap', icon: <SmileOutlined /> },
+            { id: 'voice-any', label: 'Voice (any)', icon: <AudioOutlined /> },
           ].map(t => (
             <button key={t.id} onClick={() => { setTab(t.id); setJob(null); setError(null) }}
-              className={`luxe-btn text-xs sm:text-sm ${tab === t.id ? 'luxe-btn-primary' : 'luxe-btn-secondary'}`}>
-              {t.label}
+              className={`luxe-btn text-xs sm:text-sm inline-flex items-center gap-2 ${tab === t.id ? 'luxe-btn-primary' : 'luxe-btn-secondary'}`}>
+              {t.icon}{t.label}
             </button>
           ))}
         </div>
@@ -208,7 +208,7 @@ function DeepfakeInner() {
                   <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500 font-mono">
                     <span className="truncate">{refFile?.name || 'recorded clip'}</span>
                     <button onClick={() => { setRefFile(null); setRefDataUrl('') }}
-                      className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-rose-500/40 hover:border-rose-400 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300">
+                      className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-rose-500/40 hover:border-rose-400 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300">
                       <SyncOutlined className="text-[9px]" /> Replace
                     </button>
                   </div>
@@ -244,7 +244,7 @@ function DeepfakeInner() {
                   <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500 font-mono">
                     <span className="truncate">{melodyFile?.name || 'hummed melody'}</span>
                     <button onClick={() => { setMelodyFile(null); setMelodyDataUrl('') }}
-                      className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-rose-500/40 hover:border-rose-400 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300">
+                      className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-rose-500/40 hover:border-rose-400 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300">
                       <SyncOutlined className="text-[9px]" /> Replace
                     </button>
                   </div>
@@ -281,7 +281,11 @@ function DeepfakeInner() {
 
             <div>
               <label className="text-[11px] uppercase tracking-wider text-gray-400 mb-1 block font-semibold">Language</label>
-              <Select className="w-full" value={language} onChange={setLanguage} options={XTTS_LANGUAGES} />
+              <Select className="w-full" value={language} onChange={setLanguage}
+                showSearch allowClear
+                placeholder="Search language…"
+                filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+                options={XTTS_LANGUAGES} />
             </div>
           </section>
         )}
@@ -304,8 +308,8 @@ function DeepfakeInner() {
                         selector for us, so the user lands ready-to-render. */}
                     <button
                       onClick={() => navigate(`/ai-video?image=${encodeURIComponent(outputUrl)}&fromDeepfake=1&provider=optimized`)}
-                      className="text-xs font-semibold px-3 py-2 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20">
-                      🎬 Send to Video Studio
+                      className="text-xs font-semibold px-3 py-2 rounded-lg border border-amber-500/40 bg-amber-500/12 text-amber-300 hover:bg-amber-500/20 inline-flex items-center gap-1.5">
+                      <VideoCameraOutlined /> Send to Video Studio
                     </button>
                     <a href={outputUrl} download
                       className="flex items-center gap-1 text-xs px-3 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40">
@@ -353,7 +357,7 @@ function DeepfakeInner() {
               description={error}
               action={
                 <button onClick={generate}
-                  className="text-[11px] font-semibold px-3 py-1.5 rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-700 hover:bg-rose-500/20 inline-flex items-center gap-1">
+                  className="text-[11px] font-semibold px-3 py-1.5 rounded-lg border border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 inline-flex items-center gap-1">
                   <ReloadOutlined /> Retry
                 </button>
               }
@@ -391,40 +395,40 @@ function DeepfakeLibrary({ items, filter, setFilter }) {
   return (
     <section className="mt-10">
       <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
-        <h2 className="text-lg font-bold bg-gradient-to-r from-rose-300 via-fuchsia-400 to-amber-300 bg-clip-text text-transparent">
+        <h2 className="text-lg font-bold text-white">
           Your private library
         </h2>
         <div className="flex items-center gap-1.5">
           {[
-            { id: 'all',        label: 'All' },
-            { id: 'face-swap',  label: '🎭 Face' },
-            { id: 'voice-any',  label: '🎤 Voice' },
+            { id: 'all',        label: 'All', icon: null },
+            { id: 'face-swap',  label: 'Face', icon: <SmileOutlined /> },
+            { id: 'voice-any',  label: 'Voice', icon: <AudioOutlined /> },
           ].map(f => (
             <button key={f.id} onClick={() => setFilter(f.id)}
-              className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${
+              className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-colors inline-flex items-center gap-1 ${
                 filter === f.id
                   ? 'border-rose-400/60 bg-rose-500/10 text-rose-300'
                   : 'border-gray-800 bg-gray-900/40 text-gray-400 hover:text-gray-200'
               }`}>
-              {f.label}
+              {f.icon}{f.label}
             </button>
           ))}
         </div>
       </div>
 
       {items.length === 0 ? (
-        <p className="text-xs text-gray-500 text-center py-8 border border-dashed border-gray-800 rounded-xl">
+        <p className="text-xs text-gray-500 text-center py-8 border border-dashed border-gray-800 rounded-lg">
           Nothing yet — your generated deepfakes will land here.
         </p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {items.map(item => (
             <div key={item.jobId}
-              className="rounded-xl border border-gray-800 bg-gray-900/40 overflow-hidden hover:border-rose-500/40 transition-colors">
+              className="rounded-lg border border-gray-800 bg-gray-900/40 overflow-hidden hover:border-rose-500/40 transition-colors">
               {item.kind === 'face-swap' && item.outputUrl ? (
                 <img src={item.outputUrl} alt="swap" className="w-full h-44 object-cover" />
               ) : item.kind === 'voice-any' && item.outputUrl ? (
-                <div className="p-3 bg-gradient-to-br from-rose-500/10 via-fuchsia-500/5 to-amber-500/5 h-44 flex flex-col justify-center gap-2">
+                <div className="p-3 bg-rose-500/8 h-44 flex flex-col justify-center gap-2">
                   <p className="text-[11px] text-gray-300 line-clamp-3 leading-snug">
                     {item.prompt || '(no text)'}
                   </p>
@@ -432,20 +436,20 @@ function DeepfakeLibrary({ items, filter, setFilter }) {
                 </div>
               ) : (
                 <div className="h-44 flex items-center justify-center text-[10px] text-gray-600">
-                  {item.status === 'failed' ? '✗ failed' : item.status}
+                  {item.status === 'failed' ? 'failed' : item.status}
                 </div>
               )}
               <div className="px-3 py-2 flex items-center justify-between gap-2 border-t border-gray-800/60">
                 <div className="min-w-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-fuchsia-300">
-                    {item.kind === 'face-swap' ? '🎭 Face Swap' : '🎤 Voice Clone'}
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-rose-300 inline-flex items-center gap-1.5">
+                    {item.kind === 'face-swap' ? <><SmileOutlined /> Face Swap</> : <><AudioOutlined /> Voice Clone</>}
                   </p>
                   <p className="text-[9px] text-gray-500 font-mono">{fmtDate(item.createdAt)}</p>
                 </div>
                 {item.outputUrl && (
                   <a href={item.outputUrl} download target="_blank" rel="noopener noreferrer"
-                    className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/40">
-                    ↓
+                    className="text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/40 inline-flex items-center gap-1">
+                    <DownloadOutlined />
                   </a>
                 )}
               </div>
@@ -459,7 +463,7 @@ function DeepfakeLibrary({ items, filter, setFilter }) {
 
 function UploadCard({ label, accent, dataUrl, file, onUpload, onClear, onCapture, hint }) {
   const accentMap = {
-    fuchsia: { border: 'border-fuchsia-500/40', icon: 'text-fuchsia-400', btn: 'border-fuchsia-500/40 hover:border-fuchsia-400 bg-fuchsia-500/10 hover:bg-fuchsia-500/20 text-fuchsia-300', hex: '#e879f9' },
+    fuchsia: { border: 'border-cyan-500/40', icon: 'text-cyan-400', btn: 'border-cyan-500/40 hover:border-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300', hex: '#22d3ee' },
     amber:   { border: 'border-amber-500/40',   icon: 'text-amber-400',   btn: 'border-amber-500/40 hover:border-amber-400 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300', hex: '#fbbf24' },
   }
   const a = accentMap[accent] || accentMap.fuchsia
@@ -469,12 +473,12 @@ function UploadCard({ label, accent, dataUrl, file, onUpload, onClear, onCapture
         {label}
       </label>
       {dataUrl ? (
-        <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-3 space-y-2">
+        <div className="rounded-lg border border-gray-800 bg-gray-900/40 p-3 space-y-2">
           <img src={dataUrl} alt={label} className="w-full max-h-64 object-contain rounded-lg" />
           <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500 font-mono">
             <span className="truncate">{file?.name || 'image'}</span>
             <button onClick={onClear}
-              className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border ${a.btn}`}>
+              className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg border ${a.btn}`}>
               <SyncOutlined className="text-[9px]" /> Replace
             </button>
           </div>

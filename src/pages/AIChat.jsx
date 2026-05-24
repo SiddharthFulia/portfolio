@@ -7,7 +7,7 @@ import {
   UserOutlined, CopyOutlined, CheckOutlined, MenuOutlined,
   ThunderboltOutlined, CloudOutlined, DesktopOutlined, GoogleOutlined,
   PictureOutlined, FileTextOutlined, SettingOutlined, MergeCellsOutlined,
-  ExperimentOutlined,
+  ExperimentOutlined, LockOutlined, CameraOutlined, AudioOutlined, BgColorsOutlined,
 } from '@ant-design/icons'
 import ReactMarkdown from 'react-markdown'
 import ChatSidebar from '../components/ChatSidebar'
@@ -30,10 +30,10 @@ import {
 // runtime gets a premium-sounding name — visitors should perceive it
 // as a powerful feature, not "running on someone's PC".
 const PROVIDERS = [
-  { id: '5090',          label: '⚡ Studio Pro',     icon: <ThunderboltOutlined />, blurb: 'Premium · private · multimodal',                      accent: 'from-amber-400 via-rose-400 to-fuchsia-500' },
-  { id: 'cloud-groq',    label: '☁ Groq Cloud',     icon: <CloudOutlined />,      blurb: 'Hosted · sub-second tokens · Llama / GPT-OSS',         accent: 'from-cyan-400 to-blue-500' },
-  { id: 'cloud-gemini',  label: '✨ Gemini',         icon: <GoogleOutlined />,    blurb: 'Google · multimodal · fast + free tier',               accent: 'from-blue-400 via-fuchsia-400 to-pink-400' },
-  { id: 'oracle-ollama', label: '🛟 Standby',         icon: <DesktopOutlined />,  blurb: 'Lightweight fallback when other lanes are busy',       accent: 'from-emerald-400 to-cyan-400' },
+  { id: '5090',          label: 'Studio Pro',     icon: <ThunderboltOutlined />, blurb: 'Premium · private · multimodal',                      accent: 'bg-amber-500' },
+  { id: 'cloud-groq',    label: 'Groq Cloud',     icon: <CloudOutlined />,      blurb: 'Hosted · sub-second tokens · Llama / GPT-OSS',         accent: 'bg-cyan-500' },
+  { id: 'cloud-gemini',  label: 'Gemini',         icon: <GoogleOutlined />,    blurb: 'Google · multimodal · fast + free tier',               accent: 'bg-cyan-500' },
+  { id: 'oracle-ollama', label: 'Standby',        icon: <DesktopOutlined />,    blurb: 'Lightweight fallback when other lanes are busy',       accent: 'bg-emerald-500' },
 ]
 
 const GROQ_MODELS = [
@@ -357,10 +357,10 @@ const AIChat = () => {
       content: (
         <div className="text-sm space-y-3">
           <div className="grid grid-cols-2 gap-2">
-            <div className="p-3 rounded-lg bg-fuchsia-500/15 border border-fuchsia-500/40">
-              <div className="text-[10px] uppercase tracking-wider text-fuchsia-300 font-bold">Will compact</div>
+            <div className="p-3 rounded-lg bg-amber-500/12 border border-amber-500/40">
+              <div className="text-[10px] uppercase tracking-wider text-amber-300 font-bold">Will compact</div>
               <div className="text-2xl font-black text-white leading-tight">{willCompact}</div>
-              <div className="text-[10px] text-fuchsia-200">older messages</div>
+              <div className="text-[10px] text-amber-200">older messages</div>
             </div>
             <div className="p-3 rounded-lg bg-cyan-500/15 border border-cyan-500/40">
               <div className="text-[10px] uppercase tracking-wider text-cyan-300 font-bold">Will keep</div>
@@ -372,10 +372,10 @@ const AIChat = () => {
             Summarised into one system note so the model stays fast.
             Nothing is deleted — older messages are just hidden from the prompt.
           </p>
-          <div className="text-[12px] text-emerald-100 bg-emerald-500/15 border border-emerald-500/40 rounded-lg px-3 py-2.5 flex items-start gap-2">
-            <span className="text-lg leading-none">🔒</span>
+          <div className="text-[12px] text-emerald-100 bg-emerald-500/12 border border-emerald-500/40 rounded-lg px-3 py-2.5 flex items-start gap-2">
+            <LockOutlined className="text-base mt-0.5" />
             <span>
-              Runs on your <span className="font-bold text-white">⚡ Studio Pro</span> when online —
+              Runs on your <span className="font-bold text-white">Studio Pro</span> when online —
               chat stays private. Falls back to cloud only if 5090 is offline.
             </span>
           </div>
@@ -383,7 +383,7 @@ const AIChat = () => {
       ),
       okText: 'Compact',
       okButtonProps: {
-        style: { background: 'linear-gradient(135deg, #06b6d4, #7c3aed, #f59e0b)', border: 'none', fontWeight: 700 },
+        style: { background: '#f59e0b', border: 'none', fontWeight: 700 },
       },
       cancelText: 'Cancel',
       cancelButtonProps: {
@@ -561,11 +561,11 @@ const AIChat = () => {
                 className="lg:hidden w-9 h-9 inline-flex items-center justify-center rounded-lg bg-gray-900 hover:bg-gray-800 text-gray-300">
                 <MenuOutlined />
               </button>
-              <h1 className="font-poppins font-black text-xl sm:text-2xl leading-tight pb-0.5 bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-500 bg-clip-text text-transparent flex-1 min-w-0 truncate">
+              <h1 className="font-poppins font-black text-xl sm:text-2xl leading-tight pb-0.5 text-white flex-1 min-w-0 truncate">
                 {conversation?.title || 'AI Chat'}
               </h1>
               {provider === '5090' && (
-                <span className={`luxe-card hidden sm:inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 !rounded-full ${
+                <span className={`luxe-card hidden sm:inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 !rounded-lg ${
                   localOnline ? 'text-emerald-300' : 'text-rose-300'
                 }`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${localOnline ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
@@ -628,9 +628,9 @@ const AIChat = () => {
                 const active = provider === p.id
                 return (
                   <button key={p.id} onClick={() => setProvider(p.id)}
-                    className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all border ${
+                    className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-colors border ${
                       active
-                        ? `text-white bg-gradient-to-r ${p.accent} border-transparent shadow-md`
+                        ? `text-white ${p.accent} border-transparent`
                         : 'bg-gray-900/60 text-gray-400 border-gray-800 hover:border-gray-700 hover:text-gray-200'
                     }`}>
                     {p.icon} {p.label}
@@ -652,10 +652,13 @@ const AIChat = () => {
                 }}
                 style={{ flex: 1, minWidth: 240 }}
                 placeholder={provider === '5090'
-                  ? (localModels.length ? 'Pick a model' : 'No 5090 models available right now — try a cloud provider')
-                  : 'Pick a model'}
+                  ? (localModels.length ? 'Search a model…' : 'No 5090 models available right now — try a cloud provider')
+                  : 'Search a model…'}
                 disabled={!availableModels.length}
                 popupMatchSelectWidth={false}
+                showSearch allowClear
+                optionFilterProp="name"
+                filterOption={(input, option) => (option?.name ?? '').toLowerCase().includes(input.toLowerCase())}
                 options={availableModels.map(m => {
                   // For cloud-gemini every model is multimodal — treat
                   // as vision-capable. For 5090 we read the isVision
@@ -666,6 +669,7 @@ const AIChat = () => {
                   const disabledByImage = hasImageAttached && !providerHasVision
                   return {
                     value: m.id,
+                    name: `${m.name} ${m.best || ''}`,
                     disabled: disabledByImage,
                     label: (
                       <div className={`leading-tight py-0.5 pr-2 ${disabledByImage ? 'opacity-50' : ''}`}>
@@ -745,8 +749,8 @@ const AIChat = () => {
                 sending={sending}
                 placeholder={
                   acceptsVision
-                    ? 'Ask anything — drop an image with 📷, a doc with 📄, or speak with 🎙'
-                    : 'Ask anything — attach a doc with 📄 or speak with 🎙'
+                    ? 'Ask anything — drop an image, a doc, or speak with the mic'
+                    : 'Ask anything — attach a doc or speak with the mic'
                 }
                 acceptsVision={acceptsVision}
                 onSubmit={handleSubmit}
@@ -782,10 +786,10 @@ function WelcomeHero({ provider, localModels, localOnline, onPickProvider, onNew
         <div className="flex justify-center mb-3">
           <ChatLogo size={56} glow />
         </div>
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r from-cyan-500/20 via-purple-500/20 to-amber-500/20 border border-cyan-500/30 text-[10px] uppercase tracking-wider text-cyan-200 font-semibold mb-3">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-cyan-500/12 border border-cyan-500/30 text-[10px] uppercase tracking-wider text-cyan-200 font-semibold mb-3">
           AI Chat · 4 providers
         </div>
-        <h2 className="text-2xl sm:text-4xl font-black leading-tight pb-1 bg-gradient-to-r from-cyan-300 via-purple-300 to-amber-300 bg-clip-text text-transparent">
+        <h2 className="text-2xl sm:text-4xl font-black leading-tight pb-1 text-white">
           Pick a brain and start a conversation
         </h2>
         <p className="text-gray-400 text-sm mt-2 max-w-xl mx-auto">
@@ -800,13 +804,12 @@ function WelcomeHero({ provider, localModels, localOnline, onPickProvider, onNew
           return (
             <button key={p.id} onClick={() => onPickProvider(p.id)}
               className={`luxe-card luxe-card-hover relative p-4 text-left overflow-hidden ${
-                active ? 'scale-[1.02]' : ''
+                active ? 'border-amber-500/40' : ''
               }`}>
-              <div aria-hidden className={`absolute inset-0 pointer-events-none opacity-25 bg-gradient-to-br ${p.accent} mix-blend-overlay`} />
               <div className="relative">
                 <div className="flex items-center justify-between mb-1">
-                  <span className={`text-sm font-bold ${active ? 'text-white' : 'text-gray-200'}`}>{p.label}</span>
-                  {active && <CheckOutlined className="text-cyan-300" />}
+                  <span className={`text-sm font-bold inline-flex items-center gap-2 ${active ? 'text-white' : 'text-gray-200'}`}>{p.icon}{p.label}</span>
+                  {active && <CheckOutlined className="text-amber-300" />}
                 </div>
                 <p className="text-[11px] text-gray-400 leading-snug">{p.blurb}</p>
               </div>
@@ -817,10 +820,10 @@ function WelcomeHero({ provider, localModels, localOnline, onPickProvider, onNew
 
       {/* 5090 lane status panel */}
       {provider === '5090' && (
-        <div className="relative z-10 rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/5 via-rose-500/5 to-fuchsia-500/5 p-4 mb-6">
+        <div className="relative z-10 rounded-lg border border-amber-500/30 bg-amber-500/8 p-4 mb-6">
           <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
-            <h3 className="text-sm font-bold bg-gradient-to-r from-amber-300 via-rose-300 to-fuchsia-300 bg-clip-text text-transparent">
-              ⚡ Studio Pro — {localOnline ? 'online' : 'offline'}
+            <h3 className="text-sm font-bold text-amber-300 inline-flex items-center gap-2">
+              <ThunderboltOutlined /> Studio Pro — {localOnline ? 'online' : 'offline'}
             </h3>
             <span className="text-[10px] font-mono text-gray-500">
               {localModels.length} model{localModels.length === 1 ? '' : 's'} installed
@@ -828,7 +831,7 @@ function WelcomeHero({ provider, localModels, localOnline, onPickProvider, onNew
           </div>
           {!localOnline && (
             <p className="text-[11px] text-rose-300 leading-snug mb-2">
-              ⚠ The personal 5090 lane is taking a break right now — try a cloud provider above.
+              The personal 5090 lane is taking a break right now — try a cloud provider above.
             </p>
           )}
           {localOnline && localModels.length === 0 && (
@@ -839,7 +842,7 @@ function WelcomeHero({ provider, localModels, localOnline, onPickProvider, onNew
           {localModels.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {localModels.slice(0, 8).map(m => (
-                <span key={m.name} className="text-[10px] px-2 py-0.5 rounded-full bg-gray-900/80 border border-gray-700 text-gray-300 font-mono">
+                <span key={m.name} className="text-[10px] px-2 py-0.5 rounded-lg bg-gray-900/80 border border-gray-700 text-gray-300 font-mono">
                   {m.name}
                 </span>
               ))}
@@ -862,9 +865,9 @@ function WelcomeHero({ provider, localModels, localOnline, onPickProvider, onNew
 
       {/* Helper grid */}
       <div className="relative z-10 grid grid-cols-1 sm:grid-cols-3 gap-2 mt-8">
-        <HelpCard icon="🎙" title="Speak it" body="Tap the mic in the input row — Whisper transcribes your voice straight into the prompt." />
-        <HelpCard icon="📷" title="Attach an image" body="Vision models on 5090 (Qwen2.5-VL, Llama Vision) + Gemini accept images for OCR, charts, screenshots." />
-        <HelpCard icon="📄" title="Drop a document" body="Plain text, markdown, JSON, CSV, logs — gets embedded into your message for analysis." />
+        <HelpCard icon={<AudioOutlined />} title="Speak it" body="Tap the mic in the input row — Whisper transcribes your voice straight into the prompt." />
+        <HelpCard icon={<CameraOutlined />} title="Attach an image" body="Vision models on 5090 (Qwen2.5-VL, Llama Vision) + Gemini accept images for OCR, charts, screenshots." />
+        <HelpCard icon={<FileTextOutlined />} title="Drop a document" body="Plain text, markdown, JSON, CSV, logs — gets embedded into your message for analysis." />
       </div>
     </div>
   )
@@ -877,8 +880,8 @@ function WelcomeHero({ provider, localModels, localOnline, onPickProvider, onNew
 function VisionSwitchHint({ provider, available5090Vision, onSwitchProvider, onSwitchModel }) {
   const has5090Vision = available5090Vision.length > 0
   return (
-    <div className="mb-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 flex items-start gap-3 flex-wrap">
-      <span className="text-lg leading-none">🖼</span>
+    <div className="mb-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 flex items-start gap-3 flex-wrap">
+      <PictureOutlined className="text-base leading-none text-amber-300 mt-0.5" />
       <div className="flex-1 min-w-0">
         <p className="text-[11px] text-amber-200 font-semibold">
           This model can't see images.
@@ -889,20 +892,20 @@ function VisionSwitchHint({ provider, available5090Vision, onSwitchProvider, onS
         <div className="flex items-center gap-1.5 mt-2 flex-wrap">
           {provider === '5090' && has5090Vision && available5090Vision.slice(0, 3).map(m => (
             <button key={m.id} onClick={() => onSwitchModel(m.id)}
-              className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-amber-400/50 bg-amber-500/15 hover:bg-amber-500/25 text-amber-100 hover:text-white transition-colors">
+              className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-amber-400/50 bg-amber-500/15 hover:bg-amber-500/25 text-amber-100 hover:text-white transition-colors">
               <CheckOutlined className="text-[9px]" /> {m.name}
             </button>
           ))}
           {provider !== 'cloud-gemini' && (
             <button onClick={() => onSwitchProvider('cloud-gemini')}
-              className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-blue-400/50 bg-blue-500/15 hover:bg-blue-500/25 text-blue-100 hover:text-white transition-colors">
-              ✨ Use Gemini
+              className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-cyan-400/50 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-100 hover:text-white transition-colors">
+              <GoogleOutlined /> Use Gemini
             </button>
           )}
           {provider !== '5090' && has5090Vision && (
             <button onClick={() => onSwitchProvider('5090')}
-              className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-fuchsia-400/50 bg-fuchsia-500/15 hover:bg-fuchsia-500/25 text-fuchsia-100 hover:text-white transition-colors">
-              ⚡ Studio Pro vision
+              className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-amber-400/50 bg-amber-500/15 hover:bg-amber-500/25 text-amber-100 hover:text-white transition-colors">
+              <ThunderboltOutlined /> Studio Pro vision
             </button>
           )}
         </div>
@@ -914,7 +917,7 @@ function VisionSwitchHint({ provider, available5090Vision, onSwitchProvider, onS
 function HelpCard({ icon, title, body }) {
   return (
     <div className="luxe-card p-3">
-      <div className="text-2xl mb-1">{icon}</div>
+      <div className="text-xl text-amber-300 mb-1">{icon}</div>
       <div className="text-xs font-semibold text-gray-200 mb-1">{title}</div>
       <p className="text-[11px] text-gray-500 leading-relaxed">{body}</p>
     </div>
@@ -959,9 +962,9 @@ function MessageBubble({ msg }) {
       )}
       <div className={`max-w-[88%] sm:max-w-[78%] min-w-0 break-words px-3 sm:px-4 py-2.5 overflow-hidden ${
         isUser
-          ? 'rounded-2xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-cyan-500/30 text-gray-100'
+          ? 'rounded-lg bg-cyan-500/12 border border-cyan-500/30 text-gray-100'
           : msg._failed
-            ? 'rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-200'
+            ? 'rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-200'
             : 'luxe-card text-gray-100'
       }`}>
         {msg.imageUrl && (
@@ -1003,7 +1006,7 @@ function MessageBubble({ msg }) {
         )}
       </div>
       {isUser && (
-        <div className="w-8 h-8 shrink-0 rounded-full bg-gradient-to-br from-amber-400 to-rose-500 flex items-center justify-center text-white shadow-md">
+        <div className="w-8 h-8 shrink-0 rounded-lg bg-amber-500 flex items-center justify-center text-white">
           <UserOutlined />
         </div>
       )}
@@ -1014,10 +1017,10 @@ function MessageBubble({ msg }) {
 // Curated image-gen models (Cloudflare Workers AI). Default = Flux
 // Schnell — 4 steps, fast, good quality, generous free tier.
 const IMAGE_MODELS = [
-  { id: '@cf/black-forest-labs/flux-1-schnell',                name: 'Flux Schnell',         hint: '⚡ Fast · 4 steps · default' },
+  { id: '@cf/black-forest-labs/flux-1-schnell',                name: 'Flux Schnell',         hint: 'Fast · 4 steps · default' },
   { id: '@cf/bytedance/stable-diffusion-xl-lightning',         name: 'SDXL Lightning',       hint: 'Sharp · 5 steps' },
-  { id: '@cf/stabilityai/stable-diffusion-xl-base-1.0',        name: 'SDXL Base 1.0',        hint: '🎨 Highest detail · slower' },
-  { id: '@cf/lykon/dreamshaper-8-lcm',                          name: 'Dreamshaper 8 LCM',    hint: '✨ Stylized · 4 steps' },
+  { id: '@cf/stabilityai/stable-diffusion-xl-base-1.0',        name: 'SDXL Base 1.0',        hint: 'Highest detail · slower' },
+  { id: '@cf/lykon/dreamshaper-8-lcm',                          name: 'Dreamshaper 8 LCM',    hint: 'Stylized · 4 steps' },
 ]
 
 // ─── Generation settings popover ───────────────────────────
@@ -1104,8 +1107,8 @@ function GenerationSettings({
           Cloudflare model that runs the actual render. */}
       <div className="mt-3 pt-3 border-t border-gray-800">
         <div className="flex items-center justify-between mb-1">
-          <label className="text-[11px] font-semibold text-gray-300">
-            🎨 Image generation <span className="text-gray-600">— allow "draw / make an image"</span>
+          <label className="text-[11px] font-semibold text-gray-300 inline-flex items-center gap-1.5">
+            <BgColorsOutlined /> Image generation <span className="text-gray-600">— allow "draw / make an image"</span>
           </label>
           <Switch
             size="small"
@@ -1127,7 +1130,12 @@ function GenerationSettings({
               onChange={(v) => onChangeImageGenModel?.(v)}
               className="w-full"
               popupMatchSelectWidth={false}
+              showSearch allowClear
+              placeholder="Search image model…"
+              optionFilterProp="name"
+              filterOption={(input, option) => (option?.name ?? '').toLowerCase().includes(input.toLowerCase())}
               options={IMAGE_MODELS.map(m => ({
+                name: `${m.name} ${m.hint || ''}`,
                 value: m.id,
                 label: (
                   <div className="leading-tight py-0.5">

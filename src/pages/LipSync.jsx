@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { Upload, Input, Select, Modal, Alert, message as antMessage } from 'antd'
 import { UploadOutlined, SoundOutlined, ThunderboltOutlined, ReloadOutlined, DownloadOutlined, CheckOutlined, DeleteOutlined, SyncOutlined } from '@ant-design/icons'
 import { submitLipsync, getLipsyncStatus, fileToDataUrl, listLipsyncJobs, lipsyncBulkAction } from '../api/ai'
-import { useTilt, TILT_STYLE } from '../components/useTilt'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
 import AudioRecorder from '../components/AudioRecorder'
 import CameraCapture from '../components/CameraCapture'
@@ -111,7 +110,7 @@ export default function LipSync() {
           <p className="eyebrow-mono">— AI Studio · Lip Sync</p>
           <div className="flex items-center gap-3 mt-2">
             <SoundOutlined className="text-emerald-400 text-2xl" />
-            <h1 className="text-4xl sm:text-5xl font-bold leading-tight gradient-text-cyan">
+            <h1 className="text-4xl sm:text-5xl font-bold leading-tight text-white">
               Lip Sync Studio
             </h1>
           </div>
@@ -140,7 +139,7 @@ export default function LipSync() {
                 <div className="flex items-center justify-between gap-2 pt-1">
                   <span className="text-[10px] text-gray-600 font-mono truncate">{audioFile?.name || 'recorded audio'}</span>
                   <button onClick={() => { setAudioFile(null); setAudioDataUrl('') }}
-                    className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-rose-500/40 hover:border-rose-400 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 transition-colors">
+                    className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-rose-500/40 hover:border-rose-400 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 transition-colors">
                     <SyncOutlined className="text-[9px]" /> Replace
                   </button>
                 </div>
@@ -188,7 +187,7 @@ export default function LipSync() {
               <div className="relative">
                 <img src={portraitDataUrl} alt="portrait" className="w-full max-h-72 object-contain rounded-lg" />
                 <button onClick={() => { setPortraitFile(null); setPortraitDataUrl('') }}
-                  className="absolute top-2 right-2 inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full bg-black/70 hover:bg-rose-600 text-gray-200 hover:text-white border border-white/10 transition-colors">
+                  className="absolute top-2 right-2 inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-black/70 hover:bg-rose-600 text-gray-200 hover:text-white border border-white/10 transition-colors">
                   <SyncOutlined className="text-[9px]" /> Replace
                 </button>
               </div>
@@ -258,7 +257,7 @@ export default function LipSync() {
               description={error}
               action={
                 <button onClick={generate}
-                  className="text-[11px] font-semibold px-3 py-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 inline-flex items-center gap-1">
+                  className="text-[11px] font-semibold px-3 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/12 text-emerald-300 hover:bg-emerald-500/20 inline-flex items-center gap-1">
                   <ReloadOutlined /> Retry
                 </button>
               }
@@ -271,7 +270,7 @@ export default function LipSync() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2">
           {(audioDataUrl || portraitDataUrl) && (
             <button onClick={reset}
-              className="tap-44 px-4 text-sm text-gray-400 hover:text-gray-200 border border-line hover:border-line-strong rounded-full transition-colors">
+              className="tap-44 px-4 text-sm text-gray-400 hover:text-gray-200 border border-line hover:border-line-strong rounded-lg transition-colors">
               Clear
             </button>
           )}
@@ -322,9 +321,9 @@ function LipsyncCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
     ? { to: href }
     : { href, target: '_blank', rel: 'noopener' }
   return (
-    <div className={`group relative aspect-video rounded-xl overflow-hidden border transition-all bg-gray-900/40 ${
+    <div className={`group relative aspect-video rounded-lg overflow-hidden border transition-colors bg-gray-900/40 ${
       checked
-        ? 'border-emerald-400 shadow-lg shadow-emerald-500/30 ring-2 ring-emerald-400/40'
+        ? 'border-emerald-400 ring-2 ring-emerald-400/40'
         : 'border-gray-800 hover:border-emerald-400/50'
     }`}>
       <Linker {...linkerProps} onClick={handleClick}
@@ -333,9 +332,9 @@ function LipsyncCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
           <video src={url} muted playsInline preload="metadata"
             className={`w-full h-full object-cover ${selectMode && !checked ? 'opacity-60' : ''}`} />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-900 to-gray-950">
-            <span className="text-3xl opacity-50">
-              {item.status === 'failed' ? '✗' : item.status === 'processing' ? '⚡' : '⏳'}
+          <div className="w-full h-full flex items-center justify-center bg-gray-950">
+            <span className="text-xs uppercase tracking-wider text-gray-500 font-mono">
+              {item.status === 'failed' ? 'failed' : item.status === 'processing' ? 'rendering' : 'queued'}
             </span>
           </div>
         )}
@@ -354,7 +353,7 @@ function LipsyncCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
       {!selectMode && onDelete && (
         <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete() }}
           title="Delete"
-          className="absolute bottom-1.5 right-1.5 w-7 h-7 flex items-center justify-center rounded-full bg-black/70 hover:bg-rose-600 text-gray-200 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
+          className="absolute bottom-1.5 right-1.5 w-7 h-7 flex items-center justify-center rounded-lg bg-black/70 hover:bg-rose-600 text-gray-200 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
           <DeleteOutlined className="text-xs" />
         </button>
       )}
@@ -362,22 +361,17 @@ function LipsyncCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
   )
 }
 
-// 3D tilt card for the lipsync-model picker
+// Flat model picker card
 function ModelCard({ model: m, active, onSelect }) {
-  const tilt = useTilt(7)
   return (
-    <button {...tilt} type="button" onClick={onSelect}
-      style={TILT_STYLE}
-      className={`relative p-3 rounded-xl text-left border-2 transition-all overflow-hidden group will-change-transform ${
+    <button type="button" onClick={onSelect}
+      className={`relative p-3 rounded-lg text-left border-2 transition-colors overflow-hidden group ${
         active
-          ? 'border-emerald-400/70 bg-emerald-500/10 shadow-lg shadow-emerald-500/20'
+          ? 'border-emerald-400/70 bg-emerald-500/10'
           : 'border-gray-800 bg-gray-900/40 hover:border-gray-700 hover:bg-gray-900'
       }`}>
-      <span aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
-        style={{ background: `radial-gradient(220px at var(--glx, 50%) var(--gly, 50%), rgba(52,211,153,0.18), transparent 65%)` }} />
       {active && (
-        <span aria-hidden className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center text-black shadow-md z-10">
+        <span aria-hidden className="absolute -top-2 -right-2 w-6 h-6 rounded-lg bg-emerald-500 flex items-center justify-center text-black z-10">
           <CheckOutlined className="text-[10px] font-bold" />
         </span>
       )}

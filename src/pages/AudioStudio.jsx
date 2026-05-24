@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Input, Select, Slider, Tooltip, Upload, Alert, message as antMessage } from 'antd'
-import { CustomerServiceOutlined, ThunderboltOutlined, DownloadOutlined, ReloadOutlined, BulbOutlined, CheckOutlined, DeleteOutlined, UploadOutlined, CopyOutlined, SyncOutlined } from '@ant-design/icons'
+import { CustomerServiceOutlined, ThunderboltOutlined, DownloadOutlined, ReloadOutlined, BulbOutlined, CheckOutlined, CloseOutlined, DeleteOutlined, UploadOutlined, CopyOutlined, SyncOutlined, SoundOutlined, AudioOutlined, EditOutlined, ScissorOutlined, VideoCameraOutlined, DesktopOutlined } from '@ant-design/icons'
 import { submitAudio, getAudioStatus, listAudioJobs, audioBulkAction, transcribeAudio, fileToDataUrl } from '../api/ai'
 import PromptHelper from '../components/PromptHelper'
-import { useTilt, TILT_STYLE } from '../components/useTilt'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
 import AudioRecorder from '../components/AudioRecorder'
 import VoiceCloneAnalysis from '../components/VoiceCloneAnalysis'
@@ -12,18 +11,18 @@ import { FastTTS } from '../components/aitools'
 import useQueryState from '../hooks/useQueryState'
 
 const KINDS = [
-  { value: 'fast-tts',     label: '⚡ Fast TTS',          blurb: 'Instant TTS via Browser voice or Cloud — no queue, sub-second.',       defaultModel: 'browser-or-cloud' },
-  { value: 'music',        label: '🎵 Music',            blurb: 'Background tracks, soundtracks, loops. Best for video soundtracks.',  defaultModel: 'musicgen' },
-  { value: 'sfx',          label: '🔊 SFX / Ambience',   blurb: 'One-shot effects, foley, drones, ambient textures.',                   defaultModel: 'stable-audio' },
-  { value: 'tts',          label: '🗣 Text → Speech',    blurb: 'Heavy-duty multilingual TTS via Bark on 5090.',                       defaultModel: 'bark' },
-  { value: 'stt',          label: '✍️ Speech → Text',    blurb: 'Upload audio → transcript. Whisper, 99 languages, auto-detect.',      defaultModel: 'whisper' },
-  { value: 'separate',     label: '🎚 Stem Split',       blurb: 'Split a song into vocals / drums / bass / other. Demucs on 5090.',    defaultModel: 'htdemucs' },
-  { value: 'voice-clone',  label: '🎤 Voice Clone',      blurb: 'Upload a 6-30s clip + text → speech in that voice (XTTS-v2, 5090).',  defaultModel: 'xtts-v2' },
-  { value: 'voice-sing',   label: '🎶 Cloned Singing',   blurb: 'Voice clone rides a melody track to sing your lyrics (XTTS+RVC).',     defaultModel: 'xtts-v2+rvc' },
+  { value: 'fast-tts',     label: 'Fast TTS',          icon: <ThunderboltOutlined />, blurb: 'Instant TTS via Browser voice or Cloud — no queue, sub-second.',       defaultModel: 'browser-or-cloud' },
+  { value: 'music',        label: 'Music',             icon: <CustomerServiceOutlined />, blurb: 'Background tracks, soundtracks, loops. Best for video soundtracks.',  defaultModel: 'musicgen' },
+  { value: 'sfx',          label: 'SFX / Ambience',    icon: <SoundOutlined />, blurb: 'One-shot effects, foley, drones, ambient textures.',                   defaultModel: 'stable-audio' },
+  { value: 'tts',          label: 'Text → Speech',     icon: <AudioOutlined />, blurb: 'Heavy-duty multilingual TTS via Bark on 5090.',                       defaultModel: 'bark' },
+  { value: 'stt',          label: 'Speech → Text',     icon: <EditOutlined />, blurb: 'Upload audio → transcript. Whisper, 99 languages, auto-detect.',      defaultModel: 'whisper' },
+  { value: 'separate',     label: 'Stem Split',        icon: <ScissorOutlined />, blurb: 'Split a song into vocals / drums / bass / other. Demucs on 5090.',    defaultModel: 'htdemucs' },
+  { value: 'voice-clone',  label: 'Voice Clone',       icon: <AudioOutlined />, blurb: 'Upload a 6-30s clip + text → speech in that voice (XTTS-v2, 5090).',  defaultModel: 'xtts-v2' },
+  { value: 'voice-sing',   label: 'Cloned Singing',    icon: <CustomerServiceOutlined />, blurb: 'Voice clone rides a melody track to sing your lyrics (XTTS+RVC).',     defaultModel: 'xtts-v2+rvc' },
   // Lip sync was a standalone /lipsync page — now consolidated here as a
   // kind. Render is an iframe so we don't have to refactor 600 lines of
   // form into a sub-component. The /lipsync route still works directly.
-  { value: 'lipsync',      label: '👄 Lip Sync',         blurb: 'Audio + portrait → talking-head video. LatentSync · MuseTalk · LivePortrait.', defaultModel: 'latentsync' },
+  { value: 'lipsync',      label: 'Lip Sync',          icon: <VideoCameraOutlined />, blurb: 'Audio + portrait → talking-head video. LatentSync · MuseTalk · LivePortrait.', defaultModel: 'latentsync' },
 ]
 
 const MODELS = {
@@ -367,8 +366,8 @@ export default function AudioStudio() {
         <header className="mb-8">
           <p className="eyebrow-mono">— AI Studio · Audio</p>
           <div className="flex items-center gap-3 mt-2">
-            <CustomerServiceOutlined className="text-fuchsia-400 text-2xl" />
-            <h1 className="text-4xl sm:text-5xl font-bold leading-tight gradient-text-amber">
+            <CustomerServiceOutlined className="text-amber-400 text-2xl" />
+            <h1 className="text-4xl sm:text-5xl font-bold leading-tight text-white">
               Audio Studio
             </h1>
           </div>
@@ -394,6 +393,10 @@ export default function AudioStudio() {
           <div>
             <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">Model</label>
             <Select className="w-full" value={model} onChange={setModel}
+              showSearch allowClear
+              placeholder="Search model…"
+              optionFilterProp="label"
+              filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
               options={MODELS[kind]} optionLabelProp="label"
               optionRender={(o) => (
                 <div className="py-0.5">
@@ -414,7 +417,7 @@ export default function AudioStudio() {
             // but absorbing 600+ lines into a sub-component would risk
             // breakage. Iframe is the pragmatic move: same UX, lives
             // inside the Audio Studio tab so users don't go hunting.
-            <div className="rounded-2xl border border-fuchsia-500/30 overflow-hidden bg-black"
+            <div className="rounded-lg border border-amber-500/30 overflow-hidden bg-black"
                  style={{ height: 'min(80vh, 900px)' }}>
               <iframe title="Lip Sync" src="/lipsync"
                 allow="camera; microphone; autoplay"
@@ -438,7 +441,7 @@ export default function AudioStudio() {
                     <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500 font-mono">
                       <span className="truncate">{sttFile?.name || 'uploaded song'}</span>
                       <button onClick={() => { setSttFile(null); setSttDataUrl(''); setSepResult(null) }}
-                        className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-rose-500/40 hover:border-rose-400 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 transition-colors">
+                        className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-rose-500/40 hover:border-rose-400 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 transition-colors">
                         <SyncOutlined className="text-[9px]" /> Replace
                       </button>
                     </div>
@@ -448,7 +451,7 @@ export default function AudioStudio() {
                     accept="audio/*,video/*"
                     beforeUpload={handleSttUpload}
                     style={{ background: 'transparent', borderColor: '#374151', padding: '24px 0' }}>
-                    <UploadOutlined className="text-3xl text-fuchsia-400 mb-2" />
+                    <UploadOutlined className="text-3xl text-amber-400 mb-2" />
                     <p className="text-sm text-gray-300">Drop a song or music video</p>
                     <p className="text-[10px] text-gray-500 mt-1">mp3 · wav · m4a · mp4 · webm · max 100 MB · audio track auto-extracted from video · runs on 5090</p>
                   </Upload.Dragger>
@@ -456,12 +459,12 @@ export default function AudioStudio() {
               </div>
               <label className="flex items-center justify-between gap-2 p-3 rounded-lg border border-gray-800 bg-gray-900/40 cursor-pointer">
                 <span className="flex items-center gap-2">
-                  <span className="text-base">🎤</span>
+                  <AudioOutlined className="text-base text-amber-300" />
                   <span className="text-xs font-semibold text-gray-200">Transcribe vocals → lyrics</span>
                   <span className="text-[10px] text-gray-500">+10-20s · Whisper on the vocals stem</span>
                 </span>
                 <input type="checkbox" checked={sepWithLyrics} onChange={e => setSepWithLyrics(e.target.checked)}
-                  className="w-4 h-4 accent-fuchsia-500" />
+                  className="w-4 h-4 accent-amber-500" />
               </label>
               <p className="text-[10px] text-gray-600 leading-snug">
                 Demucs splits the song into 4 audio stems: vocals, drums, bass, and everything else.
@@ -481,18 +484,18 @@ export default function AudioStudio() {
                 <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">Engine</label>
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { id: 'cloud', label: '☁ Cloud',     desc: 'Fast · sub-2s · Whisper auto-fallback',   accent: 'from-cyan-400 to-blue-500' },
-                    { id: '5090',  label: '🖥 5090 Beast', desc: 'Local · ~5-15s · Whisper-large-v3 quality', accent: 'from-amber-400 via-rose-400 to-fuchsia-500' },
+                    { id: 'cloud', label: 'Cloud',     icon: <ThunderboltOutlined />, desc: 'Fast · sub-2s · Whisper auto-fallback' },
+                    { id: '5090',  label: '5090 Beast', icon: <DesktopOutlined />,    desc: 'Local · ~5-15s · Whisper-large-v3 quality' },
                   ].map(p => {
                     const active = sttProvider === p.id
                     return (
                       <button key={p.id} type="button" onClick={() => setSttProvider(p.id)}
-                        className={`p-2.5 rounded-lg border text-left transition-all ${
+                        className={`p-2.5 rounded-lg border text-left transition-colors ${
                           active
-                            ? `border-fuchsia-400/60 bg-gradient-to-br ${p.accent} bg-opacity-10 shadow-md`
+                            ? 'border-amber-400/60 bg-amber-500/12'
                             : 'border-gray-800 bg-gray-900/40 hover:border-gray-700 hover:bg-gray-900'
                         }`}>
-                        <div className={`text-xs font-semibold ${active ? 'text-white' : 'text-gray-200'}`}>{p.label}</div>
+                        <div className={`text-xs font-semibold inline-flex items-center gap-1.5 ${active ? 'text-white' : 'text-gray-200'}`}>{p.icon}{p.label}</div>
                         <div className={`text-[10px] leading-snug mt-0.5 ${active ? 'text-white/70' : 'text-gray-500'}`}>{p.desc}</div>
                       </button>
                     )
@@ -512,7 +515,7 @@ export default function AudioStudio() {
                     <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500 font-mono">
                       <span className="truncate">{sttFile?.name || 'recorded audio'}</span>
                       <button onClick={() => { setSttFile(null); setSttDataUrl(''); setSttResult(null) }}
-                        className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-rose-500/40 hover:border-rose-400 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 transition-colors">
+                        className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-rose-500/40 hover:border-rose-400 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 transition-colors">
                         <SyncOutlined className="text-[9px]" /> Replace
                       </button>
                     </div>
@@ -523,7 +526,7 @@ export default function AudioStudio() {
                       accept="audio/*,video/*"
                       beforeUpload={handleSttUpload}
                       style={{ background: 'transparent', borderColor: '#374151', padding: '24px 0' }}>
-                      <UploadOutlined className="text-3xl text-fuchsia-400 mb-2" />
+                      <UploadOutlined className="text-3xl text-amber-400 mb-2" />
                       <p className="text-sm text-gray-300">Drop audio or click to upload</p>
                       <p className="text-[10px] text-gray-500 mt-1">mp3 · wav · m4a · ogg · video (audio track) · max 25 MB</p>
                     </Upload.Dragger>
@@ -562,7 +565,7 @@ export default function AudioStudio() {
                     <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500 font-mono">
                       <span className="truncate">{vcRefFile?.name || 'recorded clip'}</span>
                       <button onClick={() => { setVcRefFile(null); setVcRefDataUrl('') }}
-                        className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-rose-500/40 hover:border-rose-400 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 transition-colors">
+                        className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-rose-500/40 hover:border-rose-400 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 transition-colors">
                         <SyncOutlined className="text-[9px]" /> Replace
                       </button>
                     </div>
@@ -573,7 +576,7 @@ export default function AudioStudio() {
                       accept="audio/*"
                       beforeUpload={handleVcRefUpload}
                       style={{ background: 'transparent', borderColor: '#374151', padding: '24px 0' }}>
-                      <UploadOutlined className="text-3xl text-fuchsia-400 mb-2" />
+                      <UploadOutlined className="text-3xl text-amber-400 mb-2" />
                       <p className="text-sm text-gray-300">Drop a reference clip or click to upload</p>
                       <p className="text-[10px] text-gray-500 mt-1">mp3 · wav · m4a · ogg · max 8 MB · 6–30s ideal</p>
                     </Upload.Dragger>
@@ -599,7 +602,7 @@ export default function AudioStudio() {
                       <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500 font-mono">
                         <span className="truncate">{vcMelodyFile?.name || 'hummed melody'}</span>
                         <button onClick={() => { setVcMelodyFile(null); setVcMelodyDataUrl('') }}
-                          className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-rose-500/40 hover:border-rose-400 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 transition-colors">
+                          className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-rose-500/40 hover:border-rose-400 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 transition-colors">
                           <SyncOutlined className="text-[9px]" /> Replace
                         </button>
                       </div>
@@ -641,7 +644,11 @@ export default function AudioStudio() {
 
               <div>
                 <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">Language</label>
-                <Select className="w-full" value={vcLanguage} onChange={setVcLanguage} options={XTTS_LANGUAGES} />
+                <Select className="w-full" value={vcLanguage} onChange={setVcLanguage}
+                  showSearch allowClear
+                  placeholder="Search language…"
+                  filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+                  options={XTTS_LANGUAGES} />
                 <p className="text-[10px] text-gray-600 mt-1">
                   Pick the language of the lyrics — XTTS chooses the phoneme set from this.
                 </p>
@@ -667,7 +674,7 @@ export default function AudioStudio() {
                   <div className="flex items-center gap-1.5">
                     <button type="button" onClick={() => setHelperOpen(true)}
                       title="AI prompt helper + sample prompts"
-                      className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-amber-500/40 hover:border-amber-400 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-colors">
+                      className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg border border-amber-500/40 hover:border-amber-400 bg-amber-500/12 hover:bg-amber-500/20 text-amber-300 transition-colors">
                       <BulbOutlined className="text-[10px]" /> Help me write
                     </button>
                     {prompt && (
@@ -691,7 +698,7 @@ export default function AudioStudio() {
 
               <div>
                 <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">
-                  Duration · <span className="text-fuchsia-300 font-mono">{duration}s</span>
+                  Duration · <span className="text-amber-300 font-mono">{duration}s</span>
                 </label>
                 <Slider min={kind === 'tts' ? 1 : 3} max={kind === 'sfx' ? 47 : kind === 'music' ? 30 : 20}
                   value={duration} onChange={setDuration} />
@@ -700,7 +707,11 @@ export default function AudioStudio() {
               {kind === 'tts' && (
                 <div>
                   <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">Voice</label>
-                  <Select className="w-full" value={voice} onChange={setVoice} options={BARK_VOICES} />
+                  <Select className="w-full" value={voice} onChange={setVoice}
+                    showSearch allowClear
+                    placeholder="Search voice…"
+                    filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+                    options={BARK_VOICES} />
                 </div>
               )}
             </>
@@ -717,10 +728,10 @@ export default function AudioStudio() {
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
                 {[
-                  { key: 'vocals', label: '🎤 Vocals', tint: 'border-fuchsia-500/40 bg-fuchsia-500/5' },
-                  { key: 'drums',  label: '🥁 Drums',  tint: 'border-amber-500/40 bg-amber-500/5' },
-                  { key: 'bass',   label: '🎸 Bass',   tint: 'border-emerald-500/40 bg-emerald-500/5' },
-                  { key: 'other',  label: '🎹 Other',  tint: 'border-cyan-500/40 bg-cyan-500/5' },
+                  { key: 'vocals', label: 'Vocals', tint: 'border-amber-500/40 bg-amber-500/5' },
+                  { key: 'drums',  label: 'Drums',  tint: 'border-amber-500/40 bg-amber-500/5' },
+                  { key: 'bass',   label: 'Bass',   tint: 'border-emerald-500/40 bg-emerald-500/5' },
+                  { key: 'other',  label: 'Other',  tint: 'border-cyan-500/40 bg-cyan-500/5' },
                 ].map(s => (
                   <div key={s.key} className={`rounded-lg border p-3 ${s.tint}`}>
                     <div className="flex items-center justify-between gap-2 mb-2">
@@ -742,15 +753,15 @@ export default function AudioStudio() {
               </div>
               {sepResult.stems?.lyrics ? (
                 <details className="rounded-lg border border-gray-800 bg-black/40 p-3 mb-3">
-                  <summary className="text-xs font-semibold text-fuchsia-300 cursor-pointer">
-                    📝 Lyrics (Whisper on vocals stem)
+                  <summary className="text-xs font-semibold text-amber-300 cursor-pointer inline-flex items-center gap-1.5">
+                    <EditOutlined /> Lyrics (Whisper on vocals stem)
                   </summary>
                   <p className="mt-2 text-sm text-gray-100 leading-relaxed whitespace-pre-wrap">
                     {sepResult.stems.lyrics}
                   </p>
                 </details>
               ) : sepWithLyrics ? (
-                <p className="text-[10px] text-gray-500 mb-3">⚠ Lyrics transcription was requested but came back empty.</p>
+                <p className="text-[10px] text-gray-500 mb-3">Lyrics transcription was requested but came back empty.</p>
               ) : null}
               <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500 font-mono">
                 <span>{sepResult.model}{sepResult.elapsedMs ? ` · ${(sepResult.elapsedMs/1000).toFixed(1)}s` : ''}</span>
@@ -772,7 +783,7 @@ export default function AudioStudio() {
                   <ul className="mt-2 space-y-0.5 max-h-40 overflow-y-auto bg-black/30 rounded p-2">
                     {sttResult.chunks.map((c, i) => (
                       <li key={i} className="text-[10px] font-mono text-gray-400">
-                        <span className="text-fuchsia-300">[{(c.timestamp?.[0] ?? 0).toFixed(1)}s → {(c.timestamp?.[1] ?? 0).toFixed(1)}s]</span> {c.text}
+                        <span className="text-amber-300">[{(c.timestamp?.[0] ?? 0).toFixed(1)}s → {(c.timestamp?.[1] ?? 0).toFixed(1)}s]</span> {c.text}
                       </li>
                     ))}
                   </ul>
@@ -783,7 +794,7 @@ export default function AudioStudio() {
                   {sttResult.model} · {sttResult.elapsedMs}ms
                 </span>
                 <button onClick={copyTranscript}
-                  className="flex items-center gap-1 text-xs px-3 py-1 rounded-lg bg-fuchsia-500/20 hover:bg-fuchsia-500/30 text-fuchsia-300 border border-fuchsia-500/40">
+                  className="flex items-center gap-1 text-xs px-3 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40">
                   <CopyOutlined /> Copy transcript
                 </button>
               </div>
@@ -794,7 +805,7 @@ export default function AudioStudio() {
               <div className="mt-3 flex items-center justify-between">
                 <span className="text-[10px] text-gray-500 font-mono">{job.jobId}</span>
                 <a href={job.outputUrl} download
-                  className="flex items-center gap-1 text-xs px-3 py-1 rounded-lg bg-fuchsia-500/20 hover:bg-fuchsia-500/30 text-fuchsia-300 border border-fuchsia-500/40">
+                  className="flex items-center gap-1 text-xs px-3 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40">
                   <DownloadOutlined /> Download
                 </a>
               </div>
@@ -811,12 +822,12 @@ export default function AudioStudio() {
             </>
           ) : working ? (
             <div className="py-6 flex flex-col items-center gap-2">
-              <div className="w-8 h-8 rounded-full border-2 border-fuchsia-500/30 border-t-fuchsia-400 animate-spin" />
-              <p className="text-fuchsia-300 text-sm font-semibold">{job?.status === 'processing' ? 'Generating audio…' : 'Queued'}</p>
+              <div className="w-8 h-8 rounded-full border-2 border-amber-500/30 border-t-amber-400 animate-spin" />
+              <p className="text-amber-300 text-sm font-semibold">{job?.status === 'processing' ? 'Generating audio…' : 'Queued'}</p>
               {Array.isArray(job?.logs) && job.logs.length > 0 && (
                 <ul className="mt-3 w-full max-h-40 overflow-y-auto bg-black/40 rounded-lg p-2 space-y-0.5">
                   {job.logs.slice(-10).map((l, i) => (
-                    <li key={i} className="text-[10px] font-mono text-fuchsia-200/80 break-all">{l.msg}</li>
+                    <li key={i} className="text-[10px] font-mono text-amber-200/80 break-all">{l.msg}</li>
                   ))}
                 </ul>
               )}
@@ -829,7 +840,7 @@ export default function AudioStudio() {
               description={error}
               action={
                 <button onClick={generate}
-                  className="text-[11px] font-semibold px-3 py-1.5 rounded-full border border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-700 hover:bg-fuchsia-500/20 inline-flex items-center gap-1">
+                  className="text-[11px] font-semibold px-3 py-1.5 rounded-lg border border-amber-500/40 bg-amber-500/12 text-amber-300 hover:bg-amber-500/20 inline-flex items-center gap-1">
                   <ReloadOutlined /> Retry
                 </button>
               }
@@ -859,7 +870,7 @@ export default function AudioStudio() {
                     ? 'Clone voice'
                     : kind === 'voice-sing'
                       ? 'Generate singing'
-                      : `Generate ${kindObj?.label.toLowerCase().replace(/[🎵🔊🗣✍️🎚🎤🎶 ]/g, '').trim() || 'audio'}`
+                      : `Generate ${kindObj?.label.toLowerCase().trim() || 'audio'}`
             return (
               <button onClick={generate} disabled={disabled}
                 className={`luxe-btn luxe-btn-primary ${
@@ -881,7 +892,7 @@ export default function AudioStudio() {
           listFn={({ status, page, limit }) => listAudioJobs({ status, page, limit })}
           bulkFn={audioBulkAction}
           getId={(it) => it.jobId}
-          bulkAccent="fuchsia"
+          bulkAccent="amber"
           renderCard={(it, { selectMode, checked, onToggleSelect, onDelete }) => (
             <AudioCard key={it.jobId} item={it}
               selectMode={selectMode} checked={checked}
@@ -906,14 +917,14 @@ export default function AudioStudio() {
 // Library card — audio is rendered as an inline player + metadata
 function AudioCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
   const handleClick = (e) => { if (selectMode) { e.preventDefault(); onToggleSelect?.() } }
-  const kindIcon = item.kind === 'music' ? '🎵'
-    : item.kind === 'sfx' ? '🔊'
-    : item.kind === 'tts' ? '🗣'
-    : item.kind === 'stt' ? '✍️'
-    : item.kind === 'separate' ? '🎚'
-    : item.kind === 'voice-clone' ? '🎤'
-    : item.kind === 'voice-sing' ? '🎶'
-    : '🎧'
+  const kindIcon = item.kind === 'music' ? <CustomerServiceOutlined />
+    : item.kind === 'sfx' ? <SoundOutlined />
+    : item.kind === 'tts' ? <AudioOutlined />
+    : item.kind === 'stt' ? <EditOutlined />
+    : item.kind === 'separate' ? <ScissorOutlined />
+    : item.kind === 'voice-clone' ? <AudioOutlined />
+    : item.kind === 'voice-sing' ? <CustomerServiceOutlined />
+    : <CustomerServiceOutlined />
   // Clicking a still-rendering card navigates to /audio/<jobId> for the
   // full live-log view; completed cards just play in-place (the embedded
   // <audio> controls handle that without a redirect).
@@ -924,13 +935,13 @@ function AudioCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
     ? (typeof item.stems === 'string' ? (() => { try { return JSON.parse(item.stems) } catch { return null } })() : item.stems)
     : null
   return (
-    <div className={`luxe-card-hover group relative rounded-xl overflow-hidden border transition-all bg-gray-900/40 p-3 ${
+    <div className={`luxe-card-hover group relative rounded-lg overflow-hidden border transition-colors bg-gray-900/40 p-3 ${
       checked
-        ? 'border-fuchsia-400 shadow-lg shadow-fuchsia-500/30 ring-2 ring-fuchsia-400/40'
-        : 'border-gray-800 hover:border-fuchsia-400/50'
+        ? 'border-amber-400 ring-2 ring-amber-400/40'
+        : 'border-gray-800 hover:border-amber-400/50'
     }`} onClick={handleClick}>
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-base">{kindIcon}</span>
+        <span className="text-base text-amber-300">{kindIcon}</span>
         <span className="text-[10px] uppercase tracking-wider text-gray-500 font-mono">{item.model}</span>
         <span className="text-[10px] text-gray-600 ml-auto">
           {item.kind === 'separate' && stemsObj ? `${Object.keys(stemsObj).filter(k => k !== 'lyrics').length} stems`
@@ -943,14 +954,13 @@ function AudioCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
       {item.kind === 'separate' && stemsObj ? (
         <div className="grid grid-cols-2 gap-1.5" onClick={e => e.stopPropagation()}>
           {[
-            { key: 'vocals', label: '🎤', tint: 'border-fuchsia-500/40' },
-            { key: 'drums',  label: '🥁', tint: 'border-amber-500/40' },
-            { key: 'bass',   label: '🎸', tint: 'border-emerald-500/40' },
-            { key: 'other',  label: '🎹', tint: 'border-cyan-500/40' },
+            { key: 'vocals', tint: 'border-amber-500/40' },
+            { key: 'drums',  tint: 'border-amber-500/40' },
+            { key: 'bass',   tint: 'border-emerald-500/40' },
+            { key: 'other',  tint: 'border-cyan-500/40' },
           ].map(s => stemsObj[s.key] ? (
             <div key={s.key} className={`rounded-md border ${s.tint} p-1 bg-black/30`}>
               <div className="flex items-center gap-1 mb-0.5">
-                <span className="text-[10px]">{s.label}</span>
                 <span className="text-[9px] uppercase text-gray-500 font-semibold">{s.key}</span>
               </div>
               <audio src={stemsObj[s.key]} controls className="w-full h-6" preload="none"
@@ -971,20 +981,20 @@ function AudioCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
       ) : isActive ? (
         <Link to={`/audio/${encodeURIComponent(item.jobId)}`}
           onClick={(e) => e.stopPropagation()}
-          className="h-10 flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 to-gray-950 rounded hover:from-fuchsia-900/20 hover:to-gray-950 transition-colors">
-          <span className="text-xs text-fuchsia-300 font-semibold">
-            {item.status === 'processing' ? '⚡ Watch live logs' : '⏳ Open detail'}
+          className="h-10 flex flex-col items-center justify-center bg-gray-950 rounded hover:bg-gray-900 transition-colors">
+          <span className="text-xs text-amber-300 font-semibold inline-flex items-center gap-1.5">
+            {item.status === 'processing' ? <><ThunderboltOutlined /> Watch live logs</> : 'Open detail'}
           </span>
         </Link>
       ) : (
-        <div className="h-10 flex items-center justify-center bg-gradient-to-br from-gray-900 to-gray-950 rounded">
-          <span className="text-2xl opacity-50">✗</span>
+        <div className="h-10 flex items-center justify-center bg-gray-950 rounded">
+          <span className="text-xs uppercase tracking-wider text-gray-500 font-mono">failed</span>
         </div>
       )}
       {/* Lyrics teaser line on stem-split cards */}
       {item.kind === 'separate' && stemsObj?.lyrics && (
-        <p className="text-[10px] text-fuchsia-300/70 mt-2 line-clamp-2 leading-snug italic">
-          📝 {stemsObj.lyrics.slice(0, 100)}{stemsObj.lyrics.length > 100 ? '…' : ''}
+        <p className="text-[10px] text-amber-300/70 mt-2 line-clamp-2 leading-snug italic">
+          <EditOutlined /> {stemsObj.lyrics.slice(0, 100)}{stemsObj.lyrics.length > 100 ? '…' : ''}
         </p>
       )}
       {!(item.kind === 'separate' || item.kind === 'stt') && (
@@ -1001,7 +1011,7 @@ function AudioCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
       {!selectMode && onDelete && (
         <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete() }}
           title="Delete"
-          className="absolute top-1.5 right-1.5 w-7 h-7 flex items-center justify-center rounded-full bg-black/70 hover:bg-rose-600 text-gray-200 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
+          className="absolute top-1.5 right-1.5 w-7 h-7 flex items-center justify-center rounded-lg bg-black/70 hover:bg-rose-600 text-gray-200 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
           <DeleteOutlined className="text-xs" />
         </button>
       )}
@@ -1009,27 +1019,24 @@ function AudioCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
   )
 }
 
-// 3D-tilt audio-kind card. Same physics as ImageEnhancer's WorkflowCard.
+// Flat audio-kind picker card.
 function KindCard({ kind: k, active, onSelect }) {
-  const tilt = useTilt(7)
   return (
-    <button {...tilt} type="button" onClick={onSelect}
-      style={TILT_STYLE}
-      className={`relative p-3 rounded-xl text-left border-2 transition-all overflow-hidden group will-change-transform ${
+    <button type="button" onClick={onSelect}
+      className={`relative p-3 rounded-lg text-left border-2 transition-colors overflow-hidden group ${
         active
-          ? 'border-fuchsia-400/70 bg-fuchsia-500/10 shadow-lg shadow-fuchsia-500/20'
+          ? 'border-amber-400/70 bg-amber-500/10'
           : 'border-gray-800 bg-gray-900/40 hover:border-gray-700 hover:bg-gray-900'
       }`}>
-      <span aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
-        style={{ background: `radial-gradient(220px at var(--glx, 50%) var(--gly, 50%), rgba(232,121,249,0.18), transparent 65%)` }} />
       {active && (
-        <span aria-hidden className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-gradient-to-br from-fuchsia-400 to-amber-400 flex items-center justify-center text-black shadow-md z-10">
+        <span aria-hidden className="absolute -top-2 -right-2 w-6 h-6 rounded-lg bg-amber-500 flex items-center justify-center text-black z-10">
           <CheckOutlined className="text-[10px] font-bold" />
         </span>
       )}
       <div className="relative">
-        <p className={`text-sm font-bold ${active ? 'text-white' : 'text-gray-200'}`}>{k.label}</p>
+        <p className={`text-sm font-bold inline-flex items-center gap-2 ${active ? 'text-white' : 'text-gray-200'}`}>
+          {k.icon}{k.label}
+        </p>
         <p className={`text-[10px] mt-0.5 leading-snug ${active ? 'text-gray-300' : 'text-gray-500'}`}>{k.blurb}</p>
       </div>
     </button>

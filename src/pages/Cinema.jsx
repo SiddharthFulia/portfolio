@@ -85,7 +85,7 @@ export default function Cinema({ embedded = false }) {
             <p className="eyebrow-mono">— AI Studio · Cinema</p>
             <div className="flex items-center gap-3 mt-2">
               <VideoCameraOutlined className="text-amber-400 text-2xl" />
-              <h1 className="text-4xl sm:text-5xl font-bold leading-tight gradient-text-amber">
+              <h1 className="text-4xl sm:text-5xl font-bold leading-tight text-white">
                 Cinema
               </h1>
             </div>
@@ -149,12 +149,14 @@ export default function Cinema({ embedded = false }) {
               <div>
                 <label className="text-[11px] uppercase tracking-wider text-gray-400 font-mono mb-2 block">Aspect</label>
                 <Select className="w-full" value={aspectRatio} onChange={setAspectRatio}
-                  options={['16:9','9:16','1:1','21:9'].map(v => ({ value: v, label: v }))} />
+                  options={['16:9','9:16','1:1','21:9'].map(v => ({ value: v, label: v }))}
+                  style={{ width: '100%' }} />
               </div>
               <div>
                 <label className="text-[11px] uppercase tracking-wider text-gray-400 font-mono mb-2 block">Resolution</label>
                 <Select className="w-full" value={resolution} onChange={setResolution}
-                  options={['480p','720p','1080p'].map(v => ({ value: v, label: v }))} />
+                  options={['480p','720p','1080p'].map(v => ({ value: v, label: v }))}
+                  style={{ width: '100%' }} />
               </div>
             </div>
 
@@ -168,7 +170,7 @@ export default function Cinema({ embedded = false }) {
                 disabled={working || !masterPrompt.trim()}
                 loading={working}
                 icon={!working && <ThunderboltOutlined />}
-                className="w-full sm:w-auto !min-h-[48px] !rounded-full !font-bold"
+                className="w-full sm:w-auto !min-h-[48px] !rounded-lg !font-bold"
               >
                 {working ? 'Planning…' : `Plan ${shotCount} shots`}
               </Button>
@@ -187,7 +189,7 @@ export default function Cinema({ embedded = false }) {
               description={error}
               action={
                 <button onClick={plan}
-                  className="text-[11px] font-semibold px-3 py-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 inline-flex items-center gap-1">
+                  className="text-[11px] font-semibold px-3 py-1.5 rounded-lg border border-amber-500/40 bg-amber-500/12 text-amber-300 hover:bg-amber-500/20 inline-flex items-center gap-1">
                   <ReloadOutlined /> Retry
                 </button>
               }
@@ -249,9 +251,9 @@ function CinemaCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
   }
   return (
     <div onClick={handleClick}
-      className={`group relative rounded-xl overflow-hidden border transition-all bg-gray-900/40 p-3 cursor-pointer ${
+      className={`group relative rounded-lg overflow-hidden border transition-colors bg-gray-900/40 p-3 cursor-pointer ${
         checked
-          ? 'border-amber-400 shadow-lg shadow-amber-500/30 ring-2 ring-amber-400/40'
+          ? 'border-amber-400 ring-2 ring-amber-400/40'
           : 'border-gray-800 hover:border-amber-400/50'
       }`}>
       <div className="flex items-center gap-2 mb-2">
@@ -270,7 +272,7 @@ function CinemaCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
       {!selectMode && onDelete && (
         <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete() }}
           title="Delete"
-          className="absolute top-1.5 right-1.5 w-7 h-7 flex items-center justify-center rounded-full bg-black/70 hover:bg-rose-600 text-gray-200 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
+          className="absolute top-1.5 right-1.5 w-7 h-7 flex items-center justify-center rounded-lg bg-black/70 hover:bg-rose-600 text-gray-200 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
           <DeleteOutlined className="text-xs" />
         </button>
       )}

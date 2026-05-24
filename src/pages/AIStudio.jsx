@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { Input, Button, Select, Tabs } from 'antd'
-import { PictureOutlined, SoundOutlined, FileTextOutlined, EyeOutlined, DownloadOutlined, CopyOutlined, CheckOutlined } from '@ant-design/icons'
+import { PictureOutlined, SoundOutlined, FileTextOutlined, EyeOutlined, DownloadOutlined, CopyOutlined, CheckOutlined, ThunderboltOutlined, BgColorsOutlined } from '@ant-design/icons'
 import { generateImage, geminiVision, summarizeText, textToSpeech } from '../api/ai'
 import ReactMarkdown from 'react-markdown'
 import CameraCapture from '../components/CameraCapture'
@@ -9,8 +9,8 @@ const P = 'animate-pulse bg-gray-800 rounded-xl'
 
 // ─── Image Generation ───
 const PROVIDERS = [
-  { id: 'cloudflare', label: '⚡ Instant', desc: 'Sub-second · best for iterations' },
-  { id: 'huggingface', label: '🎨 Quality', desc: 'Slightly slower · richer detail' },
+  { id: 'cloudflare', label: 'Instant', icon: <ThunderboltOutlined />, desc: 'Sub-second · best for iterations' },
+  { id: 'huggingface', label: 'Quality', icon: <BgColorsOutlined />, desc: 'Slightly slower · richer detail' },
 ]
 
 const ImageGen = () => {
@@ -45,10 +45,10 @@ const ImageGen = () => {
             <button key={p.id} onClick={() => setProvider(p.id)}
               className={`p-3 rounded-lg border text-left transition-colors ${
                 provider === p.id
-                  ? 'border-purple-500 bg-purple-600/15'
+                  ? 'border-amber-500 bg-amber-500/12'
                   : 'border-gray-700 bg-gray-800/40 hover:bg-gray-800'
               }`}>
-              <div className={`text-sm font-semibold ${provider === p.id ? 'text-purple-300' : 'text-gray-300'}`}>{p.label}</div>
+              <div className={`text-sm font-semibold inline-flex items-center gap-2 ${provider === p.id ? 'text-amber-300' : 'text-gray-300'}`}>{p.icon}{p.label}</div>
               <div className="text-[10px] text-gray-500 mt-0.5">{p.desc}</div>
             </button>
           ))}
@@ -280,12 +280,12 @@ const TTS = () => {
             <div>
               <label className="text-xs text-gray-400 mb-1 block">Speed: {rate}x</label>
               <input type="range" min="0.5" max="2" step="0.1" value={rate} onChange={e => setRate(parseFloat(e.target.value))}
-                className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500" />
+                className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-amber-500" />
             </div>
             <div>
               <label className="text-xs text-gray-400 mb-1 block">Pitch: {pitch}</label>
               <input type="range" min="0.5" max="2" step="0.1" value={pitch} onChange={e => setPitch(parseFloat(e.target.value))}
-                className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500" />
+                className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-amber-500" />
             </div>
           </div>
           <div className="flex gap-2">
@@ -298,7 +298,10 @@ const TTS = () => {
         <>
           <div>
             <label className="text-xs text-gray-400 mb-1 block">Voice</label>
-            <Select value={cloudVoice} onChange={setCloudVoice} size="small" style={{ width: 220 }}
+            <Select value={cloudVoice} onChange={setCloudVoice} size="small" style={{ width: 240 }}
+              showSearch allowClear
+              placeholder="Search voice…"
+              filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
               options={CLOUD_VOICES} />
           </div>
           <Button type="primary" onClick={speakCloud} loading={loading} disabled={!text.trim()}
@@ -378,15 +381,12 @@ const AIStudio = () => {
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-pink-900/10 to-amber-900/20 pointer-events-none" />
-        <div className="absolute -top-32 -right-32 w-96 h-96 bg-purple-600/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-20 -left-20 w-96 h-96 bg-amber-600/15 rounded-full blur-3xl pointer-events-none" />
         <div className="relative max-w-5xl mx-auto px-5 sm:px-6 pt-28 sm:pt-32 pb-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gray-800/60 border border-gray-700 backdrop-blur-sm mb-3">
-            <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
-            <span className="text-[11px] uppercase tracking-wider text-gray-300 font-semibold">4 tools • multi-provider</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-gray-900/60 border border-gray-700 mb-3">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+            <span className="text-[11px] uppercase tracking-wider text-gray-300 font-semibold">4 tools · multi-provider</span>
           </div>
-          <h1 className="font-poppins font-black text-4xl sm:text-5xl md:text-6xl bg-gradient-to-r from-purple-300 via-pink-300 to-amber-300 bg-clip-text text-transparent leading-tight mb-2">
+          <h1 className="font-poppins font-black text-4xl sm:text-5xl md:text-6xl text-white leading-tight mb-2">
             AI Studio
           </h1>
           <p className="text-gray-400 text-sm sm:text-base max-w-xl">

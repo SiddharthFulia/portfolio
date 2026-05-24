@@ -41,7 +41,7 @@ export default function LipsyncDetail() {
   return <JobDetailPage
     lane="lipsync"
     title="Lip Sync Studio"
-    accentClass="bg-gradient-to-r from-emerald-300 via-cyan-400 to-fuchsia-300 bg-clip-text text-transparent"
+    accentClass="text-white"
     backTo="/lipsync"
     getStatus={getLipsyncStatus}
     idKey="jobId"

@@ -4,9 +4,10 @@ import { Modal, Upload, Tabs, Input, Select, Switch, Tooltip, Alert, message as 
 import CameraCapture, { transformImage } from '../components/CameraCapture'
 import {
   UploadOutlined, ExpandAltOutlined, DownloadOutlined,
-  CheckOutlined, ReloadOutlined, ThunderboltOutlined,
+  CheckOutlined, CloseOutlined, ReloadOutlined, ThunderboltOutlined,
   AppstoreOutlined, CloudOutlined, DesktopOutlined, DeleteOutlined,
   LockOutlined, BulbOutlined, CopyOutlined, SyncOutlined,
+  PictureOutlined, GlobalOutlined, FireOutlined,
 } from '@ant-design/icons'
 import {
   enhanceImage, getImageStatus, listEnhancedImages, deleteEnhancedImage, fileToDataUrl,
@@ -27,7 +28,7 @@ const logTone = (text) => {
   if (text.startsWith('🖼')) return 'text-emerald-300'
   if (text.startsWith('✓')) return 'text-emerald-400/80'
   if (text.startsWith('⚡')) return 'text-amber-300'
-  if (text.startsWith('→') || text.startsWith('↑')) return 'text-fuchsia-300'
+  if (text.startsWith('→') || text.startsWith('↑')) return 'text-amber-300'
   return 'text-gray-400'
 }
 
@@ -737,7 +738,7 @@ export default function ImageEnhancer() {
                   `text-xl sm:text-3xl lg:text-4xl` — three-step scale so the
                   title doesn't crowd the Vault pill + Engine toggle on the
                   same row at narrow viewports. */}
-              <h1 className="text-xl sm:text-3xl lg:text-4xl font-bold leading-tight gradient-text-amber truncate">
+              <h1 className="text-xl sm:text-3xl lg:text-4xl font-bold leading-tight text-white truncate">
                 Image Studio
               </h1>
               {/* Vault pill — full label + status dot. Clear professional
@@ -745,9 +746,9 @@ export default function ImageEnhancer() {
                   NSFW filter and their outputs land in the Vault library. */}
               <button onClick={() => setVaultLoginOpen(true)} type="button"
                 title={isLoggedIn ? 'Vault unlocked · click to lock or sign out' : 'Sign in to unlock the private Vault'}
-                className={`group relative inline-flex items-center gap-1.5 sm:gap-2 pl-2 pr-2.5 sm:pl-2.5 sm:pr-3 py-1 rounded-full border text-[11px] font-semibold tracking-wide transition-all overflow-hidden ${
+                className={`group relative inline-flex items-center gap-1.5 sm:gap-2 pl-2 pr-2.5 sm:pl-2.5 sm:pr-3 py-1 rounded-lg border text-[11px] font-semibold tracking-wide transition-colors overflow-hidden ${
                   isLoggedIn
-                    ? 'bg-emerald-500/12 border-emerald-400/50 text-emerald-200 shadow-[0_0_18px_-6px_rgba(16,185,129,0.55)] hover:bg-emerald-500/20'
+                    ? 'bg-emerald-500/12 border-emerald-400/50 text-emerald-200 hover:bg-emerald-500/20'
                     : 'bg-gray-900/70 border-gray-700/80 text-gray-300 hover:border-cyan-400/50 hover:text-cyan-200 hover:bg-gray-900'
                 }`}>
                 <span aria-hidden
@@ -760,16 +761,16 @@ export default function ImageEnhancer() {
               </button>
             </div>
             {/* Engine toggle — Cloud (Gemini) vs Local Atelier (5090) */}
-            <div className="flex items-center gap-1 p-1 rounded-full bg-gray-900/60 border border-gray-800">
+            <div className="flex items-center gap-1 p-1 rounded-lg bg-gray-900/60 border border-gray-800">
               {[
                 { id: 'cloud',   label: 'Cloud',   icon: <CloudOutlined />,   sub: 'Gemini · 10-15s' },
                 { id: 'atelier', label: 'Atelier', icon: <DesktopOutlined />, sub: '5090 local · 8 workflows' },
               ].map(opt => (
                 <button key={opt.id} onClick={() => setEngine(opt.id)}
                   disabled={working}
-                  className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs transition-all ${
+                  className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs transition-colors ${
                     engine === opt.id
-                      ? 'bg-gradient-to-r from-cyan-500/30 to-fuchsia-500/30 text-white border border-cyan-400/40'
+                      ? 'bg-cyan-500/15 text-white border border-cyan-400/40'
                       : 'text-gray-400 hover:text-gray-200'
                   } ${working ? 'opacity-50 cursor-not-allowed' : ''}`}>
                   {opt.icon}
@@ -828,7 +829,7 @@ export default function ImageEnhancer() {
             },
             {
               key: 't2i',
-              label: <span>✨ Text → Image</span>,
+              label: <span><BulbOutlined /> Text → Image</span>,
               children: (
                 <GenerateSection
                   sourceDataUrl={sourceDataUrl} reset={reset} handleFile={handleFile}
@@ -860,7 +861,7 @@ export default function ImageEnhancer() {
               // fallback. Sub-second response vs the 5090 ComfyUI queue.
               // Was previously a tab inside /ai-studio (now sunset).
               key: 'fastgen',
-              label: <span>⚡ Fast Gen</span>,
+              label: <span><ThunderboltOutlined /> Fast Gen</span>,
               children: <FastImageGen />,
             },
             {
@@ -868,7 +869,7 @@ export default function ImageEnhancer() {
               // page; consolidated here so the Image Studio is the
               // one-stop image lane.
               key: 'vision',
-              label: <span>👁 Explain Image</span>,
+              label: <span><PictureOutlined /> Explain Image</span>,
               children: <VisionAI />,
             },
           ]}
@@ -919,21 +920,19 @@ export default function ImageEnhancer() {
             mask: { backdropFilter: 'blur(6px)', background: 'rgba(0,0,0,0.7)' },
           }}>
           {isLoggedIn ? (
-            <div className="relative rounded-2xl border border-emerald-500/40 bg-gradient-to-b from-gray-900/95 to-gray-950/95 p-6 text-center shadow-[0_30px_70px_-20px_rgba(16,185,129,0.35)] overflow-hidden">
-              {/* Subtle ambient orb behind the title */}
-              <div aria-hidden className="absolute -top-12 left-1/2 -translate-x-1/2 w-40 h-40 rounded-full bg-emerald-500/15 blur-3xl pointer-events-none" />
+            <div className="relative rounded-lg border border-emerald-500/40 bg-gray-900/95 p-6 text-center overflow-hidden">
               <div className="relative">
-                <div className="inline-flex w-14 h-14 items-center justify-center rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 mb-3 text-3xl shadow-inner">
-                  ✓
+                <div className="inline-flex w-14 h-14 items-center justify-center rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 mb-3">
+                  <CheckOutlined className="text-2xl" />
                 </div>
                 <p className="text-emerald-200 text-lg font-bold tracking-tight">Vault unlocked</p>
                 <p className="text-gray-400 text-xs mt-1 mb-5 max-w-[34ch] mx-auto leading-relaxed">
-                  Outputs route to <span className="text-emerald-300 font-semibold">🔒 Vault</span> ·
+                  Outputs route to <span className="text-emerald-300 font-semibold inline-flex items-center gap-1"><LockOutlined /> Vault</span> ·
                   NSFW filter bypassed · Vault items are hidden from public viewers
                 </p>
                 <div className="space-y-2">
                   <button onClick={() => { setVaultLoginOpen(false); setNsfwBlocked(null) }}
-                    className="w-full px-5 py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-400/50 text-xs font-semibold transition-all">
+                    className="w-full px-5 py-2.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-400/50 text-xs font-semibold transition-colors">
                     Stay unlocked
                   </button>
                   <button onClick={() => {
@@ -944,7 +943,7 @@ export default function ImageEnhancer() {
                       setRefreshKey(k => k + 1)
                       antMessage.success('Vault locked — public view restored')
                     }}
-                    className="w-full px-5 py-2.5 rounded-xl bg-gray-900/70 hover:bg-rose-500/15 text-gray-400 hover:text-rose-300 border border-gray-700/80 hover:border-rose-500/40 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all">
+                    className="w-full px-5 py-2.5 rounded-lg bg-gray-900/70 hover:bg-rose-500/15 text-gray-400 hover:text-rose-300 border border-gray-700/80 hover:border-rose-500/40 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors">
                     <LockOutlined /> Lock vault & sign out
                   </button>
                 </div>
@@ -956,8 +955,8 @@ export default function ImageEnhancer() {
           ) : (
             <>
               {nsfwBlocked && (
-                <div className="mb-3 p-3 rounded-xl border border-amber-500/40 bg-amber-500/10 text-center">
-                  <p className="text-amber-300 text-xs font-semibold">🛡️ Prompt looks NSFW</p>
+                <div className="mb-3 p-3 rounded-lg border border-amber-500/40 bg-amber-500/10 text-center">
+                  <p className="text-amber-300 text-xs font-semibold">Prompt looks NSFW</p>
                   <p className="text-gray-300 text-[11px] mt-0.5">
                     Unlock with the password to bypass and save to Vault.
                   </p>
@@ -1030,7 +1029,7 @@ function NegativePromptField({ value, onChange, family, supported = true }) {
         {open && (
           <div className="flex items-center gap-1.5">
             <button type="button" onClick={() => onChange(baseline)}
-              className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30">
+              className="text-[10px] px-2 py-0.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30">
               Use {family === 'pony' ? 'Pony' : family === 'sdxl-hyper' ? 'Hyper' : 'SDXL'} baseline
             </button>
             {value && (
@@ -1101,34 +1100,22 @@ function useTilt(maxTiltDeg = 8) {
   return { ref, onMouseMove, onMouseLeave }
 }
 
-// 3D-tilt workflow card. Hover the card to get a perspective-warp + neon
-// glow follow-the-cursor effect. Falls back to flat on touch / reduced-motion.
+// Flat workflow card.
 function WorkflowCard({ workflow: w, active, onSelect }) {
-  const tilt = useTilt(8)
   // Family → fully-spelled Tailwind classes (JIT can't see interpolated strings)
   const familyChip = w.family === 'upscale' ? 'bg-emerald-500/15 text-emerald-300'
-    : w.family === 'img2img' ? 'bg-fuchsia-500/15 text-fuchsia-300'
+    : w.family === 'img2img' ? 'bg-cyan-500/15 text-cyan-300'
     : w.family === 't2i'     ? 'bg-amber-500/15 text-amber-300'
     : 'bg-cyan-500/15 text-cyan-300'
   return (
-    <button {...tilt} type="button" onClick={onSelect}
-      style={{
-        transform: 'perspective(800px) rotateX(var(--tx, 0deg)) rotateY(var(--ty, 0deg))',
-        transition: 'transform 120ms ease-out, border-color 200ms, box-shadow 200ms',
-      }}
-      className={`luxe-card luxe-card-hover relative p-3 text-left overflow-hidden group will-change-transform ${
+    <button type="button" onClick={onSelect}
+      className={`luxe-card luxe-card-hover relative p-3 text-left overflow-hidden group ${
         active
-          ? 'ring-2 ring-cyan-400/70 shadow-lg shadow-cyan-500/20'
+          ? 'ring-2 ring-cyan-400/70'
           : ''
       }`}>
-      {/* Cursor-following glow — purely cosmetic, pointer-events-none */}
-      <span aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
-        style={{
-          background: `radial-gradient(220px at var(--glx, 50%) var(--gly, 50%), rgba(56,189,248,0.18), transparent 65%)`,
-        }} />
       {active && (
-        <span aria-hidden className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-gradient-to-br from-cyan-400 to-fuchsia-500 flex items-center justify-center text-black shadow-md z-10">
+        <span aria-hidden className="absolute -top-2 -right-2 w-6 h-6 rounded-lg bg-cyan-500 flex items-center justify-center text-black z-10">
           <CheckOutlined className="text-[10px] font-bold" />
         </span>
       )}
@@ -1150,32 +1137,17 @@ function WorkflowCard({ workflow: w, active, onSelect }) {
   )
 }
 
-// 3D-tilt Cloud preset card. Same physics as WorkflowCard but laid out with
-// the gradient accent the cloud presets already use.
+// Flat Cloud preset card.
 function PresetCard({ preset: p, active, onSelect, onExpand }) {
-  const tilt = useTilt(7)
   return (
-    <button {...tilt} type="button" onClick={onSelect}
-      style={{
-        transform: 'perspective(800px) rotateX(var(--tx, 0deg)) rotateY(var(--ty, 0deg))',
-        transition: 'transform 120ms ease-out, border-color 200ms, box-shadow 200ms',
-      }}
-      className={`luxe-card luxe-card-hover relative p-4 text-left overflow-hidden group will-change-transform ${
+    <button type="button" onClick={onSelect}
+      className={`luxe-card luxe-card-hover relative p-4 text-left overflow-hidden group ${
         active
-          ? `ring-2 ${p.border.replace('border-', 'ring-').replace('/40', '/70')} shadow-xl ${p.glow}`
+          ? `ring-2 ${p.border.replace('border-', 'ring-').replace('/40', '/70')}`
           : ''
       }`}>
-      {/* Cursor-following glow */}
-      <span aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
-        style={{
-          background: `radial-gradient(260px at var(--glx, 50%) var(--gly, 50%), rgba(255,255,255,0.10), transparent 65%)`,
-        }} />
       {active && (
-        <div aria-hidden className={`absolute inset-0 pointer-events-none opacity-20 bg-gradient-to-br ${p.accent}`} />
-      )}
-      {active && (
-        <div className={`absolute -top-2 -right-2 w-6 h-6 rounded-full bg-gradient-to-br ${p.accent} flex items-center justify-center text-black shadow-md z-10`}>
+        <div className="absolute -top-2 -right-2 w-6 h-6 rounded-lg bg-amber-500 flex items-center justify-center text-black z-10">
           <CheckOutlined className="text-[10px] font-bold" />
         </div>
       )}
@@ -1186,7 +1158,7 @@ function PresetCard({ preset: p, active, onSelect, onExpand }) {
           </span>
           <span onClick={(e) => { e.stopPropagation(); onExpand() }} role="button" tabIndex={0}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); onExpand() } }}
-            className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-gray-700 hover:border-cyan-400 text-gray-400 hover:text-cyan-300 transition-colors cursor-pointer">
+            className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg border border-gray-700 hover:border-cyan-400 text-gray-400 hover:text-cyan-300 transition-colors cursor-pointer">
             <ExpandAltOutlined /> Expand
           </span>
         </div>
@@ -1297,18 +1269,18 @@ function GenerateSection({
                   <div className="flex items-center justify-center gap-1.5 flex-wrap pt-1">
                     <button onClick={() => applyTransform('rotate-left')}
                       title="Rotate 90° counter-clockwise"
-                      className="flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-gray-700 hover:border-cyan-500 bg-gray-900/60 hover:bg-cyan-500/10 text-gray-300 hover:text-cyan-200 transition-colors">
-                      ↺ Rotate L
+                      className="flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-gray-700 hover:border-cyan-500 bg-gray-900/60 hover:bg-cyan-500/10 text-gray-300 hover:text-cyan-200 transition-colors">
+                      <ReloadOutlined /> Rotate L
                     </button>
                     <button onClick={() => applyTransform('rotate-right')}
                       title="Rotate 90° clockwise"
-                      className="flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-gray-700 hover:border-cyan-500 bg-gray-900/60 hover:bg-cyan-500/10 text-gray-300 hover:text-cyan-200 transition-colors">
-                      ↻ Rotate R
+                      className="flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-gray-700 hover:border-cyan-500 bg-gray-900/60 hover:bg-cyan-500/10 text-gray-300 hover:text-cyan-200 transition-colors">
+                      <ReloadOutlined /> Rotate R
                     </button>
                     <button onClick={() => applyTransform('mirror')}
                       title="Flip horizontally"
-                      className="flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-gray-700 hover:border-cyan-500 bg-gray-900/60 hover:bg-cyan-500/10 text-gray-300 hover:text-cyan-200 transition-colors">
-                      ⇄ Mirror
+                      className="flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-gray-700 hover:border-cyan-500 bg-gray-900/60 hover:bg-cyan-500/10 text-gray-300 hover:text-cyan-200 transition-colors">
+                      <SyncOutlined /> Mirror
                     </button>
                   </div>
                 )}
@@ -1347,7 +1319,7 @@ function GenerateSection({
             <div className="flex items-center justify-between mb-2">
               <p className="text-[10px] uppercase tracking-wider text-gray-500">Enhanced output</p>
               {status && status !== 'completed' && (
-                <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-lg border ${
                   status === 'queued'     ? 'bg-amber-500/15 text-amber-300 border-amber-500/40'
                   : status === 'processing' ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/40'
                   : 'bg-rose-500/15 text-rose-300 border-rose-500/40'
@@ -1373,7 +1345,7 @@ function GenerateSection({
                         navigate(`/ai-video?image=${url}&fromImage=1&provider=optimized&mode=balanced${isVault ? '&vault=1' : ''}`)
                       }}
                       className="flex items-center gap-1 text-xs px-3 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 transition-colors">
-                      🎬 Animate
+                      <ThunderboltOutlined /> Animate
                     </button>
                     <button onClick={downloadResult}
                       className="flex items-center gap-1 text-xs px-3 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 transition-colors">
@@ -1442,7 +1414,7 @@ function GenerateSection({
                         live · {job.logs.length} {job.logs.length === 1 ? 'event' : 'events'}
                       </span>
                       <button type="button" onClick={() => setLogsModalOpen(true)}
-                        className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-cyan-500/40 hover:border-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 transition-colors">
+                        className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg border border-cyan-500/40 hover:border-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 transition-colors">
                         <ExpandAltOutlined className="text-[9px]" /> Expand
                       </button>
                     </div>
@@ -1485,7 +1457,7 @@ function GenerateSection({
                   </div>
                   <div className="flex items-center gap-2 pt-1">
                     <button onClick={() => enhance('local')}
-                      className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-gradient-to-r from-cyan-400 via-fuchsia-400 to-amber-400 text-black font-semibold hover:scale-[1.03] transition-transform">
+                      className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-amber-500 text-black font-semibold hover:bg-amber-400 transition-colors">
                       <DesktopOutlined /> Try on 5090
                     </button>
                     <button onClick={() => enhance()}
@@ -1505,7 +1477,7 @@ function GenerateSection({
                     description={error}
                     action={
                       <button onClick={() => enhance()}
-                        className="text-[11px] font-semibold px-3 py-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 inline-flex items-center gap-1">
+                        className="text-[11px] font-semibold px-3 py-1.5 rounded-lg border border-amber-500/40 bg-amber-500/12 text-amber-300 hover:bg-amber-500/20 inline-flex items-center gap-1">
                         <ReloadOutlined /> Retry
                       </button>
                     }
@@ -1532,20 +1504,20 @@ function GenerateSection({
                 {/* Family filter chips — quick categorisation of the
                     workflow list. Hidden in t2iMode (already filtered). */}
                 {!t2iMode && setFamilyFilter && (
-                  <div className="inline-flex items-center gap-1 p-0.5 rounded-full bg-gray-900/60 border border-gray-800">
+                  <div className="inline-flex items-center gap-1 p-0.5 rounded-lg bg-gray-900/60 border border-gray-800">
                     {[
                       { id: 'all',     label: 'All' },
-                      { id: 'img2img', label: '🖼 Image → Image' },
-                      { id: 't2i',     label: '✍ Text → Image' },
-                      { id: 'both',    label: '↔ Both' },
-                      { id: 'upscale', label: '⤴ Upscale' },
+                      { id: 'img2img', label: 'Image → Image' },
+                      { id: 't2i',     label: 'Text → Image' },
+                      { id: 'both',    label: 'Both' },
+                      { id: 'upscale', label: 'Upscale' },
                     ].map(c => {
                       const active = familyFilterProp === c.id
                       return (
                         <button key={c.id} onClick={() => setFamilyFilter(c.id)}
-                          className={`text-[10px] font-semibold px-2.5 py-1 rounded-full transition-colors whitespace-nowrap ${
+                          className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap ${
                             active
-                              ? 'bg-gradient-to-r from-cyan-500 to-fuchsia-500 text-white shadow-sm'
+                              ? 'bg-cyan-500 text-white'
                               : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/60'
                           }`}>
                           {c.label}
@@ -1589,7 +1561,7 @@ function GenerateSection({
                   <div className="flex items-center gap-1.5">
                     <button type="button" onClick={() => setPromptHelperOpen?.(true)}
                       title="Help me write a prompt for this model"
-                      className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-amber-500/40 hover:border-amber-400 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-colors">
+                      className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg border border-amber-500/40 hover:border-amber-400 bg-amber-500/12 hover:bg-amber-500/20 text-amber-300 transition-colors">
                       <BulbOutlined className="text-[10px]" /> Help me write
                     </button>
                     <button type="button" onClick={() => setAtelierPrompt('')}
@@ -1601,9 +1573,12 @@ function GenerateSection({
                 <Select
                   className="w-full mb-2"
                   size="middle"
-                  placeholder="📋 Pick a template…  (or just type below)"
+                  placeholder="Pick a template…  (or just type below)"
                   options={groupedTemplates()}
                   value={undefined}
+                  showSearch allowClear
+                  optionFilterProp="label"
+                  filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
                   popupMatchSelectWidth={false}
                   onChange={(_value, option) => {
                     // Append a comma+space if the textarea already has content,
@@ -1719,9 +1694,9 @@ function GenerateSection({
                     <Tooltip key={p.label} title={p.hint}>
                       <button type="button"
                         onClick={() => setTunings(t => ({ ...t, denoise: p.v }))}
-                        className={`text-[10px] px-2.5 py-1 rounded-full border transition-all ${
+                        className={`text-[10px] px-2.5 py-1 rounded-lg border transition-colors ${
                           active
-                            ? 'bg-fuchsia-500/30 text-fuchsia-100 border-fuchsia-400/60 shadow-md shadow-fuchsia-500/20'
+                            ? 'bg-amber-500/20 text-amber-100 border-amber-400/60'
                             : 'bg-gray-900/60 text-gray-400 border-gray-800 hover:border-gray-700 hover:text-gray-200'
                         }`}>
                         {p.label} <span className="font-mono opacity-60">{p.v.toFixed(2)}</span>
@@ -1734,7 +1709,7 @@ function GenerateSection({
 
             {/* Fine-tunes — show only the ones relevant to this workflow */}
             {(showSteps || showDenoise || showCfg || showWH) && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-xl bg-gray-900/40 border border-gray-800">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-lg bg-gray-900/40 border border-gray-800">
                 {showSteps && (
                   <Tuner label="Steps" value={tunings.steps} min={1} max={50} step={1}
                     onChange={v => setTunings(t => ({ ...t, steps: v }))} />
@@ -1925,47 +1900,48 @@ function ImageLibrary({ refreshKey }) {
       {/* Visibility toggle — Public showcase / Vault (private, requires login).
           Vault chip is hidden entirely when not logged in. */}
       <div className="flex items-center gap-2 flex-wrap">
-        <div className="flex items-center gap-1 p-1 rounded-full bg-gray-900/60 border border-gray-800 w-fit">
+        <div className="flex items-center gap-1 p-1 rounded-lg bg-gray-900/60 border border-gray-800 w-fit">
           <button onClick={() => setVisibility('public')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-colors ${
               visibility === 'public'
-                ? 'bg-gradient-to-r from-cyan-500/30 to-fuchsia-500/30 text-white border border-cyan-400/40'
+                ? 'bg-cyan-500/15 text-white border border-cyan-400/40'
                 : 'text-gray-400 hover:text-gray-200'
             }`}>
-            <span className="font-semibold">🌐 Public</span>
+            <GlobalOutlined />
+            <span className="font-semibold">Public</span>
             <span className="hidden sm:inline text-[9px] opacity-60">showcase</span>
           </button>
           {loggedIn && (
             <button onClick={() => setVisibility('vault')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-colors ${
                 visibility === 'vault'
-                  ? 'bg-gradient-to-r from-cyan-500/30 to-fuchsia-500/30 text-white border border-cyan-400/40'
+                  ? 'bg-cyan-500/15 text-white border border-cyan-400/40'
                   : 'text-gray-400 hover:text-gray-200'
               }`}>
-              <span className="font-semibold">🔒 Vault</span>
+              <LockOutlined />
+              <span className="font-semibold">Vault</span>
               <span className="hidden sm:inline text-[9px] opacity-60">private</span>
             </button>
           )}
         </div>
 
-        {/* Select-mode toggle — flip on, then check whichever cards you want
-            and a sticky toolbar pops up at the bottom of the grid. */}
+        {/* Select-mode toggle */}
         <button onClick={() => setSelectMode(s => !s)}
-          className={`px-3 py-1.5 text-xs rounded-full border transition-all ${
+          className={`px-3 py-1.5 text-xs rounded-lg border transition-colors inline-flex items-center gap-1.5 ${
             selectMode
               ? 'bg-amber-500/20 text-amber-200 border-amber-400/50'
               : 'bg-gray-900/60 text-gray-400 border-gray-800 hover:border-gray-700 hover:text-gray-200'
           }`}>
-          {selectMode ? `Selecting (${selCount})` : '☑ Select'}
+          {selectMode ? `Selecting (${selCount})` : <><CheckOutlined /> Select</>}
         </button>
         {selectMode && (
           <>
             <button onClick={selectAllOnPage}
-              className="px-2 py-1.5 text-[10px] rounded-full bg-gray-900/60 text-gray-400 border border-gray-800 hover:text-gray-200">
+              className="px-2 py-1.5 text-[10px] rounded-lg bg-gray-900/60 text-gray-400 border border-gray-800 hover:text-gray-200">
               All on page
             </button>
             <button onClick={clearSelection}
-              className="px-2 py-1.5 text-[10px] rounded-full bg-gray-900/60 text-gray-400 border border-gray-800 hover:text-gray-200">
+              className="px-2 py-1.5 text-[10px] rounded-lg bg-gray-900/60 text-gray-400 border border-gray-800 hover:text-gray-200">
               Clear
             </button>
           </>
@@ -1992,7 +1968,7 @@ function ImageLibrary({ refreshKey }) {
       {loading ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {[1,2,3,4,5,6,7,8].map(i => (
-            <div key={i} className="aspect-square rounded-xl bg-gray-900/40 animate-pulse" />
+            <div key={i} className="aspect-square rounded-lg bg-gray-900/40 animate-pulse" />
           ))}
         </div>
       ) : data.items.length === 0 ? (
@@ -2019,7 +1995,7 @@ function ImageLibrary({ refreshKey }) {
           BE rejects with 401 if missing. */}
       {selectMode && selCount > 0 && (
         <div className="sticky bottom-3 z-30 mx-auto max-w-xl">
-          <div className="rounded-2xl border border-cyan-500/40 bg-gradient-to-r from-gray-900/95 via-gray-950/95 to-gray-900/95 backdrop-blur p-3 shadow-2xl shadow-cyan-500/10 flex items-center justify-between gap-3 flex-wrap">
+          <div className="rounded-lg border border-cyan-500/40 bg-gray-950/95 backdrop-blur p-3 flex items-center justify-between gap-3 flex-wrap">
             <span className="text-xs text-gray-300">
               <span className="font-mono text-cyan-300">{selCount}</span> selected
             </span>
@@ -2033,7 +2009,7 @@ function ImageLibrary({ refreshKey }) {
               {loggedIn && visibility === 'vault' && (
                 <button onClick={() => doBulk('make-public')} disabled={bulkBusy}
                   className="flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-500/40 font-semibold disabled:opacity-50">
-                  🌐 Make public
+                  <GlobalOutlined /> Make public
                 </button>
               )}
               <button onClick={() => doBulk('delete')} disabled={bulkBusy}
@@ -2069,9 +2045,9 @@ function LibraryCard({ image, onDelete, selectMode = false, checked = false, onT
     ? { to: `/image-enhancer/${encodeURIComponent(image.imageId)}` }
     : { href: url || '#', target: '_blank', rel: 'noopener' }
   return (
-    <div className={`group relative aspect-square rounded-xl overflow-hidden border transition-all bg-gray-900/40 ${
+    <div className={`group relative aspect-square rounded-lg overflow-hidden border transition-colors bg-gray-900/40 ${
       checked
-        ? 'border-cyan-400 shadow-lg shadow-cyan-500/30 ring-2 ring-cyan-400/40'
+        ? 'border-cyan-400 ring-2 ring-cyan-400/40'
         : 'border-gray-800 hover:border-cyan-400/50'
     }`}>
       <Linker {...linkerProps} onClick={handleClick}
@@ -2084,7 +2060,7 @@ function LibraryCard({ image, onDelete, selectMode = false, checked = false, onT
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-900 to-gray-950">
             <span className="text-3xl opacity-50">
-              {image.status === 'failed' ? '✗' : image.status === 'processing' ? '⚡' : '⏳'}
+              {image.status === 'failed' ? 'failed' : image.status === 'processing' ? 'rendering' : 'queued'}
             </span>
           </div>
         )}
@@ -2102,8 +2078,8 @@ function LibraryCard({ image, onDelete, selectMode = false, checked = false, onT
         </button>
       )}
 
-      <div className="pointer-events-none absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-black/60 text-white border border-white/10">
-        {image.engine === 'cloud' ? '☁ Gemini' : '🖥 5090'}
+      <div className="pointer-events-none absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-black/60 text-white border border-white/10 inline-flex items-center gap-1">
+        {image.engine === 'cloud' ? <><CloudOutlined /> Gemini</> : <><DesktopOutlined /> 5090</>}
       </div>
       {image.status !== 'completed' && (
         <div className={`pointer-events-none absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
@@ -2120,28 +2096,28 @@ function LibraryCard({ image, onDelete, selectMode = false, checked = false, onT
           {url && (
             <button onClick={animate}
               title="Animate this image (→ AI Video Studio)"
-              className="w-7 h-7 flex items-center justify-center rounded-full bg-black/70 hover:bg-amber-600 text-gray-200 hover:text-white text-xs">
-              🎬
+              className="w-7 h-7 flex items-center justify-center rounded-lg bg-black/70 hover:bg-amber-600 text-gray-200 hover:text-white text-xs">
+              <ThunderboltOutlined />
             </button>
           )}
           {loggedIn && image.vault === 0 && onMoveToVault && (
             <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onMoveToVault() }}
               title="Move to Vault (private)"
-              className="w-7 h-7 flex items-center justify-center rounded-full bg-black/70 hover:bg-emerald-600 text-gray-200 hover:text-white">
+              className="w-7 h-7 flex items-center justify-center rounded-lg bg-black/70 hover:bg-emerald-600 text-gray-200 hover:text-white">
               <LockOutlined className="text-xs" />
             </button>
           )}
           {loggedIn && image.vault === 1 && onMakePublic && (
             <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onMakePublic() }}
               title="Make public"
-              className="w-7 h-7 flex items-center justify-center rounded-full bg-black/70 hover:bg-cyan-600 text-gray-200 hover:text-white text-xs">
-              🌐
+              className="w-7 h-7 flex items-center justify-center rounded-lg bg-black/70 hover:bg-cyan-600 text-gray-200 hover:text-white text-xs">
+              <GlobalOutlined />
             </button>
           )}
           {onDelete && (
             <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(image) }}
               title="Delete"
-              className="w-7 h-7 flex items-center justify-center rounded-full bg-black/70 hover:bg-rose-600 text-gray-200 hover:text-white">
+              className="w-7 h-7 flex items-center justify-center rounded-lg bg-black/70 hover:bg-rose-600 text-gray-200 hover:text-white">
               <DeleteOutlined className="text-xs" />
             </button>
           )}
@@ -2221,7 +2197,7 @@ function PromptHelperModal({
         mask: { backdropFilter: 'blur(6px)' },
       }}>
       {/* ── Header ─────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-gray-800/80 bg-gradient-to-r from-amber-500/10 via-fuchsia-500/5 to-transparent">
+      <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-gray-800/80 bg-amber-500/8">
         <div className="flex items-center gap-2 min-w-0">
           <BulbOutlined className="text-amber-400 shrink-0" />
           <div className="min-w-0">
@@ -2237,8 +2213,8 @@ function PromptHelperModal({
             <button
               onClick={() => { setIdea(''); setCoachResult(null); setCoachError('') }}
               title="Clear the idea + last result"
-              className="text-[10px] uppercase tracking-wider text-gray-500 hover:text-amber-300 px-2 py-1 rounded border border-gray-800 hover:border-amber-500/50">
-              ↻ Reset
+              className="text-[10px] uppercase tracking-wider text-gray-500 hover:text-amber-300 px-2 py-1 rounded border border-gray-800 hover:border-amber-500/50 inline-flex items-center gap-1">
+              <ReloadOutlined /> Reset
             </button>
           )}
           <button onClick={onClose}
@@ -2253,8 +2229,8 @@ function PromptHelperModal({
         {/* ── Section: AI coach ────────────────────────────── */}
         <section>
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-[10px] uppercase tracking-wider text-fuchsia-300 font-semibold">
-              ✨ Describe what you want
+            <span className="text-[10px] uppercase tracking-wider text-amber-300 font-semibold inline-flex items-center gap-1.5">
+              <BulbOutlined /> Describe what you want
             </span>
             <span className="text-[9px] font-mono text-gray-600">powered by Groq · llama-3.3-70b</span>
           </div>
@@ -2284,10 +2260,10 @@ function PromptHelperModal({
               Press <span className="font-mono text-gray-400">Enter</span> to ask · Shift+Enter for newline
             </p>
             <button onClick={askCoach} disabled={coachLoading || !idea.trim()}
-              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition-all ${
+              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors ${
                 coachLoading || !idea.trim()
                   ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-fuchsia-500 to-amber-500 text-black hover:scale-[1.02]'
+                  : 'bg-amber-500 text-black hover:bg-amber-400'
               }`}>
               {coachLoading ? (
                 <>
@@ -2295,26 +2271,26 @@ function PromptHelperModal({
                   Thinking…
                 </>
               ) : (
-                <>✨ Generate prompt</>
+                <><BulbOutlined /> Generate prompt</>
               )}
             </button>
           </div>
 
           {coachResult && (
-            <div className="mt-3 rounded-xl border border-fuchsia-500/40 bg-gradient-to-b from-fuchsia-500/10 to-transparent p-3 space-y-3">
+            <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/8 p-3 space-y-3">
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] uppercase tracking-wider text-fuchsia-300 font-semibold">
+                  <span className="text-[10px] uppercase tracking-wider text-amber-300 font-semibold">
                     Tuned prompt
                   </span>
                   <div className="flex items-center gap-1">
                     <button onClick={() => copy(coachResult.prompt)}
-                      className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700">
+                      className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700">
                       <CopyOutlined /> Copy
                     </button>
                     <button onClick={() => onApply(coachResult.prompt, coachResult.negative)}
                       title={coachResult.negative ? 'Apply prompt + negative' : 'Apply prompt'}
-                      className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-fuchsia-500/30 hover:bg-fuchsia-500/40 text-fuchsia-200 border border-fuchsia-500/50 font-semibold">
+                      className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-lg bg-amber-500/25 hover:bg-amber-500/35 text-amber-200 border border-amber-500/50 font-semibold">
                       <CheckOutlined /> Use {coachResult.negative ? 'both' : 'this'}
                     </button>
                   </div>
@@ -2324,26 +2300,26 @@ function PromptHelperModal({
                 </p>
               </div>
               {family === 'flux' && !coachResult.negative && (
-                <div className="pt-2 border-t border-fuchsia-500/20">
+                <div className="pt-2 border-t border-amber-500/20">
                   <p className="text-[10px] text-gray-500 italic">
-                    🚫 Flux Kontext doesn't use negative prompts. Steer edits via the positive prompt only.
+                    Flux Kontext doesn't use negative prompts. Steer edits via the positive prompt only.
                   </p>
                 </div>
               )}
               {coachResult.negative && (
-                <div className="pt-2 border-t border-fuchsia-500/20">
+                <div className="pt-2 border-t border-amber-500/20">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-[10px] uppercase tracking-wider text-rose-300 font-semibold">
                       Negative prompt (suggested)
                     </span>
                     <div className="flex items-center gap-1">
                       <button onClick={() => copy(coachResult.negative, 'Negative')}
-                        className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700">
+                        className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700">
                         <CopyOutlined /> Copy
                       </button>
                       {onApplyNegative && (
                         <button onClick={() => { onApplyNegative(coachResult.negative); antMessage.success('Negative prompt applied') }}
-                          className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/40 font-semibold">
+                          className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/40 font-semibold">
                           <CheckOutlined /> Apply
                         </button>
                       )}
@@ -2377,7 +2353,7 @@ function PromptHelperModal({
         <section>
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] uppercase tracking-wider text-cyan-300 font-semibold">
-              📋 Sample prompts for {tip.label}
+              Sample prompts for {tip.label}
             </span>
             <span className="text-[9px] font-mono text-gray-600">{samples.length} starter{samples.length === 1 ? '' : 's'}</span>
           </div>
@@ -2398,20 +2374,20 @@ function PromptHelperModal({
                   <div className="flex items-center gap-1 shrink-0">
                     <Tooltip title="Copy to clipboard">
                       <button onClick={() => copy(s.text)}
-                        className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-full bg-gray-800/70 hover:bg-gray-700 text-gray-400 hover:text-gray-200 border border-gray-700/60">
+                        className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg bg-gray-800/70 hover:bg-gray-700 text-gray-400 hover:text-gray-200 border border-gray-700/60">
                         <CopyOutlined />
                       </button>
                     </Tooltip>
                     {currentPrompt?.trim() && (
                       <Tooltip title="Append to current prompt (comma-separated)">
                         <button onClick={() => onAppend(s.text)}
-                          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-full bg-gray-800/70 hover:bg-gray-700 text-gray-400 hover:text-gray-200 border border-gray-700/60">
+                          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg bg-gray-800/70 hover:bg-gray-700 text-gray-400 hover:text-gray-200 border border-gray-700/60">
                           + add
                         </button>
                       </Tooltip>
                     )}
                     <button onClick={() => onApply(s.text)}
-                      className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-full bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-500/40 font-semibold">
+                      className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-500/40 font-semibold">
                       <CheckOutlined /> Use
                     </button>
                   </div>
@@ -2465,7 +2441,7 @@ function ImageLogModal({ open, onClose, job }) {
         header: { display: 'none' },
         mask: { backdropFilter: 'blur(6px)' },
       }}>
-      <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-gray-800/80 bg-gradient-to-r from-cyan-500/10 via-fuchsia-500/5 to-transparent">
+      <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-gray-800/80 bg-cyan-500/8">
         <div className="flex items-center gap-2 min-w-0">
           <span className={`w-2 h-2 rounded-full shrink-0 ${
             job?.status === 'completed' ? 'bg-emerald-400'
@@ -2482,8 +2458,9 @@ function ImageLogModal({ open, onClose, job }) {
             {logs.length} {logs.length === 1 ? 'event' : 'events'}
           </span>
           <button type="button" onClick={onClose}
-            className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded">
-            ✕
+            className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded"
+            aria-label="Close">
+            ×
           </button>
         </div>
       </div>
@@ -2527,19 +2504,19 @@ function ImageEnhancerModal({ expanded, setExpandedPreset, setSelectedPreset }) 
       }}>
       {expanded && (
         <>
-          <div className={`flex items-center justify-between px-5 py-3 border-b border-gray-800/80 bg-gradient-to-r ${expanded.accent.replace('via-', 'to-').split(' ')[0]} bg-opacity-10`}>
+          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-800/80 bg-cyan-500/8">
             <div className="flex items-center gap-2">
-              <span className="text-2xl">{expanded.icon}</span>
               <h3 className="text-sm font-semibold text-white tracking-wide">{expanded.name}</h3>
             </div>
             <div className="flex items-center gap-2">
               <button onClick={() => { setSelectedPreset(expanded.id); setExpandedPreset(null) }}
-                className="text-[10px] font-semibold px-2 py-1 rounded-full bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 transition-colors">
+                className="text-[10px] font-semibold px-2 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 transition-colors">
                 Use this prompt
               </button>
               <button onClick={() => setExpandedPreset(null)}
-                className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded">
-                ✕
+                className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded"
+                aria-label="Close">
+                ×
               </button>
             </div>
           </div>

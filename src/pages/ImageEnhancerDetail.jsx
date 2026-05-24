@@ -46,7 +46,7 @@ export default function ImageEnhancerDetail() {
   return <JobDetailPage
     lane="image"
     title="Image Studio"
-    accentClass="bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-amber-300 bg-clip-text text-transparent"
+    accentClass="text-white"
     backTo="/image-enhancer"
     getStatus={getImageStatus}
     idKey="imageId"

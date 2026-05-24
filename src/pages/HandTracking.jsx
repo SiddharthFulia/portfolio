@@ -3,6 +3,7 @@ import { Button, Tooltip, Slider } from 'antd'
 import {
   PlayCircleFilled, PauseCircleFilled, ReloadOutlined, DownloadOutlined,
   EyeOutlined, HighlightOutlined, AimOutlined, ClearOutlined,
+  BgColorsOutlined, ThunderboltOutlined, FullscreenOutlined,
 } from '@ant-design/icons'
 import notify from '../utils/notify'
 import { FILTERS, GESTURE_DEFAULTS, FAMILY_ORDER, FAMILY_LABELS } from '../components/luxe/HandFilters'
@@ -580,15 +581,15 @@ export default function HandTracking() {
         {/* Hero — mobile-tuned: shorter pill text, smaller H1 + body on
             phone, no horizontal overflow. */}
         <header className="text-center mb-5 sm:mb-6">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
-                          bg-gradient-to-r from-cyan-500/20 via-violet-500/20 to-fuchsia-500/20
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg
+                          bg-cyan-500/12
                           border border-cyan-500/30 text-[9px] sm:text-[10px] uppercase tracking-wider
                           text-cyan-200 font-semibold mb-2.5 sm:mb-3 max-w-full">
-            <span>✋ MediaPipe Hand Tracking</span>
+            <span>MediaPipe Hand Tracking</span>
             <span className="hidden sm:inline opacity-70">· runs in-browser, no upload</span>
           </div>
           <h1 className="text-2xl sm:text-4xl md:text-5xl font-black leading-tight pb-1
-                         gradient-text-amber">
+                         text-white">
             Track hands. Draw with your finger.
           </h1>
           <p className="text-gray-400 text-[12px] sm:text-sm md:text-base mt-2
@@ -612,21 +613,21 @@ export default function HandTracking() {
                         overflow-x-auto -mx-1 px-1 pb-1
                         snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {[
-            { id: 'view',    icon: <EyeOutlined />,       label: 'Skeleton',  color: 'from-cyan-500 to-blue-500' },
-            { id: 'draw',    icon: <HighlightOutlined />, label: 'Draw',      color: 'from-violet-500 to-fuchsia-500' },
-            ...(isTouch ? [] : [{ id: 'cursor', icon: <AimOutlined />, label: 'Cursor', color: 'from-amber-400 to-rose-500' }]),
-            { id: 'filters', icon: <span>✨</span>,        label: 'Filters',   color: 'from-pink-500 via-fuchsia-500 to-cyan-500' },
-            { id: 'laser',   icon: <span>⚡</span>,        label: 'Laser AR',  color: 'from-emerald-400 via-cyan-400 to-violet-500' },
+            { id: 'view',    icon: <EyeOutlined />,       label: 'Skeleton',  color: 'bg-cyan-500' },
+            { id: 'draw',    icon: <HighlightOutlined />, label: 'Draw',      color: 'bg-amber-500' },
+            ...(isTouch ? [] : [{ id: 'cursor', icon: <AimOutlined />, label: 'Cursor', color: 'bg-amber-500' }]),
+            { id: 'filters', icon: <BgColorsOutlined />,  label: 'Filters',   color: 'bg-cyan-500' },
+            { id: 'laser',   icon: <ThunderboltOutlined />, label: 'Laser AR',  color: 'bg-emerald-500' },
           ].map(m => {
             const active = mode === m.id
             return (
               <button key={m.id} onClick={() => setMode(m.id)}
                 className={`shrink-0 snap-start inline-flex items-center gap-1.5
                             px-3 py-2 sm:py-1.5 min-h-[40px] sm:min-h-0
-                            rounded-full text-[11px] sm:text-xs font-bold
-                            border-2 transition-all ${
+                            rounded-lg text-[11px] sm:text-xs font-bold
+                            border-2 transition-colors ${
                   active
-                    ? `border-transparent bg-gradient-to-r ${m.color} text-white shadow-md`
+                    ? `border-transparent ${m.color} text-white`
                     : 'border-gray-800 bg-gray-900/40 text-gray-400 hover:border-gray-700 hover:text-gray-200'
                 }`}>
                 {m.icon} {m.label}
@@ -663,7 +664,7 @@ export default function HandTracking() {
             existing video element stays mounted so flipping back to other
             modes is instant. */}
         {mode === 'laser' && (
-          <div className="relative rounded-2xl overflow-hidden border border-emerald-500/40 bg-black shadow-xl shadow-emerald-500/10"
+          <div className="relative rounded-lg overflow-hidden border border-emerald-500/40 bg-black"
             style={{ aspectRatio: '16 / 10' }}>
             <iframe
               title="Laser Hands AR"
@@ -673,14 +674,14 @@ export default function HandTracking() {
               style={{ border: 0 }}
             />
             <div className="absolute top-3 left-3 inline-flex items-center gap-2 px-2.5 py-1
-                            rounded-full bg-emerald-500/15 border border-emerald-400/40 text-[10px] font-mono text-emerald-200">
+                            rounded-lg bg-emerald-500/15 border border-emerald-400/40 text-[10px] font-mono text-emerald-200">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Laser AR
             </div>
             <a href="/laserhands.html" target="_blank" rel="noopener noreferrer"
               className="absolute top-3 right-3 inline-flex items-center gap-1.5 px-2.5 py-1
-                         rounded-full bg-gray-950/85 border border-gray-700 hover:border-emerald-400
+                         rounded-lg bg-gray-950/85 border border-gray-700 hover:border-emerald-400
                          text-[10px] font-semibold text-gray-300 hover:text-emerald-200 transition-colors">
-              ↗ Open fullscreen
+              <FullscreenOutlined /> Open fullscreen
             </a>
           </div>
         )}
@@ -690,7 +691,7 @@ export default function HandTracking() {
             on a clean dark canvas, not over their face. The video keeps
             playing in the background (kept off-screen, not paused) so
             MediaPipe still receives frames. */}
-        <div className="relative rounded-2xl overflow-hidden border border-gray-800 bg-gray-950 shadow-xl shadow-black/40"
+        <div className="relative rounded-lg overflow-hidden border border-gray-800 bg-gray-950"
           style={{ aspectRatio: '4 / 3', display: mode === 'laser' ? 'none' : 'block' }}>
           <video ref={videoRef}
             className="absolute inset-0 w-full h-full block object-cover"
@@ -703,7 +704,7 @@ export default function HandTracking() {
             playsInline muted />
           {/* Whiteboard background — visible only when the video is hidden */}
           {mode === 'draw' && whiteboard && (
-            <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-950 to-black" />
+            <div className="absolute inset-0 bg-gray-950" />
           )}
           <canvas ref={canvasRef}
             className="absolute inset-0 w-full h-full pointer-events-none"
@@ -713,7 +714,7 @@ export default function HandTracking() {
 
           {/* Status pill */}
           <div className="absolute top-3 left-3 inline-flex items-center gap-2 px-2.5 py-1
-                          rounded-full bg-gray-950/85 border border-gray-700 text-[10px] font-mono">
+                          rounded-lg bg-gray-950/85 border border-gray-700 text-[10px] font-mono">
             <span className={`w-2 h-2 rounded-full ${running ? 'bg-emerald-400 animate-pulse' : 'bg-gray-500'}`} />
             {running ? `${fps.toFixed(0)} fps` : ready ? 'ready' : 'loading…'}
           </div>
@@ -732,9 +733,9 @@ export default function HandTracking() {
               }}
               title="Switch camera"
               className="absolute bottom-3 right-3 w-10 h-10 inline-flex items-center justify-center
-                         rounded-full bg-gray-950/85 hover:bg-cyan-500/30 border border-gray-700
+                         rounded-lg bg-gray-950/85 hover:bg-cyan-500/30 border border-gray-700
                          hover:border-cyan-400 text-gray-200 hover:text-white backdrop-blur-sm
-                         shadow-lg shadow-black/40 transition-colors">
+                         transition-colors">
               <ReloadOutlined />
             </button>
           )}
@@ -742,11 +743,11 @@ export default function HandTracking() {
           {/* Live gesture chip — compact, never wider than half the
               stage on phone so it can't push the camera frame around. */}
           {gestures && running && (
-            <div className="absolute top-3 right-3 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl
+            <div className="absolute top-3 right-3 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg
                             bg-gray-950/85 backdrop-blur-sm border border-gray-700
                             text-[10px] sm:text-[11px] max-w-[55%]">
               <div className="text-cyan-300 font-bold mb-0.5 truncate">
-                {gestures.hand}{gestures.pinch && ' · 🤏'}
+                {gestures.hand}{gestures.pinch && ' · pinch'}
               </div>
               <div className="font-mono text-gray-400 text-[9px] sm:text-[10px] whitespace-nowrap">
                 {Object.entries(gestures.fingers).map(([k, up]) => (
@@ -763,7 +764,7 @@ export default function HandTracking() {
               <Button type="primary" size="large" icon={<PlayCircleFilled />}
                 disabled={!ready} loading={!ready}
                 onClick={start}
-                style={{ background: 'linear-gradient(135deg, #06b6d4, #8b5cf6, #ec4899)', border: 'none', fontWeight: 700 }}
+                style={{ background: '#f59e0b', border: 'none', fontWeight: 700 }}
                 className="!h-12 !px-6">
                 {ready ? 'Start camera' : 'Loading MediaPipe…'}
               </Button>
@@ -781,23 +782,23 @@ export default function HandTracking() {
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Mode-specific tool panel */}
           {mode === 'draw' && (
-            <div className="luxe-card p-3 border-violet-500/40">
+            <div className="luxe-card p-3 border-amber-500/40">
               <div className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-2 flex items-center justify-between">
-                <span>✍ Drawing — pinch index + thumb to draw</span>
+                <span>Drawing — pinch index + thumb to draw</span>
                 <button onClick={() => setWhiteboard(w => !w)}
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border transition-colors ${
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-colors ${
                     whiteboard
-                      ? 'bg-violet-500/25 border-violet-400 text-violet-100'
+                      ? 'bg-amber-500/20 border-amber-400 text-amber-100'
                       : 'border-gray-700 bg-gray-900/60 text-gray-300 hover:border-gray-600'
                   }`}>
-                  {whiteboard ? '◑ Whiteboard ON' : '◐ Whiteboard'}
+                  {whiteboard ? 'Whiteboard ON' : 'Whiteboard'}
                 </button>
               </div>
               <div className="flex items-center gap-1.5 mb-2 flex-wrap">
                 {COLORS.map(c => (
                   <button key={c} onClick={() => setColor(c)}
-                    className={`w-7 h-7 rounded-full border-2 transition-transform ${
-                      color === c ? 'border-white scale-110 shadow-md' : 'border-gray-700'
+                    className={`w-7 h-7 rounded-lg border-2 transition-transform ${
+                      color === c ? 'border-white scale-110' : 'border-gray-700'
                     }`}
                     style={{ background: c }}
                     title={c} />
@@ -812,7 +813,7 @@ export default function HandTracking() {
               <div className="flex items-center gap-2 mt-3">
                 <Button size="small" icon={<ClearOutlined />} onClick={clearDrawing} className="luxe-btn luxe-btn-secondary">Clear</Button>
                 <Button size="small" type="primary" icon={<DownloadOutlined />} onClick={saveDrawing}
-                  style={{ background: 'linear-gradient(135deg, #8b5cf6, #ec4899)', border: 'none' }}
+                  style={{ background: '#f59e0b', border: 'none' }}
                   className="luxe-btn luxe-btn-secondary">
                   Save PNG
                 </Button>
@@ -823,8 +824,8 @@ export default function HandTracking() {
           {/* Cursor mode — pick a cursor style */}
           {mode === 'cursor' && (
             <div className="luxe-card p-3 border-amber-500/40">
-              <div className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-2">
-                🎯 Cursor — pick a style
+              <div className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-2 inline-flex items-center gap-1.5">
+                <AimOutlined /> Cursor — pick a style
               </div>
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
                 {CURSORS.map(c => {
@@ -832,9 +833,9 @@ export default function HandTracking() {
                   return (
                     <button key={c.id} onClick={() => setCursorStyle(c.id)}
                       className={`flex flex-col items-center justify-center gap-1 p-2 rounded-lg
-                                  border-2 transition-all ${
+                                  border-2 transition-colors ${
                         active
-                          ? 'border-amber-400 bg-amber-500/15 shadow-md shadow-amber-500/20 scale-[1.03]'
+                          ? 'border-amber-400 bg-amber-500/15'
                           : 'border-gray-800 bg-gray-900/40 hover:border-gray-700'
                       }`}>
                       <CursorVisual id={c.id} accent={c.accent} state="idle" />
@@ -844,7 +845,7 @@ export default function HandTracking() {
                 })}
               </div>
               <p className="text-[10px] text-gray-500 mt-2 leading-snug">
-                Index fingertip = cursor · 🤏 pinch = click. The cursor floats over
+                Index fingertip = cursor · pinch = click. The cursor floats over
                 the whole page so you can hover and click any button.
               </p>
             </div>
@@ -853,22 +854,22 @@ export default function HandTracking() {
           {/* Filters mode — gesture map + a chip strip for the full catalog.
               Auto mode lets gestures choose; clicking a chip locks in a pick. */}
           {mode === 'filters' && (
-            <div className="luxe-card p-3 border-fuchsia-500/40 sm:col-span-2">
+            <div className="luxe-card p-3 border-cyan-500/40 sm:col-span-2">
               <div className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-2 flex items-center justify-between gap-2">
-                <span>✨ Filters — {userPickedFilter ? 'manual pick' : 'gesture-driven (Auto)'}</span>
+                <span className="inline-flex items-center gap-1.5"><BgColorsOutlined /> Filters — {userPickedFilter ? 'manual pick' : 'gesture-driven (Auto)'}</span>
                 <div className="flex items-center gap-1.5">
                   {activeFilter && (
                     <span className="text-[10px] font-mono px-1.5 py-0.5 rounded
-                                     bg-fuchsia-500/20 text-fuchsia-200 border border-fuchsia-500/40">
+                                     bg-cyan-500/15 text-cyan-200 border border-cyan-500/40">
                       gesture: {activeFilter}
                     </span>
                   )}
                   <button
                     onClick={() => setUserPickedFilter(false)}
                     title="Resume gesture-driven filter selection"
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border transition-colors ${
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-colors ${
                       !userPickedFilter
-                        ? 'bg-fuchsia-500/25 border-fuchsia-400 text-fuchsia-100'
+                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-100'
                         : 'border-gray-700 bg-gray-900/60 text-gray-300 hover:border-gray-600'
                     }`}>
                     {userPickedFilter ? 'Auto OFF' : 'Auto ON'}
@@ -879,17 +880,17 @@ export default function HandTracking() {
               {/* Gesture → default filter cheatsheet */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mb-3">
                 {[
-                  { id: 'fist',  label: 'Fist ✊',      effect: 'Dither dark' },
-                  { id: 'peace', label: 'Peace ✌',     effect: 'VHS Aberration' },
-                  { id: 'point', label: 'Point ☝',     effect: 'Spotlight' },
-                  { id: 'open',  label: 'Open hand ✋', effect: 'Water ripple' },
+                  { id: 'fist',  label: 'Fist',      effect: 'Dither dark' },
+                  { id: 'peace', label: 'Peace',     effect: 'VHS Aberration' },
+                  { id: 'point', label: 'Point',     effect: 'Spotlight' },
+                  { id: 'open',  label: 'Open hand', effect: 'Water ripple' },
                 ].map(g => {
                   const on = !userPickedFilter && activeFilter === g.id
                   return (
                     <div key={g.id}
                       className={`p-2 rounded-lg border ${
                         on
-                          ? 'border-fuchsia-400 bg-fuchsia-500/10 shadow-md shadow-fuchsia-500/20'
+                          ? 'border-cyan-400 bg-cyan-500/10'
                           : 'border-gray-800 bg-gray-900/40'
                       }`}>
                       <div className={`text-xs font-bold ${on ? 'text-white' : 'text-gray-300'}`}>
@@ -928,9 +929,9 @@ export default function HandTracking() {
                                 : `${f.name} · tap to apply`}
                               className={`shrink-0 inline-flex items-center gap-1
                                           px-2 py-1 rounded-lg text-[10px] font-semibold
-                                          border transition-all ${
+                                          border transition-colors ${
                                 active
-                                  ? 'border-fuchsia-400 bg-fuchsia-500/15 text-white shadow-md shadow-fuchsia-500/20'
+                                  ? 'border-cyan-400 bg-cyan-500/15 text-white'
                                   : 'border-gray-800 bg-gray-900/40 text-gray-300 hover:border-gray-700 hover:text-gray-100'
                               }`}>
                               <span className="text-[13px] leading-none">{f.icon}</span>
@@ -962,8 +963,8 @@ export default function HandTracking() {
           {/* View mode — small instruction card */}
           {mode === 'view' && (
             <div className="luxe-card p-3 border-cyan-500/40">
-              <div className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-2">
-                👁 Skeleton view
+              <div className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-2 inline-flex items-center gap-1.5">
+                <EyeOutlined /> Skeleton view
               </div>
               <p className="text-[11px] text-gray-300 leading-relaxed">
                 21 landmarks per hand (up to 2 hands) rendered as a live skeleton.
@@ -984,7 +985,7 @@ export default function HandTracking() {
               ) : (
                 <Button type="primary" icon={<PlayCircleFilled />} onClick={start}
                   disabled={!ready}
-                  style={{ background: 'linear-gradient(135deg, #06b6d4, #8b5cf6)', border: 'none' }}>
+                  style={{ background: '#f59e0b', border: 'none' }}>
                   Start camera
                 </Button>
               )}
@@ -995,8 +996,8 @@ export default function HandTracking() {
             </div>
             <ul className="text-[11px] text-gray-400 leading-relaxed space-y-1 pl-4 list-disc">
               <li><span className="text-cyan-300 font-semibold">Skeleton mode</span> — just visualize the bones</li>
-              <li><span className="text-violet-300 font-semibold">Draw mode</span> — 🤏 pinch index + thumb to draw, release to lift the pen</li>
-              <li><span className="text-amber-300 font-semibold">Cursor mode</span> — index fingertip moves a pointer; 🤏 pinch fires a click</li>
+              <li><span className="text-amber-300 font-semibold">Draw mode</span> — pinch index + thumb to draw, release to lift the pen</li>
+              <li><span className="text-amber-300 font-semibold">Cursor mode</span> — index fingertip moves a pointer; pinch fires a click</li>
               <li>Everything runs in-browser. Nothing leaves your device.</li>
             </ul>
           </div>

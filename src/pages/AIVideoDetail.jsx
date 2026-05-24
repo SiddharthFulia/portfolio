@@ -58,7 +58,7 @@ export default function AIVideoDetail() {
   return <JobDetailPage
     lane="video"
     title="AI Video"
-    accentClass="bg-gradient-to-r from-cyan-300 via-purple-300 to-amber-300 bg-clip-text text-transparent"
+    accentClass="text-white"
     backTo="/ai-video"
     getStatus={getJobStatus}
     idKey="videoId"
