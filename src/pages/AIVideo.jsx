@@ -20,6 +20,7 @@ import { UploadOutlined } from '@ant-design/icons'
 import { DeleteOutlined } from '@ant-design/icons'
 import PromptHelper from '../components/PromptHelper'
 import JobLogsAgentPlan from '../components/JobLogsAgentPlan'
+import VideoCombiner from '../components/aiVideo/VideoCombiner'
 
 const BE_URL = import.meta.env.VITE_BE_URL || 'http://localhost:4001'
 
@@ -1788,7 +1789,7 @@ const AIVideo = () => {
   // back-button work intuitively. Default to 'generate' when nothing
   // is in the URL.
   const [searchParams, setSearchParams] = useSearchParams()
-  const activeKey = ['generate', 'jobs', 'library', 'cinema'].includes(searchParams.get('tab'))
+  const activeKey = ['generate', 'jobs', 'library', 'cinema', 'combine'].includes(searchParams.get('tab'))
     ? searchParams.get('tab')
     : 'generate'
   const onTabChange = (k) => {
@@ -1858,6 +1859,11 @@ const AIVideo = () => {
               key: 'library',
               label: <span><AppstoreOutlined /> Library</span>,
               children: <LibraryTab refreshKey={refreshKey} />,
+            },
+            {
+              key: 'combine',
+              label: <span>🎬 Combine</span>,
+              children: <VideoCombiner />,
             },
           ]}
         />

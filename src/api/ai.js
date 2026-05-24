@@ -726,6 +726,36 @@ export async function chessResignMatch(id, body) { try { const data = await post
 export async function chessListLiveMatches() { try { const data = await get(`${ENDPOINTS.CHESS_MATCHES}/lobby/live`, {}, { timeout: 6000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 
 // ─── YouTube downloader (yt-dlp wrapped on the BE) ─────────────────
+// ─── Multi-video concatenation (ffmpeg-concat on the BE) ──────────
+export async function combineCreate({ sources, title }) {
+  try {
+    const data = await post(ENDPOINTS.COMBINE, { sources, title }, { timeout: 10000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function combineStatus(id) {
+  try {
+    const data = await get(`${ENDPOINTS.COMBINE_STATUS}/${id}`, {}, { timeout: 6000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function combineList(limit = 30) {
+  try {
+    const data = await get(ENDPOINTS.COMBINE_LIST, { limit }, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function combineDelete(id) {
+  try {
+    const data = await del(`${ENDPOINTS.COMBINE}/${id}`, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export function combineFileUrl(id) {
+  const base = import.meta.env.VITE_BE_URL || '';
+  return `${base}${ENDPOINTS.COMBINE_FILE}/${id}`;
+}
+
 export async function ytdlCreate({ url, format, quality, worker = 'cobalt' }) {
   try {
     const data = await post(ENDPOINTS.YTDL, { url, format, quality, worker }, { timeout: 10000 });
