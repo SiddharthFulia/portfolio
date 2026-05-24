@@ -7,7 +7,7 @@ import {
 } from 'recharts'
 import VaultGate from '../components/VaultGate'
 import {
-  adminServerStats, adminDbStats, adminQueueStats, adminWorkers, adminPurgeQueue,
+  adminServerStats, adminDbStats, adminDiskStats, adminQueueStats, adminWorkers, adminPurgeQueue,
   adminActivity,
 } from '../api/ai'
 import useQueryState from '../hooks/useQueryState'
@@ -48,9 +48,10 @@ function SettingsInner() {
   // ?tab= mirrors the active Tabs key so refreshing or sharing the URL
   // preserves which pane the user was viewing. Defaults to 'overview',
   // which is omitted from the URL so /settings stays clean.
-  const [tab, setTab] = useQueryState('tab', 'overview', { allowed: ['overview', 'visualize'] })
+  const [tab, setTab] = useQueryState('tab', 'overview', { allowed: ['overview', 'storage', 'visualize'] })
   const [server, setServer] = useState(null)
   const [dbStats, setDbStats] = useState(null)
+  const [diskStats, setDiskStats] = useState(null)
   const [queues, setQueues] = useState(null)
   const [workers, setWorkers] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -96,19 +97,21 @@ function SettingsInner() {
     try {
       // Fire all four in parallel — each helper already returns { data, error }
       // so a single failing endpoint doesn't break the others.
-      const [s, d, q, w] = await Promise.all([
+      const [s, d, k, q, w] = await Promise.all([
         adminServerStats(),
         adminDbStats(),
+        adminDiskStats(),
         adminQueueStats(),
         adminWorkers(),
       ])
       if (s.data) setServer(s.data)
       if (d.data) setDbStats(d.data)
+      if (k.data) setDiskStats(k.data)
       if (q.data) setQueues(q.data)
       if (w.data) setWorkers(w.data?.workers || [])
       // Track the worst error so the user knows something's off, but keep
       // rendering stale data from the cards that did succeed.
-      const firstErr = s.error || d.error || q.error || w.error || null
+      const firstErr = s.error || d.error || k.error || q.error || w.error || null
       setErr(firstErr)
       setLoading(false)
     } finally {
@@ -228,6 +231,11 @@ function SettingsInner() {
                   <WorkersCard rows={workers} />
                 </div>
               ),
+            },
+            {
+              key: 'storage',
+              label: <span className="text-sm">💾 Storage</span>,
+              children: <StorageCard data={diskStats} />,
             },
             {
               key: 'visualize',
@@ -548,6 +556,122 @@ function ServerCard({ data }) {
         </div>
       )}
     </Card>
+  )
+}
+
+// ─── Storage card ─────────────────────────────────────────────
+// Pulls /api/admin/disk-stats and shows three blocks:
+//   1) Filesystem header with a single fill bar (used vs free).
+//   2) Per-bucket table — the actual binary lanes that grow over time
+//      (sqlite db, combined videos, yt downloads, loose state files).
+//      Each bucket renders a coloured mini-bar relative to its share of
+//      the tracked total, so you can eyeball which lane is hogging space
+//      without doing the math.
+//   3) Domain row counts — chess_games, mesh_jobs, etc. These do not
+//      directly map to disk bytes (most live inside the sqlite file), but
+//      the user thinks in terms of "how many chess games", so we expose
+//      both axes.
+const BUCKET_ACCENT = {
+  sqlite:   ['from-fuchsia-500/70 to-fuchsia-500/20', 'text-fuchsia-300'],
+  combined: ['from-amber-500/70   to-amber-500/20',   'text-amber-300'],
+  ytdl:     ['from-rose-500/70    to-rose-500/20',    'text-rose-300'],
+  other:    ['from-gray-500/70    to-gray-500/20',    'text-gray-300'],
+}
+
+function StorageCard({ data }) {
+  if (!data) {
+    return (
+      <Card icon={<DatabaseOutlined />} title="Storage" accent="emerald">
+        <Empty />
+      </Card>
+    )
+  }
+  const { disk, buckets = [], trackedBytes = 0, domains = [] } = data
+  const diskPct = disk?.totalBytes
+    ? Math.min(100, Math.round((disk.usedBytes / disk.totalBytes) * 1000) / 10)
+    : null
+  const maxBucket = Math.max(1, ...buckets.map(b => b.sizeBytes || 0))
+
+  return (
+    <div className="space-y-4">
+      <Card icon={<DatabaseOutlined />} title="Disk" accent="emerald">
+        {disk ? (
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-gray-500">Total</div>
+                <div className="text-sm font-mono text-gray-200 mt-0.5">{fmtBytes(disk.totalBytes)}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-gray-500">Used</div>
+                <div className="text-sm font-mono text-amber-300 mt-0.5">{fmtBytes(disk.usedBytes)}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-gray-500">Free</div>
+                <div className="text-sm font-mono text-emerald-300 mt-0.5">{fmtBytes(disk.freeBytes)}</div>
+              </div>
+            </div>
+            <div className="w-full h-2 rounded-full bg-gray-900 overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-emerald-400 via-amber-400 to-rose-400 transition-all"
+                style={{ width: `${diskPct || 0}%` }}
+              />
+            </div>
+            <p className="text-[10px] text-gray-500 text-right">
+              {diskPct != null ? `${diskPct}% used` : 'stats unavailable'}
+            </p>
+          </div>
+        ) : (
+          <p className="text-xs text-gray-500">Filesystem stats unavailable on this host.</p>
+        )}
+      </Card>
+
+      <Card icon={<DatabaseOutlined />} title="Buckets" accent="amber">
+        <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">
+          Tracked: {fmtBytes(trackedBytes)} · across {buckets.length} lanes
+        </div>
+        <div className="space-y-2">
+          {buckets.map(b => {
+            const [grad, txt] = BUCKET_ACCENT[b.id] || BUCKET_ACCENT.other
+            const pct = Math.round(((b.sizeBytes || 0) / maxBucket) * 100)
+            return (
+              <div key={b.id} className="p-2.5 rounded-md border border-gray-900 bg-gray-950/50">
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="text-gray-300">
+                    <span className="mr-1.5">{b.emoji}</span>
+                    <span className="font-semibold">{b.label}</span>
+                    <span className="ml-2 text-gray-500 font-mono">{b.path}</span>
+                  </span>
+                  <span className={`font-mono ${txt}`}>{fmtBytes(b.sizeBytes)}</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-gray-900 overflow-hidden">
+                  <div className={`h-full bg-gradient-to-r ${grad} transition-all`} style={{ width: `${pct}%` }} />
+                </div>
+                <div className="text-[10px] text-gray-600 mt-1">{b.fileCount.toLocaleString()} files</div>
+              </div>
+            )
+          })}
+        </div>
+      </Card>
+
+      {domains.length > 0 && (
+        <Card icon={<DatabaseOutlined />} title="By domain" accent="cyan">
+          <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">
+            Row counts (live db) — not file size; lives inside the sqlite file
+          </div>
+          <table className="w-full text-xs">
+            <tbody>
+              {domains.map(d => (
+                <tr key={d.id} className="border-b border-gray-900 last:border-0">
+                  <td className="py-1 text-gray-400">{d.label}</td>
+                  <td className="py-1 text-right text-gray-200 font-mono">{d.rows.toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      )}
+    </div>
   )
 }
 

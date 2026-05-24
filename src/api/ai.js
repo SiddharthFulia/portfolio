@@ -739,9 +739,16 @@ export async function combineStatus(id) {
     return { data: data?.data || data, error: null };
   } catch (err) { return { data: null, error: err.message }; }
 }
-export async function combineList(limit = 30) {
+// Paginated. Params:
+//   visibility : 'public' | 'vault'   (vault requires auth)
+//   status     : optional filter (queued | processing | completed | failed)
+//   page       : 1-based
+//   pageSize   : 1..1000 (server clamps); default 20
+export async function combineList({ visibility = 'public', status, page = 1, pageSize = 20 } = {}) {
   try {
-    const data = await get(ENDPOINTS.COMBINE_LIST, { limit }, { timeout: 8000 });
+    const params = { visibility, page, pageSize };
+    if (status) params.status = status;
+    const data = await get(ENDPOINTS.COMBINE_LIST, params, { timeout: 10000 });
     return { data: data?.data || data, error: null };
   } catch (err) { return { data: null, error: err.message }; }
 }
@@ -797,6 +804,7 @@ export function ytdlFileUrl(id) {
 // surfaces "signal timed out" in the UI.
 export async function adminServerStats() { try { const data = await get(ENDPOINTS.ADMIN_SERVER_STATS, {}, { timeout: 10000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 export async function adminDbStats() { try { const data = await get(ENDPOINTS.ADMIN_DB_STATS, {}, { timeout: 15000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+export async function adminDiskStats() { try { const data = await get(ENDPOINTS.ADMIN_DISK_STATS, {}, { timeout: 20000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 export async function adminQueueStats() { try { const data = await get(ENDPOINTS.ADMIN_QUEUES, {}, { timeout: 20000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 export async function adminWorkers() { try { const data = await get(ENDPOINTS.ADMIN_WORKERS, {}, { timeout: 10000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 export async function adminPurgeQueue(queue) { try { const data = await post(ENDPOINTS.ADMIN_PURGE_QUEUE, { queue }, { timeout: 15000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }

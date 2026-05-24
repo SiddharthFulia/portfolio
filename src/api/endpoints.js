@@ -78,6 +78,7 @@ export const ENDPOINTS = {
   // Vault-gated admin dashboard
   ADMIN_SERVER_STATS:   '/api/admin/server-stats',
   ADMIN_DB_STATS:       '/api/admin/db-stats',
+  ADMIN_DISK_STATS:     '/api/admin/disk-stats',
   ADMIN_QUEUES:         '/api/admin/queues',
   ADMIN_WORKERS:        '/api/admin/workers',
   ADMIN_PURGE_QUEUE:    '/api/admin/queues/purge',
