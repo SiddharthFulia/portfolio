@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Modal, Input } from 'antd'
+import {
+  ArrowLeftOutlined, FullscreenOutlined, UndoOutlined, SwapOutlined,
+  EyeOutlined, EyeInvisibleOutlined, ReloadOutlined, CopyOutlined,
+  SaveOutlined, SendOutlined, CloseOutlined, BookOutlined,
+  AimOutlined, SearchOutlined, TeamOutlined,
+} from '@ant-design/icons'
 import { Chess } from 'chess.js'
 import 'chessground/assets/chessground.base.css'
 import 'chessground/assets/chessground.brown.css'
@@ -459,14 +465,14 @@ export default function ChessPage() {
         {promotionPicker}
         {/* Back button — top-left corner, always visible */}
         <button onClick={() => setFullscreen(false)}
-          className="absolute top-4 left-4 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full
+          className="absolute top-4 left-4 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-lg
                      bg-gray-900/80 backdrop-blur border border-gray-700 hover:border-amber-400/60
                      text-gray-200 hover:text-amber-200 text-xs font-semibold transition-colors">
-          ← Back
+          <ArrowLeftOutlined /> Back
         </button>
         {/* Status pill — fullscreen has no status bar, surface the basics */}
         <div className="absolute top-4 right-4 z-10 flex items-center gap-2 text-[11px]">
-          <span className={`px-2 py-0.5 rounded-full border font-mono ${
+          <span className={`px-2 py-0.5 rounded-lg border font-mono ${
             status.kind === 'error' ? 'border-rose-400/40 bg-rose-500/10 text-rose-300'
             : (thinking || status.kind === 'thinking' || status.kind === 'analyzing') ? 'border-cyan-400/40 bg-cyan-500/10 text-cyan-300'
             : 'border-gray-700 bg-gray-900/60 text-gray-400'
@@ -623,7 +629,7 @@ export default function ChessPage() {
                 <p className="text-[10px] uppercase tracking-wider text-gray-500">Saved games</p>
                 <p className="text-xs text-gray-200 mt-0.5">Browse your library</p>
               </div>
-              <span className="text-base">📚</span>
+              <BookOutlined className="text-base text-amber-300" />
             </button>
           </div>
         </div>
@@ -683,19 +689,19 @@ function Header({ engineHealth, onFullscreen }) {
         <div className="flex items-center gap-2 text-[10px]">
           <button onClick={onFullscreen}
             title="Fullscreen board (ESC to exit)"
-            className="px-2 py-1 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 font-semibold">
-            ⛶ Fullscreen
+            className="px-2 py-1 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 font-semibold inline-flex items-center gap-1">
+            <FullscreenOutlined /> Fullscreen
           </button>
           {engineHealth?.status === 'ok' ? (
-            <span className="px-2 py-0.5 rounded-full border border-emerald-400/40 bg-emerald-500/10 text-emerald-300">
+            <span className="px-2 py-0.5 rounded-lg border border-emerald-400/40 bg-emerald-500/10 text-emerald-300">
               Stockfish online
             </span>
           ) : engineHealth?.status === 'missing' ? (
-            <span className="px-2 py-0.5 rounded-full border border-rose-400/40 bg-rose-500/10 text-rose-300">
+            <span className="px-2 py-0.5 rounded-lg border border-rose-400/40 bg-rose-500/10 text-rose-300">
               Stockfish not installed
             </span>
           ) : (
-            <span className="px-2 py-0.5 rounded-full border border-gray-700 bg-gray-900/60 text-gray-400">
+            <span className="px-2 py-0.5 rounded-lg border border-gray-700 bg-gray-900/60 text-gray-400">
               Engine status…
             </span>
           )}
@@ -714,16 +720,17 @@ function ModeBar({ engineMode, setEngineMode, playerColor, setPlayerColor, engin
   return (
     <div className="luxe-card p-3 flex items-center gap-2 flex-wrap">
       {[
-        { id: 'play',            label: '🎯 Play vs engine' },
-        { id: 'analyze',         label: '🔍 Analyze' },
-        { id: 'human-vs-human',  label: '👥 Pass and play' },
+        { id: 'play',            label: 'Play vs engine', icon: <AimOutlined /> },
+        { id: 'analyze',         label: 'Analyze',        icon: <SearchOutlined /> },
+        { id: 'human-vs-human',  label: 'Pass and play',  icon: <TeamOutlined /> },
       ].map(m => (
         <button key={m.id} onClick={() => setEngineMode(m.id)}
-          className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ${
+          className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors inline-flex items-center gap-1.5 ${
             engineMode === m.id
               ? 'border-amber-400/60 bg-amber-500/15 text-amber-200'
               : 'border-gray-800 bg-gray-900/40 text-gray-400 hover:text-gray-200'
           }`}>
+          {m.icon}
           {m.label}
         </button>
       ))}
@@ -734,9 +741,9 @@ function ModeBar({ engineMode, setEngineMode, playerColor, setPlayerColor, engin
           <div className="flex items-center gap-1">
             {[{ id: 'white', label: 'White' }, { id: 'black', label: 'Black' }].map(c => (
               <button key={c.id} onClick={() => setPlayerColor(c.id)}
-                className={`text-[10px] font-semibold px-2 py-1 rounded-full border ${
+                className={`text-[10px] font-semibold px-2 py-1 rounded-lg border ${
                   playerColor === c.id
-                    ? 'border-fuchsia-400/60 bg-fuchsia-500/15 text-fuchsia-200'
+                    ? 'border-amber-400/60 bg-amber-500/15 text-amber-200'
                     : 'border-gray-800 bg-gray-900/40 text-gray-400'
                 }`}>{c.label}</button>
             ))}
@@ -785,12 +792,12 @@ function StatusBar({ status, thinking, isGameOver, gameOverReason, onUndo, onFli
           40×40 minimum tap target on mobile per Apple HIG / Material. */}
       <div className="flex flex-wrap items-center gap-1.5">
         <button onClick={onUndo}
-          className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 min-h-[40px] sm:min-h-0 rounded-full border border-gray-800 hover:border-gray-600 text-gray-300">
-          ↶ Undo
+          className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 min-h-[40px] sm:min-h-0 rounded-lg border border-gray-800 hover:border-gray-600 text-gray-300 inline-flex items-center gap-1.5">
+          <UndoOutlined /> Undo
         </button>
         <button onClick={onFlip}
-          className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 min-h-[40px] sm:min-h-0 rounded-full border border-gray-800 hover:border-gray-600 text-gray-300">
-          ⇅ Flip
+          className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 min-h-[40px] sm:min-h-0 rounded-lg border border-gray-800 hover:border-gray-600 text-gray-300 inline-flex items-center gap-1.5">
+          <SwapOutlined /> Flip
         </button>
         {/* Eval visibility toggle — off during play / human-vs-human so
             Stockfish's score doesn't give away the answer; user can
@@ -798,29 +805,29 @@ function StatusBar({ status, thinking, isGameOver, gameOverReason, onUndo, onFli
             (analyze=on, play/HvH=off) on mode change. */}
         <button onClick={onToggleEval}
           title={showEval ? 'Hide engine eval' : 'Show engine eval'}
-          className={`text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 min-h-[40px] sm:min-h-0 rounded-full border transition-colors ${
+          className={`text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 min-h-[40px] sm:min-h-0 rounded-lg border transition-colors inline-flex items-center gap-1.5 ${
             showEval
               ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20'
               : 'border-gray-800 hover:border-gray-600 text-gray-400'
           }`}>
-          {showEval ? '👁 Eval' : '🙈 Eval'}
+          {showEval ? <EyeOutlined /> : <EyeInvisibleOutlined />} Eval
         </button>
         <button onClick={onReset}
-          className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 min-h-[40px] sm:min-h-0 rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20">
-          ⟲ New game
+          className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 min-h-[40px] sm:min-h-0 rounded-lg border border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 inline-flex items-center gap-1.5">
+          <ReloadOutlined /> New game
         </button>
         <button onClick={onCopyPgn}
-          className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 min-h-[40px] sm:min-h-0 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20">
-          ⎘ Copy PGN
+          className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 min-h-[40px] sm:min-h-0 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 inline-flex items-center gap-1.5">
+          <CopyOutlined /> Copy PGN
         </button>
         <button onClick={onSave}
-          className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 min-h-[40px] sm:min-h-0 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20">
-          💾 Save game
+          className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 min-h-[40px] sm:min-h-0 rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 inline-flex items-center gap-1.5">
+          <SaveOutlined /> Save game
         </button>
         {onChallenge && (
           <button onClick={onChallenge}
-            className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 min-h-[40px] sm:min-h-0 rounded-full border border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-300 hover:bg-fuchsia-500/20">
-            🎯 Challenge
+            className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 min-h-[40px] sm:min-h-0 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 inline-flex items-center gap-1.5">
+            <SendOutlined /> Challenge
           </button>
         )}
       </div>
@@ -848,12 +855,12 @@ function PromotionPicker({ color, pieceSet, onPick, onCancel }) {
       <div onClick={e => e.stopPropagation()}
         className="luxe-card p-6 max-w-md w-full">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-bold bg-gradient-to-r from-amber-300 to-fuchsia-400 bg-clip-text text-transparent">
+          <h3 className="text-base font-bold text-amber-300">
             Promote pawn
           </h3>
           <button onClick={onCancel}
-            className="text-xs text-gray-500 hover:text-gray-200 px-2 py-1 rounded border border-gray-800 hover:border-gray-600">
-            ✕ Cancel
+            className="text-xs text-gray-500 hover:text-gray-200 px-2 py-1 rounded border border-gray-800 hover:border-gray-600 inline-flex items-center gap-1">
+            <CloseOutlined /> Cancel
           </button>
         </div>
         <p className="text-xs text-gray-400 mb-4">Pick what your pawn becomes.</p>
@@ -861,11 +868,11 @@ function PromotionPicker({ color, pieceSet, onPick, onCancel }) {
           {choices.map(c => (
             <button key={c.piece}
               onClick={() => onPick(c.piece)}
-              className="group aspect-square rounded-xl bg-gray-900/60 border-2 border-gray-800 hover:border-amber-400 hover:bg-amber-500/10 transition-all flex flex-col items-center justify-center p-1">
+              className="group aspect-square rounded-lg bg-gray-900/60 border-2 border-gray-800 hover:border-amber-400 hover:bg-amber-500/10 transition-colors flex flex-col items-center justify-center p-1">
               <img
                 src={`/piece/${pieceSet}/${colorLetter}${c.piece.toUpperCase()}.svg`}
                 alt={c.label}
-                className="w-full h-full max-w-[88px] max-h-[88px] object-contain transition-transform group-hover:scale-110"
+                className="w-full h-full max-w-[88px] max-h-[88px] object-contain"
               />
               <span className="text-[10px] uppercase tracking-wider text-gray-500 group-hover:text-amber-300 mt-1">
                 {c.label}

@@ -15,23 +15,23 @@ const COMPONENTS = {
 }
 
 const META = {
-  pokedex:   { label: 'Pokedex',        color: 'from-red-500 to-orange-500',
+  pokedex:   { label: 'Pokedex',        accent: 'bg-red-500',
     info: 'Browse Pokemon across 3 generations. Click any card to see stats, types, abilities. Search by name or number.' },
-  rickmorty: { label: 'Rick & Morty',    color: 'from-green-500 to-cyan-500',
+  rickmorty: { label: 'Rick & Morty',    accent: 'bg-emerald-500',
     info: 'Browse all 826 characters. Search by name, filter by status (Alive/Dead/Unknown). Click for full details.' },
-  launches:  { label: 'Space Launches',  color: 'from-blue-500 to-indigo-500',
+  launches:  { label: 'Space Launches',  accent: 'bg-blue-500',
     info: 'Upcoming rocket launches worldwide with live countdowns, rocket info, launch providers, pads, and mission details.' },
-  mtg:       { label: 'Magic Cards',     color: 'from-purple-500 to-indigo-500',
+  mtg:       { label: 'Magic Cards',     accent: 'bg-amber-500',
     info: 'Browse Magic: The Gathering cards. Search by name or click Random for surprise cards. Download card images.' },
-  memes:     { label: 'Meme Templates',  color: 'from-yellow-500 to-orange-500',
+  memes:     { label: 'Meme Templates',  accent: 'bg-yellow-500',
     info: 'Browse popular meme templates. Search by name, click to see full size, download the template image.' },
-  food:      { label: 'Food Gallery',    color: 'from-orange-400 to-red-500',
+  food:      { label: 'Food Gallery',    accent: 'bg-orange-500',
     info: 'Random food photos. Pick a category (pizza, burger, pasta, biryani, dessert) or shuffle for random. Download images.' },
-  dogs:      { label: 'Dog Explorer',    color: 'from-amber-400 to-amber-600',
+  dogs:      { label: 'Dog Explorer',    accent: 'bg-amber-500',
     info: 'Random dog photos from 120+ breeds. Search breeds in the dropdown, click Shuffle for new photos. Download images.' },
-  countries: { label: 'World Countries', color: 'from-emerald-500 to-green-500',
+  countries: { label: 'World Countries', accent: 'bg-emerald-500',
     info: '250 countries with flags, capitals, population, languages, currencies. Filter by region, sort by name/population/area.' },
-  quotes:    { label: 'Quote Wall',      color: 'from-indigo-500 to-purple-500',
+  quotes:    { label: 'Quote Wall',      accent: 'bg-cyan-500',
     info: 'Random inspiring quotes in a masonry layout. Click Load More to add more quotes.' },
 }
 
@@ -76,13 +76,13 @@ const ExploreModule = () => {
         </Link>
         <div className="eyebrow-mono mb-3">// Public API module</div>
         <div className="flex items-center gap-3 mb-1 flex-wrap">
-          <div className={`h-1 w-12 rounded-full bg-gradient-to-r ${meta.color}`} />
+          <div className={`h-1 w-12 rounded-lg ${meta.accent}`} />
           <h1 className="font-poppins font-black text-3xl md:text-4xl gradient-text-amber">
             {meta.label}
           </h1>
           <ModuleInfo text={meta.info} />
         </div>
-        <div className="mt-4 h-px bg-gradient-to-r from-amber-900/40 via-red-900/20 to-transparent" />
+        <div className="mt-4 h-px bg-gray-800" />
       </div>
       <div className="max-w-6xl mx-auto px-6 pb-24">
         <Suspense fallback={<PageLoader />}><Component /></Suspense>

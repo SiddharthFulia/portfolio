@@ -23,6 +23,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Chess } from 'chess.js'
 import { Modal } from 'antd'
+import {
+  ReloadOutlined, ArrowLeftOutlined, LinkOutlined, ThunderboltOutlined,
+  FlagOutlined, CopyOutlined, CheckOutlined, CloseOutlined,
+} from '@ant-design/icons'
 import 'chessground/assets/chessground.base.css'
 import 'chessground/assets/chessground.brown.css'
 
@@ -396,12 +400,12 @@ export default function ChessLive() {
           <p className="text-xs text-gray-400">Refresh to try again.</p>
           <div className="flex items-center justify-center gap-2">
             <button onClick={() => { setNotFoundAttempts(0); setGivenUp(false); fetchState() }}
-              className="text-xs font-semibold px-4 py-2 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20">
-              🔄 Try again
+              className="text-xs font-semibold px-4 py-2 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 inline-flex items-center gap-1.5">
+              <ReloadOutlined /> Try again
             </button>
             <button onClick={() => navigate('/chess')}
-              className="text-xs font-semibold px-4 py-2 rounded-full border border-gray-700 bg-gray-900/60 text-gray-300 hover:border-gray-500">
-              ← Back to /chess
+              className="text-xs font-semibold px-4 py-2 rounded-lg border border-gray-700 bg-gray-900/60 text-gray-300 hover:border-gray-500 inline-flex items-center gap-1.5">
+              <ArrowLeftOutlined /> Back to /chess
             </button>
           </div>
         </div>
@@ -416,8 +420,8 @@ export default function ChessLive() {
           <h2 className="text-lg font-bold text-rose-300">Match unavailable</h2>
           <p className="text-xs text-gray-400 font-mono break-all">{error}</p>
           <button onClick={() => navigate('/chess')}
-            className="text-xs font-semibold px-4 py-2 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20">
-            ← Back to /chess
+            className="text-xs font-semibold px-4 py-2 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 inline-flex items-center gap-1.5">
+            <ArrowLeftOutlined /> Back to /chess
           </button>
         </div>
       </div>
@@ -455,9 +459,9 @@ export default function ChessLive() {
 
   const youWonText = (() => {
     if (!isDone || !mySide) return null
-    if (result === '1-0' && mySide === 'white') return '🎉 You won!'
-    if (result === '0-1' && mySide === 'black') return '🎉 You won!'
-    if (result === '1/2-1/2') return '🤝 Drawn'
+    if (result === '1-0' && mySide === 'white') return 'You won!'
+    if (result === '0-1' && mySide === 'black') return 'You won!'
+    if (result === '1/2-1/2') return 'Drawn'
     if (result === '1-0' || result === '0-1') return 'You lost'
     return null
   })()
@@ -482,7 +486,7 @@ export default function ChessLive() {
             </h1>
           </div>
           <div className="flex items-center gap-2 text-[10px]">
-            <span className={`px-2 py-0.5 rounded-full border font-mono ${
+            <span className={`px-2 py-0.5 rounded-lg border font-mono ${
               isDone ? 'border-amber-400/40 bg-amber-500/10 text-amber-300'
               : isActive ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-300'
               : 'border-gray-700 bg-gray-900/60 text-gray-400'
@@ -492,7 +496,7 @@ export default function ChessLive() {
               {isDone && 'Completed'}
               {isAborted && 'Aborted — both players left'}
             </span>
-            <span className="px-2 py-0.5 rounded-full border border-gray-700 bg-gray-900/60 text-gray-400 font-mono">
+            <span className="px-2 py-0.5 rounded-lg border border-gray-700 bg-gray-900/60 text-gray-400 font-mono">
               #{matchId}
             </span>
           </div>
@@ -517,22 +521,22 @@ export default function ChessLive() {
           <div className="luxe-card p-3 flex items-center gap-2 justify-between">
             <span className="text-[11px] text-gray-400">Share this link so a friend can join.</span>
             <button onClick={() => setShareOpen(true)}
-              className="text-xs font-semibold px-4 py-2 rounded-full border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 shrink-0">
-              🔗 Share link
+              className="text-xs font-semibold px-4 py-2 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 shrink-0 inline-flex items-center gap-1.5">
+              <LinkOutlined /> Share link
             </button>
           </div>
         )}
 
         {/* Join CTA — only when waiting and we don't already have a session */}
         {isWaiting && !session && (
-          <div className="luxe-card p-4 flex items-center justify-between gap-3 flex-wrap border border-fuchsia-500/30 bg-fuchsia-500/5">
+          <div className="luxe-card p-4 flex items-center justify-between gap-3 flex-wrap border border-amber-500/30 bg-amber-500/5">
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-fuchsia-200">Someone challenged you to a chess game.</p>
+              <p className="text-sm font-semibold text-amber-200">Someone challenged you to a chess game.</p>
               <p className="text-xs text-gray-400 mt-0.5">You'll be playing as Black.</p>
             </div>
             <button onClick={onJoin} disabled={joining}
-              className="text-sm font-semibold px-5 py-3 rounded-full border border-fuchsia-500/60 bg-fuchsia-500/15 text-fuchsia-200 hover:bg-fuchsia-500/25 disabled:opacity-50 shrink-0">
-              {joining ? 'Joining…' : '⚔️ Join as Black'}
+              className="text-sm font-semibold px-5 py-3 rounded-lg border border-amber-500/60 bg-amber-500/15 text-amber-200 hover:bg-amber-500/25 disabled:opacity-50 shrink-0 inline-flex items-center gap-1.5">
+              <ThunderboltOutlined /> {joining ? 'Joining…' : 'Join as Black'}
             </button>
           </div>
         )}
@@ -581,8 +585,8 @@ export default function ChessLive() {
           <div className="flex items-center gap-1.5 flex-wrap">
             {isActive && session && (
               <button onClick={onResign}
-                className="text-xs font-semibold px-3 py-2 rounded-full border border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20">
-                🏳️ Resign
+                className="text-xs font-semibold px-3 py-2 rounded-lg border border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 inline-flex items-center gap-1.5">
+                <FlagOutlined /> Resign
               </button>
             )}
             {isOver && (
@@ -599,8 +603,8 @@ export default function ChessLive() {
                   </span>
                 )}
                 <button onClick={onNewGame}
-                  className="text-xs font-semibold px-3 py-2 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20">
-                  🔄 New game
+                  className="text-xs font-semibold px-3 py-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 inline-flex items-center gap-1.5">
+                  <ReloadOutlined /> New game
                 </button>
               </>
             )}
@@ -632,8 +636,8 @@ export default function ChessLive() {
             {shareUrl}
           </code>
           <button onClick={onCopyLink}
-            className="w-full text-sm font-semibold px-4 py-3 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20">
-            {copied ? '✓ Copied to clipboard' : '⎘ Copy link'}
+            className="w-full text-sm font-semibold px-4 py-3 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 inline-flex items-center justify-center gap-1.5">
+            {copied ? <><CheckOutlined /> Copied to clipboard</> : <><CopyOutlined /> Copy link</>}
           </button>
         </div>
       </Modal>
@@ -671,12 +675,12 @@ function PromotionPicker({ color, pieceSet, onPick, onCancel }) {
       <div onClick={e => e.stopPropagation()}
         className="luxe-card p-6 max-w-md w-full">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-bold bg-gradient-to-r from-amber-300 to-fuchsia-400 bg-clip-text text-transparent">
+          <h3 className="text-base font-bold text-amber-300">
             Promote pawn
           </h3>
           <button onClick={onCancel}
-            className="text-xs text-gray-500 hover:text-gray-200 px-2 py-1 rounded border border-gray-800 hover:border-gray-600">
-            ✕ Cancel
+            className="text-xs text-gray-500 hover:text-gray-200 px-2 py-1 rounded border border-gray-800 hover:border-gray-600 inline-flex items-center gap-1">
+            <CloseOutlined /> Cancel
           </button>
         </div>
         <p className="text-xs text-gray-400 mb-4">Pick what your pawn becomes.</p>
@@ -684,11 +688,11 @@ function PromotionPicker({ color, pieceSet, onPick, onCancel }) {
           {choices.map(c => (
             <button key={c.piece}
               onClick={() => onPick(c.piece)}
-              className="group aspect-square rounded-xl bg-gray-900/60 border-2 border-gray-800 hover:border-amber-400 hover:bg-amber-500/10 transition-all flex flex-col items-center justify-center p-1">
+              className="group aspect-square rounded-lg bg-gray-900/60 border-2 border-gray-800 hover:border-amber-400 hover:bg-amber-500/10 transition-colors flex flex-col items-center justify-center p-1">
               <img
                 src={`/piece/${pieceSet}/${colorLetter}${c.piece.toUpperCase()}.svg`}
                 alt={c.label}
-                className="w-full h-full max-w-[88px] max-h-[88px] object-contain transition-transform group-hover:scale-110"
+                className="w-full h-full max-w-[88px] max-h-[88px] object-contain"
               />
               <span className="text-[10px] uppercase tracking-wider text-gray-500 group-hover:text-amber-300 mt-1">
                 {c.label}

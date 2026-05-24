@@ -11,19 +11,21 @@ const CATEGORIES = [
   { key: 'data', label: 'Data & Search' },
 ]
 
-/* ── Section definitions ── */
+/* ── Section definitions ──
+ * `accent` is a single Tailwind colour used for the top bar + hover hint.
+ * Flat-professional: no multi-stop gradients on the card chrome. */
 const SECTIONS = [
-  { id: 'apod',       label: 'Picture of the Day',  color: 'from-purple-500 to-pink-500',   desc: 'Daily astronomy image with full context',   api: 'APOD',         cat: 'imagery',  hasDate: true },
-  { id: 'asteroids',  label: 'Asteroid Tracker',     color: 'from-orange-500 to-red-500',    desc: 'Near-Earth objects this week',               api: 'NeoWs',        cat: 'tracking', hasDate: true },
-  { id: 'weather',    label: 'Space Weather',        color: 'from-yellow-500 to-orange-500', desc: 'Solar flares, storms & CMEs',                api: 'DONKI',        cat: 'tracking', hasDate: true },
-  { id: 'earth',      label: 'Earth Events',         color: 'from-green-500 to-emerald-500', desc: 'Wildfires, volcanoes, storms from orbit',    api: 'EONET',        cat: 'tracking', hasDate: false },
-  { id: 'epic',       label: 'EPIC Earth Camera',    color: 'from-blue-500 to-cyan-500',     desc: 'Daily Earth photos from DSCOVR',             api: 'EPIC',         cat: 'imagery',  hasDate: true },
-  { id: 'media',      label: 'Media Library',        color: 'from-indigo-500 to-blue-500',   desc: 'Search millions of space images & videos',   api: 'Images',       cat: 'data',     hasDate: false },
-  { id: 'imagery',    label: 'Earth Imagery',         color: 'from-emerald-500 to-cyan-500',  desc: 'Satellite photos of any location on Earth',  api: 'Landsat',      cat: 'imagery',  hasDate: true },
-  { id: 'mars',       label: 'Mars Rovers',          color: 'from-red-500 to-orange-500',    desc: 'Rover mission info (API retired)',            api: 'Mars',         cat: 'imagery',  hasDate: false, retired: true },
-  { id: 'tech',       label: 'Tech Portal',          color: 'from-cyan-500 to-teal-500',     desc: 'Space agency patents & tech transfer',       api: 'TechTransfer', cat: 'data',     hasDate: false },
-  { id: 'fireballs',  label: 'Fireball Tracker',     color: 'from-amber-500 to-red-600',     desc: 'Atmospheric fireball events worldwide',      api: 'CNEOS',        cat: 'tracking', hasDate: true },
-  { id: 'satellites', label: 'Satellite Tracker',    color: 'from-violet-500 to-purple-500', desc: 'Live ISS position & satellite orbits',       api: 'TLE/ISS',      cat: 'tracking', hasDate: false },
+  { id: 'apod',       label: 'Picture of the Day',  accent: 'bg-amber-500',   desc: 'Daily astronomy image with full context',   api: 'APOD',         cat: 'imagery',  hasDate: true },
+  { id: 'asteroids',  label: 'Asteroid Tracker',     accent: 'bg-orange-500',  desc: 'Near-Earth objects this week',               api: 'NeoWs',        cat: 'tracking', hasDate: true },
+  { id: 'weather',    label: 'Space Weather',        accent: 'bg-yellow-500',  desc: 'Solar flares, storms & CMEs',                api: 'DONKI',        cat: 'tracking', hasDate: true },
+  { id: 'earth',      label: 'Earth Events',         accent: 'bg-emerald-500', desc: 'Wildfires, volcanoes, storms from orbit',    api: 'EONET',        cat: 'tracking', hasDate: false },
+  { id: 'epic',       label: 'EPIC Earth Camera',    accent: 'bg-cyan-500',    desc: 'Daily Earth photos from DSCOVR',             api: 'EPIC',         cat: 'imagery',  hasDate: true },
+  { id: 'media',      label: 'Media Library',        accent: 'bg-blue-500',    desc: 'Search millions of space images & videos',   api: 'Images',       cat: 'data',     hasDate: false },
+  { id: 'imagery',    label: 'Earth Imagery',         accent: 'bg-emerald-500', desc: 'Satellite photos of any location on Earth',  api: 'Landsat',      cat: 'imagery',  hasDate: true },
+  { id: 'mars',       label: 'Mars Rovers',          accent: 'bg-red-500',     desc: 'Rover mission info (API retired)',            api: 'Mars',         cat: 'imagery',  hasDate: false, retired: true },
+  { id: 'tech',       label: 'Tech Portal',          accent: 'bg-cyan-500',    desc: 'Space agency patents & tech transfer',       api: 'TechTransfer', cat: 'data',     hasDate: false },
+  { id: 'fireballs',  label: 'Fireball Tracker',     accent: 'bg-amber-500',   desc: 'Atmospheric fireball events worldwide',      api: 'CNEOS',        cat: 'tracking', hasDate: true },
+  { id: 'satellites', label: 'Satellite Tracker',    accent: 'bg-cyan-500',    desc: 'Live ISS position & satellite orbits',       api: 'TLE/ISS',      cat: 'tracking', hasDate: false },
 ]
 
 const ICONS = {
@@ -310,8 +312,8 @@ const Science = () => {
               >
                 <AnimatedCard effect={effectMap[s.id] || 'default'} className="h-full">
                 <div className="luxe-card luxe-card-hover relative overflow-hidden h-full flex flex-col p-4 sm:p-5">
-                  {/* Top gradient bar */}
-                  <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${s.color} opacity-50 group-hover:opacity-100 transition-opacity`} />
+                  {/* Top accent bar — solid colour, no gradient */}
+                  <div className={`absolute inset-x-0 top-0 h-1 ${s.accent} opacity-60 group-hover:opacity-100 transition-opacity`} />
 
                   <div className="flex items-start gap-3">
                     <div className="text-gray-500 group-hover:text-cyan-300 transition-colors mt-0.5">
@@ -354,7 +356,6 @@ const Science = () => {
         {/* Empty state — when a category has no modules */}
         {filtered.length === 0 && (
           <div className="text-center py-20 luxe-card mt-6 p-8">
-            <div className="text-5xl mb-3" aria-hidden>🛰️</div>
             <p className="text-gray-300 font-semibold mb-1">No feeds in this category yet</p>
             <p className="text-gray-500 text-sm mb-4">Try a different filter or browse all eleven.</p>
             <button

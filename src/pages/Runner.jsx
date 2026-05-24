@@ -12,6 +12,7 @@
 //   HUD / StartMenu / GameOverModal / Leaderboard ─ React UI
 
 import { useEffect, useRef, useState } from 'react'
+import { CaretRightOutlined, RollbackOutlined } from '@ant-design/icons'
 import { GameStateProvider, useGameState } from '../components/runner/v2/hooks/useGameState'
 import useInput from '../components/runner/v2/hooks/useInput'
 import GameCanvas from '../components/runner/v2/GameCanvas'
@@ -110,17 +111,17 @@ function RunnerInner() {
         <div className='absolute inset-0 z-30 bg-black/55 backdrop-blur-sm flex items-center justify-center'>
           <div className='luxe-card p-6 text-center max-w-xs'>
             <p className='text-xs uppercase tracking-[0.3em] text-gray-400 font-mono'>Paused</p>
-            <h2 className='mt-2 text-2xl font-bold bg-gradient-to-r from-amber-300 via-rose-300 to-fuchsia-300 bg-clip-text text-transparent'>
+            <h2 className='mt-2 text-2xl font-bold gradient-text-amber'>
               Catch your breath
             </h2>
             <div className='mt-4 flex items-center gap-2 justify-center'>
               <button onClick={resume}
-                className='text-sm font-bold px-5 py-2.5 rounded-full border border-emerald-500/50 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25 min-h-[44px]'>
-                ▶ Resume
+                className='text-sm font-bold px-5 py-2.5 rounded-lg border border-emerald-500/50 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25 min-h-[44px]'>
+                <CaretRightOutlined /> Resume
               </button>
               <button onClick={() => { reset(); setView('menu') }}
-                className='text-xs font-semibold px-4 py-2.5 rounded-full border border-gray-700 hover:border-gray-500 text-gray-300 min-h-[44px]'>
-                ↩ Menu
+                className='text-xs font-semibold px-4 py-2.5 rounded-lg border border-gray-700 hover:border-gray-500 text-gray-300 min-h-[44px]'>
+                <RollbackOutlined /> Menu
               </button>
             </div>
           </div>

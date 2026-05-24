@@ -17,27 +17,27 @@ const COMPONENTS = {
 }
 
 const META = {
-  apod:       { label: 'Picture of the Day',  api: 'APOD',         color: 'from-purple-500 to-pink-500',  skeleton: 'image',
+  apod:       { label: 'Picture of the Day',  api: 'APOD',         accent: 'bg-amber-500',   skeleton: 'image',
     info: 'A different astronomy image or photo each day, with an explanation by a professional astronomer. Use the date picker to browse past images, click the image to zoom in.' },
-  asteroids:  { label: 'Asteroid Tracker',     api: 'NeoWs',        color: 'from-orange-500 to-red-500',   skeleton: 'dashboard',
+  asteroids:  { label: 'Asteroid Tracker',     api: 'NeoWs',        accent: 'bg-orange-500',  skeleton: 'dashboard',
     info: 'Shows all near-Earth asteroids detected this week. Sort by size, distance, or date. Red badges mark potentially hazardous objects. The orbit animation shows relative positions.' },
-  weather:    { label: 'Space Weather',        api: 'DONKI',        color: 'from-yellow-500 to-orange-500',skeleton: 'dashboard',
+  weather:    { label: 'Space Weather',        api: 'DONKI',        accent: 'bg-yellow-500',  skeleton: 'dashboard',
     info: 'Solar activity from the last 30 days — solar flares, geomagnetic storms, and coronal mass ejections (CMEs). Data loads progressively as each feed arrives. Filter by event type using the tabs.' },
-  earth:      { label: 'Earth Events',         api: 'EONET',        color: 'from-green-500 to-emerald-500',skeleton: 'map',
+  earth:      { label: 'Earth Events',         api: 'EONET',        accent: 'bg-emerald-500', skeleton: 'map',
     info: 'Active natural events tracked from orbit — wildfires, volcanic eruptions, storms, and more. Click markers on the map to see event details. Filter by category using the buttons above the map.' },
-  epic:       { label: 'EPIC Earth Camera',    api: 'EPIC',         color: 'from-blue-500 to-cyan-500',    skeleton: 'gallery',
+  epic:       { label: 'EPIC Earth Camera',    api: 'EPIC',         accent: 'bg-cyan-500',    skeleton: 'gallery',
     info: 'Daily photos of Earth from the DSCOVR satellite at the L1 point, 1.5 million km away. Browse through thumbnails, navigate dates, and use the play button to see Earth rotate.' },
-  media:      { label: 'Media Library',        api: 'Images',       color: 'from-indigo-500 to-blue-500',  skeleton: 'grid',
+  media:      { label: 'Media Library',        api: 'Images',       accent: 'bg-blue-500',    skeleton: 'grid',
     info: 'Search through millions of space images and videos. Try terms like "nebula", "mars", "hubble", "galaxy", or "astronaut". Click any image to see it full-size with metadata.' },
-  mars:       { label: 'Mars Rovers',          api: 'Mars',         color: 'from-red-500 to-orange-500',   skeleton: 'list',
+  mars:       { label: 'Mars Rovers',          api: 'Mars',         accent: 'bg-red-500',     skeleton: 'list',
     info: 'The Mars Rover Photos API has been officially retired. This page shows rover mission info and links to browse Mars images through the Media Library.' },
-  tech:       { label: 'Tech Portal',          api: 'TechTransfer', color: 'from-cyan-500 to-teal-500',    skeleton: 'list',
+  tech:       { label: 'Tech Portal',          api: 'TechTransfer', accent: 'bg-cyan-500',    skeleton: 'list',
     info: 'Search patents and technologies developed by space agencies. Click any result to expand details and find links to the original patent documentation.' },
-  imagery:    { label: 'Earth Imagery',         api: 'Landsat',      color: 'from-emerald-500 to-cyan-500', skeleton: 'image',
+  imagery:    { label: 'Earth Imagery',         api: 'Landsat',      accent: 'bg-emerald-500', skeleton: 'image',
     info: 'View satellite imagery of any location on Earth from Landsat 8. Enter coordinates or pick a preset city, set a date, and adjust zoom level. Not all dates have coverage for every location.' },
-  fireballs:  { label: 'Fireball Tracker',     api: 'CNEOS',        color: 'from-amber-500 to-red-600',    skeleton: 'map',
+  fireballs:  { label: 'Fireball Tracker',     api: 'CNEOS',        accent: 'bg-amber-500',   skeleton: 'map',
     info: 'Bright meteor events (fireballs) detected in Earth\'s atmosphere. Markers on the map show impact locations sized by energy. Use the date range filter and sort by energy, velocity, or date.' },
-  satellites: { label: 'Satellite Tracker',    api: 'TLE/ISS',      color: 'from-violet-500 to-purple-500',skeleton: 'dashboard',
+  satellites: { label: 'Satellite Tracker',    api: 'TLE/ISS',      accent: 'bg-cyan-500',    skeleton: 'dashboard',
     info: 'Live ISS position updated every 5 seconds on a rotating globe. See who\'s currently in space. Search for any satellite by name to view its orbital elements (TLE data).' },
 }
 
@@ -146,14 +146,14 @@ const ScienceModule = () => {
 
         <div className="eyebrow-mono mb-3">// {meta.api} feed · live data</div>
         <div className="flex items-center gap-3 mb-1 flex-wrap">
-          <div className={`h-1 w-12 rounded-full bg-gradient-to-r ${meta.color}`} />
+          <div className={`h-1 w-12 rounded-lg ${meta.accent}`} />
           <h1 className="font-poppins font-black text-3xl md:text-4xl gradient-text-cyan">
             {meta.label}
           </h1>
           <span className="px-2 py-0.5 bg-gray-800 text-gray-500 text-xs rounded font-mono">{meta.api}</span>
           <ModuleInfo text={meta.info} />
         </div>
-        <div className="mt-4 h-px bg-gradient-to-r from-cyan-900/40 via-purple-900/20 to-transparent" />
+        <div className="mt-4 h-px bg-gray-800" />
       </div>
 
       <div className="max-w-6xl mx-auto px-6 pb-24">

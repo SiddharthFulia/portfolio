@@ -30,9 +30,9 @@ export default function ChessViz() {
         {/* Hero */}
         <div className='mb-8 sm:mb-10'>
           <div className='flex items-center gap-3 sm:gap-4 mb-3'>
-            <span className='text-3xl sm:text-4xl'>♟</span>
+            <span className='text-3xl sm:text-4xl text-amber-300'>♟</span>
             <div>
-              <h1 className='font-poppins font-black text-2xl sm:text-4xl md:text-5xl bg-gradient-to-r from-amber-400 via-orange-400 to-red-500 bg-clip-text text-transparent'>
+              <h1 className='font-poppins font-black text-2xl sm:text-4xl md:text-5xl gradient-text-amber'>
                 Chess Engine
               </h1>
               <p className='text-gray-500 text-xs sm:text-sm mt-1'>Live visualization of the engine running in your browser</p>
@@ -70,7 +70,7 @@ export default function ChessViz() {
                 i
               </div>
               <div className='absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-white text-gray-900 text-xs
-                              rounded-lg shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity
+                              rounded-lg shadow-sm opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity
                               duration-200 whitespace-nowrap z-10 font-sans'>
                 Private repo — proprietary algorithms & logic.
                 <br />Request access via GitHub.
@@ -79,46 +79,39 @@ export default function ChessViz() {
             </div>
           </div>
 
-          <div className='mt-6 h-px bg-gradient-to-r from-amber-900/60 to-transparent' />
+          <div className='mt-6 h-px bg-gray-800' />
         </div>
 
         {/* How it works panel */}
         <div className='mb-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
           {[
             {
-              icon: '🧠',
               title: 'Alpha-Beta Pruning',
               desc: 'Minimax search with alpha-beta cutoffs eliminates branches that cannot influence the final decision, searching deeper in less time.',
             },
             {
-              icon: '📊',
               title: 'Piece-Square Tables',
               desc: 'Material counting + 6 positional tables (one per piece type) score each position. Knights love the center, rooks love open files, kings stay safe.',
             },
             {
-              icon: '🔍',
               title: 'Iterative Deepening',
               desc: 'Searches depth 1, then 2, then 3... each deeper iteration reuses the best move from the last for superior move ordering.',
             },
             {
-              icon: '⚡',
               title: 'Quiescence Search',
               desc: 'At leaf nodes, continues searching all captures and promotions to resolve tactical sequences. Prevents the horizon effect — no more trading a rook for a bishop.',
             },
             {
-              icon: '🎯',
               title: 'MVV-LVA Ordering',
               desc: 'Most Valuable Victim — Least Valuable Attacker. Captures are searched best-first (QxP before PxP) for maximum pruning efficiency.',
             },
             {
-              icon: '✂️',
               title: 'Delta Pruning',
               desc: 'In quiescence, skips captures that cannot raise alpha even if the piece is won for free. Reduces node count by 30-50% with zero accuracy loss.',
             },
           ].map(item => (
-            <div key={item.title} className='bg-gray-900 border border-gray-800 rounded-xl p-4 hover:border-gray-700 transition-colors'>
-              <span className='text-2xl'>{item.icon}</span>
-              <h3 className='text-white font-bold text-sm mt-2'>{item.title}</h3>
+            <div key={item.title} className='bg-gray-900 border border-gray-800 rounded-lg p-4 hover:border-gray-700 transition-colors'>
+              <h3 className='text-white font-bold text-sm'>{item.title}</h3>
               <p className='text-gray-500 text-xs mt-1 leading-relaxed'>{item.desc}</p>
             </div>
           ))}
@@ -131,8 +124,8 @@ export default function ChessViz() {
             <span className='px-1.5 sm:px-2 py-0.5 bg-gray-800 text-amber-400 text-[10px] sm:text-xs rounded font-mono'>Alpha-Beta</span>
             <span className='px-1.5 sm:px-2 py-0.5 bg-gray-800 text-cyan-400 text-[10px] sm:text-xs rounded font-mono'>Iterative Deepening</span>
             <span className='px-1.5 sm:px-2 py-0.5 bg-gray-800 text-green-400 text-[10px] sm:text-xs rounded font-mono'>Quiescence Search</span>
-            <span className='hidden sm:inline px-2 py-0.5 bg-gray-800 text-purple-400 text-xs rounded font-mono'>MVV-LVA</span>
-            <span className='hidden sm:inline px-2 py-0.5 bg-gray-800 text-pink-400 text-xs rounded font-mono'>Delta Pruning</span>
+            <span className='hidden sm:inline px-2 py-0.5 bg-gray-800 text-cyan-400 text-xs rounded font-mono'>MVV-LVA</span>
+            <span className='hidden sm:inline px-2 py-0.5 bg-gray-800 text-amber-400 text-xs rounded font-mono'>Delta Pruning</span>
           </div>
           <div className='p-4'>
             <Suspense fallback={<Loader />}>

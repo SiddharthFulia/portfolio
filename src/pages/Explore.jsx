@@ -3,15 +3,15 @@ import { Link } from 'react-router-dom'
 import AnimatedCard from '../components/explore/AnimatedCard'
 
 const MODULES = [
-  { id: 'pokedex',   label: 'Pokedex',           color: 'from-red-500 to-orange-500',    desc: 'Browse 386 Pokemon with stats, types, abilities' },
-  { id: 'rickmorty', label: 'Rick & Morty',       color: 'from-green-500 to-cyan-500',    desc: 'Character browser with search, filters, episodes' },
-  { id: 'launches',  label: 'Space Launches',     color: 'from-blue-500 to-indigo-500',   desc: 'Upcoming rocket launches with live countdowns' },
-  { id: 'mtg',       label: 'Magic Cards',        color: 'from-purple-500 to-indigo-500', desc: 'MTG card browser — search, random, card details' },
-  { id: 'memes',     label: 'Meme Templates',     color: 'from-yellow-500 to-orange-500', desc: 'Browse & download popular meme templates' },
-  { id: 'food',      label: 'Food Gallery',       color: 'from-orange-400 to-red-500',    desc: 'Random food photos by category — pizza, burger, dessert' },
-  { id: 'dogs',      label: 'Dog Explorer',       color: 'from-amber-400 to-amber-600',   desc: 'Random dog photos — filter by 120+ breeds' },
-  { id: 'countries', label: 'World Countries',    color: 'from-emerald-500 to-green-500', desc: '250 countries with flags, population, languages' },
-  { id: 'quotes',    label: 'Quote Wall',         color: 'from-indigo-500 to-purple-500', desc: 'Inspiring quotes in a masonry layout' },
+  { id: 'pokedex',   label: 'Pokedex',           accent: 'bg-red-500',     desc: 'Browse 386 Pokemon with stats, types, abilities' },
+  { id: 'rickmorty', label: 'Rick & Morty',       accent: 'bg-emerald-500', desc: 'Character browser with search, filters, episodes' },
+  { id: 'launches',  label: 'Space Launches',     accent: 'bg-blue-500',    desc: 'Upcoming rocket launches with live countdowns' },
+  { id: 'mtg',       label: 'Magic Cards',        accent: 'bg-amber-500',   desc: 'MTG card browser — search, random, card details' },
+  { id: 'memes',     label: 'Meme Templates',     accent: 'bg-yellow-500',  desc: 'Browse & download popular meme templates' },
+  { id: 'food',      label: 'Food Gallery',       accent: 'bg-orange-500',  desc: 'Random food photos by category — pizza, burger, dessert' },
+  { id: 'dogs',      label: 'Dog Explorer',       accent: 'bg-amber-500',   desc: 'Random dog photos — filter by 120+ breeds' },
+  { id: 'countries', label: 'World Countries',    accent: 'bg-emerald-500', desc: '250 countries with flags, population, languages' },
+  { id: 'quotes',    label: 'Quote Wall',         accent: 'bg-cyan-500',    desc: 'Inspiring quotes in a masonry layout' },
 ]
 
 const ICONS = {
@@ -69,7 +69,7 @@ const Explore = () => (
               className="group relative block h-full">
               <AnimatedCard effect={effectMap[m.id] || 'default'} className="h-full">
               <div className="luxe-card luxe-card-hover relative overflow-hidden h-full p-4 sm:p-5">
-                <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${m.color} opacity-50 group-hover:opacity-100 transition-opacity`} />
+                <div className={`absolute inset-x-0 top-0 h-1 ${m.accent} opacity-60 group-hover:opacity-100 transition-opacity`} />
                 <div className="flex items-start gap-3">
                   <div className="text-gray-500 group-hover:text-amber-300 transition-colors mt-0.5">{ICONS[m.id]}</div>
                   <div className="flex-1">
