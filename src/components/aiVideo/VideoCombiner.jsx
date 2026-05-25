@@ -27,6 +27,7 @@ import {
   combineCreate, combineList, combineDelete, combineFileUrl,
   listVideos,
 } from '../../api/ai'
+import useQueryState from '../../hooks/useQueryState'
 
 const POLL_MS = 1500
 const TRACKED_KEY = 'sid-combine-tracked'
@@ -435,10 +436,13 @@ function BuildTab({
 function LibraryTab({ onDelete, refreshKey }) {
   const [items, setItems]       = useState([])
   const [total, setTotal]       = useState(0)
-  const [page, setPage]         = useState(1)
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
-  const [visibility, setVisibility] = useState('public')   // 'public' | 'vault'
-  const [status, setStatus]     = useState('')             // '' | 'queued' | 'processing' | 'completed' | 'failed'
+  // Pagination + filters mirrored to URL so refresh keeps the user on
+  // page 3 of completed combines (etc.). `cl` (combine library) prefix
+  // avoids collisions with parent useQueryState keys like AIVideo's tab.
+  const [page, setPage]         = useQueryState('clPage',     1,                  { parse: Number })
+  const [pageSize, setPageSize] = useQueryState('clSize',     DEFAULT_PAGE_SIZE,  { parse: Number })
+  const [visibility, setVisibility] = useQueryState('clVis',  'public',           { allowed: ['public', 'vault'] })
+  const [status, setStatus]     = useQueryState('clStatus',   '',                 { allowed: ['', 'queued', 'processing', 'completed', 'failed'] })
   const [loading, setLoading]   = useState(false)
 
   const load = useCallback(async () => {
@@ -537,7 +541,7 @@ function LibraryTab({ onDelete, refreshKey }) {
 // (tracked jobs + the polling history of those tracked jobs).
 // ─────────────────────────────────────────────────────────────────────
 export default function VideoCombiner() {
-  const [tab, setTab] = useState('build')
+  const [tab, setTab] = useQueryState('cTab', 'build', { allowed: ['build', 'library'] })
   const [trackedIds, setTrackedIds] = useState(loadTracked)
   const [history, setHistory] = useState([])
   const [logsByJob, setLogsByJob] = useState({})

@@ -9,6 +9,7 @@ import PromptToThree from '../components/luxe/PromptToThree'
 import PromptToMesh from '../components/luxe/PromptToMesh'
 import MeshLibrary from '../components/luxe/MeshLibrary'
 import MeshVisualize from '../components/luxe/MeshVisualize'
+import useQueryState from '../hooks/useQueryState'
 
 // /3d — five tabs:
 //   1) Generate          — Groq DSL → live Three.js
@@ -27,7 +28,12 @@ const SHOWCASE_SCENE_URL =
   'https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode'
 
 export default function Dragon3D() {
-  const [tab, setTab] = useState('generate')
+  // Tab mirrored to URL so refresh / share keeps the user on the same
+  // pane (Studio Pro / Library / Visualize / Showcase). Default
+  // 'generate' is omitted from the URL.
+  const [tab, setTab] = useQueryState('tab', 'generate', {
+    allowed: ['generate', '5090', 'library', 'visualize', 'showcase'],
+  })
   // When the user clicks "Open in viewer" on a Library row, we set this
   // and switch to Studio Pro so the existing PromptToMesh viewer renders
   // the historical GLB. PromptToMesh reads it via a `presetGlbUrl` prop.

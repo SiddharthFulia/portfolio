@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Modal, Pagination, InputNumber, message as antMessage } from 'antd'
 import { DeleteOutlined, CheckOutlined, AppstoreOutlined, ReloadOutlined, CheckSquareOutlined } from '@ant-design/icons'
+import useQueryState from '../hooks/useQueryState'
 
 const PAGE_SIZE_OPTIONS = ['10', '20', '30', '50', '100']
 const DEFAULT_PAGE_SIZE = 24
@@ -65,9 +66,12 @@ export default function StudioLibrary({
   statuses = ['completed', 'processing', 'queued', 'failed', 'all'],
   bulkAccent = 'cyan',
 }) {
-  const [filter, setFilter] = useState('completed')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+  // Filter + page + size mirrored to URL so refresh keeps the user on
+  // page 3 of failed lipsync jobs (or whatever they were looking at).
+  // `sl` (studio library) prefix avoids collisions with parent state.
+  const [filter, setFilter]     = useQueryState('slFilter', 'completed')
+  const [page, setPage]         = useQueryState('slPage',   1, { parse: Number })
+  const [pageSize, setPageSize] = useQueryState('slSize',   DEFAULT_PAGE_SIZE, { parse: Number })
   const [data, setData] = useState({ items: [], total: 0, pages: 1 })
   const [loading, setLoading] = useState(true)
   const [selectMode, setSelectMode] = useState(false)

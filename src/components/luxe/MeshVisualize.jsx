@@ -24,6 +24,7 @@ import { STLLoader }    from 'three/examples/jsm/loaders/STLLoader.js'
 import { PLYLoader }    from 'three/examples/jsm/loaders/PLYLoader.js'
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
 import MeshViewerCanvas from './MeshViewerCanvas'
+import useQueryState from '../../hooks/useQueryState'
 
 const ACCEPTED = '.glb,.gltf,.obj,.stl,.ply'
 const SUPPORTED_HINT = 'GLB · GLTF · OBJ · STL · PLY'
@@ -87,9 +88,18 @@ export default function MeshVisualize() {
   // Render-side state — kept lean for the viewer. The generator tab has
   // the full kit (materials, environments, decimation); here we expose
   // just the essentials so the page stays focused on "look at my mesh".
-  const [materialMode, setMaterialMode] = useState('original')
-  const [envPreset, setEnvPreset]       = useState('city')
-  const [autoRotate, setAutoRotate]     = useState(true)
+  // Render-side knobs mirrored to URL so refresh keeps the same material
+  // + environment + autorotate combo. `viz` prefix avoids collisions
+  // with the same-named keys on other tabs.
+  const [materialMode, setMaterialMode] = useQueryState('vizMat', 'original', {
+    allowed: ['original', 'matte', 'metal', 'glass', 'wireframe', 'normals'],
+  })
+  const [envPreset, setEnvPreset]       = useQueryState('vizEnv', 'city', {
+    allowed: ['city', 'studio', 'sunset', 'night', 'forest', 'none'],
+  })
+  const [autoRotate, setAutoRotate]     = useQueryState('vizSpin', true, {
+    parse: (s) => s === '1', serialize: (v) => v ? '1' : '0',
+  })
   const viewerRef = useRef(null)
 
   const handleFile = async (file) => {

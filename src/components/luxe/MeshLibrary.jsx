@@ -18,6 +18,7 @@ import {
 } from '@ant-design/icons'
 import { listMeshJobs, deleteMeshJob } from '../../api/ai'
 import notify from '../../utils/notify'
+import useQueryState from '../../hooks/useQueryState'
 
 const PAGE_SIZE_OPTIONS = ['10', '20', '30', '50', '100']
 const DEFAULT_PAGE_SIZE = 20
@@ -182,9 +183,15 @@ function MeshCard({ row, onView, onDelete }) {
 export default function MeshLibrary({ onPickRow, refreshKey = 0 }) {
   const [items, setItems]       = useState([])
   const [total, setTotal]       = useState(0)
-  const [page, setPage]         = useState(1)
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
-  const [statusFilter, setStatusFilter] = useState('all')
+  // Pagination + status filter mirrored to URL so refresh keeps the
+  // user on the same page of the library (e.g. "page 3 of failed jobs").
+  // Prefixed keys (libPage / libPageSize / libStatus) avoid collisions
+  // with parent state on the same route (Dragon3D's `tab`, etc.).
+  const [page, setPage]         = useQueryState('libPage',     1, { parse: Number })
+  const [pageSize, setPageSize] = useQueryState('libPageSize', DEFAULT_PAGE_SIZE, { parse: Number })
+  const [statusFilter, setStatusFilter] = useQueryState('libStatus', 'all', {
+    allowed: ['all', 'queued', 'processing', 'completed', 'failed'],
+  })
   const [loading, setLoading]   = useState(false)
   const pollTimerRef = useRef(null)
 
