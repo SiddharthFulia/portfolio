@@ -161,16 +161,20 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
   const projectAspect     = project?.aspectRatio     || '16:9'
   const projectResolution = project?.resolution      || '720p'
 
-  // Hydrate per-shot state from `initialRender.shotJobIds` if present:
-  // every populated entry means that shot was at least kicked off, so
-  // we map it to a status='completed' row with the jobId. The chain
-  // skips already-completed shots on Resume.
+  // Hydrate per-shot state from `initialRender.shotJobIds` if present.
+  // Every populated entry means the shot was at least kicked off — but
+  // it might still be processing / failed / completed. We mark every
+  // populated jobId as 'processing' optimistically; an effect below
+  // then fetches /api/ai-video/status/:jobId for each and patches in
+  // the real status + videoUrl. Without that fetch the user would see
+  // "all shots completed" on refresh even when shots 2/3/4 were still
+  // running on the worker.
   const initialShots = () => {
     const base = shotPrompts.map(initialShotState)
     if (initialRender?.shotJobIds) {
       initialRender.shotJobIds.forEach((jobId, idx) => {
         if (jobId && base[idx]) {
-          base[idx] = { ...base[idx], jobId, videoId: jobId, status: 'completed', progressPercent: 100 }
+          base[idx] = { ...base[idx], jobId, videoId: jobId, status: 'processing' }
         }
       })
     }
@@ -203,6 +207,46 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
     if (!renderId) return
     patchCinemaRender(renderId, patch).catch(() => {})
   }
+
+  // Hydrate per-shot REAL status + videoUrl from the BE for each
+  // populated jobId. The render row only stores jobIds, not status or
+  // videoUrl, so without this the cards on refresh would show:
+  //   - all shots as 'processing' even when several are completed
+  //   - no inline <video> preview because shotRow.videoUrl is missing
+  // Fetch /api/ai-video/status/:jobId in parallel for every shot that
+  // has a jobId, then patch each card. Re-runs every time the page
+  // poll refreshes the render row (so a shot that finishes mid-view
+  // populates its videoUrl + flips to 'completed' on the next tick).
+  useEffect(() => {
+    const jobIdsToHydrate = (initialRender?.shotJobIds || [])
+      .map((jobId, idx) => ({ jobId, idx }))
+      .filter(entry => entry.jobId)
+    if (jobIdsToHydrate.length === 0) return
+    let cancelled = false
+    Promise.all(jobIdsToHydrate.map(async ({ jobId, idx }) => {
+      const { data } = await getJobStatus(jobId)
+      return { idx, jobId, data }
+    })).then(results => {
+      if (cancelled) return
+      setShots(previousShots => previousShots.map((shotRow, rowIndex) => {
+        const result = results.find(r => r.idx === rowIndex)
+        if (!result?.data) return shotRow
+        const job = result.data
+        return {
+          ...shotRow,
+          jobId: result.jobId,
+          videoId: job.videoId || result.jobId,
+          status:  job.status   || shotRow.status,
+          videoUrl: job.videoUrl || shotRow.videoUrl || null,
+          progressPercent: typeof job.progress === 'number' ? job.progress : shotRow.progressPercent,
+          error: job.error || shotRow.error,
+        }
+      }))
+    })
+    return () => { cancelled = true }
+    // Re-fetch whenever the render row's shotJobIds reference changes
+    // (new shot kicked off / new tick from CinemaRenderPage's poll).
+  }, [initialRender?.shotJobIds?.join(',') || ''])
 
   // Re-init shots whenever the project changes (new plan).
   useEffect(() => {

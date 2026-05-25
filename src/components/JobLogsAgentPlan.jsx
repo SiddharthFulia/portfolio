@@ -215,14 +215,17 @@ export default function JobLogsAgentPlan({
     ]
   }, [logs, status])
 
-  // Expand the active group by default — whichever has logs most recently.
-  const defaultExpanded = useMemo(() => {
-    const last = tasks.find((t) => t.status === 'in-progress' || t.status === 'failed')
-    if (last) return [last.id]
-    // No active → expand the last completed (or fallback to setup)
-    const completed = [...tasks].reverse().find((t) => t.status === 'completed')
-    return [completed?.id || 'setup']
-  }, [tasks])
+  // Expand ALL three groups by default. The earlier "only-active-group"
+  // behaviour was broken on refresh — `defaultExpanded` is read by
+  // AgentPlan ONCE at first mount (before logs have loaded) and never
+  // re-syncs when later groups get logs. So after a refresh on a
+  // completed job, the user would see Setup expanded but Generate +
+  // Post-process collapsed even though those buckets had plenty of
+  // lines. The outer Cinema accordion already gates whether to render
+  // this tree at all, so having all three inner groups visible by
+  // default is the right tradeoff — user can collapse manually if they
+  // want a denser view.
+  const defaultExpanded = useMemo(() => ['setup', 'generate', 'post'], [])
 
   return (
     <div className="rounded-xl border border-gray-800 bg-black/40 overflow-hidden">
