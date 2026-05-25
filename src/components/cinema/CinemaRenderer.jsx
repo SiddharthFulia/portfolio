@@ -302,21 +302,85 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
     ))
   }
 
-  // startRender — kick off the chain. On the standalone render page
-  // (renderId set) we skip the confirm modal — the user already
-  // confirmed on the previous page. On the planner page (no renderId)
-  // this function isn't called anyway; the planner has its own button
-  // that creates the render row + navigates.
+  // startRender — BE-driven. We only need to submit SHOT 1 here. The
+  // BE's cinemaChain orchestrator (services/aiVideo/cinemaChain.js)
+  // hooks into the worker's job-complete callback and handles every
+  // subsequent step server-side:
+  //   • extract last frame of completed shot via ffmpeg
+  //   • upload frame to Cloudinary
+  //   • queue next shot with imageUrl set
+  //   • after the last shot, kick off the combine
+  //
+  // Closing the tab / refreshing / losing the network mid-render is
+  // now safe — the chain continues regardless. The FE just polls the
+  // render row to display the current state.
   async function startRender({ resume = false } = {}) {
     if (!shotPrompts.length) return
     if (phase === 'rendering' || phase === 'extracting' || phase === 'uploading' || phase === 'combining') {
       antMessage.warning('Already running — Cancel first if you want to restart')
       return
     }
-    const startFromShotIndex = resume ? (currentShotIndex || 0) : 0
+
+    // Resume path: hit the BE /resume endpoint which advances the
+    // existing render from currentShotIndex without re-running any
+    // already-completed shots. Useful after a failure.
+    if (resume && renderId) {
+      const { error: resumeError } = await patchCinemaRender(renderId, { status: 'rendering', phase: 'rendering', error: null })
+      // Then ask the BE to advance from the last-completed shot.
+      // (The orchestrator does the right thing — if the last shot is
+      // already done it triggers combine; if a middle shot is done it
+      // extracts + queues the next.)
+      try {
+        const base = import.meta.env.VITE_BE_URL || ''
+        await fetch(`${base}/api/cinema/render/${renderId}/resume`, { method: 'POST' })
+      } catch (e) { /* polling will catch the next state change */ }
+      if (resumeError) antMessage.error(resumeError)
+      return
+    }
+
+    const doSubmitShot0 = async () => {
+      setPhase('rendering')
+      persist({ status: 'rendering', phase: 'rendering', error: null, currentShotIndex: 0 })
+      patchShot(0, { status: 'queued', startedAtMs: Date.now() })
+
+      // Determine engine + mode from the render row (set when the
+      // planner created the render). Defaults to optimized/balanced
+      // for back-compat with old rows.
+      const chainProvider = initialRender?.provider     || 'optimized'
+      const chainMode     = initialRender?.optimizedMode || 'balanced'
+
+      const { data, error: submitError } = await generateVideo(
+        shotPrompts[0],
+        {
+          provider:    chainProvider,
+          mode:        chainMode,
+          duration:    projectDuration,
+          aspectRatio: projectAspect,
+          resolution:  projectResolution,
+          imageUrl:    '',                    // shot 1 is text-to-video
+          withMusic:   false,
+          generateCaption: false,
+          silentWake:  true,
+        },
+      )
+      if (submitError || !data?.jobId) {
+        const msg = submitError || 'Failed to queue shot 1'
+        patchShot(0, { status: 'failed', error: msg })
+        setPhase('failed')
+        persist({ status: 'failed', phase: 'failed', error: msg })
+        antMessage.error(msg)
+        return
+      }
+      patchShot(0, { jobId: data.jobId, status: 'processing' })
+      const nextJobIds = [...shots.map(s => s.videoId || s.jobId)]
+      nextJobIds[0] = data.jobId
+      persist({ shotJobIds: nextJobIds })
+      antMessage.success('Shot 1 queued — BE chain takes over from here')
+    }
+
     if (renderId) {
       // Standalone page — start immediately, no second confirm.
-      runPipeline({ startFromShotIndex })
+      doSubmitShot0()
       return
     }
     Modal.confirm({
@@ -324,13 +388,13 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
       content: (
         <div className="text-sm space-y-2">
           <p>
-            This will generate <span className="font-semibold text-amber-300">shot 1</span> from text,
-            then use its <span className="font-semibold text-cyan-300">last frame</span> as the starting frame for
-            shot 2, and so on through shot {shotPrompts.length}.
+            This kicks off <span className="font-semibold text-amber-300">shot 1</span>. The BE then
+            extracts the last frame of each completed shot, uploads it, and queues the next shot
+            automatically — closing the tab is safe.
           </p>
           <p className="text-fg-muted text-xs">
             Each shot takes ~60–90s. Total wall time ≈ {Math.ceil(shotPrompts.length * 75 / 60)}m.
-            Finally the {shotPrompts.length} clips are stitched into one mp4.
+            Final ffmpeg stitch happens server-side after the last shot.
           </p>
         </div>
       ),
@@ -338,7 +402,7 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
       cancelText: 'Back',
       autoFocusButton: 'ok',
       centered: true,
-      onOk: () => runPipeline({ startFromShotIndex }),
+      onOk: () => doSubmitShot0(),
     })
   }
 
