@@ -2,13 +2,13 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { Modal, message as antMessage, InputNumber, Select, Tabs, Segmented } from 'antd'
 import { LockOutlined, ReloadOutlined, DatabaseOutlined, CloudServerOutlined, ApiOutlined, ClusterOutlined, DashboardOutlined, BarChartOutlined } from '@ant-design/icons'
 import {
-  ResponsiveContainer, LineChart, Line, AreaChart, Area,
+  ResponsiveContainer, LineChart, Line, AreaChart, Area, BarChart, Bar, Cell,
   XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from 'recharts'
 import VaultGate from '../components/VaultGate'
 import {
   adminServerStats, adminDbStats, adminDiskStats, adminQueueStats, adminWorkers, adminPurgeQueue,
-  adminActivity,
+  adminActivity, adminMeshStats,
 } from '../api/ai'
 import useQueryState from '../hooks/useQueryState'
 
@@ -311,6 +311,7 @@ function VisualizeTab({ pollMs }) {
     allowed: [7, 14, 30],
   })
   const [activity, setActivity] = useState(null)
+  const [meshStats, setMeshStats] = useState(null)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState(null)
   const timerRef = useRef(null)
@@ -318,17 +319,22 @@ function VisualizeTab({ pollMs }) {
 
   const fetchActivity = async (n) => {
     // Same overlap-guard as Overview — the activity endpoint runs N table
-    // group-by queries and can take a few seconds on Oracle ARM.
+    // group-by queries and can take a few seconds on Oracle ARM. Mesh
+    // stats fire in parallel — cheap aggregate query, never blocks.
     if (inFlightRef.current) return
     inFlightRef.current = true
     try {
-      const { data, error: e } = await adminActivity(n)
-      if (e) {
-        setErr(e)
+      const [activityRes, meshRes] = await Promise.all([
+        adminActivity(n),
+        adminMeshStats(),
+      ])
+      if (activityRes.error) {
+        setErr(activityRes.error)
       } else {
         setErr(null)
-        setActivity(data)
+        setActivity(activityRes.data)
       }
+      if (meshRes.data) setMeshStats(meshRes.data)
       setLoading(false)
     } finally {
       inFlightRef.current = false
@@ -397,6 +403,15 @@ function VisualizeTab({ pollMs }) {
         )}
         {err && <span className="text-rose-400 text-xs font-mono">{err}</span>}
       </div>
+
+      {/* Mesh details — by-status + by-model breakdown + BLOB totals.
+          Two Recharts bar charts side by side on lg; stacked on phone.
+          The data is independent of the day-window slider above (it's
+          all-time aggregates), but lives in this tab so the user has
+          one place for "everything about mesh gen". */}
+      {meshStats && (meshStats.byStatus || meshStats.byModel) && (
+        <MeshDetailsCard meshStats={meshStats} />
+      )}
 
       {nonEmpty.length === 0 ? (
         <Card icon={<DatabaseOutlined />} title="Activity" accent="cyan">
@@ -511,6 +526,142 @@ function VisualizeTab({ pollMs }) {
         </>
       )}
     </div>
+  )
+}
+
+// ─── Mesh details card — Visualize tab ──────────────────────────
+// Two Recharts BarCharts (by-status + by-model) on top of a 4-up stat
+// row showing GLB BLOB totals (count / total / avg / max). Recent rows
+// at the bottom give a click-into-context for whatever's at the top.
+// Status colours match the dot-indicator convention used elsewhere on
+// the dashboard (emerald = ready, amber = queued/working, rose = failed).
+const STATUS_TONE = {
+  queued:     '#fbbf24',   // amber
+  processing: '#fbbf24',
+  completed:  '#34d399',   // emerald
+  failed:     '#fb7185',   // rose
+}
+const MODEL_TONE = {
+  'shap-e':     '#22d3ee',
+  'tripo':      '#06b6d4',
+  'trellis':    '#fbbf24',
+  'trellis-v2': '#f59e0b',
+  'hunyuan3d':  '#34d399',
+}
+
+function MeshDetailsCard({ meshStats }) {
+  const byStatusData = Object.entries(meshStats.byStatus || {}).map(([name, count]) => ({ name, count }))
+  const byModelData  = Object.entries(meshStats.byModel  || {}).map(([name, count]) => ({ name, count }))
+  const blob = meshStats.blob || { count: 0, totalBytes: 0, avgBytes: 0, maxBytes: 0 }
+  const recent = Array.isArray(meshStats.recent) ? meshStats.recent : []
+
+  return (
+    <Card icon={<DatabaseOutlined />} title="Mesh details" accent="amber">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* By status */}
+        <div>
+          <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">By status</p>
+          {byStatusData.length === 0 ? (
+            <p className="text-xs text-gray-500 py-6 text-center">No mesh jobs yet.</p>
+          ) : (
+            <div style={{ width: '100%', height: 180 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={byStatusData} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+                  <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={{ stroke: '#1f2937' }} tickLine={false} />
+                  <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={{ stroke: '#1f2937' }} tickLine={false} allowDecimals={false} />
+                  <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+                  <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                    {byStatusData.map(entry => (
+                      <Cell key={entry.name} fill={STATUS_TONE[entry.name] || '#94a3b8'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+
+        {/* By model */}
+        <div>
+          <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">By engine</p>
+          {byModelData.length === 0 ? (
+            <p className="text-xs text-gray-500 py-6 text-center">No mesh jobs yet.</p>
+          ) : (
+            <div style={{ width: '100%', height: 180 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={byModelData} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+                  <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={{ stroke: '#1f2937' }} tickLine={false} interval={0} />
+                  <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={{ stroke: '#1f2937' }} tickLine={false} allowDecimals={false} />
+                  <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+                  <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                    {byModelData.map(entry => (
+                      <Cell key={entry.name} fill={MODEL_TONE[entry.name] || '#94a3b8'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* GLB BLOB totals */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4 pt-3 border-t border-gray-800">
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-gray-500">Count</div>
+          <div className="text-sm font-mono text-gray-200 mt-0.5 tabular-nums">{blob.count.toLocaleString()}</div>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-gray-500">Total bytes</div>
+          <div className="text-sm font-mono text-amber-300 mt-0.5">{fmtBytes(blob.totalBytes)}</div>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-gray-500">Avg / job</div>
+          <div className="text-sm font-mono text-gray-200 mt-0.5">{fmtBytes(blob.avgBytes)}</div>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-gray-500">Largest</div>
+          <div className="text-sm font-mono text-gray-200 mt-0.5">{fmtBytes(blob.maxBytes)}</div>
+        </div>
+      </div>
+
+      {/* Last 10 — compact table so the user can spot what's running now */}
+      {recent.length > 0 && (
+        <div className="mt-4 pt-3 border-t border-gray-800">
+          <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">
+            Recent 10
+          </p>
+          <table className="w-full text-[11px] font-mono">
+            <thead>
+              <tr className="text-gray-600 uppercase tracking-wider text-[9px]">
+                <th className="text-left py-1">Job</th>
+                <th className="text-left py-1">Engine</th>
+                <th className="text-left py-1">Status</th>
+                <th className="text-right py-1">Bytes</th>
+                <th className="text-left py-1 pl-4">Prompt</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recent.map(row => (
+                <tr key={row.jobId} className="border-t border-gray-900">
+                  <td className="py-1 text-gray-500">{row.jobId.slice(-8)}</td>
+                  <td className="py-1 text-amber-300">{row.model}</td>
+                  <td className="py-1">
+                    <span style={{ color: STATUS_TONE[row.status] || '#94a3b8' }}>
+                      {row.status}
+                    </span>
+                  </td>
+                  <td className="py-1 text-right text-gray-300 tabular-nums">{fmtBytes(row.bytes)}</td>
+                  <td className="py-1 pl-4 text-gray-300 truncate max-w-[260px]">{row.prompt}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
   )
 }
 
