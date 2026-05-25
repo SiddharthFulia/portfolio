@@ -985,6 +985,10 @@ function HeroImagePanel({
   const [coaching, setCoaching] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [progress, setProgress] = useState(0)
+  // Live worker-log tail while T2I is running. Cursor-based via
+  // `since=<lastTs>` so each poll only pulls new lines.
+  const [genLogs, setGenLogs] = useState([])
+  const logsSinceRef = useRef(0)
   const pollAbortRef = useRef(false)
 
   const composeBaseIdea = () => {
@@ -1017,11 +1021,30 @@ function HeroImagePanel({
     if (polished) { setPrompt(polished); notice.success('Prompt polished — review and Generate.') }
   }
 
+  // Fetch new log lines since the cursor. Plain fetch (no helper) keeps
+  // this independent of the api/ai.js layer; the job-logs endpoint is
+  // a thin read so a custom call here keeps the surface small.
+  const fetchHeroLogs = async (imageId) => {
+    try {
+      const base = import.meta.env.VITE_BE_URL || ''
+      const url = `${base}/api/job-logs/image/${imageId}?since=${logsSinceRef.current}&limit=80`
+      const r = await fetch(url)
+      const body = await r.json()
+      const lines = body?.data?.logs || []
+      if (lines.length) {
+        setGenLogs(prev => [...prev, ...lines].slice(-200))
+        logsSinceRef.current = lines[lines.length - 1].ts || logsSinceRef.current
+      }
+    } catch {}
+  }
+
   const startGenerate = async () => {
     const p = prompt.trim()
     if (!p) { notice.warning('Add a prompt first'); return }
     setGenerating(true)
     setProgress(5)
+    setGenLogs([])
+    logsSinceRef.current = 0
     pollAbortRef.current = false
     const wf = HERO_T2I_MODELS.find(m => m.id === model) || HERO_T2I_MODELS[0]
     const dims = _heroDims(aspectRatio)
@@ -1041,14 +1064,20 @@ function HeroImagePanel({
       return
     }
     const imageId = data.imageId
-    // Poll status every 2s. The image-enhance lane sets outputUrl
-    // when the worker finishes; we promote that to heroImageUrl.
+    // Poll status + logs every 2s. The image-enhance lane sets
+    // outputUrl when the worker finishes; we promote that to
+    // heroImageUrl. Worker writes log lines under lane='image' to
+    // job_logs as it goes (queue → submit → sampler X/Y → upload).
     for (let i = 0; i < 240 && !pollAbortRef.current; i++) {  // 240 × 2s = 8min cap
       await new Promise(r => setTimeout(r, 2000))
+      await fetchHeroLogs(imageId)
       const { data: row } = await getImageStatus(imageId)
       if (!row) continue
       setProgress(Math.min(95, 5 + (i * 90 / 60)))
       if (row.status === 'completed' && row.outputUrl) {
+        // One last log fetch so the user sees the "✓ done" line
+        // before the modal closes.
+        await fetchHeroLogs(imageId)
         setHeroImageUrl(row.outputUrl)
         setProgress(100)
         setGenerating(false)
@@ -1057,6 +1086,7 @@ function HeroImagePanel({
         return
       }
       if (row.status === 'failed') {
+        await fetchHeroLogs(imageId)
         notice.error(`Hero generation failed: ${row.error || 'unknown'}`)
         setGenerating(false); setProgress(0)
         return
@@ -1192,10 +1222,33 @@ function HeroImagePanel({
           </div>
 
           {generating && (
-            <div className="space-y-1">
-              <p className="text-[10px] font-mono text-amber-300">Generating · {Math.round(progress)}%</p>
-              <div className="h-1.5 rounded bg-gray-800 overflow-hidden">
-                <div className="h-full bg-amber-400 transition-all" style={{ width: `${progress}%` }} />
+            <div className="space-y-2">
+              <div className="space-y-1">
+                <p className="text-[10px] font-mono text-amber-300">Generating · {Math.round(progress)}%</p>
+                <div className="h-1.5 rounded bg-gray-800 overflow-hidden">
+                  <div className="h-full bg-amber-400 transition-all" style={{ width: `${progress}%` }} />
+                </div>
+              </div>
+
+              {/* Live worker log tail — same job_logs stream the AI
+                  Video detail page reads, filtered to lane='image'.
+                  Newest at the bottom; scrolls to show ~last 12 lines
+                  worth of room without growing the modal too tall. */}
+              <div className="rounded-md border border-gray-800 bg-black/40 p-2 max-h-48 overflow-y-auto">
+                {genLogs.length === 0 ? (
+                  <p className="text-[10px] font-mono text-gray-600 py-3 text-center">
+                    Waiting for the worker to start the T2I pass…
+                  </p>
+                ) : (
+                  <ul className="space-y-0.5">
+                    {genLogs.slice(-50).map((line, idx) => (
+                      <li key={`${line.ts}-${idx}`}
+                          className="text-[10px] font-mono leading-snug text-gray-300 break-all">
+                        {line.msg || ''}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
           )}
