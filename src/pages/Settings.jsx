@@ -65,9 +65,8 @@ function SettingsInner() {
   const [queuesLoading,  setQueuesLoading]  = useState(true)
   const [workersLoading, setWorkersLoading] = useState(true)
   const [err, setErr] = useState(null)
-  const timerRef = useRef(null)
-  // Per-endpoint overlap guards. Lets the slow queue-check stay
-  // in-flight without blocking the other four from polling on time.
+  // Per-endpoint overlap guards. Each fetch's `finally` releases its
+  // own ref, so a slow Queues call doesn't block its sibling fetches.
   const inFlightServer  = useRef(false)
   const inFlightDb      = useRef(false)
   const inFlightDisk    = useRef(false)
@@ -154,25 +153,43 @@ function SettingsInner() {
     } finally { inFlightWorkers.current = false }
   }
 
-  // Fan out — no await. Each promise resolves on its own timeline and
-  // updates its own slice of state. Errors don't block siblings.
-  const tick = () => {
-    fetchServer()
-    fetchDb()
-    fetchDisk()
-    fetchQueues()
-    fetchWorkers()
-  }
-
   // Aggregate "still loading something" — drives the header spinner pill.
   // The cards themselves show per-section skeletons via their own flags.
   const loading = serverLoading || dbLoading || diskLoading || queuesLoading || workersLoading
 
+  // The fetch fns above are recreated on every render, but the polling
+  // loops below need a stable reference. Refs hold the latest version
+  // so the loop always calls the most up-to-date closure (matters for
+  // any future state captured inside fetchX — today nothing relevant,
+  // but keeps the pattern bulletproof for later edits).
+  const fetchServerRef  = useRef(fetchServer);  fetchServerRef.current  = fetchServer
+  const fetchDbRef      = useRef(fetchDb);      fetchDbRef.current      = fetchDb
+  const fetchDiskRef    = useRef(fetchDisk);    fetchDiskRef.current    = fetchDisk
+  const fetchQueuesRef  = useRef(fetchQueues);  fetchQueuesRef.current  = fetchQueues
+  const fetchWorkersRef = useRef(fetchWorkers); fetchWorkersRef.current = fetchWorkers
+
+  // Per-endpoint poll loops. Each loop awaits its own fetch, sleeps
+  // pollMs, fires again. A 5-second Queues call holds up only the
+  // Queues card's next refresh — Server / DB / Disk / Workers keep
+  // ticking at 2s (or whatever pollMs is) independently. The user's
+  // stated contract: "call all others every 2s and wait for this to
+  // get called and then wait 2sec for this to get called again."
   useEffect(() => {
-    tick()
-    timerRef.current = setInterval(tick, pollMs)
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms))
+    let cancelled = false
+    const runLoop = async (getFetch) => {
+      while (!cancelled) {
+        await getFetch()()
+        if (cancelled) break
+        await sleep(pollMs)
+      }
+    }
+    runLoop(() => fetchServerRef.current)
+    runLoop(() => fetchDbRef.current)
+    runLoop(() => fetchDiskRef.current)
+    runLoop(() => fetchQueuesRef.current)
+    runLoop(() => fetchWorkersRef.current)
+    return () => { cancelled = true }
   }, [pollMs])
 
   // Persist whichever ms value the user lands on.
