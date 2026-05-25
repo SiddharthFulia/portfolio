@@ -248,6 +248,30 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
     // (new shot kicked off / new tick from CinemaRenderPage's poll).
   }, [initialRender?.shotJobIds?.join(',') || ''])
 
+  // Re-sync the live fields from the BE row on every poll tick. The
+  // CinemaRenderPage above us polls /api/cinema/render/:renderId every
+  // 3s and re-passes initialRender as a prop. Without this effect the
+  // FE would render whatever phase / combineJobId / finalDownloadHref
+  // we hydrated at first mount, so the BE flipping phase='done' +
+  // setting finalDownloadHref wouldn't reach the UI until a manual
+  // refresh. That was the symptom of the "Download button missing /
+  // redirects to homepage" bug — the BE row WAS correct but the
+  // component's local state was stale.
+  useEffect(() => {
+    if (!initialRender) return
+    if (initialRender.phase) setPhase(initialRender.phase)
+    if (initialRender.combineJobId != null) setCombineJobId(initialRender.combineJobId)
+    if (initialRender.finalDownloadHref) setFinalDownloadHref(initialRender.finalDownloadHref)
+    if (typeof initialRender.currentShotIndex === 'number') setCurrentShotIndex(initialRender.currentShotIndex)
+    if (initialRender.error) setPipelineError(initialRender.error)
+  }, [
+    initialRender?.phase,
+    initialRender?.combineJobId,
+    initialRender?.finalDownloadHref,
+    initialRender?.currentShotIndex,
+    initialRender?.error,
+  ])
+
   // Re-init shots whenever the project changes (new plan).
   useEffect(() => {
     setShots(initialShots())
@@ -768,8 +792,25 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
                 {combineRow?.status === 'completed' ? 'Stitched mp4 ready' : `ffmpeg-concat #${combineJobId}`}
               </h4>
             </div>
-            {phase === 'done' && finalDownloadHref ? (
-              <a href={finalDownloadHref}
+            {/* Resolve the download URL at render time so it works
+                regardless of how the href landed in state:
+                  • BE-driven chain stores '/api/combine/file/<id>' (rel)
+                  • Legacy FE chain stored the full VITE_BE_URL'd path
+                A bare path would otherwise navigate to the FE domain
+                (siddharthfulia.com/api/combine/file/...) → React Router
+                catch-all redirect → homepage. That's the symptom the
+                user just hit: "doesn't download, redirects to home".
+                combineFileUrl always returns the absolute BE URL when
+                we have a combineJobId. Falls back to whatever's stored
+                on the row, with a prepend if relative. */}
+            {phase === 'done' && (combineJobId || finalDownloadHref) ? (
+              <a href={
+                combineJobId
+                  ? combineFileUrl(combineJobId)
+                  : (finalDownloadHref?.startsWith('http')
+                      ? finalDownloadHref
+                      : `${import.meta.env.VITE_BE_URL || ''}${finalDownloadHref || ''}`)
+              }
                 className="text-xs font-semibold px-3 py-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20 inline-flex items-center gap-1.5">
                 <DownloadOutlined /> Download final mp4
               </a>
