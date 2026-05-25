@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { Input, Select, Slider, Tooltip, Upload, Alert, message as antMessage } from 'antd'
+import { Input, Select, Slider, Tooltip, Upload, Alert } from 'antd'
+import { notice } from '../lib/notice'
 import { CustomerServiceOutlined, ThunderboltOutlined, DownloadOutlined, ReloadOutlined, BulbOutlined, CheckOutlined, CloseOutlined, DeleteOutlined, UploadOutlined, CopyOutlined, SyncOutlined, SoundOutlined, AudioOutlined, EditOutlined, ScissorOutlined, VideoCameraOutlined, DesktopOutlined } from '@ant-design/icons'
 import { submitAudio, getAudioStatus, listAudioJobs, audioBulkAction, transcribeAudio, fileToDataUrl } from '../api/ai'
 import PromptHelper from '../components/PromptHelper'
@@ -206,7 +207,7 @@ export default function AudioStudio() {
               ? new Date(data.completedAt) - new Date(data.createdAt) : null,
             provider: '5090',
           })
-          antMessage.success('Transcript ready')
+          notice.success('Transcript ready')
         }
         // Stem-separation jobs return a `stems` object — promote to sepResult.
         if (data.kind === 'separate' && data.stems && typeof data.stems === 'object') {
@@ -216,7 +217,7 @@ export default function AudioStudio() {
             elapsedMs: data.completedAt && data.createdAt
               ? new Date(data.completedAt) - new Date(data.createdAt) : null,
           })
-          antMessage.success('Stems ready')
+          notice.success('Stems ready')
         }
         setLibraryRefresh(k => k + 1)
       } else if (data.status === 'failed') {
@@ -243,7 +244,7 @@ export default function AudioStudio() {
         setWorking(false)
         if (err) { setError(err); return }
         setSttResult(data)
-        antMessage.success('Transcript ready')
+        notice.success('Transcript ready')
         return
       }
 
@@ -317,20 +318,20 @@ export default function AudioStudio() {
   // clips are typically <1 MB; melody tracks rarely exceed a few MB).
   const handleVcRefUpload = async (file) => {
     if (!file) return false
-    if (file.size > 8 * 1024 * 1024) { antMessage.error('Reference clip too large (max 8 MB)'); return false }
+    if (file.size > 8 * 1024 * 1024) { notice.error('Reference clip too large (max 8 MB)'); return false }
     try {
       const d = await fileToDataUrl(file)
       setVcRefFile(file); setVcRefDataUrl(d); setError(null)
-    } catch { antMessage.error('Could not read file') }
+    } catch { notice.error('Could not read file') }
     return false
   }
   const handleVcMelodyUpload = async (file) => {
     if (!file) return false
-    if (file.size > 16 * 1024 * 1024) { antMessage.error('Melody clip too large (max 16 MB)'); return false }
+    if (file.size > 16 * 1024 * 1024) { notice.error('Melody clip too large (max 16 MB)'); return false }
     try {
       const d = await fileToDataUrl(file)
       setVcMelodyFile(file); setVcMelodyDataUrl(d); setError(null)
-    } catch { antMessage.error('Could not read file') }
+    } catch { notice.error('Could not read file') }
     return false
   }
 
@@ -341,21 +342,21 @@ export default function AudioStudio() {
     if (!file) return false
     const cap = kind === 'separate' ? 100 * 1024 * 1024 : 25 * 1024 * 1024
     if (file.size > cap) {
-      antMessage.error(`File too large (max ${Math.round(cap / 1024 / 1024)} MB)`)
+      notice.error(`File too large (max ${Math.round(cap / 1024 / 1024)} MB)`)
       return false
     }
     try {
       const d = await fileToDataUrl(file)
       setSttFile(file); setSttDataUrl(d); setError(null); setSttResult(null); setSepResult(null)
     } catch {
-      antMessage.error('Could not read file')
+      notice.error('Could not read file')
     }
     return false   // don't auto-POST via antd
   }
 
   const copyTranscript = async () => {
     if (!sttResult?.text) return
-    try { await navigator.clipboard.writeText(sttResult.text); antMessage.success('Copied') } catch {}
+    try { await navigator.clipboard.writeText(sttResult.text); notice.success('Copied') } catch {}
   }
 
   const kindObj = KINDS.find(k => k.value === kind)

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CopyOutlined, SendOutlined, DownloadOutlined, ReloadOutlined } from '@ant-design/icons'
-import { message as antMessage } from 'antd'
+import { notice } from '../lib/notice'
 import JobDetailPage from '../components/JobDetailPage'
 import { getCinemaStatus, listCinemaRenders, getCinemaRenderLogs } from '../api/ai'
 
@@ -20,7 +20,7 @@ function CinemaOutput({ job }) {
   const navigate = useNavigate()
   const shots = Array.isArray(job?.shotPrompts) ? job.shotPrompts : []
   const copy = async (t) => {
-    try { await navigator.clipboard.writeText(t); antMessage.success('Copied') } catch {}
+    try { await navigator.clipboard.writeText(t); notice.success('Copied') } catch {}
   }
   const sendToAIVideo = (t) => {
     if (!t || !t.trim()) return

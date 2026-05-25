@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Modal, Upload, Tabs, Input, Select, Switch, Tooltip, Alert, message as antMessage } from 'antd'
+import { Modal, Upload, Tabs, Input, Select, Switch, Tooltip, Alert } from 'antd'
+import { notice } from '../lib/notice'
 import CameraCapture, { transformImage } from '../components/CameraCapture'
 import {
   UploadOutlined, ExpandAltOutlined, DownloadOutlined,
@@ -637,14 +638,14 @@ export default function ImageEnhancer() {
 
   const handleFile = async (file) => {
     setError(null); setJob(null)
-    if (!file?.type?.startsWith('image/')) { antMessage.error('Pick an image file'); return false }
-    if (file.size > 8 * 1024 * 1024)        { antMessage.error('Image too large (max 8 MB)'); return false }
+    if (!file?.type?.startsWith('image/')) { notice.error('Pick an image file'); return false }
+    if (file.size > 8 * 1024 * 1024)        { notice.error('Image too large (max 8 MB)'); return false }
     setSourceFile(file)
     try {
       const dataUrl = await fileToDataUrl(file)
       setSourceDataUrl(dataUrl)
     } catch {
-      antMessage.error('Could not read the image')
+      notice.error('Could not read the image')
     }
     return false
   }
@@ -943,7 +944,7 @@ export default function ImageEnhancer() {
                       setNsfwBlocked(null)
                       setVaultLoginOpen(false)
                       setRefreshKey(k => k + 1)
-                      antMessage.success('Vault locked — public view restored')
+                      notice.success('Vault locked — public view restored')
                     }}
                     className="w-full px-5 py-2.5 rounded-lg bg-gray-900/70 hover:bg-rose-500/15 text-gray-400 hover:text-rose-300 border border-gray-700/80 hover:border-rose-500/40 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors">
                     <LockOutlined /> Lock vault & sign out
@@ -1207,7 +1208,7 @@ function GenerateSection({
       const next = await transformImage(sourceDataUrl, op)
       setSourceDataUrl(next)
     } catch (e) {
-      antMessage.error(`Transform failed: ${e.message}`)
+      notice.error(`Transform failed: ${e.message}`)
     }
   }
   // Camera snap → drop straight into the same sourceDataUrl slot as upload.
@@ -1830,10 +1831,10 @@ function ImageLibrary({ refreshKey }) {
       onOk: async () => {
         const { error: err } = await deleteEnhancedImage(img.imageId)
         if (err) {
-          antMessage.error(`Delete failed: ${err}`)
+          notice.error(`Delete failed: ${err}`)
           return
         }
-        antMessage.success('Deleted')
+        notice.success('Deleted')
         setInternalReload(n => n + 1)
       },
     })
@@ -1846,17 +1847,17 @@ function ImageLibrary({ refreshKey }) {
       [img.imageId]
     )
     if (err) {
-      antMessage.error(err.includes('login') ? 'Unlock the vault first' : `Failed: ${err}`)
+      notice.error(err.includes('login') ? 'Unlock the vault first' : `Failed: ${err}`)
       return
     }
-    antMessage.success(moveToVault ? 'Moved to Vault' : 'Made public')
+    notice.success(moveToVault ? 'Moved to Vault' : 'Made public')
     setInternalReload(n => n + 1)
   }
 
   // Bulk action wrapper. Action is one of 'move-to-vault' | 'make-public' | 'delete'.
   const doBulk = async (action) => {
     const ids = Array.from(selected)
-    if (!ids.length) { antMessage.warning('Select at least one image'); return }
+    if (!ids.length) { notice.warning('Select at least one image'); return }
     const verb = action === 'delete' ? 'Delete' : action === 'move-to-vault' ? 'Move to Vault' : 'Make public'
     Modal.confirm({
       title: `${verb} ${ids.length} image${ids.length === 1 ? '' : 's'}?`,
@@ -1876,10 +1877,10 @@ function ImageLibrary({ refreshKey }) {
         const { data: result, error: err } = await imageBulkAction(action, ids)
         setBulkBusy(false)
         if (err) {
-          antMessage.error(err.includes('login') ? 'Unlock the vault first' : `Failed: ${err}`)
+          notice.error(err.includes('login') ? 'Unlock the vault first' : `Failed: ${err}`)
           return
         }
-        antMessage.success(`${verb}: ${result?.affected ?? ids.length} done`)
+        notice.success(`${verb}: ${result?.affected ?? ids.length} done`)
         setSelected(new Set())
         setSelectMode(false)
         setInternalReload(n => n + 1)
@@ -2163,9 +2164,9 @@ function PromptHelperModal({
   const copy = async (text, label = 'Prompt') => {
     try {
       await navigator.clipboard.writeText(text)
-      antMessage.success(`${label} copied`)
+      notice.success(`${label} copied`)
     } catch {
-      antMessage.error('Could not copy — your browser blocked clipboard access')
+      notice.error('Could not copy — your browser blocked clipboard access')
     }
   }
 
@@ -2320,7 +2321,7 @@ function PromptHelperModal({
                         <CopyOutlined /> Copy
                       </button>
                       {onApplyNegative && (
-                        <button onClick={() => { onApplyNegative(coachResult.negative); antMessage.success('Negative prompt applied') }}
+                        <button onClick={() => { onApplyNegative(coachResult.negative); notice.success('Negative prompt applied') }}
                           className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/40 font-semibold">
                           <CheckOutlined /> Apply
                         </button>

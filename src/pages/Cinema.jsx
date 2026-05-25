@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Input, Select, Modal, Alert, message as antMessage } from 'antd'
+import { Input, Select, Modal, Alert } from 'antd'
+import { notice } from '../lib/notice'
 import { VideoCameraOutlined, ThunderboltOutlined, ReloadOutlined, BulbOutlined, DeleteOutlined, DownloadOutlined, LockOutlined, UnlockOutlined, PictureOutlined, UploadOutlined } from '@ant-design/icons'
 import { submitCinema, listCinemaProjects, cinemaBulkAction, createCinemaRender, patchCinemaProject, reviewCinemaShot, getCinemaDiskStats, uploadSourceImage } from '../api/ai'
 import PromptHelper from '../components/PromptHelper'
@@ -65,7 +66,7 @@ export default function Cinema({ embedded = false, view = 'all', refreshKey = 0 
     if (err) { setError(err); return }
     setProject(data)
     setLibraryRefresh(k => k + 1)
-    antMessage.success(`Planned ${data.shotCount} shots — review and render below.`)
+    notice.success(`Planned ${data.shotCount} shots — review and render below.`)
   }
 
   // Confirm before clearing a master prompt that has real content. Tiny
@@ -361,7 +362,7 @@ function PlannedShotsPanel({ project, navigate }) {
 
   const patchProject = async (patch) => {
     const { error: err } = await patchCinemaProject(project.projectId, patch)
-    if (err) antMessage.error(`Save failed: ${err}`)
+    if (err) notice.error(`Save failed: ${err}`)
   }
   const setMusicAt = (idx, v) => {
     const next = [...shotMusic]; next[idx] = !!v; setShotMusic(next)
@@ -387,7 +388,7 @@ function PlannedShotsPanel({ project, navigate }) {
   // Seed save — only on blur or when toggling the lock off + back on.
   const commitSeed = () => {
     const n = parseInt(seed, 10)
-    if (!Number.isFinite(n) || n < 0) { antMessage.error('Seed must be a positive integer'); return }
+    if (!Number.isFinite(n) || n < 0) { notice.error('Seed must be a positive integer'); return }
     patchProject({ lockedSeed: n })
   }
   const rerollSeed = () => {
@@ -405,16 +406,16 @@ function PlannedShotsPanel({ project, navigate }) {
   // the project so a refresh restores it.
   const onPickHeroFile = async (file) => {
     if (!file) return
-    if (!/^image\//i.test(file.type)) { antMessage.warning('Only image uploads'); return }
+    if (!/^image\//i.test(file.type)) { notice.warning('Only image uploads'); return }
     setHeroUploading(true)
     const { data, error: err } = await uploadSourceImage(file)
     setHeroUploading(false)
-    if (err) { antMessage.error(`Upload failed: ${err}`); return }
+    if (err) { notice.error(`Upload failed: ${err}`); return }
     const url = data?.url || data?.secure_url || ''
-    if (!url) { antMessage.error('Upload returned no URL'); return }
+    if (!url) { notice.error('Upload returned no URL'); return }
     setHeroImageUrl(url)
     patchProject({ heroImageUrl: url })
-    antMessage.success('Hero image set — will anchor shot 1')
+    notice.success('Hero image set — will anchor shot 1')
   }
   const clearHero = () => {
     setHeroImageUrl('')
@@ -452,7 +453,7 @@ function PlannedShotsPanel({ project, navigate }) {
         })
         setCreating(false)
         if (error || !data?.renderId) {
-          antMessage.error(error || 'Failed to create render — try again')
+          notice.error(error || 'Failed to create render — try again')
           return
         }
         navigate(`/cinema/render/${data.renderId}`)
@@ -771,7 +772,7 @@ function ShotPromptRow({
     const { error: err } = await patchCinemaProject(projectId, { shotPrompts: nextPrompts })
     setSaving(false)
     if (err) {
-      antMessage.error(`Save failed: ${err}`)
+      notice.error(`Save failed: ${err}`)
       return
     }
     setSavedText(text.trim())
@@ -787,7 +788,7 @@ function ShotPromptRow({
     })
     setReviewLoading(false)
     if (err) {
-      antMessage.error(`Review failed: ${err}`)
+      notice.error(`Review failed: ${err}`)
       return
     }
     setReviewResult(data)
@@ -801,10 +802,10 @@ function ShotPromptRow({
     const nextPrompts = [...allPrompts]
     nextPrompts[shotIndex] = reviewResult.suggested
     const { error: err } = await patchCinemaProject(projectId, { shotPrompts: nextPrompts })
-    if (err) { antMessage.error(`Apply failed: ${err}`); return }
+    if (err) { notice.error(`Apply failed: ${err}`); return }
     setSavedText(reviewResult.suggested)
     setReviewOpen(false)
-    antMessage.success('Applied AI suggestion')
+    notice.success('Applied AI suggestion')
   }
 
   const assessmentTone =
@@ -982,34 +983,56 @@ function CinemaCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
     : null
   return (
     <div onClick={handleClick}
-      className={`group relative rounded-lg overflow-hidden border transition-colors bg-gray-900/40 p-3 cursor-pointer ${
+      className={`group relative rounded-lg overflow-hidden border transition-colors bg-gray-900/40 cursor-pointer ${
         checked
           ? 'border-amber-400 ring-2 ring-amber-400/40'
           : 'border-gray-800 hover:border-amber-400/50'
       }`}>
-      <div className="flex items-center gap-2 mb-2">
-        <VideoCameraOutlined className="text-amber-400" />
-        <span className="text-[10px] uppercase tracking-wider text-gray-500 font-mono">
-          {item.shotCount} shots · {item.aspectRatio}
-        </span>
-        <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded uppercase font-bold ${
-          item.status === 'completed' ? 'bg-emerald-500/20 text-emerald-300'
-          : item.status === 'failed' ? 'bg-rose-500/20 text-rose-300'
-          : 'bg-amber-500/20 text-amber-300'
-        }`}>{item.status}</span>
-      </div>
-      <p className="text-[11px] text-gray-300 line-clamp-3 leading-snug">{item.masterPrompt}</p>
-
-      {/* Download button — completed cinemas with a combine URL get a
-          one-click save right here so the user doesn't have to open the
-          detail page just to grab the mp4. */}
-      {downloadHref && item.status === 'completed' && !selectMode && (
-        <a href={downloadHref}
+      {/* Video preview thumb (Cloudinary-style) — completed cinemas
+          inline-stream the combined mp4 right in the card. Click to
+          play; muted + preload="metadata" so the grid stays cheap on
+          first paint. Falls back to a flat gradient for non-completed
+          rows so the card height stays consistent across statuses. */}
+      {item.status === 'completed' && downloadHref ? (
+        <video
+          src={downloadHref}
+          className="w-full aspect-video object-cover bg-black"
+          muted
+          playsInline
+          preload="metadata"
+          controls
           onClick={(e) => e.stopPropagation()}
-          className="mt-2 inline-flex items-center justify-center gap-1 w-full text-[11px] font-semibold px-3 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/12 text-emerald-200 hover:bg-emerald-500/22 transition-colors">
-          <DownloadOutlined /> Download mp4
-        </a>
+        />
+      ) : (
+        <div className="w-full aspect-video bg-gradient-to-br from-amber-500/8 to-fuchsia-500/8 flex items-center justify-center">
+          <VideoCameraOutlined className="text-3xl text-amber-300/40" />
+        </div>
       )}
+
+      <div className="p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <VideoCameraOutlined className="text-amber-400" />
+          <span className="text-[10px] uppercase tracking-wider text-gray-500 font-mono">
+            {item.shotCount} shots · {item.aspectRatio}
+          </span>
+          <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded uppercase font-bold ${
+            item.status === 'completed' ? 'bg-emerald-500/20 text-emerald-300'
+            : item.status === 'failed' ? 'bg-rose-500/20 text-rose-300'
+            : 'bg-amber-500/20 text-amber-300'
+          }`}>{item.status}</span>
+        </div>
+        <p className="text-[11px] text-gray-300 line-clamp-3 leading-snug">{item.masterPrompt}</p>
+
+        {/* Download chip — only on completed renders. Stop-prop so
+            clicking it doesn't fire the card's navigate handler. */}
+        {downloadHref && item.status === 'completed' && !selectMode && (
+          <a href={downloadHref}
+            onClick={(e) => e.stopPropagation()}
+            className="mt-2 inline-flex items-center justify-center gap-1 w-full text-[11px] font-semibold px-3 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/12 text-emerald-200 hover:bg-emerald-500/22 transition-colors">
+            <DownloadOutlined /> Download mp4
+          </a>
+        )}
+      </div>
 
       {selectMode && <SelectCheckbox checked={checked} onToggle={onToggleSelect} />}
       {!selectMode && onDelete && (

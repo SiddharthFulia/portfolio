@@ -19,7 +19,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Alert, Modal, message as antMessage } from 'antd'
+import { Alert, Modal } from 'antd'
 import { ArrowLeftOutlined, ReloadOutlined, ExpandAltOutlined } from '@ant-design/icons'
 import { getCinemaRender, getCinemaRenderLogs } from '../api/ai'
 import CinemaRenderer from '../components/cinema/CinemaRenderer'

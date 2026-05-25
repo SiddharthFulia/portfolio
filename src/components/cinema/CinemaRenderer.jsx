@@ -19,7 +19,8 @@
 // and the worker uses it as the first frame.
 
 import { useEffect, useRef, useState } from 'react'
-import { Modal, Progress, message as antMessage } from 'antd'
+import { Modal, Progress } from 'antd'
+import { notice } from '../../lib/notice'
 import { DownloadOutlined } from '@ant-design/icons'
 import { Button } from '../ui'
 import JobLogsAgentPlan from '../JobLogsAgentPlan'
@@ -374,7 +375,7 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
   async function startRender({ resume = false } = {}) {
     if (!shotPrompts.length) return
     if (phase === 'rendering' || phase === 'extracting' || phase === 'uploading' || phase === 'combining') {
-      antMessage.warning('Already running — Cancel first if you want to restart')
+      notice.warning('Already running — Cancel first if you want to restart')
       return
     }
 
@@ -391,7 +392,7 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
         const base = import.meta.env.VITE_BE_URL || ''
         await fetch(`${base}/api/cinema/render/${renderId}/resume`, { method: 'POST' })
       } catch (e) { /* polling will catch the next state change */ }
-      if (resumeError) antMessage.error(resumeError)
+      if (resumeError) notice.error(resumeError)
       return
     }
 
@@ -425,14 +426,14 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
         patchShot(0, { status: 'failed', error: msg })
         setPhase('failed')
         persist({ status: 'failed', phase: 'failed', error: msg })
-        antMessage.error(msg)
+        notice.error(msg)
         return
       }
       patchShot(0, { jobId: data.jobId, status: 'processing' })
       const nextJobIds = [...shots.map(s => s.videoId || s.jobId)]
       nextJobIds[0] = data.jobId
       persist({ shotJobIds: nextJobIds })
-      antMessage.success('Shot 1 queued — BE chain takes over from here')
+      notice.success('Shot 1 queued — BE chain takes over from here')
     }
 
     if (renderId) {
@@ -536,7 +537,7 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
         patchShot(shotIndex, { status: 'failed', error: messageText })
         setPipelineError(`Shot ${shotIndex + 1}: ${messageText}`)
         setPhase('failed')
-        antMessage.error(messageText)
+        notice.error(messageText)
         return
       }
       patchShot(shotIndex, { jobId: submitData.jobId, status: 'processing' })
@@ -661,7 +662,7 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
           setFinalDownloadHref(href)
           setPhase('done')
           persist({ status: 'completed', phase: 'done', finalDownloadHref: href })
-          antMessage.success('Cinema render complete — Download to save the mp4')
+          notice.success('Cinema render complete — Download to save the mp4')
           return
         }
         if (combineStatusData.status === 'failed') {

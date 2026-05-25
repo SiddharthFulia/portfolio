@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Modal, Input, Tooltip, message as antMessage } from 'antd'
+import { Modal, Input, Tooltip } from 'antd'
+import { notice } from '../lib/notice'
 import { BulbOutlined, CopyOutlined, CheckOutlined, ReloadOutlined } from '@ant-design/icons'
 import { promptCoach } from '../api/ai'
 
@@ -157,8 +158,8 @@ export default function PromptHelper({
   const copy = async (text, label = 'Prompt') => {
     try {
       await navigator.clipboard.writeText(text)
-      antMessage.success(`${label} copied`)
-    } catch { antMessage.error('Could not copy — browser blocked clipboard') }
+      notice.success(`${label} copied`)
+    } catch { notice.error('Could not copy — browser blocked clipboard') }
   }
 
   const askCoach = async () => {
@@ -269,7 +270,7 @@ export default function PromptHelper({
                 <div className="pt-2 border-t border-amber-500/20">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-[10px] uppercase tracking-wider text-rose-300 font-semibold">Negative prompt (suggested)</span>
-                    <button onClick={() => { onApplyNegative(coachResult.negative); antMessage.success('Negative prompt applied') }}
+                    <button onClick={() => { onApplyNegative(coachResult.negative); notice.success('Negative prompt applied') }}
                       className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-200 border border-rose-500/40 font-semibold">
                       <CheckOutlined /> Apply
                     </button>

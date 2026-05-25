@@ -21,7 +21,8 @@
 // (handled server-side via maybeVault).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Modal, Progress, Tag, Input, InputNumber, Pagination, Tabs, message as antMessage } from 'antd'
+import { Modal, Progress, Tag, Input, InputNumber, Pagination, Tabs } from 'antd'
+import { notice } from '../../lib/notice'
 import { DownloadOutlined, DeleteOutlined, ReloadOutlined, CheckOutlined, LockOutlined, GlobalOutlined, ToolOutlined, BookOutlined, ThunderboltOutlined, RocketOutlined, VideoCameraOutlined } from '@ant-design/icons'
 import {
   combineCreate, combineList, combineDelete, combineFileUrl,
@@ -234,7 +235,7 @@ function BuildTab({
   const onPickFile = async (file) => {
     if (!file) return
     if (!/^video\//i.test(file.type) && !/\.mp4$/i.test(file.name)) {
-      antMessage.warning('Only mp4 / video uploads')
+      notice.warning('Only mp4 / video uploads')
       return
     }
     setUploadName(file.name)
@@ -242,13 +243,13 @@ function BuildTab({
     const { data, error: err } = await combineUpload(file, { onProgress: setUploadPct })
     setUploadPct(null)
     setUploadName('')
-    if (err) { antMessage.error(`Upload failed: ${err}`); return }
+    if (err) { notice.error(`Upload failed: ${err}`); return }
     setPicked(prev => [...prev, {
       uploadId: data.uploadId,
       title: data.name?.slice(0, 60) || `upload-${data.uploadId.slice(0, 6)}`,
       bytes: data.size || null,
     }])
-    antMessage.success('Uploaded — added to selection')
+    notice.success('Uploaded — added to selection')
   }
   const onFileInputChange = (e) => {
     const f = e.target.files?.[0]
@@ -273,7 +274,7 @@ function BuildTab({
   }, [showCombined, combinedItems.length, loadCombined])
   const addCombined = (row) => {
     if (picked.find(p => p.combineId === row.id)) {
-      antMessage.info(`Combine #${row.id} is already in your selection`)
+      notice.info(`Combine #${row.id} is already in your selection`)
       return
     }
     setPicked(prev => [...prev, {
@@ -285,8 +286,8 @@ function BuildTab({
 
   // ── submit ──
   const onSubmit = async () => {
-    if (picked.length < 2) return antMessage.warning('Pick at least 2 videos to combine')
-    if (picked.length > 12) return antMessage.warning('Cap is 12 videos per combine')
+    if (picked.length < 2) return notice.warning('Pick at least 2 videos to combine')
+    if (picked.length > 12) return notice.warning('Cap is 12 videos per combine')
     setSubmitting(true)
     // Pass through whichever source-shape the row carries. The BE's
     // resolveSource handles videoId / url / combineId / uploadId.
@@ -298,9 +299,9 @@ function BuildTab({
     })
     const { data, error } = await combineCreate({ sources, title: title.trim() || null })
     setSubmitting(false)
-    if (error) { antMessage.error(error); return }
+    if (error) { notice.error(error); return }
     setTrackedIds(prev => [...prev.filter(id => id !== data.jobId), data.jobId])
-    antMessage.info(`Combine #${data.jobId} queued — ffmpeg working`)
+    notice.info(`Combine #${data.jobId} queued — ffmpeg working`)
     setPicked([]); setTitle('')
     refreshHistory()
   }
@@ -720,7 +721,7 @@ export default function VideoCombiner({ refreshKey = 0 } = {}) {
       if (!trackedIds.includes(j.id)) continue
       if (notifiedRef.current.has(j.id)) continue
       if (j.status === 'completed') {
-        antMessage.success(`#${j.id} ready — click Download to save`)
+        notice.success(`#${j.id} ready — click Download to save`)
         notifiedRef.current.add(j.id)
       } else if (j.status === 'failed') {
         notifiedRef.current.add(j.id)
@@ -774,8 +775,8 @@ export default function VideoCombiner({ refreshKey = 0 } = {}) {
       centered: true,
       onOk: async () => {
         const { error } = await combineDelete(job.id)
-        if (error) { antMessage.error(error); return }
-        antMessage.success('Removed')
+        if (error) { notice.error(error); return }
+        notice.success('Removed')
         setTrackedIds(prev => prev.filter(x => x !== job.id))
         notifiedRef.current.delete(job.id)
         setLogsByJob(prev => { const c = { ...prev }; delete c[job.id]; return c })

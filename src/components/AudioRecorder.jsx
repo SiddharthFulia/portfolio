@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { AudioOutlined, StopOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons'
-import { message as antMessage } from 'antd'
-
+import { notice } from '../lib/notice'
 // Reusable mic recorder for STT / Lip Sync / AI Chat. Uses the browser
 // MediaRecorder API — no native deps, works on all evergreen browsers.
 //
@@ -74,7 +73,7 @@ export default function AudioRecorder({
         if (e >= maxSeconds) stop()
       }, 250)
     } catch (e) {
-      antMessage.error(`Could not access mic: ${e.message}`)
+      notice.error(`Could not access mic: ${e.message}`)
     }
   }
 

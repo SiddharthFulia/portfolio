@@ -12,7 +12,8 @@
 // dies harmlessly during the 5s immunity window.
 
 import { useState } from 'react'
-import { Modal, message as antMessage } from 'antd'
+import { Modal } from 'antd'
+import { notice } from '../../../lib/notice'
 import { submitGameScore } from '../../../api/ai'
 import { useGameState } from './hooks/useGameState'
 
@@ -44,10 +45,10 @@ export default function GameOverModal({ open, onContinue, onPlayAgain, onLeaderb
     setSubmitting(false)
     if (error) {
       setSubmitError(error)
-      antMessage.error(`Score submit failed: ${error}`)
+      notice.error(`Score submit failed: ${error}`)
     } else {
       setSubmitted(true)
-      antMessage.success('Score submitted to leaderboard')
+      notice.success('Score submitted to leaderboard')
     }
   }
 

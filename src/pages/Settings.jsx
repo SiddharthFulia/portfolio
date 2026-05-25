@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Modal, message as antMessage, InputNumber, Select, Tabs, Segmented } from 'antd'
+import { Modal, InputNumber, Select, Tabs, Segmented } from 'antd'
+import { notice } from '../lib/notice'
 import { LockOutlined, ReloadOutlined, DatabaseOutlined, CloudServerOutlined, ApiOutlined, ClusterOutlined, DashboardOutlined, BarChartOutlined } from '@ant-design/icons'
 import {
   ResponsiveContainer, LineChart, Line, AreaChart, Area, BarChart, Bar, Cell,
@@ -220,9 +221,9 @@ function SettingsInner() {
       onOk: async () => {
         const { data, error } = await adminPurgeQueue(queue)
         if (error) {
-          antMessage.error(`Purge failed: ${error}`)
+          notice.error(`Purge failed: ${error}`)
         } else {
-          antMessage.success(`Purged ${data?.purged ?? 0} messages from ${queue}`)
+          notice.success(`Purged ${data?.purged ?? 0} messages from ${queue}`)
           // Only the Queues card needs to refresh after a purge — fan-out
           // tick would re-poll everything else for no reason.
           fetchQueues()

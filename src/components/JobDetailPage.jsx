@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { Button, Modal, message as antMessage } from 'antd'
+import { Button, Modal } from 'antd'
+import { notice } from '../lib/notice'
 import {
   ArrowLeftOutlined, ReloadOutlined, PauseOutlined, CaretRightOutlined,
   ExpandAltOutlined, ClockCircleOutlined, ThunderboltOutlined,
@@ -141,8 +142,8 @@ export default function JobDetailPage({
   const refresh = async () => {
     if (!id) return
     const { data, error: err } = await getStatus(id)
-    if (err) { antMessage.error(err); return }
-    if (data) { setJob(data); antMessage.success('Refreshed') }
+    if (err) { notice.error(err); return }
+    if (data) { setJob(data); notice.success('Refreshed') }
   }
 
   const allLogs = Array.isArray(job?.logs) ? job.logs : []

@@ -11,7 +11,8 @@
 // 2s when any job is in flight, slows to 15s otherwise.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Modal, Pagination, InputNumber, Progress, Tag, message as antMessage } from 'antd'
+import { Modal, Pagination, InputNumber, Progress, Tag } from 'antd'
+import { notice } from '../../lib/notice'
 import {
   DownloadOutlined, DeleteOutlined, ReloadOutlined,
   CheckOutlined, EyeOutlined,
@@ -222,7 +223,7 @@ export default function MeshLibrary({ onPickRow, refreshKey = 0 }) {
       cancelText: 'Keep', autoFocusButton: 'cancel', centered: true,
       onOk: async () => {
         const { error } = await deleteMeshJob(row.jobId)
-        if (error) { antMessage.error(error); return }
+        if (error) { notice.error(error); return }
         notify.success('Deleted')
         load()
       },

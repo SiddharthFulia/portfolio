@@ -5,6 +5,7 @@ import { Footer, Navbar } from "./components";
 import BackToTop from './components/BackToTop';
 import EasterEgg from './components/EasterEgg';
 import RouteErrorBoundary from './components/RouteErrorBoundary';
+import NoticeStack from './components/NoticeStack';
 
 // Lazy import wrapper that auto-recovers from Vite/Vercel chunk-hash
 // mismatches. After a deploy, an open tab still has the OLD index.html
@@ -306,6 +307,7 @@ const App = () => {
       </Router>
       <BackToTop />
       <EasterEgg />
+      <NoticeStack />
     </main>
     </ConfigProvider>
   );

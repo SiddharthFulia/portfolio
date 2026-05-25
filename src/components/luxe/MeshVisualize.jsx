@@ -15,7 +15,8 @@
 // ~50-200ms) so the user doesn't see a hang.
 
 import { useRef, useState } from 'react'
-import { Modal, message as antMessage } from 'antd'
+import { Modal } from 'antd'
+import { notice } from '../../lib/notice'
 import { UploadOutlined, LinkOutlined, ClearOutlined } from '@ant-design/icons'
 import * as THREE from 'three'
 import { GLTFLoader }   from 'three/examples/jsm/loaders/GLTFLoader.js'
@@ -112,7 +113,7 @@ export default function MeshVisualize() {
       setGlbUrl(url)
       setSourceLabel(file.name)
     } catch (err) {
-      antMessage.error(`Failed to load: ${err.message}`)
+      notice.error(`Failed to load: ${err.message}`)
     } finally {
       setLoading(false)
     }
@@ -134,7 +135,7 @@ export default function MeshVisualize() {
     const url = pasteUrl.trim()
     if (!url) return
     if (!/^https?:\/\//i.test(url)) {
-      antMessage.warning('URL must start with http(s)://')
+      notice.warning('URL must start with http(s)://')
       return
     }
     // For pasted URLs we trust the extension. If it's not a GLB/GLTF,
@@ -170,7 +171,7 @@ export default function MeshVisualize() {
       untextured: exportUntextured,
       filename: exportUntextured ? 'mesh-clay' : 'mesh',
     })
-    if (!ok) antMessage.error(`Export to .${format} failed`)
+    if (!ok) notice.error(`Export to .${format} failed`)
   }
 
   return (

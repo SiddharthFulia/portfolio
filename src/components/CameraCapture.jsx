@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { CameraOutlined, CheckOutlined, CloseOutlined, SwapOutlined } from '@ant-design/icons'
-import { message as antMessage } from 'antd'
-
+import { notice } from '../lib/notice'
 // Live camera → snapshot → data URL. Used by Image Studio so users can
 // shoot a photo directly instead of uploading one from disk.
 //
@@ -47,7 +46,7 @@ export default function CameraCapture({
       if (videoRef.current) videoRef.current.srcObject = stream
       setFacing(which); setState('streaming')
     } catch (e) {
-      antMessage.error(`Could not access camera: ${e.message}`)
+      notice.error(`Could not access camera: ${e.message}`)
     }
   }
 

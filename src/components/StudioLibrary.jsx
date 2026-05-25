@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { Modal, Pagination, InputNumber, message as antMessage } from 'antd'
+import { Modal, Pagination, InputNumber } from 'antd'
+import { notice } from '../lib/notice'
 import { DeleteOutlined, CheckOutlined, AppstoreOutlined, ReloadOutlined, CheckSquareOutlined } from '@ant-design/icons'
 import useQueryState from '../hooks/useQueryState'
 
@@ -128,8 +129,8 @@ export default function StudioLibrary({
       okText: 'Delete', okButtonProps: { danger: true }, cancelText: 'Keep', centered: true,
       onOk: async () => {
         const { error: err } = await bulkFn('delete', [getId(item)])
-        if (err) { antMessage.error(`Delete failed: ${err}`); return }
-        antMessage.success('Deleted')
+        if (err) { notice.error(`Delete failed: ${err}`); return }
+        notice.success('Deleted')
         setInternalReload(n => n + 1)
       },
     })
@@ -137,7 +138,7 @@ export default function StudioLibrary({
 
   const doBulkDelete = () => {
     const ids = Array.from(selected)
-    if (!ids.length) { antMessage.warning('Select at least one item'); return }
+    if (!ids.length) { notice.warning('Select at least one item'); return }
     Modal.confirm({
       title: `Delete ${ids.length} item${ids.length === 1 ? '' : 's'}?`,
       content: <p className="text-sm text-rose-300 font-medium">⚠ Removes rows + Cloudinary assets. Can't be undone.</p>,
@@ -146,8 +147,8 @@ export default function StudioLibrary({
         setBulkBusy(true)
         const { data: result, error: err } = await bulkFn('delete', ids)
         setBulkBusy(false)
-        if (err) { antMessage.error(`Failed: ${err}`); return }
-        antMessage.success(`Deleted ${result?.affected ?? ids.length}`)
+        if (err) { notice.error(`Failed: ${err}`); return }
+        notice.success(`Deleted ${result?.affected ?? ids.length}`)
         setSelected(new Set())
         setSelectMode(false)
         setInternalReload(n => n + 1)

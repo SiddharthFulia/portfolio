@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Input, Button, Select, Switch, Tabs, Modal, Upload, Alert, message as antMessage } from 'antd'
+import { Input, Button, Select, Switch, Tabs, Modal, Upload, Alert } from 'antd'
 
+import { notice } from '../lib/notice'
 // Cinema lives inside this page as a tab. Lazy-loaded so the Cinema
 // bundle only ships when the user actually opens the tab.
 const Cinema = lazy(() => import('./Cinema'))
@@ -602,13 +603,13 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
     if (qImage) setImageUrl(qImage)
     if (qVault) setSourceIsVault(true)
     if (fromDeepfake) {
-      antMessage.info('Imported from Deepfake Studio — image pre-filled.')
+      notice.info('Imported from Deepfake Studio — image pre-filled.')
     } else if (fromImage) {
-      antMessage.info(qVault
+      notice.info(qVault
         ? 'Imported from Image Studio (Vault) — output will save to Vault.'
         : 'Imported from Image Studio — image pre-filled.')
     } else if (qPrompt || qProvider) {
-      antMessage.success('Prompt loaded — review and hit Generate Video')
+      notice.success('Prompt loaded — review and hit Generate Video')
     }
     // Strip one-shot hand-off flags (fromDeepfake / fromImage) so a refresh
     // doesn't re-toast. Keep prompt / provider / mode / music / model in the
@@ -627,7 +628,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
   const handleImageUpload = async (file) => {
     if (!file) return false
     if (file.size > 25 * 1024 * 1024) {
-      antMessage.error('Image too large (max 25 MB)')
+      notice.error('Image too large (max 25 MB)')
       return false
     }
     setUploadingImage(true)
@@ -635,11 +636,11 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
     const { data, error: err } = await uploadSourceImage(file)
     setUploadingImage(false)
     if (err) {
-      antMessage.error(`Upload failed: ${err}`)
+      notice.error(`Upload failed: ${err}`)
       return false
     }
     setImageUrl(data.url)
-    antMessage.success('Image uploaded')
+    notice.success('Image uploaded')
     return false   // false = don't let antd Upload also do its own POST
   }
 
@@ -1536,8 +1537,8 @@ const JobsTab = ({ refreshKey }) => {
       centered: true,
       onOk: async () => {
         const { error } = await deleteVideo(job.videoId)
-        if (error) { antMessage.error(`Delete failed: ${error}`); return }
-        antMessage.success(isLive ? 'Job cancelled' : 'Deleted')
+        if (error) { notice.error(`Delete failed: ${error}`); return }
+        notice.success(isLive ? 'Job cancelled' : 'Deleted')
         setInternalReload(n => n + 1)
       },
     })

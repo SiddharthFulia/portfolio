@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Upload, Input, Select, Alert, message as antMessage } from 'antd'
+import { Upload, Input, Select, Alert } from 'antd'
+import { notice } from '../lib/notice'
 import { UploadOutlined, ThunderboltOutlined, DownloadOutlined, SyncOutlined, LockOutlined, ReloadOutlined, SmileOutlined, AudioOutlined, VideoCameraOutlined } from '@ant-design/icons'
 import VaultGate from '../components/VaultGate'
 import AudioRecorder from '../components/AudioRecorder'
@@ -103,13 +104,13 @@ function DeepfakeInner() {
   const handleUpload = (setter) => async (file) => {
     if (!file) return false
     if (file.size > 16 * 1024 * 1024) {
-      antMessage.error('File too large (max 16 MB)'); return false
+      notice.error('File too large (max 16 MB)'); return false
     }
     try {
       const d = await fileToDataUrl(file)
       setter({ file, dataUrl: d })
       setError(null)
-    } catch { antMessage.error('Could not read file') }
+    } catch { notice.error('Could not read file') }
     return false
   }
   const handleSrcUpload    = handleUpload(({ file, dataUrl }) => { setSrcFile(file); setSrcDataUrl(dataUrl) })

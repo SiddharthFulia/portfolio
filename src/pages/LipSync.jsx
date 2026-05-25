@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { Upload, Input, Select, Modal, Alert, message as antMessage } from 'antd'
+import { Upload, Input, Select, Modal, Alert } from 'antd'
+import { notice } from '../lib/notice'
 import { UploadOutlined, SoundOutlined, ThunderboltOutlined, ReloadOutlined, DownloadOutlined, CheckOutlined, DeleteOutlined, SyncOutlined } from '@ant-design/icons'
 import { submitLipsync, getLipsyncStatus, fileToDataUrl, listLipsyncJobs, lipsyncBulkAction } from '../api/ai'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
@@ -38,12 +39,12 @@ export default function LipSync() {
 
   const handleAudio = async (f) => {
     try { const d = await fileToDataUrl(f); setAudioFile(f); setAudioDataUrl(d); setError(null) }
-    catch { antMessage.error('Could not read audio') }
+    catch { notice.error('Could not read audio') }
     return false
   }
   const handlePortrait = async (f) => {
     try { const d = await fileToDataUrl(f); setPortraitFile(f); setPortraitDataUrl(d); setError(null) }
-    catch { antMessage.error('Could not read image') }
+    catch { notice.error('Could not read image') }
     return false
   }
 
