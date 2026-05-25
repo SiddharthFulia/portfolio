@@ -1409,12 +1409,13 @@ const LANE_COPY = {
   zsky:      { label: 'ZSky',           bg: 'bg-sky-500' },
 }
 
-const JobCard = ({ job }) => {
+const JobCard = ({ job, onDelete }) => {
   const meta = JOB_STATUS_META[job.status] || JOB_STATUS_META.queued
   const lane = LANE_COPY[job.lane] || { label: job.lane || '?', bg: 'bg-gray-700' }
   const created = job.createdAt ? new Date(job.createdAt) : null
   const ago = created ? timeAgo(created) : ''
   const errShort = (job.error || '').slice(0, 120)
+  const isLive = job.status === 'queued' || job.status === 'processing'
 
   return (
     <div className={`luxe-card luxe-card-hover group relative overflow-hidden ring-1 ${meta.ring.replace('border-', 'ring-')}`}>
@@ -1435,6 +1436,24 @@ const JobCard = ({ job }) => {
         <div className={`absolute top-2 right-2 px-2 py-0.5 rounded-lg text-[9px] font-semibold uppercase tracking-wider ${lane.bg} text-black`}>
           {lane.label}
         </div>
+        {/* Delete / cancel — top-right corner, only renders if a handler
+            was passed (the JobsTab passes one; other consumers might not).
+            Tooltip swaps label based on whether the row is live or
+            terminal. e.stopPropagation so the card's hover-play doesn't
+            grab the click. */}
+        {onDelete && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onDelete(job) }}
+            title={isLive ? 'Cancel this job' : 'Delete this job'}
+            aria-label={isLive ? 'Cancel job' : 'Delete job'}
+            className="absolute bottom-2 right-2 w-7 h-7 rounded-md grid place-items-center
+                       border border-rose-500/40 bg-rose-500/10 text-rose-300
+                       hover:bg-rose-500/25 hover:text-rose-100 transition-colors
+                       opacity-0 group-hover:opacity-100 focus:opacity-100">
+            <DeleteOutlined className="text-xs" />
+          </button>
+        )}
       </div>
       <div className="p-3 space-y-1.5">
         <p className="text-xs text-gray-200 line-clamp-2 leading-snug min-h-[2.4em]">
@@ -1467,6 +1486,11 @@ const JobsTab = ({ refreshKey }) => {
   const [page, setPage] = useState(1)
   const [data, setData] = useState({ items: [], total: 0, pages: 1, counts: { queued: 0, processing: 0, completed: 0, failed: 0 } })
   const [loading, setLoading] = useState(true)
+  // Internal bump triggers an immediate refetch after a delete — without
+  // it, the user would have to wait for the next auto-poll (or only see
+  // the change if the row was queued/processing). Same pattern Library
+  // uses after its bulk ops.
+  const [internalReload, setInternalReload] = useState(0)
 
   // Reset page on filter change so we don't paginate to ghost pages
   useEffect(() => { setPage(1) }, [statusFilter, refreshKey])
@@ -1489,7 +1513,35 @@ const JobsTab = ({ refreshKey }) => {
     if (!hasActive) return () => { cancelled = true }
     const iv = setInterval(fetchPage, 4000)
     return () => { cancelled = true; clearInterval(iv) }
-  }, [statusFilter, page, refreshKey, data.counts?.queued, data.counts?.processing])
+  }, [statusFilter, page, refreshKey, internalReload, data.counts?.queued, data.counts?.processing])
+
+  // Per-row delete. The BE endpoint (`DELETE /api/ai-video/:videoId`)
+  // already handles BOTH inflight jobs AND completed videos — the
+  // controller checks the inflight `jobs` table first, then falls
+  // through to Cloudinary cleanup for completed `videos` rows. So one
+  // button does the right thing whether the row is queued, processing,
+  // failed, or completed.
+  const requestDelete = (job) => {
+    const isLive = job.status === 'queued' || job.status === 'processing'
+    Modal.confirm({
+      title: isLive ? `Cancel job ${job.videoId.slice(-8)}?` : `Delete job ${job.videoId.slice(-8)}?`,
+      content: isLive
+        ? "This removes the row before the worker finishes. If the worker has already started, the result lands in the database orphaned — you'll see it in Library and can delete it from there too."
+        : "This removes the row + Cloudinary asset. Can't be undone.",
+      okText:  isLive ? 'Cancel job' : 'Delete',
+      okType:  'danger',
+      okButtonProps: { danger: true },
+      cancelText: 'Back',
+      autoFocusButton: 'cancel',
+      centered: true,
+      onOk: async () => {
+        const { error } = await deleteVideo(job.videoId)
+        if (error) { antMessage.error(`Delete failed: ${error}`); return }
+        antMessage.success(isLive ? 'Job cancelled' : 'Deleted')
+        setInternalReload(n => n + 1)
+      },
+    })
+  }
 
   const filters = [
     { v: 'all',        label: 'All',        n: data.counts ? (data.counts.queued + data.counts.processing + data.counts.completed + data.counts.failed) : null },
@@ -1534,7 +1586,7 @@ const JobsTab = ({ refreshKey }) => {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {data.items.map(j => <JobCard key={`${j.src}-${j.videoId}-${j.ts}`} job={j} />)}
+          {data.items.map(j => <JobCard key={`${j.src}-${j.videoId}-${j.ts}`} job={j} onDelete={requestDelete} />)}
         </div>
       )}
 

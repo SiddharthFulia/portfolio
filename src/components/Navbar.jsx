@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useRef, useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { LockOutlined } from "@ant-design/icons";
 import { logo } from "../assets/images";
 import sakura from "../assets/sakura.mp3";
 
@@ -87,7 +88,19 @@ const Navbar = () => {
         { to: '/explore',    label: 'Web Playground',   desc: '9 APIs · Pokémon · Memes · Countries · Quotes' },
         { to: '/summarizer', label: 'Summarizer',       desc: 'Paste long text · get a tight summary' },
         { to: '/yt-dl',      label: 'YouTube DL',       desc: 'Paste a YouTube link · get MP3 or MP4 · 1hr+ works fine' },
-        { to: '/settings',   label: 'Settings',         desc: "Admin · Sid's monitoring panel · server / DB / queues" },
+      ],
+    },
+    {
+      // Vault-gated lanes — every link here passes through <VaultGate>
+      // which prompts for the password on first visit, then keeps a JWT
+      // in localStorage (`sid-vault-token`) until expiry so subsequent
+      // clicks bypass the modal.
+      title: 'Vault',
+      accent: 'text-fuchsia-300',
+      vault: true,
+      items: [
+        { to: '/deepfake', label: 'Deepfake Studio', desc: 'Face-swap · voice-clone · Vault password required', vault: true },
+        { to: '/settings', label: 'Settings',        desc: "Admin · Sid's monitoring panel · server / DB / queues", vault: true },
       ],
     },
   ];
@@ -181,12 +194,17 @@ const Navbar = () => {
                               }`}>
                             {({ isActive }) => (
                               <>
-                                <span className={`text-sm font-semibold transition-colors ${
+                                <span className={`text-sm font-semibold transition-colors inline-flex items-center gap-1.5 ${
                                   isActive
                                     ? (isDark ? 'text-white' : 'text-black')
                                     : (isDark ? 'text-gray-100 group-hover:text-white' : 'text-gray-900')
                                 }`}>
                                   {it.label}
+                                  {it.vault && (
+                                    <LockOutlined
+                                      className="text-[10px] text-fuchsia-400"
+                                      title="Vault password required" />
+                                  )}
                                 </span>
                                 <span className={`text-[11px] mt-0.5 ${isDark ? 'text-gray-500 group-hover:text-gray-400' : 'text-gray-500'}`}>
                                   {it.desc}
@@ -286,7 +304,13 @@ const Navbar = () => {
                     ? 'text-amber-300 bg-amber-500/10'
                     : isDark ? 'text-gray-300' : 'text-gray-700'
                   }`}>
-                  <span className="text-sm font-medium">{it.label}</span>
+                  <span className="text-sm font-medium inline-flex items-center gap-1.5">
+                    {it.label}
+                    {it.vault && (
+                      <LockOutlined className="text-[10px] text-fuchsia-400"
+                        title="Vault password required" />
+                    )}
+                  </span>
                   <span className="text-[11px] text-gray-500">{it.desc}</span>
                 </NavLink>
               ))}
