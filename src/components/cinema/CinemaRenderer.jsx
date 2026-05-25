@@ -181,6 +181,13 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
   const [phase, setPhase] = useState(() => initialRender?.phase || 'idle')
   const [currentShotIndex, setCurrentShotIndex] = useState(() => initialRender?.currentShotIndex || 0)
   const [combineJobId, setCombineJobId] = useState(() => initialRender?.combineJobId || null)
+  // Per-shot accordion. Set of shot indices that are EXPANDED. Default
+  // is "auto" — in-flight shots open themselves, completed shots stay
+  // closed so the user isn't staring at the AgentPlan tree's
+  // boilerplate "Setup / Generate / Post-process · pending" for shots
+  // whose logs have already expired. Manual click overrides.
+  const [expandedShots, setExpandedShots] = useState(() => new Set())
+  const [combineExpanded, setCombineExpanded] = useState(false)
   const [combineRow, setCombineRow] = useState(null)
   const [finalDownloadHref, setFinalDownloadHref] = useState(() => initialRender?.finalDownloadHref || '')
   const [pipelineError, setPipelineError] = useState(() => initialRender?.error || '')
@@ -206,9 +213,43 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
     setCombineRow(null)
     setFinalDownloadHref(initialRender?.finalDownloadHref || '')
     setPipelineError(initialRender?.error || '')
+    setExpandedShots(new Set())
+    setCombineExpanded(false)
     isCancelledRef.current = false
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.projectId, shotPrompts.length, renderId])
+
+  // Auto-expand whichever shot is currently in flight, so the user
+  // always sees the running shot's log tree without having to click.
+  // Done by ADDING to the set, not replacing — manual closes stick
+  // unless the user opens them again.
+  useEffect(() => {
+    setExpandedShots(prev => {
+      let changed = false
+      const next = new Set(prev)
+      shots.forEach((shotRow, idx) => {
+        const live = shotRow.status === 'queued' || shotRow.status === 'processing'
+        if (live && !next.has(idx)) { next.add(idx); changed = true }
+      })
+      return changed ? next : prev
+    })
+  }, [shots])
+
+  // Same for the combine row — auto-open while it's running.
+  useEffect(() => {
+    if (combineRow?.status === 'queued' || combineRow?.status === 'processing') {
+      setCombineExpanded(true)
+    }
+  }, [combineRow?.status])
+
+  const toggleShot = (idx) => {
+    setExpandedShots(prev => {
+      const next = new Set(prev)
+      if (next.has(idx)) next.delete(idx)
+      else next.add(idx)
+      return next
+    })
+  }
 
   // Helper to patch a single shot row by index.
   const patchShot = (shotIndex, patchObject) => {
@@ -521,70 +562,85 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
         <p className="mb-3 text-xs font-mono text-rose-300 break-words">{pipelineError}</p>
       )}
 
-      {/* Per-shot rows */}
+      {/* Per-shot rows — accordion. Header (shot # / status / prompt /
+          inline preview) is always visible. The agentic log tree mounts
+          only when the card is expanded so completed shots don't show
+          "Setup / Generate / Post-process · pending" when their logs
+          have already expired in the BE. In-flight shots auto-expand
+          via the effect above so the running shot's logs are visible
+          without a click. */}
       <ol className="space-y-2">
-        {shots.map((shotRow, shotIndex) => (
-          <li key={shotIndex} className="luxe-card p-3">
-            <div className="flex items-start justify-between gap-3 flex-wrap">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="text-[10px] font-mono text-amber-400 font-bold tabular-nums">
-                    SHOT {String(shotIndex + 1).padStart(2, '0')}
-                  </span>
-                  <span className={`text-[10px] font-mono uppercase tracking-wider ${
-                    shotRow.status === 'completed' ? 'text-emerald-300'
-                    : shotRow.status === 'failed' ? 'text-rose-300'
-                    : shotRow.status === 'processing' || shotRow.status === 'queued' ? 'text-amber-300'
-                    : 'text-fg-muted'
-                  }`}>
-                    {shotRow.status}
-                  </span>
-                  {shotRow.sourceImageUrl && (
-                    <span className="text-[10px] font-mono text-cyan-300/80">
-                      ← from shot {shotIndex} tail frame
+        {shots.map((shotRow, shotIndex) => {
+          const expanded = expandedShots.has(shotIndex)
+          const headerStatusTone =
+            shotRow.status === 'completed' ? 'text-emerald-300'
+            : shotRow.status === 'failed' ? 'text-rose-300'
+            : shotRow.status === 'processing' || shotRow.status === 'queued' ? 'text-amber-300'
+            : 'text-fg-muted'
+          return (
+            <li key={shotIndex} className="luxe-card p-3">
+              <button
+                type="button"
+                onClick={() => toggleShot(shotIndex)}
+                className="w-full text-left flex items-start justify-between gap-3 flex-wrap"
+                aria-expanded={expanded}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-[10px] font-mono text-amber-400 font-bold tabular-nums">
+                      SHOT {String(shotIndex + 1).padStart(2, '0')}
                     </span>
+                    <span className={`text-[10px] font-mono uppercase tracking-wider ${headerStatusTone}`}>
+                      {shotRow.status}
+                    </span>
+                    {shotRow.sourceImageUrl && (
+                      <span className="text-[10px] font-mono text-cyan-300/80">
+                        ← from shot {shotIndex} tail frame
+                      </span>
+                    )}
+                    <span className="ml-auto text-[10px] font-mono text-gray-500">
+                      {expanded ? '▾ collapse' : '▸ logs'}
+                    </span>
+                  </div>
+                  <p className="text-[12px] text-gray-300 font-mono leading-relaxed">
+                    {shotRow.prompt}
+                  </p>
+                  {(shotRow.status === 'queued' || shotRow.status === 'processing') && (
+                    <Progress
+                      percent={shotRow.progressPercent || 0} size="small" showInfo={false}
+                      strokeColor="#fbbf24" trailColor="#1f2937"
+                      className="!mt-2 !mb-0"
+                    />
+                  )}
+                  {shotRow.error && (
+                    <p className="mt-2 text-[10px] font-mono text-rose-400 break-words">{shotRow.error}</p>
                   )}
                 </div>
-                <p className="text-[12px] text-gray-300 font-mono leading-relaxed">
-                  {shotRow.prompt}
-                </p>
-                {(shotRow.status === 'queued' || shotRow.status === 'processing') && (
-                  <Progress
-                    percent={shotRow.progressPercent || 0} size="small" showInfo={false}
-                    strokeColor="#fbbf24" trailColor="#1f2937"
-                    className="!mt-2 !mb-0"
+                {shotRow.videoUrl && (
+                  <video
+                    src={shotRow.videoUrl} muted playsInline preload="metadata" controls
+                    className="w-40 aspect-video rounded-md border border-line"
+                    onClick={(e) => e.stopPropagation()}
                   />
                 )}
-                {shotRow.error && (
-                  <p className="mt-2 text-[10px] font-mono text-rose-400 break-words">{shotRow.error}</p>
-                )}
-              </div>
-              {shotRow.videoUrl && (
-                <video
-                  src={shotRow.videoUrl} muted playsInline preload="metadata" controls
-                  className="w-40 aspect-video rounded-md border border-line"
-                />
-              )}
-            </div>
+              </button>
 
-            {/* Live agentic logs for this shot's video job. JobLogsAgentPlan
-                polls /api/job-logs/ai-video/<jobId>?since=… every 1.5s and
-                renders the same tree AI Video uses — [process] line,
-                [eta], sampler X/Y, etc. Only mounts once the shot has a
-                jobId (i.e. it's been queued). Stays mounted on completed
-                shots too so the user can scroll back through what ran. */}
-            {shotRow.jobId && (
-              <div className="mt-2">
-                <JobLogsAgentPlan
-                  lane="ai-video"
-                  jobId={shotRow.jobId}
-                  status={shotRow.status}
-                  error={shotRow.error}
-                />
-              </div>
-            )}
-          </li>
-        ))}
+              {/* Log tree mounts only when expanded — saves polling
+                  cycles on completed shots that the user isn't looking
+                  at, and avoids the "Setup pending" boilerplate on
+                  shots whose logs have already aged out. */}
+              {expanded && shotRow.jobId && (
+                <div className="mt-2">
+                  <JobLogsAgentPlan
+                    lane="ai-video"
+                    jobId={shotRow.jobId}
+                    status={shotRow.status}
+                    error={shotRow.error}
+                  />
+                </div>
+              )}
+            </li>
+          )
+        })}
       </ol>
 
       {/* Combine row */}
@@ -615,18 +671,28 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
               className="!mt-2"
             />
           )}
-          {/* ffmpeg-concat agentic logs — same tree component, lane='combine'.
-              Polls /api/job-logs/combine/<combineJobId> and shows the
-              per-step messages the BE writes (download N MB, concat
-              demuxer try, re-encode fallback, final mux, etc.). */}
+          {/* ffmpeg-concat agentic logs — same accordion pattern as the
+              shot cards above. Auto-opens while combining, collapsed
+              once done so the user isn't staring at an empty plan tree. */}
           {combineJobId && (
             <div className="mt-3">
-              <JobLogsAgentPlan
-                lane="combine"
-                jobId={combineJobId}
-                status={combineRow?.status || 'queued'}
-                error={combineRow?.error}
-              />
+              <button
+                type="button"
+                onClick={() => setCombineExpanded(o => !o)}
+                aria-expanded={combineExpanded}
+                className="text-[10px] font-mono text-gray-400 hover:text-gray-200 inline-flex items-center gap-1">
+                {combineExpanded ? '▾ collapse combine logs' : '▸ combine logs'}
+              </button>
+              {combineExpanded && (
+                <div className="mt-2">
+                  <JobLogsAgentPlan
+                    lane="combine"
+                    jobId={combineJobId}
+                    status={combineRow?.status || 'queued'}
+                    error={combineRow?.error}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>

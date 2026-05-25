@@ -19,8 +19,8 @@
 
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Alert, message as antMessage } from 'antd'
-import { ArrowLeftOutlined, ReloadOutlined } from '@ant-design/icons'
+import { Alert, Modal, message as antMessage } from 'antd'
+import { ArrowLeftOutlined, ReloadOutlined, ExpandAltOutlined } from '@ant-design/icons'
 import { getCinemaRender } from '../api/ai'
 import CinemaRenderer from '../components/cinema/CinemaRenderer'
 
@@ -32,6 +32,7 @@ export default function CinemaRenderPage() {
   const [project, setProject] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [titleModalOpen, setTitleModalOpen] = useState(false)
 
   useEffect(() => {
     document.title = `Cinema render · ${renderId?.slice(-8) || ''}`
@@ -118,15 +119,52 @@ export default function CinemaRenderPage() {
 
         <header className="pb-2 border-b border-gray-800">
           <p className="eyebrow-mono mb-2">— Cinema · live render</p>
-          <h1 className="text-2xl sm:text-3xl font-bold text-white">
-            {project?.masterPrompt
-              ? project.masterPrompt.slice(0, 120) + (project.masterPrompt.length > 120 ? '…' : '')
-              : 'Untitled render'}
-          </h1>
-          <p className="text-[11px] font-mono text-gray-500 mt-1">
-            project {render.projectId} · {render.shotCount} shots · status <span className="text-amber-300">{render.status}</span>
-          </p>
+          {(() => {
+            const fullTitle = project?.masterPrompt || 'Untitled render'
+            const isTruncated = fullTitle.length > 120
+            // Title shows truncated by default + an expand button when
+            // it's been clipped. Click anywhere on the heading (or the
+            // explicit button) to open a Modal with the full prompt —
+            // saves the user from squinting at the trailing "…".
+            return (
+              <>
+                <h1
+                  className={`text-2xl sm:text-3xl font-bold text-white leading-tight ${isTruncated ? 'cursor-pointer hover:text-amber-200' : ''}`}
+                  onClick={() => isTruncated && setTitleModalOpen(true)}
+                  title={isTruncated ? 'Click to read the full prompt' : undefined}>
+                  {isTruncated ? fullTitle.slice(0, 120) + '…' : fullTitle}
+                  {isTruncated && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setTitleModalOpen(true) }}
+                      className="ml-2 inline-flex items-center gap-1 text-[11px] font-mono text-amber-300/80 hover:text-amber-200 underline align-middle">
+                      <ExpandAltOutlined /> full
+                    </button>
+                  )}
+                </h1>
+                <p className="text-[11px] font-mono text-gray-500 mt-1">
+                  project {render.projectId} · {render.shotCount} shots · status <span className="text-amber-300">{render.status}</span>
+                </p>
+              </>
+            )
+          })()}
         </header>
+
+        {/* Full-title modal. Centered, no chrome around the prose — just
+            the master prompt verbatim so the user can read or copy it.
+            Closes on backdrop click + Escape (antd Modal defaults). */}
+        <Modal
+          open={titleModalOpen}
+          onCancel={() => setTitleModalOpen(false)}
+          footer={null}
+          centered
+          width={640}
+          title="Master prompt"
+        >
+          <p className="text-sm text-gray-200 leading-relaxed whitespace-pre-wrap font-mono">
+            {project?.masterPrompt || '—'}
+          </p>
+        </Modal>
 
         {project && (
           <CinemaRenderer
