@@ -48,6 +48,51 @@ const QUALITY_PRESETS = [
   { id: 'ultra',    label: 'Ultra',     steps: 64, hint: '~60s · max' },
 ]
 
+// Model catalog. `quality: true` means the engine accepts the rich mesh
+// + texture quality knobs (TRELLIS family + Hunyuan3D). Shap-E / TripoSR
+// only use `steps`. Order matters — fastest first so the picker reads as
+// a quality ramp left → right.
+const MODELS = [
+  {
+    id: 'shap-e', name: 'Shap-E', tag: 'Fast',
+    eta: '~30-60s',
+    blurb: 'OpenAI · pure text → 3D, abstract-friendly',
+    quality: false,
+  },
+  {
+    id: 'tripo', name: 'TripoSR', tag: 'Speed',
+    eta: '~10-15s',
+    blurb: 'Flux image → TripoSR, recognisable objects',
+    quality: false,
+  },
+  {
+    id: 'trellis', name: 'TRELLIS', tag: 'Quality',
+    eta: '~2-3m',
+    blurb: 'Microsoft · sparse-structure + structured-latent flow',
+    quality: true,
+  },
+  {
+    id: 'trellis-v2', name: 'TRELLIS v2', tag: 'Quality+',
+    eta: '~3-5m',
+    blurb: 'Larger SLAT decoder · cleaner texture seams',
+    quality: true,
+  },
+  {
+    id: 'hunyuan3d', name: 'Hunyuan3D', tag: 'Studio',
+    eta: '~4-6m',
+    blurb: 'Tencent · DiT shape + texture · biggest detail',
+    quality: true,
+  },
+]
+
+const TEXTURE_RES_OPTIONS = [512, 1024, 2048]
+const POLYGON_PRESETS = [
+  { value: 5000,   label: 'Low (5k)' },
+  { value: 20000,  label: 'Med (20k)' },
+  { value: 80000,  label: 'High (80k)' },
+  { value: 200000, label: 'Ultra (200k)' },
+]
+
 const EXPORT_FORMATS = [
   { id: 'glb', label: 'GLB',  hint: 'best fidelity (binary glTF)' },
   { id: 'obj', label: 'OBJ',  hint: 'Blender · classic' },
@@ -185,12 +230,19 @@ function CanvasOverlay({ kind, progressMessage, elapsedMs, error }) {
 // ── main ─────────────────────────────────────────────────────────────
 export default function PromptToMesh() {
   // ── generation state ──
-  const [prompt, setPrompt]                 = useState('')
-  const [model, setModel]                   = useState('shap-e')
-  const [steps, setSteps]                   = useState(32)
-  const [seed, setSeed]                     = useState(() => randomSeed())
-  const [guidance, setGuidance]             = useState(15)
-  const [negativePrompt, setNegativePrompt] = useState('')
+  const [prompt, setPrompt]                       = useState('')
+  const [model, setModel]                         = useState('shap-e')
+  const [steps, setSteps]                         = useState(32)
+  const [seed, setSeed]                           = useState(() => randomSeed())
+  const [guidance, setGuidance]                   = useState(15)
+  const [negativePrompt, setNegativePrompt]       = useState('')
+  // Advanced quality knobs — forwarded to the worker on TRELLIS family +
+  // Hunyuan3D. The worker maps each slider to engine-specific params
+  // (see HOW_IT_WORKS §36 in local-gpu-worker for the mapping table).
+  const [meshQuality, setMeshQuality]             = useState(50)
+  const [textureQuality, setTextureQuality]       = useState(50)
+  const [textureResolution, setTextureResolution] = useState(1024)
+  const [polygonTarget, setPolygonTarget]         = useState(80000)
 
   const [submitting, setSubmitting]           = useState(false)
   const [jobId, setJobId]                     = useState('')
@@ -272,12 +324,22 @@ export default function PromptToMesh() {
     setStatus('queued'); setProgressMessage('Submitting…')
     setElapsedMs(0); startedAtRef.current = Date.now()
 
-    // Pass through every advanced knob — the BE drops unknown fields today
-    // but the same payload will work the moment the worker learns them.
+    // Quality knobs are only meaningful for the high-fidelity engines
+    // (TRELLIS family + Hunyuan3D). For Shap-E / TripoSR we keep the
+    // payload lean — BE clamps + ignores extras, but sending only what
+    // matters keeps the logs readable.
+    const modelDef = MODELS.find(m => m.id === model)
+    const sendsQuality = !!modelDef?.quality
     const payload = {
       prompt: text, model, steps,
       seed, guidance,
       negativePrompt: negativePrompt.trim() || undefined,
+      ...(sendsQuality ? {
+        meshQuality,
+        textureQuality,
+        textureResolution,
+        polygonTarget,
+      } : {}),
     }
     const { data, error: subErr } = await submitMeshJob(payload)
     if (subErr || !data?.jobId) {
@@ -549,44 +611,135 @@ export default function PromptToMesh() {
                 disabled={isWorking}
               />
 
-              {/* Model picker */}
+              {/* Model picker — five engines, fastest to most-detailed.
+                  TRELLIS / TRELLIS v2 / Hunyuan3D additionally expose the
+                  Mesh & Texture Quality section below. */}
               <div className="mt-3">
                 <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-300 mb-1.5 block">
                   Engine
                 </label>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <button type="button" onClick={() => setModel('shap-e')}
-                    disabled={isWorking}
-                    className={`text-left p-2.5 rounded-lg border transition-all ${
-                      model === 'shap-e'
-                        ? 'border-amber-400/60 bg-amber-500/10 ring-1 ring-amber-400/40'
-                        : 'border-gray-800 bg-gray-900/40 hover:border-gray-700'
-                    }`}>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-white">Shap-E</span>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-300">Solid</span>
-                    </div>
-                    <div className="text-[11.5px] text-gray-200 mt-1 leading-snug">
-                      Pure text → 3D · ~30-60s · abstract-friendly
-                    </div>
-                  </button>
-                  <button type="button" onClick={() => setModel('tripo')}
-                    disabled={isWorking}
-                    className={`text-left p-2.5 rounded-lg border transition-all ${
-                      model === 'tripo'
-                        ? 'border-fuchsia-400/60 bg-fuchsia-500/10 ring-1 ring-fuchsia-400/40'
-                        : 'border-gray-800 bg-gray-900/40 hover:border-gray-700'
-                    }`}>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-white">TripoSR</span>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-fuchsia-300">🔥 Beast</span>
-                    </div>
-                    <div className="text-[11.5px] text-gray-200 mt-1 leading-snug">
-                      Flux image → 3D · ~10-15s · better fidelity
-                    </div>
-                  </button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  {MODELS.map(m => {
+                    const active = model === m.id
+                    return (
+                      <button key={m.id} type="button"
+                        onClick={() => setModel(m.id)}
+                        disabled={isWorking}
+                        className={`text-left p-2.5 rounded-lg border transition-colors ${
+                          active
+                            ? 'border-amber-400/60 bg-amber-500/12'
+                            : 'border-gray-800 bg-gray-900/40 hover:border-gray-700'
+                        }`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-semibold text-white">{m.name}</span>
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-300 shrink-0">
+                            {m.tag}
+                          </span>
+                        </div>
+                        <div className="text-[11.5px] text-gray-200 mt-1 leading-snug">
+                          {m.blurb}
+                        </div>
+                        <div className="text-[10px] font-mono text-gray-500 mt-1">{m.eta}</div>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
+
+              {/* Mesh & Texture Quality — only meaningful for TRELLIS /
+                  TRELLIS v2 / Hunyuan3D. Each slider maps to engine-
+                  specific params on the worker (see HOW_IT_WORKS §36):
+                    meshQuality   → TRELLIS ss_steps / Hunyuan3D octree_resolution
+                    texQuality    → TRELLIS slat_steps / Hunyuan3D texture_steps
+                    texResolution → texture map output size (512/1024/2048)
+                    polygonTarget → decimation target (TRELLIS mesh_simplify,
+                                    Hunyuan3D target_face_num)
+                  Sliders default to 50 / 1024 / 80k — sensible "looks great
+                  without melting the GPU for 10 minutes" presets. */}
+              {MODELS.find(m => m.id === model)?.quality && (
+                <div className="mt-4 pt-3 border-t border-gray-800/60 space-y-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-300">
+                    Mesh & texture quality
+                  </p>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-300">
+                        Mesh quality
+                      </label>
+                      <span className="text-xs font-mono text-amber-300">{meshQuality}</span>
+                    </div>
+                    <input type="range" min={0} max={100} step={1}
+                      value={meshQuality}
+                      disabled={isWorking}
+                      onChange={e => setMeshQuality(parseInt(e.target.value, 10))}
+                      className="w-full accent-amber-400" />
+                    <p className="text-[10px] text-gray-500 mt-0.5">
+                      Sparse-structure flow steps · octree resolution. Higher = more geometric detail (slower).
+                    </p>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-300">
+                        Texture quality
+                      </label>
+                      <span className="text-xs font-mono text-amber-300">{textureQuality}</span>
+                    </div>
+                    <input type="range" min={0} max={100} step={1}
+                      value={textureQuality}
+                      disabled={isWorking}
+                      onChange={e => setTextureQuality(parseInt(e.target.value, 10))}
+                      className="w-full accent-amber-400" />
+                    <p className="text-[10px] text-gray-500 mt-0.5">
+                      Structured-latent flow steps · texture DiT steps. Higher = crisper materials + fewer seams.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-300 mb-1.5 block">
+                      Texture map resolution
+                    </label>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {TEXTURE_RES_OPTIONS.map(res => (
+                        <button key={res} type="button"
+                          onClick={() => setTextureResolution(res)}
+                          disabled={isWorking}
+                          className={`text-center p-1.5 rounded-md border text-[11px] font-semibold font-mono transition-colors ${
+                            textureResolution === res
+                              ? 'border-amber-400/60 bg-amber-500/12 text-amber-200'
+                              : 'border-gray-800 bg-gray-900/40 text-gray-400 hover:text-white hover:border-gray-700'
+                          }`}>
+                          {res}px
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold uppercase tracking-wider text-gray-300 mb-1.5 block">
+                      Polygon target
+                    </label>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {POLYGON_PRESETS.map(p => (
+                        <button key={p.value} type="button"
+                          onClick={() => setPolygonTarget(p.value)}
+                          disabled={isWorking}
+                          className={`text-center p-1.5 rounded-md border text-[10.5px] font-semibold transition-colors ${
+                            polygonTarget === p.value
+                              ? 'border-amber-400/60 bg-amber-500/12 text-amber-200'
+                              : 'border-gray-800 bg-gray-900/40 text-gray-400 hover:text-white hover:border-gray-700'
+                          }`}>
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-gray-500 mt-1">
+                      Higher = more triangles in the exported mesh. Studio quality wants 80k+.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Quality preset chips (Shap-E only — TripoSR ignores steps) */}
               {model === 'shap-e' && (
