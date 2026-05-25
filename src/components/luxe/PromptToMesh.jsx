@@ -228,7 +228,7 @@ function CanvasOverlay({ kind, progressMessage, elapsedMs, error }) {
 }
 
 // ── main ─────────────────────────────────────────────────────────────
-export default function PromptToMesh() {
+export default function PromptToMesh({ presetGlbUrl = '', clearPreset } = {}) {
   // ── generation state ──
   const [prompt, setPrompt]                       = useState('')
   const [model, setModel]                         = useState('shap-e')
@@ -255,7 +255,21 @@ export default function PromptToMesh() {
   const [jobId, setJobId]                     = useState('')
   const [status, setStatus]                   = useState('')
   const [progressMessage, setProgressMessage] = useState('')
-  const [glbUrl, setGlbUrl]                   = useState('')
+  const [glbUrl, setGlbUrl]                   = useState(presetGlbUrl || '')
+
+  // When the Library tab hands a historical glbUrl down via the preset
+  // prop, load it into the viewer (and reset the in-flight status fields
+  // so the empty-state overlay doesn't appear). One-shot — we call
+  // clearPreset so a later state change in the parent doesn't re-fire.
+  useEffect(() => {
+    if (!presetGlbUrl) return
+    setGlbUrl(presetGlbUrl)
+    setStatus('completed')
+    setError('')
+    setProgressMessage('')
+    setElapsedMs(0)
+    clearPreset?.()
+  }, [presetGlbUrl, clearPreset])
   const [error, setError]                     = useState('')
   const [elapsedMs, setElapsedMs]             = useState(0)
   const [history, setHistory]                 = useState(() => readHistory())

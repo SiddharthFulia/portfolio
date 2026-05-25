@@ -446,9 +446,21 @@ export async function getMeshStatus(jobId) {
     return { data: data?.data || null, error: null };
   } catch (err) { return { data: null, error: err.message }; }
 }
-export async function listMeshJobs({ status = 'completed', visibility = 'public', page = 1, limit = 24 } = {}) {
+// Paginated. Server clamps pageSize to [1, 1000]; default 24.
+//   status   — 'all' | 'queued' | 'processing' | 'completed' | 'failed'
+//   page     — 1-based
+//   pageSize — rows per page
+export async function listMeshJobs({ status = 'all', page = 1, pageSize = 24 } = {}) {
   try {
-    const data = await get(ENDPOINTS.MESH_LIST, { status, visibility, page, limit }, { timeout: 8000 });
+    const params = { page, pageSize };
+    if (status && status !== 'all') params.status = status;
+    const data = await get(ENDPOINTS.MESH_LIST, params, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function deleteMeshJob(jobId) {
+  try {
+    const data = await del(`${ENDPOINTS.MESH_GENERATE.replace('/generate', '')}/${jobId}`, { timeout: 6000 });
     return { data: data?.data || data, error: null };
   } catch (err) { return { data: null, error: err.message }; }
 }

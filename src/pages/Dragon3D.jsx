@@ -1,16 +1,24 @@
 import { useState } from 'react'
-import { ThunderboltOutlined, VideoCameraOutlined, BulbOutlined } from '@ant-design/icons'
+import { Tabs } from 'antd'
+import {
+  ThunderboltOutlined, VideoCameraOutlined, BulbOutlined,
+  AppstoreOutlined, EyeOutlined,
+} from '@ant-design/icons'
 import SplineScene from '../components/luxe/SplineScene'
 import PromptToThree from '../components/luxe/PromptToThree'
 import PromptToMesh from '../components/luxe/PromptToMesh'
+import MeshLibrary from '../components/luxe/MeshLibrary'
+import MeshVisualize from '../components/luxe/MeshVisualize'
 
-// /3d — three modes:
-//   1) Generate — type a prompt → Groq returns a constrained JSON
-//      scene DSL → live Three.js render (no fixed scene URL).
-//   2) 5090 — type a prompt → BE Shap-E worker on the 5090 produces
-//      a real .glb mesh → drei loads it.
-//   3) Showcase — a static Spline community scene as a fallback /
-//      gallery option. Swap SCENE_URL with any .splinecode URL.
+// /3d — five tabs:
+//   1) Generate          — Groq DSL → live Three.js
+//   2) Studio Pro        — text → 5090-generated GLB (PromptToMesh)
+//   3) Library           — every past mesh job, paginated, with status,
+//                          reference image, params, and "open in viewer"
+//                          that hands the URL back to Studio Pro
+//   4) Visualize         — drop any GLB/GLTF/OBJ/STL/PLY and view it in
+//                          the same canvas (no generation)
+//   5) Showcase          — static Spline community scene
 //
 // The Spline runtime is lazy-loaded inside <SplineScene>, so the
 // Showcase tab only pulls the heavy WebGL runtime when picked.
@@ -18,61 +26,78 @@ import PromptToMesh from '../components/luxe/PromptToMesh'
 const SHOWCASE_SCENE_URL =
   'https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode'
 
-const tabs = [
-  { id: 'generate', label: 'Generate from prompt', icon: <BulbOutlined /> },
-  { id: '5090',     label: 'Studio Pro · real mesh', icon: <ThunderboltOutlined /> },
-  { id: 'showcase', label: 'Spline showcase', icon: <VideoCameraOutlined /> },
-]
+export default function Dragon3D() {
+  const [tab, setTab] = useState('generate')
+  // When the user clicks "Open in viewer" on a Library row, we set this
+  // and switch to Studio Pro so the existing PromptToMesh viewer renders
+  // the historical GLB. PromptToMesh reads it via a `presetGlbUrl` prop.
+  const [presetGlbUrl, setPresetGlbUrl] = useState('')
 
-const Dragon3D = () => {
-  const [tab, setTab] = useState('generate')   // 'generate' | '5090' | 'showcase'
+  const onPickFromLibrary = (row) => {
+    if (!row?.glbUrl) return
+    setPresetGlbUrl(row.glbUrl)
+    setTab('5090')
+  }
 
   return (
     <div className="min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 pb-20 px-4 sm:px-6">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
         <header className="text-center mb-6 sm:mb-10">
           <p className="luxe-eyebrow text-cyan-300/80">— Interactive 3D</p>
           <h1 className="luxe-section-title text-4xl sm:text-5xl text-white mt-3">
             Generate a 3D scene
           </h1>
           <p className="luxe-body-muted mt-3 max-w-xl mx-auto">
-            Type a description — get a Three.js scene live, or render a real
-            generated mesh on the 5090 GPU.
+            Type a description — get a Three.js scene live, render a real
+            mesh on the 5090, browse past jobs, or drop in your own model.
           </p>
         </header>
 
-        {/* Tabs */}
-        <div className="flex items-center justify-center gap-2 mb-4 flex-wrap">
-          {tabs.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              className={`luxe-btn text-xs sm:text-sm inline-flex items-center gap-2 ${
-                tab === t.id ? 'luxe-btn-primary' : 'luxe-btn-secondary'
-              }`}>
-              {t.icon}{t.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Active tab */}
-        {tab === 'generate' && <PromptToThree />}
-        {tab === '5090'     && <PromptToMesh />}
-        {tab === 'showcase' && (
-          <div className="luxe-card overflow-hidden">
-            <div className="relative w-full" style={{ height: 'min(72vh, 640px)' }}>
-              <SplineScene scene={SHOWCASE_SCENE_URL} className="!w-full !h-full" />
-              <div className="absolute top-4 right-4 luxe-card px-3 py-2 text-[11px] text-gray-300">
-                <span className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                  Drag · Scroll · Click
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
+        <Tabs
+          activeKey={tab}
+          onChange={setTab}
+          size="large"
+          items={[
+            {
+              key: 'generate',
+              label: <span><BulbOutlined /> Generate</span>,
+              children: <PromptToThree />,
+            },
+            {
+              key: '5090',
+              label: <span><ThunderboltOutlined /> Studio Pro</span>,
+              children: <PromptToMesh presetGlbUrl={presetGlbUrl} clearPreset={() => setPresetGlbUrl('')} />,
+            },
+            {
+              key: 'library',
+              label: <span><AppstoreOutlined /> Library</span>,
+              children: <MeshLibrary onPickRow={onPickFromLibrary} />,
+            },
+            {
+              key: 'visualize',
+              label: <span><EyeOutlined /> Visualize</span>,
+              children: <MeshVisualize />,
+            },
+            {
+              key: 'showcase',
+              label: <span><VideoCameraOutlined /> Showcase</span>,
+              children: (
+                <div className="luxe-card overflow-hidden">
+                  <div className="relative w-full" style={{ height: 'min(72vh, 640px)' }}>
+                    <SplineScene scene={SHOWCASE_SCENE_URL} className="!w-full !h-full" />
+                    <div className="absolute top-4 right-4 luxe-card px-3 py-2 text-[11px] text-gray-300">
+                      <span className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                        Drag · Scroll · Click
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ),
+            },
+          ]}
+        />
       </div>
     </div>
   )
 }
-
-export default Dragon3D
