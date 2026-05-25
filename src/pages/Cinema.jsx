@@ -295,6 +295,19 @@ const CINEMA_MODES = [
   { id: 'balanced', label: 'Balanced', blurb: 'Wan 2.2 5B · 14 steps · ~60-90s per shot' },
   { id: 'quality',  label: 'Quality',  blurb: 'Wan 2.2 5B · 30 steps · ~3-4m per shot · hero output' },
 ]
+// Mirrors the local-provider model list on AI Video Generate so the
+// Cinema planner exposes the same Beast-lane models per shot. Order
+// matches that page's antd <Select> dropdown.
+const BEAST_MODELS = [
+  { id: 'ltx-video',   label: 'LTX-Video 2B',     blurb: 'fast all-rounder · text + image' },
+  { id: 'wan-2.1',     label: 'Wan 2.1 1.3B',     blurb: 'cinematic motion · T2V only' },
+  { id: 'wan-2.1-i2v', label: 'Wan 2.1 I2V 14B',  blurb: 'top quality I2V · 14B model' },
+  { id: 'hunyuan',     label: 'HunyuanVideo',     blurb: 'Tencent · highest fidelity' },
+  { id: 'wan-2.2',     label: 'Wan 2.2 5B',       blurb: 'newest gen TI2V (default)' },
+  { id: 'mochi',       label: 'Mochi 1',          blurb: 'Apache-2 · distinctive style' },
+  { id: 'svd',         label: 'SVD-XT 1.1',       blurb: 'image-only · no prompt' },
+]
+const DEFAULT_BEAST_MODEL = 'wan-2.2'
 
 function PlannedShotsPanel({ project, navigate }) {
   const [creating, setCreating] = useState(false)
@@ -304,6 +317,44 @@ function PlannedShotsPanel({ project, navigate }) {
   // 'mode' only meaningfully changes the chain output for the optimized
   // provider — the other two ignore it on the BE.
   const showModePicker = renderProvider === 'optimized'
+  // 5090 Beast lets the user pick a model PER SHOT (LTX, Wan 2.1, …);
+  // optimized + zsky pick server-side, so the per-shot dropdown is
+  // hidden in those modes.
+  const showPerShotModel = renderProvider === 'local'
+
+  // Per-shot arrays — local state for snappy UX, PATCHed to the BE on
+  // every change so a refresh restores them. Initialised from the
+  // project row + padded to shotCount when missing.
+  const shotCount = project.shotPrompts.length
+  const [shotMusic, setShotMusic]   = useState(() =>
+    Array.from({ length: shotCount }, (_, i) => !!project.shotMusic?.[i])
+  )
+  const [shotModels, setShotModels] = useState(() =>
+    Array.from({ length: shotCount }, (_, i) => project.shotModels?.[i] || DEFAULT_BEAST_MODEL)
+  )
+
+  const patchProject = async (patch) => {
+    const { error: err } = await patchCinemaProject(project.projectId, patch)
+    if (err) antMessage.error(`Save failed: ${err}`)
+  }
+  const setMusicAt = (idx, v) => {
+    const next = [...shotMusic]; next[idx] = !!v; setShotMusic(next)
+    patchProject({ shotMusic: next })
+  }
+  const setModelAt = (idx, m) => {
+    const next = [...shotModels]; next[idx] = m; setShotModels(next)
+    patchProject({ shotModels: next })
+  }
+  const bulkMusic = (v) => {
+    const next = shotMusic.map(() => !!v); setShotMusic(next)
+    patchProject({ shotMusic: next })
+  }
+  const bulkModel = (m) => {
+    const next = shotModels.map(() => m); setShotModels(next)
+    patchProject({ shotModels: next })
+  }
+  const anyMusicOn = shotMusic.some(Boolean)
+  const allMusicOn = shotMusic.length > 0 && shotMusic.every(Boolean)
 
   const onStart = () => {
     Modal.confirm({
@@ -397,6 +448,47 @@ function PlannedShotsPanel({ project, navigate }) {
           </div>
         )}
       </div>
+      {/* Bulk shot-level controls — toggle music on/off for ALL shots
+          at once, or stamp the same Beast model across every shot.
+          Per-shot overrides still win after a bulk apply. */}
+      <div className="flex flex-wrap items-center gap-3 mb-3 pt-3 border-t border-line/40">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-gray-400">Music</span>
+          <button type="button" onClick={() => bulkMusic(true)}
+            className={`text-[11px] px-2 py-1 rounded border transition-colors ${
+              allMusicOn
+                ? 'border-emerald-400/60 bg-emerald-500/15 text-emerald-200'
+                : 'border-gray-800 text-gray-400 hover:border-gray-700'
+            }`}>
+            All on
+          </button>
+          <button type="button" onClick={() => bulkMusic(false)}
+            className={`text-[11px] px-2 py-1 rounded border transition-colors ${
+              !anyMusicOn
+                ? 'border-amber-400/60 bg-amber-500/15 text-amber-200'
+                : 'border-gray-800 text-gray-400 hover:border-gray-700'
+            }`}>
+            All off
+          </button>
+          <span className="text-[10px] text-gray-500 font-mono">
+            ({shotMusic.filter(Boolean).length}/{shotCount} on)
+          </span>
+        </div>
+        {showPerShotModel && (
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-gray-400">Apply model to all</span>
+            <Select
+              size="small"
+              value={null}
+              placeholder="Pick…"
+              onChange={(m) => m && bulkModel(m)}
+              style={{ minWidth: 180 }}
+              options={BEAST_MODELS.map(m => ({ value: m.id, label: m.label }))}
+            />
+          </div>
+        )}
+      </div>
+
       {/* Editable shot list — each row is its own component so its
           local edit + review state doesn't churn the whole panel. */}
       <ol className="space-y-2">
@@ -408,6 +500,11 @@ function PlannedShotsPanel({ project, navigate }) {
             durationPerShot={project.durationPerShot || 5}
             initialPrompt={prompt}
             allPrompts={project.shotPrompts}
+            showModel={showPerShotModel}
+            currentModel={shotModels[idx]}
+            onChangeModel={(m) => setModelAt(idx, m)}
+            musicOn={!!shotMusic[idx]}
+            onToggleMusic={(v) => setMusicAt(idx, v)}
           />
         ))}
       </ol>
@@ -422,7 +519,13 @@ function PlannedShotsPanel({ project, navigate }) {
 // against the shot's duration budget. The review opens in a modal
 // with the original prompt vs. AI suggestion side-by-side + an Apply
 // button that writes the suggestion back into the textarea + saves.
-function ShotPromptRow({ projectId, shotIndex, durationPerShot, initialPrompt, allPrompts }) {
+function ShotPromptRow({
+  projectId, shotIndex, durationPerShot, initialPrompt, allPrompts,
+  // Per-shot config — supplied by PlannedShotsPanel which owns the
+  // arrays + persists changes to the BE.
+  showModel = false, currentModel, onChangeModel,
+  musicOn = false, onToggleMusic,
+}) {
   const [text, setText] = useState(initialPrompt)
   const [savedText, setSavedText] = useState(initialPrompt)
   const [saving, setSaving] = useState(false)
@@ -520,6 +623,39 @@ function ShotPromptRow({ projectId, shotIndex, durationPerShot, initialPrompt, a
         autoSize={{ minRows: 2, maxRows: 6 }}
         className="!font-mono !text-[12px]"
       />
+
+      {/* Per-shot configuration row — Beast model dropdown (hidden on
+          optimized + zsky) and background-music toggle. Both state-
+          managed by the parent PlannedShotsPanel so bulk apply works. */}
+      <div className="mt-2 flex flex-wrap items-center gap-3 pt-2 border-t border-line/30">
+        {showModel && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-gray-500">Model</span>
+            <Select
+              size="small"
+              value={currentModel || DEFAULT_BEAST_MODEL}
+              onChange={onChangeModel}
+              style={{ minWidth: 180 }}
+              options={BEAST_MODELS.map(m => ({
+                value: m.id,
+                label: <span><span className="font-mono">{m.label}</span> <span className="text-gray-500 text-[10px]">· {m.blurb}</span></span>,
+              }))}
+            />
+          </div>
+        )}
+        <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-gray-500">Music</span>
+          <input
+            type="checkbox"
+            checked={!!musicOn}
+            onChange={(e) => onToggleMusic?.(e.target.checked)}
+            className="accent-amber-400"
+          />
+          <span className={`text-[10px] font-mono ${musicOn ? 'text-emerald-300' : 'text-gray-500'}`}>
+            {musicOn ? 'ON · MusicGen' : 'off'}
+          </span>
+        </label>
+      </div>
 
       <Modal
         title={`Review · Shot ${shotIndex + 1}`}
