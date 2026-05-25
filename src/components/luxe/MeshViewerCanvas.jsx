@@ -112,8 +112,23 @@ function makeMaterial(mode) {
 // ── GltfModel ────────────────────────────────────────────────────────
 // Loads the GLB, clones it (drei caches globally), auto-frames it, then
 // applies the chosen material + optional decimation + wireframe overlay.
+// resolveGlbUrl — handles both legacy Cloudinary URLs (full http/https)
+// and the new BE-served BLOB endpoint (`/api/mesh/file/:jobId`). drei's
+// useGLTF won't follow a relative URL, so we prepend VITE_BE_URL when
+// the path looks like a BE route. Anything else (data: URIs, blob: URLs
+// from Visualize's local file path) passes through unchanged.
+function resolveGlbUrl(url) {
+  if (!url) return url
+  if (/^(https?:|data:|blob:)/i.test(url)) return url
+  if (url.startsWith('/')) {
+    const beBase = import.meta.env.VITE_BE_URL || ''
+    return `${beBase}${url}`
+  }
+  return url
+}
+
 function GltfModel({ url, materialMode, decimation, wireframeOverlay, smoothShading, onLoaded }) {
-  const { scene } = useGLTF(url)
+  const { scene } = useGLTF(resolveGlbUrl(url))
 
   // Clone-once. Re-clone whenever url changes (parent re-keys Suspense).
   const cloned = useMemo(() => scene.clone(true), [scene])
@@ -289,24 +304,48 @@ const MeshViewerCanvas = forwardRef(function MeshViewerCanvas({
       controlsRef.current?.target?.set(0, 0, 0)
       controlsRef.current?.update?.()
     },
-    exportMesh: async (format) => {
+    // exportMesh — saves the mesh in the requested format. `opts`:
+    //   - untextured: true  → strip all baked materials and bake a flat
+    //                          white-clay material instead. Useful for
+    //                          3D printing or as a "raw geometry" download
+    //                          when the user wants to repaint elsewhere.
+    //   - filename: 'mesh'  → name without extension; defaults to 'mesh'.
+    // The override is temporary — materials are restored after the
+    // exporter callback fires so the on-screen view doesn't change.
+    exportMesh: async (format, opts = {}) => {
       if (!modelRoot) return false
+      const { untextured = false, filename = 'mesh' } = opts
+      // Stash the live materials (per mesh) and swap to a flat clay
+      // before exporting. Restore on the way out — finally-block-safe.
+      const stashed = []
+      if (untextured) {
+        const clay = new THREE.MeshStandardMaterial({
+          color: '#e5e7eb', roughness: 1.0, metalness: 0.0,
+        })
+        modelRoot.traverse(obj => {
+          if (!obj.isMesh) return
+          stashed.push({ obj, original: obj.material })
+          obj.material = clay
+        })
+      }
+      const restore = () => {
+        for (const entry of stashed) entry.obj.material = entry.original
+      }
       try {
         if (format === 'obj') {
           const exporter = new OBJExporter()
           const text = exporter.parse(modelRoot)
-          downloadBlob(new Blob([text], { type: 'text/plain' }), `mesh.obj`)
+          downloadBlob(new Blob([text], { type: 'text/plain' }), `${filename}.obj`)
         } else if (format === 'stl') {
           const exporter = new STLExporter()
           const text = exporter.parse(modelRoot)
-          downloadBlob(new Blob([text], { type: 'text/plain' }), `mesh.stl`)
+          downloadBlob(new Blob([text], { type: 'text/plain' }), `${filename}.stl`)
         } else if (format === 'ply') {
           const exporter = new PLYExporter()
-          // PLY uses a callback API.
           await new Promise((resolve, reject) => {
             try {
               exporter.parse(modelRoot, (text) => {
-                downloadBlob(new Blob([text], { type: 'text/plain' }), `mesh.ply`)
+                downloadBlob(new Blob([text], { type: 'text/plain' }), `${filename}.ply`)
                 resolve()
               }, { binary: false })
             } catch (e) { reject(e) }
@@ -319,7 +358,7 @@ const MeshViewerCanvas = forwardRef(function MeshViewerCanvas({
                 const blob = result instanceof ArrayBuffer
                   ? new Blob([result], { type: 'model/gltf-binary' })
                   : new Blob([JSON.stringify(result)], { type: 'model/gltf+json' })
-                downloadBlob(blob, `mesh.glb`)
+                downloadBlob(blob, `${filename}.glb`)
                 resolve()
               },
               (e) => reject(e),
@@ -328,7 +367,11 @@ const MeshViewerCanvas = forwardRef(function MeshViewerCanvas({
           })
         }
         return true
-      } catch { return false }
+      } catch {
+        return false
+      } finally {
+        restore()
+      }
     },
   }), [modelRoot])
 

@@ -424,10 +424,19 @@ export default function PromptToMesh({ presetGlbUrl = '', clearPreset } = {}) {
     notify.success('Screenshot saved')
   }
 
+  // Untextured-export toggle. When ON, the exporter strips all baked
+  // materials and bakes a flat white-clay material instead — useful for
+  // 3D printing or as a "raw geometry" handoff to a sculpting/painting
+  // tool elsewhere. Toggle persists for the page session.
+  const [exportUntextured, setExportUntextured] = useState(false)
+
   const exportAs = async (format) => {
     if (!glbUrl) return
-    const ok = await viewerRef.current?.exportMesh?.(format)
-    if (ok) notify.success(`Exported as .${format}`)
+    const ok = await viewerRef.current?.exportMesh?.(format, {
+      untextured: exportUntextured,
+      filename: exportUntextured ? `mesh-clay` : `mesh`,
+    })
+    if (ok) notify.success(`Exported${exportUntextured ? ' (untextured)' : ''} as .${format}`)
     else notify.error(`Could not export .${format}`)
   }
 
@@ -618,21 +627,34 @@ export default function PromptToMesh({ presetGlbUrl = '', clearPreset } = {}) {
               </div>
 
               <div className="mt-4 pt-3 border-t border-gray-800/60">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-300/80 mb-1.5">Export</p>
+                <div className="flex items-center justify-between mb-1.5 gap-3 flex-wrap">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-300/80">Export</p>
+                  <label className="inline-flex items-center gap-1.5 text-[10px] text-gray-300 cursor-pointer">
+                    <input type="checkbox"
+                      checked={exportUntextured}
+                      onChange={e => setExportUntextured(e.target.checked)} />
+                    Untextured / clay
+                  </label>
+                </div>
                 <div className="flex flex-wrap gap-1.5">
                   {EXPORT_FORMATS.map(f => (
                     <button key={f.id}
                       onClick={() => exportAs(f.id)}
                       title={f.hint}
                       className="px-2.5 py-1.5 rounded-md text-[11px] font-semibold border border-emerald-400/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20 transition-all">
-                      ↓ {f.label}
+                      Download .{f.label}
                     </button>
                   ))}
                   <button onClick={screenshot}
                     className="px-2.5 py-1.5 rounded-md text-[11px] font-semibold border border-cyan-400/30 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20 transition-all">
-                    📷 PNG
+                    Screenshot PNG
                   </button>
                 </div>
+                <p className="text-[10px] text-gray-500 mt-1.5">
+                  {exportUntextured
+                    ? 'Strips textures + bakes a flat white-clay material — useful for 3D printing or repainting elsewhere.'
+                    : 'Keeps every texture / material the engine baked in. Toggle on for a raw geometry-only export.'}
+                </p>
               </div>
             </Section>
           )}

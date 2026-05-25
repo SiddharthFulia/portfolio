@@ -150,8 +150,16 @@ export default function MeshVisualize() {
     document.body.appendChild(link); link.click(); link.remove()
   }
 
+  // Untextured-export toggle (same semantics as PromptToMesh): when on,
+  // strips materials and bakes a flat clay before exporting. Useful when
+  // the user wants the raw geometry for 3D printing or repainting.
+  const [exportUntextured, setExportUntextured] = useState(false)
+
   const exportAs = async (format) => {
-    const ok = await viewerRef.current?.exportMesh?.(format)
+    const ok = await viewerRef.current?.exportMesh?.(format, {
+      untextured: exportUntextured,
+      filename: exportUntextured ? 'mesh-clay' : 'mesh',
+    })
     if (!ok) antMessage.error(`Export to .${format} failed`)
   }
 
@@ -278,9 +286,19 @@ export default function MeshVisualize() {
               Auto-rotate
             </label>
 
-            {/* Export — same multi-format roundtrip the generator offers */}
+            {/* Export — same multi-format roundtrip the generator offers,
+                with the Untextured toggle that strips materials before
+                writing for a raw-geometry / 3D-print friendly handoff. */}
             <div className="pt-2 border-t border-gray-800">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-300 mb-1.5">Export as</p>
+              <div className="flex items-center justify-between mb-1.5 gap-3 flex-wrap">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-300">Export as</p>
+                <label className="inline-flex items-center gap-1.5 text-[10px] text-gray-300 cursor-pointer">
+                  <input type="checkbox"
+                    checked={exportUntextured}
+                    onChange={e => setExportUntextured(e.target.checked)} />
+                  Untextured / clay
+                </label>
+              </div>
               <div className="flex flex-wrap gap-1.5">
                 {['glb', 'obj', 'stl', 'ply'].map(fmt => (
                   <button key={fmt}
