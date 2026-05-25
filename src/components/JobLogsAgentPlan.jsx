@@ -140,13 +140,25 @@ export default function JobLogsAgentPlan({
     else if (generateCount > 0) activeGroup = 'generate'
     else if (setupCount > 0)    activeGroup = 'setup'
 
-    const buildSubtasks = (entries) =>
-      entries.map((entry, idx) => ({
-        id: `${entry?.ts || 'log'}-${idx}`,
-        title: truncate(entry?.msg || '', 80),
-        description: entry?.msg || '',
-        status: 'completed', // a log line that's been emitted is "done"
-      }))
+    // buildSubtasks — every log line except the LAST in the bucket is
+    // marked completed (gets the line-through styling). The last line
+    // stays 'in-progress' until either a new line arrives in the same
+    // bucket (which then becomes the new "last" and pushes this one
+    // into completed) OR the whole group / job has moved on. This is
+    // exactly the "cross the log only when you get the next log" rule
+    // the user asked for — the currently-streaming line never has a
+    // strikethrough; only superseded lines do.
+    const buildSubtasks = (entries, { groupComplete }) =>
+      entries.map((entry, idx) => {
+        const isLastInBucket = idx === entries.length - 1
+        const stillStreaming = isLastInBucket && !groupComplete
+        return {
+          id: `${entry?.ts || 'log'}-${idx}`,
+          title: truncate(entry?.msg || '', 80),
+          description: entry?.msg || '',
+          status: stillStreaming ? 'in-progress' : 'completed',
+        }
+      })
 
     const setupStatus = groupStatus({
       hasLogs: setupCount > 0,
@@ -167,27 +179,38 @@ export default function JobLogsAgentPlan({
       isActiveGroup: activeGroup === 'post',
     })
 
+    // A group is "complete" (in the sense that no further lines are
+    // expected in it) either when the outer job finished OR when a
+    // later group has already started — at which point even the last
+    // line in this group is now a fact-of-the-past.
+    const jobTerminal = status === 'completed' || status === 'failed'
     return [
       {
         id: 'setup',
         title: 'Setup',
         description: 'Queue, model load, checkpoint init',
         status: setupStatus,
-        subtasks: buildSubtasks(buckets.setup),
+        subtasks: buildSubtasks(buckets.setup, {
+          groupComplete: jobTerminal || generateCount > 0 || postCount > 0,
+        }),
       },
       {
         id: 'generate',
         title: 'Generate',
         description: 'Sampling, denoising, frames',
         status: generateStatus,
-        subtasks: buildSubtasks(buckets.generate),
+        subtasks: buildSubtasks(buckets.generate, {
+          groupComplete: jobTerminal || postCount > 0,
+        }),
       },
       {
         id: 'post',
         title: 'Post-process',
         description: 'Upscale, encode, upload',
         status: postStatus,
-        subtasks: buildSubtasks(buckets.post),
+        subtasks: buildSubtasks(buckets.post, {
+          groupComplete: jobTerminal,
+        }),
       },
     ]
   }, [logs, status])
