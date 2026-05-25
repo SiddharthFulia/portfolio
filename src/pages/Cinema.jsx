@@ -422,8 +422,17 @@ function ShotPromptRow({ projectId, shotIndex, durationPerShot, initialPrompt, a
   // unmount shot 1's editor.
   const [reviewOpen, setReviewOpen] = useState(false)
   const [reviewLoading, setReviewLoading] = useState(false)
-  const [reviewEngine, setReviewEngine] = useState('groq')   // 'groq' | 'gemini'
+  // engineId is a flat picker covering Groq + the three Gemini sizes AI
+  // Chat exposes. We translate it to { engine, model } at submit time.
+  const [reviewEngineId, setReviewEngineId] = useState('groq')
   const [reviewResult, setReviewResult] = useState(null)
+  const ENGINE_OPTIONS = [
+    { id: 'groq',              engine: 'groq',   model: 'llama-3.3-70b',   label: 'Groq · 70b (fast)' },
+    { id: 'gemini-flash',      engine: 'gemini', model: 'gemini-flash',    label: 'Gemini 2.5 Flash' },
+    { id: 'gemini-flash-lite', engine: 'gemini', model: 'gemini-flash-lite', label: 'Gemini Flash-Lite' },
+    { id: 'gemini-pro',        engine: 'gemini', model: 'gemini-pro',      label: 'Gemini 2.5 Pro' },
+  ]
+  const selectedEngine = ENGINE_OPTIONS.find(o => o.id === reviewEngineId) || ENGINE_OPTIONS[0]
 
   // Push the edit when the textarea loses focus AND the value differs
   // from what's already on the server. Cuts down PATCH spam while the
@@ -449,7 +458,8 @@ function ShotPromptRow({ projectId, shotIndex, durationPerShot, initialPrompt, a
     setReviewResult(null)
     const { data, error: err } = await reviewCinemaShot(projectId, shotIndex, {
       currentPrompt: text,
-      engine: reviewEngine,
+      engine: selectedEngine.engine,
+      model:  selectedEngine.model,
     })
     setReviewLoading(false)
     if (err) {
@@ -511,19 +521,21 @@ function ShotPromptRow({ projectId, shotIndex, durationPerShot, initialPrompt, a
         centered
         width={620}
       >
-        {/* Engine toggle — Groq default for speed, Gemini optional */}
-        <div className="flex items-center gap-2 mb-3">
+        {/* Engine + model picker. Groq is the fast default; the three
+            Gemini sizes mirror what AI Chat exposes so the user picks
+            the same model they know from there. */}
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
           <span className="text-[10px] font-mono uppercase tracking-wider text-gray-500">Engine</span>
-          {['groq', 'gemini'].map(engineId => (
-            <button key={engineId} type="button"
-              onClick={() => setReviewEngine(engineId)}
+          {ENGINE_OPTIONS.map(opt => (
+            <button key={opt.id} type="button"
+              onClick={() => setReviewEngineId(opt.id)}
               disabled={reviewLoading}
               className={`text-[11px] px-2 py-1 rounded border ${
-                reviewEngine === engineId
+                reviewEngineId === opt.id
                   ? 'border-amber-400/60 bg-amber-500/15 text-amber-200'
                   : 'border-gray-800 text-gray-400 hover:border-gray-700'
               }`}>
-              {engineId === 'groq' ? 'Groq · 70b (fast)' : 'Gemini 2.5 Flash'}
+              {opt.label}
             </button>
           ))}
         </div>
