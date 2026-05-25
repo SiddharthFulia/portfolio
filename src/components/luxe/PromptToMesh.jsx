@@ -24,6 +24,7 @@ import { submitMeshJob, getMeshStatus, uploadSourceImage } from '../../api/ai'
 import notify from '../../utils/notify'
 import JobLogsAgentPlan from '../JobLogsAgentPlan'
 import PromptHelper from '../PromptHelper'
+import useQueryState from '../../hooks/useQueryState'
 import MeshViewerCanvas, {
   MATERIAL_MODES, ENV_PRESETS, BACKGROUND_PRESETS, CAMERA_VIEWS,
 } from './MeshViewerCanvas'
@@ -233,18 +234,22 @@ function CanvasOverlay({ kind, progressMessage, elapsedMs, error }) {
 export default function PromptToMesh({ presetGlbUrl = '', clearPreset } = {}) {
   // ── generation state ──
   const [prompt, setPrompt]                       = useState('')
-  const [model, setModel]                         = useState('shap-e')
-  const [steps, setSteps]                         = useState(32)
+  // Card-style selectors mirrored to URL via useQueryState so refresh
+  // keeps the same engine + quality + reference combo selected. seed
+  // randomises per session — stays plain useState (no point freezing a
+  // random seed into the URL on first mount).
+  const [model, setModel]                         = useQueryState('model', 'shap-e', { allowed: ['shap-e', 'tripo', 'trellis', 'trellis-v2', 'hunyuan3d'] })
+  const [steps, setSteps]                         = useQueryState('steps', 32, { parse: Number })
   const [seed, setSeed]                           = useState(() => randomSeed())
-  const [guidance, setGuidance]                   = useState(15)
+  const [guidance, setGuidance]                   = useQueryState('cfg',   15, { parse: Number })
   const [negativePrompt, setNegativePrompt]       = useState('')
   // Advanced quality knobs — forwarded to the worker on TRELLIS family +
   // Hunyuan3D. The worker maps each slider to engine-specific params
   // (see HOW_IT_WORKS §36 in local-gpu-worker for the mapping table).
-  const [meshQuality, setMeshQuality]             = useState(50)
-  const [textureQuality, setTextureQuality]       = useState(50)
-  const [textureResolution, setTextureResolution] = useState(1024)
-  const [polygonTarget, setPolygonTarget]         = useState(80000)
+  const [meshQuality, setMeshQuality]             = useQueryState('meshQ',     50,   { parse: Number })
+  const [textureQuality, setTextureQuality]       = useQueryState('texQ',      50,   { parse: Number })
+  const [textureResolution, setTextureResolution] = useQueryState('texRes',    1024, { parse: Number, allowed: [512, 1024, 2048] })
+  const [polygonTarget, setPolygonTarget]         = useQueryState('poly',      80000, { parse: Number })
   // Reference image for image-conditioned 3D (TRELLIS / TRELLIS v2 / Hunyuan3D).
   // Null = pure text-to-3D path. URL = image-to-3D — the worker downloads the
   // image and uses it as the structural conditioning signal. Either pasted as

@@ -135,10 +135,12 @@ export default function AudioStudio() {
   const [kind, setKind] = useQueryState('kind', 'music', {
     allowed: KINDS.map(k => k.value),
   })
-  const [model, setModel] = useState('musicgen')
-  const [prompt, setPrompt] = useState('')
-  const [duration, setDuration] = useState(10)
-  const [voice, setVoice] = useState(BARK_VOICES[0].value)
+  // Card / select selectors mirrored to URL via useQueryState so refresh
+  // restores the same model + duration + voice combo the user picked.
+  const [model, setModel]       = useQueryState('model', 'musicgen')
+  const [prompt, setPrompt]     = useState('')
+  const [duration, setDuration] = useQueryState('dur',   10, { parse: Number })
+  const [voice, setVoice]       = useQueryState('voice', BARK_VOICES[0].value)
   const [working, setWorking] = useState(false)
   const [job, setJob] = useState(null)
   const [error, setError] = useState(null)
@@ -153,7 +155,7 @@ export default function AudioStudio() {
   // Provider: 'cloud' = synchronous via /api/stt (Whisper-small et al.,
   // sub-2s), '5090' = async via /api/audio queue (Whisper-large-v3 on the
   // 5090, ~5-15s but local + private + best quality).
-  const [sttProvider, setSttProvider] = useState('cloud')
+  const [sttProvider, setSttProvider] = useQueryState('sttProvider', 'cloud', { allowed: ['cloud', 'local'] })
   // Stem-separation state (only used when kind === 'separate'). Reuses
   // sttFile/sttDataUrl for the upload (same input shape), but renders a
   // separate result panel built around the 4 stem URLs + lyrics.

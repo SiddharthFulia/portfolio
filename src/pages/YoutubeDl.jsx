@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Input, Segmented, Select, Progress, Modal, Alert, Tag, Tooltip } from 'antd'
 import { LinkOutlined, DownloadOutlined, DeleteOutlined, ReloadOutlined, FileTextOutlined, ClockCircleOutlined, ThunderboltOutlined, VideoCameraOutlined, CustomerServiceOutlined, CopyOutlined, CloudOutlined, CheckOutlined, CloseOutlined, LockOutlined, ClockCircleFilled } from '@ant-design/icons'
 import { ytdlCreate, ytdlStatus, ytdlList, ytdlDelete, ytdlFileUrl } from '../api/ai'
+import useQueryState from '../hooks/useQueryState'
 
 // Locally-tracked job IDs we care about. Persisted so a page refresh
 // keeps us showing the jobs the user submitted in this browser even
@@ -52,11 +53,13 @@ const isYtUrl = (s) => /youtu\.?be/i.test(s || '')
 
 export default function YoutubeDl() {
   const [url, setUrl] = useState('')
-  const [format,  setFormat]  = useState('mp4')
-  const [quality, setQuality] = useState('720')
+  // Format / quality / worker mirrored to URL so refresh restores the
+  // same "mp4 · 720p · cobalt" combo the user picked.
+  const [format,  setFormat]  = useQueryState('format',  'mp4', { allowed: ['mp4', 'mp3', 'webm', 'm4a'] })
+  const [quality, setQuality] = useQueryState('quality', '720', { allowed: ['144', '240', '360', '480', '720', '1080', '1440', '2160'] })
   // worker: 'cobalt' (online API, default — fast, no auth) | 'home' (5090
   // worker on residential IP — bypasses YouTube anti-bot when Cobalt fails)
-  const [worker, setWorker] = useState('cobalt')
+  const [worker, setWorker] = useQueryState('worker', 'cobalt', { allowed: ['cobalt', '5090'] })
   const [submitting, setSubmitting] = useState(false)
   const [history, setHistory] = useState([])
   // Job IDs submitted from THIS browser. Persisted in localStorage so a

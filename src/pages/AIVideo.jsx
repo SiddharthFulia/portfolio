@@ -20,6 +20,7 @@ import { getVaultToken } from '../components/VaultGate'
 import { UploadOutlined } from '@ant-design/icons'
 import { DeleteOutlined } from '@ant-design/icons'
 import PromptHelper from '../components/PromptHelper'
+import useQueryState from '../hooks/useQueryState'
 import JobLogsAgentPlan from '../components/JobLogsAgentPlan'
 import VideoCombiner from '../components/aiVideo/VideoCombiner'
 
@@ -512,36 +513,39 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
   const location = useLocation()
   const navigate = useNavigate()
   const [prompt, setPrompt] = useState('')
-  const [provider, setProvider] = useState('zsky')
-  const [model, setModel] = useState('ltx-video')
-  const [duration, setDuration] = useState(5)
-  const [resolution, setResolution] = useState('720p')
-  const [aspectRatio, setAspectRatio] = useState('9:16')
-  const [style, setStyle] = useState('cinematic')
-  const [audio, setAudio] = useState(true)
-  const [steps, setSteps] = useState(30)
-  const [withCaption, setWithCaption] = useState(true)
-  const [imageUrl, setImageUrl] = useState('')
+  // All the card-style selectors below mirror to the URL via useQueryState
+  // so a refresh keeps the user on the same "5090 Optimized · Balanced ·
+  // 9:16 · 720p" combo they picked, instead of snapping back to the
+  // hardcoded defaults. Default values are omitted from the URL by the
+  // hook so /ai-video stays clean when nothing's customised.
+  const [provider, setProvider]         = useQueryState('provider',   'zsky',       { allowed: ['zsky', 'local', 'optimized'] })
+  const [model, setModel]               = useQueryState('model',      'ltx-video')
+  const [duration, setDuration]         = useQueryState('duration',   5,            { parse: Number })
+  const [resolution, setResolution]     = useQueryState('resolution', '720p',       { allowed: ['480p', '720p', '1080p'] })
+  const [aspectRatio, setAspectRatio]   = useQueryState('aspect',     '9:16',       { allowed: ['9:16', '16:9', '1:1', '21:9'] })
+  const [style, setStyle]               = useQueryState('style',      'cinematic')
+  const [audio, setAudio]               = useQueryState('audio',      true,         { parse: (s) => s === '1', serialize: (v) => v ? '1' : '0' })
+  const [steps, setSteps]               = useQueryState('steps',      30,           { parse: Number })
+  const [withCaption, setWithCaption]   = useQueryState('caption',    true,         { parse: (s) => s === '1', serialize: (v) => v ? '1' : '0' })
+  const [imageUrl, setImageUrl]         = useState('')
   // sourceIsVault — true when the source image came from a Vault library
   // item (or arrived with ?vault=1). Propagated to the generate call so
   // the resulting video lands in Vault rather than the public library.
   // Auto-resets to false when the user clears the imageUrl.
   const [sourceIsVault, setSourceIsVault] = useState(false)
-  const [optimizedMode, setOptimizedMode] = useState('balanced')   // preview | balanced | quality
+  const [optimizedMode, setOptimizedMode] = useQueryState('mode', 'balanced', { allowed: ['preview', 'balanced', 'quality'] })
 
-  // Mirror major selections (provider / mode / model / music) into the URL
-  // as query params so the current configuration is shareable and other
-  // pages (Cinema, Lab) can deep-link in with the right preset already
-  // selected. `replace: true` so we don't bloat back-button history.
-  // Reads via `window.location.search` rather than the React Router
-  // `location.search` to avoid a re-render loop with `useLocation`.
+  // Legacy URL helper — kept for the existing prefill effect at the top
+  // of the component. New per-field selections use useQueryState above
+  // which writes to the URL automatically; no need for the manual call
+  // on each setter anymore.
   const setUrlParam = (key, value) => {
     const next = new URLSearchParams(window.location.search)
     if (value != null && value !== '' && value !== false) next.set(key, String(value))
     else next.delete(key)
     navigate({ search: next.toString() ? `?${next.toString()}` : '' }, { replace: true })
   }
-  const [withMusic, setWithMusic] = useState(false)
+  const [withMusic, setWithMusic] = useQueryState('music', false, { parse: (s) => s === '1', serialize: (v) => v ? '1' : '0' })
   const [musicPrompt, setMusicPrompt] = useState('')
   // Image Studio library picker modal — opens from the "🖼 From Library"
   // button next to the source-image Upload control.
@@ -828,7 +832,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
               const active = provider === p.id
               const isOnline = p.id === 'worker' ? workerOnline : p.id === 'local' ? localOnline : null
               return (
-                <button key={p.id} onClick={() => { if (p.disabled) return; setProvider(p.id); setUrlParam('provider', p.id) }} type="button"
+                <button key={p.id} onClick={() => { if (p.disabled) return; setProvider(p.id) }} type="button"
                   aria-pressed={active}
                   aria-disabled={!!p.disabled}
                   disabled={!!p.disabled}
@@ -867,7 +871,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
           {provider === 'local' && (
             <div className="mt-3">
               <label className="text-[10px] text-gray-500 block mb-1 uppercase tracking-wider">Model</label>
-              <Select size="middle" value={model} onChange={(v) => { setModel(v); setUrlParam('model', v) }} style={{ width: '100%' }}
+              <Select size="middle" value={model} onChange={setModel} style={{ width: '100%' }}
                 popupMatchSelectWidth={false}
                 showSearch allowClear
                 placeholder="Search model…"
@@ -888,7 +892,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
                 {OPTIMIZED_MODES.map(m => {
                   const active = optimizedMode === m.id
                   return (
-                    <button key={m.id} onClick={() => { setOptimizedMode(m.id); setUrlParam('mode', m.id) }} type="button"
+                    <button key={m.id} onClick={() => setOptimizedMode(m.id)} type="button"
                       className={`p-2.5 rounded-lg border text-left transition-colors ${
                         active
                           ? 'border-cyan-300/70 bg-cyan-500/12'
@@ -926,7 +930,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
                   <span className="text-xs font-semibold text-gray-200">Add background music</span>
                   <span className="text-[10px] text-gray-500">+10-30s · MusicGen on 5090</span>
                 </span>
-                <Switch size="small" checked={withMusic} onChange={(v) => { setWithMusic(v); setUrlParam('music', v ? '1' : null) }} />
+                <Switch size="small" checked={withMusic} onChange={setWithMusic} />
               </label>
               {withMusic && (
                 <div className="mt-2 space-y-1">

@@ -523,9 +523,11 @@ export default function ImageEnhancer() {
   const [sourceDataUrl, setSourceDataUrl] = useState('')
   const [selectedPreset, setSelectedPreset] = useState(PRESETS[0].id)
   const [expandedPreset, setExpandedPreset] = useState(null)
-  const [engine, setEngine] = useState('cloud')          // cloud (Gemini) | atelier (5090)
+  // Engine + workflow + family-filter mirrored to URL so refresh keeps
+  // the user on the same Atelier / Cloud + workflow + filter combo.
+  const [engine, setEngine] = useQueryState('engine', 'cloud', { allowed: ['cloud', 'atelier'] })
   // Atelier-only state: which workflow + fine-tune knobs
-  const [atelierWorkflow, setAtelierWorkflow] = useState(ATELIER_WORKFLOWS[0].id)
+  const [atelierWorkflow, setAtelierWorkflow] = useQueryState('workflow', ATELIER_WORKFLOWS[0].id)
   const [tunings, setTunings] = useState({ steps: 20, denoise: 0.2, cfg: 5.0, width: 1024, height: 1024 })
   const [atelierPrompt, setAtelierPrompt] = useState('')
   // Optional negative prompt. Sent to BE as `negativePrompt` and forwarded to
@@ -536,7 +538,7 @@ export default function ImageEnhancer() {
   // Family filter for the Atelier workflow grid — quick way to narrow
   // the list to Image→Image / Text→Image / Both / Upscale. Persists
   // across re-renders. Default 'all' shows everything.
-  const [familyFilter, setFamilyFilter] = useState('all')
+  const [familyFilter, setFamilyFilter] = useQueryState('family', 'all')
   // Vault login state: small lock button in the header opens an Antd modal
   // with a password field. Once logged in, all outputs auto-route to the
   // private Vault library AND the NSFW filter is bypassed server-side.

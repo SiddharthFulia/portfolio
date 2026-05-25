@@ -6,6 +6,7 @@ import { submitLipsync, getLipsyncStatus, fileToDataUrl, listLipsyncJobs, lipsyn
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
 import AudioRecorder from '../components/AudioRecorder'
 import CameraCapture from '../components/CameraCapture'
+import useQueryState from '../hooks/useQueryState'
 
 const MODELS = [
   { value: 'latentsync',   label: 'LatentSync 1.5',  blurb: 'Best mouth detail. ByteDance. ~1-3min for a 10s clip on 5090.' },
@@ -18,7 +19,8 @@ export default function LipSync() {
   const [audioDataUrl, setAudioDataUrl] = useState('')
   const [portraitFile, setPortraitFile] = useState(null)
   const [portraitDataUrl, setPortraitDataUrl] = useState('')
-  const [model, setModel] = useState('latentsync')
+  // Model card mirrored to URL so refresh keeps the same engine selected.
+  const [model, setModel] = useQueryState('model', 'latentsync', { allowed: ['latentsync', 'musetalk', 'liveportrait'] })
   // When switching to/from LivePortrait, clear the upload — audio and
   // video file inputs are mutually incompatible. Otherwise the file from
   // before the switch silently submits to the new model and breaks.

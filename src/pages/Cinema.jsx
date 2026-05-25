@@ -7,6 +7,7 @@ import PromptHelper from '../components/PromptHelper'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
 import { Button, Slider } from '../components/ui'
 import CinemaRenderer from '../components/cinema/CinemaRenderer'
+import useQueryState from '../hooks/useQueryState'
 
 // `embedded` mode (passed when Cinema lives inside the AI Video tabs):
 //   - drops the outer page wrapper (no extra pt-20 / min-h-screen)
@@ -24,10 +25,13 @@ import CinemaRenderer from '../components/cinema/CinemaRenderer'
 // page as one nested-feeling tab.
 export default function Cinema({ embedded = false, view = 'all' }) {
   const [masterPrompt, setMasterPrompt] = useState('')
-  const [shotCount, setShotCount] = useState(4)
-  const [durationPerShot, setDurationPerShot] = useState(5)
-  const [aspectRatio, setAspectRatio] = useState('16:9')
-  const [resolution, setResolution] = useState('720p')
+  // Card-style selectors mirrored to URL so refresh restores the user's
+  // choice. Free-text masterPrompt stays plain useState — too long for
+  // URL, and the textarea is fine to start blank after refresh.
+  const [shotCount, setShotCount]             = useQueryState('shots',     4,      { parse: Number })
+  const [durationPerShot, setDurationPerShot] = useQueryState('dur',       5,      { parse: Number })
+  const [aspectRatio, setAspectRatio]         = useQueryState('aspect',    '16:9', { allowed: ['16:9', '9:16', '1:1', '21:9'] })
+  const [resolution, setResolution]           = useQueryState('resolution','720p', { allowed: ['480p', '720p', '1080p'] })
   const [working, setWorking] = useState(false)
   const [project, setProject] = useState(null)
   const [error, setError] = useState(null)

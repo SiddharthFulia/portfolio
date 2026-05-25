@@ -8,6 +8,7 @@ import CameraCapture from '../components/CameraCapture'
 import VoiceCloneAnalysis from '../components/VoiceCloneAnalysis'
 import JobLogsAgentPlan from '../components/JobLogsAgentPlan'
 import { submitDeepfakeJob, getDeepfakeStatus, listDeepfakeJobs, fileToDataUrl } from '../api/ai'
+import useQueryState from '../hooks/useQueryState'
 
 // /deepfake — Vault-gated lane. Behind the same sid-vault-token gate as
 // the rest of the AI Studio. Two tabs:
@@ -39,7 +40,9 @@ const XTTS_LANGUAGES = [
 
 function DeepfakeInner() {
   const navigate = useNavigate()
-  const [tab, setTab] = useState('face-swap')   // 'face-swap' | 'voice-any'
+  // Tab + per-lane selectors mirrored to URL so refresh restores the same
+  // tab + language combo. File uploads stay local — can't be serialised.
+  const [tab, setTab] = useQueryState('tab', 'face-swap', { allowed: ['face-swap', 'voice-any'] })
   // Face-swap state
   const [srcFile, setSrcFile] = useState(null)
   const [srcDataUrl, setSrcDataUrl] = useState('')
@@ -51,7 +54,7 @@ function DeepfakeInner() {
   const [melodyFile, setMelodyFile] = useState(null)
   const [melodyDataUrl, setMelodyDataUrl] = useState('')
   const [prompt, setPrompt] = useState('')
-  const [language, setLanguage] = useState('en')
+  const [language, setLanguage] = useQueryState('lang', 'en')
   // Shared job state
   const [working, setWorking] = useState(false)
   const [job, setJob] = useState(null)
@@ -60,7 +63,7 @@ function DeepfakeInner() {
   // Library state — past saved deepfakes (face-swap images + voice-any audio).
   // Loads on mount and refreshes after each successful submission.
   const [library, setLibrary] = useState([])
-  const [libraryFilter, setLibraryFilter] = useState('all')   // 'all' | 'face-swap' | 'voice-any'
+  const [libraryFilter, setLibraryFilter] = useQueryState('lib', 'all', { allowed: ['all', 'face-swap', 'voice-any'] })
   const [libraryRefresh, setLibraryRefresh] = useState(0)
 
   useEffect(() => { document.title = 'Deepfake · Sid' }, [])
