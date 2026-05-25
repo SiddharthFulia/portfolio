@@ -22,6 +22,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Modal, Progress, message as antMessage } from 'antd'
 import { DownloadOutlined } from '@ant-design/icons'
 import { Button } from '../ui'
+import JobLogsAgentPlan from '../JobLogsAgentPlan'
 import {
   generateVideo, getJobStatus, uploadSourceImage,
   combineCreate, combineStatus, combineFileUrl,
@@ -565,6 +566,23 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
                 />
               )}
             </div>
+
+            {/* Live agentic logs for this shot's video job. JobLogsAgentPlan
+                polls /api/job-logs/ai-video/<jobId>?since=… every 1.5s and
+                renders the same tree AI Video uses — [process] line,
+                [eta], sampler X/Y, etc. Only mounts once the shot has a
+                jobId (i.e. it's been queued). Stays mounted on completed
+                shots too so the user can scroll back through what ran. */}
+            {shotRow.jobId && (
+              <div className="mt-2">
+                <JobLogsAgentPlan
+                  lane="ai-video"
+                  jobId={shotRow.jobId}
+                  status={shotRow.status}
+                  error={shotRow.error}
+                />
+              </div>
+            )}
           </li>
         ))}
       </ol>
@@ -596,6 +614,20 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
               strokeColor="#fbbf24" trailColor="#1f2937"
               className="!mt-2"
             />
+          )}
+          {/* ffmpeg-concat agentic logs — same tree component, lane='combine'.
+              Polls /api/job-logs/combine/<combineJobId> and shows the
+              per-step messages the BE writes (download N MB, concat
+              demuxer try, re-encode fallback, final mux, etc.). */}
+          {combineJobId && (
+            <div className="mt-3">
+              <JobLogsAgentPlan
+                lane="combine"
+                jobId={combineJobId}
+                status={combineRow?.status || 'queued'}
+                error={combineRow?.error}
+              />
+            </div>
           )}
         </div>
       )}
