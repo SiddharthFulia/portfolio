@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Input, Select, Modal, Alert, message as antMessage } from 'antd'
 import { VideoCameraOutlined, ThunderboltOutlined, ReloadOutlined, BulbOutlined, DeleteOutlined } from '@ant-design/icons'
-import { submitCinema, listCinemaProjects, cinemaBulkAction, createCinemaRender, patchCinemaProject, reviewCinemaShot } from '../api/ai'
+import { submitCinema, listCinemaProjects, cinemaBulkAction, createCinemaRender, patchCinemaProject, reviewCinemaShot, getCinemaDiskStats } from '../api/ai'
 import PromptHelper from '../components/PromptHelper'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
 import { Button, Slider } from '../components/ui'
@@ -236,20 +236,23 @@ export default function Cinema({ embedded = false, view = 'all' }) {
         )}
 
         {showLibrary && (
-        <StudioLibrary
-          refreshKey={libraryRefresh}
-          title="Your Cinema projects"
-          listFn={({ status, page, limit }) => listCinemaProjects({ status, page, limit })}
-          bulkFn={cinemaBulkAction}
-          getId={(it) => it.projectId}
-          bulkAccent="amber"
-          statuses={['completed', 'rendering', 'planning', 'failed', 'all']}
-          renderCard={(it, { selectMode, checked, onToggleSelect, onDelete }) => (
-            <CinemaCard key={it.projectId} item={it}
-              selectMode={selectMode} checked={checked}
-              onToggleSelect={onToggleSelect} onDelete={onDelete} />
-          )}
-        />
+          <>
+            <CinemaDiskStatsBanner refreshKey={libraryRefresh} />
+            <StudioLibrary
+              refreshKey={libraryRefresh}
+              title="Your Cinema projects"
+              listFn={({ status, page, limit }) => listCinemaProjects({ status, page, limit })}
+              bulkFn={cinemaBulkAction}
+              getId={(it) => it.projectId}
+              bulkAccent="amber"
+              statuses={['completed', 'rendering', 'planning', 'failed', 'all']}
+              renderCard={(it, { selectMode, checked, onToggleSelect, onDelete }) => (
+                <CinemaCard key={it.projectId} item={it}
+                  selectMode={selectMode} checked={checked}
+                  onToggleSelect={onToggleSelect} onDelete={onDelete} />
+              )}
+            />
+          </>
         )}
       </div>
   )
@@ -570,6 +573,43 @@ function ShotPromptRow({ projectId, shotIndex, durationPerShot, initialPrompt, a
   )
 }
 
+// CinemaDiskStatsBanner — pulls /api/cinema/disk-stats and renders a
+// thin header strip above the library showing how much disk Cinema is
+// using IN TOTAL, separate from the rest of the BE's storage. Per the
+// user's ask: "tell me total space used for cinema specifically so I
+// know". Stat is computed from combined_videos.fileSize joined against
+// cinema_renders.combineJobId, so it only counts Cinema-driven combines
+// (ad-hoc Build-tab combines are excluded).
+function CinemaDiskStatsBanner({ refreshKey }) {
+  const [stats, setStats] = useState(null)
+  useEffect(() => {
+    let cancelled = false
+    getCinemaDiskStats().then(({ data }) => { if (!cancelled) setStats(data || null) })
+    return () => { cancelled = true }
+  }, [refreshKey])
+  if (!stats) return null
+  const total = stats.total || { count: 0, bytes: 0 }
+  const fmt = (n) => {
+    if (!n) return '0 MB'
+    const mb = n / (1024 * 1024)
+    return mb < 1024 ? `${mb.toFixed(1)} MB` : `${(mb / 1024).toFixed(2)} GB`
+  }
+  return (
+    <div className="luxe-card p-3 mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80">— Cinema disk usage</p>
+        <p className="text-sm text-white mt-1 tabular-nums">
+          <span className="font-mono text-amber-200">{total.count.toLocaleString()}</span> rendered combine{total.count === 1 ? '' : 's'} ·{' '}
+          <span className="font-mono text-amber-200">{fmt(total.bytes)}</span> on disk
+        </p>
+      </div>
+      <p className="text-[10px] text-gray-500 font-mono max-w-md text-right">
+        Counts Cinema-driven combines only (`combined_videos` rows joined against `cinema_renders.combineJobId`). Build-tab ad-hoc combines aren't included.
+      </p>
+    </div>
+  )
+}
+
 function CinemaCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
   const navigate = useNavigate()
   const handleClick = (e) => {
@@ -600,9 +640,12 @@ function CinemaCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
       <p className="text-[11px] text-gray-300 line-clamp-3 leading-snug">{item.masterPrompt}</p>
       {selectMode && <SelectCheckbox checked={checked} onToggle={onToggleSelect} />}
       {!selectMode && onDelete && (
+        // Always visible (was hover-only). Touch users couldn't find it
+        // before; the new contract is "delete is one tap away".
         <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete() }}
-          title="Delete"
-          className="absolute top-1.5 right-1.5 w-7 h-7 flex items-center justify-center rounded-lg bg-black/70 hover:bg-rose-600 text-gray-200 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
+          title="Delete this Cinema project"
+          aria-label="Delete this Cinema project"
+          className="absolute top-1.5 right-1.5 w-7 h-7 flex items-center justify-center rounded-lg border border-rose-500/40 bg-rose-500/15 text-rose-200 hover:bg-rose-500/30 hover:text-rose-100 transition-colors">
           <DeleteOutlined className="text-xs" />
         </button>
       )}

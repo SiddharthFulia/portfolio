@@ -72,7 +72,7 @@ const Footer = () => {
               <span className='text-lg font-bold text-amber-300'>Siddharth Fulia</span>
             </Link>
             <p className='text-sm text-fg-muted leading-relaxed max-w-xs'>
-              Engineer + designer. Builds AI tools, chess engines, 3D toys, and the occasional Subway-Surfers clone.
+              Engineer + designer. Builds AI lanes, chess engines, 3D asset studios, and hand-tracked games.
             </p>
             <div className='mt-4 flex gap-3 items-center'>
               {socialLinks.map((link) => (

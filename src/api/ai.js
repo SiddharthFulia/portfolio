@@ -445,6 +445,15 @@ export async function reviewCinemaShot(projectId, shotIndex, body = {}) {
     return { data: data?.data || data, error: null };
   } catch (err) { return { data: null, error: err.message }; }
 }
+// Cinema-specific disk usage. Returns { total: { count, bytes }, perRender: [...] }
+// — perRender carries { renderId, projectId, combineId, fileSize, title, createdAt }
+// so the FE library can highlight which rows contribute to the total.
+export async function getCinemaDiskStats() {
+  try {
+    const data = await get(`${ENDPOINTS.CINEMA}/disk-stats`, {}, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
 // Cinema renders — per-attempt resumable state. The FE orchestrator
 // creates one of these, navigates to /cinema/render/:renderId, then
 // PATCHes after each shot transition so the row stays in sync with
