@@ -79,6 +79,7 @@ export const ENDPOINTS = {
   ADMIN_SERVER_STATS:   '/api/admin/server-stats',
   ADMIN_DB_STATS:       '/api/admin/db-stats',
   ADMIN_DISK_STATS:     '/api/admin/disk-stats',
+  ADMIN_MESH_STATS:     '/api/admin/mesh-stats',
   ADMIN_QUEUES:         '/api/admin/queues',
   ADMIN_WORKERS:        '/api/admin/workers',
   ADMIN_PURGE_QUEUE:    '/api/admin/queues/purge',
