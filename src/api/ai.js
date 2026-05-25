@@ -117,6 +117,10 @@ export async function generateVideo(prompt, options = {}) {
         // generated video should also land in Vault — BE honours this
         // flag if a valid Vault token is on the request.
         vault: !!options.vault,
+        // Opt-out for the BE's Telegram wake-up alert. Cinema's
+        // multi-shot chain sets this so N shots don't trigger N
+        // notifications when the worker happens to be offline.
+        silentWake: !!options.silentWake,
       },
       { timeout }
     );
@@ -428,9 +432,11 @@ export async function deleteCinema(projectId) {
 // creates one of these, navigates to /cinema/render/:renderId, then
 // PATCHes after each shot transition so the row stays in sync with
 // where the client-side chain is. Refresh resumes from the DB state.
-export async function createCinemaRender(projectId) {
+export async function createCinemaRender(projectId, body = {}) {
   try {
-    const data = await post(`${ENDPOINTS.CINEMA_RENDER_CREATE}/${projectId}/render`, {}, { timeout: 10000 });
+    // body: { provider?: 'optimized' | 'local' | 'zsky',
+    //         optimizedMode?: 'preview' | 'balanced' | 'quality' }
+    const data = await post(`${ENDPOINTS.CINEMA_RENDER_CREATE}/${projectId}/render`, body, { timeout: 10000 });
     return { data: data?.data || data, error: null };
   } catch (err) { return { data: null, error: err.message }; }
 }

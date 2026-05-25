@@ -346,17 +346,24 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
         sourceImageUrl: previousFrameUrl,
       })
 
+      // Cinema chain knobs — provider / mode come from the render row
+      // (set when the user clicked "Render all shots" on the planner).
+      // Defaults match the old hardcoded behaviour so legacy rows
+      // without these fields still work.
+      const chainProvider = initialRender?.provider     || 'optimized'
+      const chainMode     = initialRender?.optimizedMode || 'balanced'
       const { data: submitData, error: submitError } = await generateVideo(
         shotPrompts[shotIndex],
         {
-          provider:    'optimized',           // 5090 lane — Wan 2.2 5B, supports i2v
-          mode:        'balanced',            // ~60-90s per shot
+          provider:    chainProvider,         // 5090 lane — Wan 2.2 5B, supports i2v
+          mode:        chainMode,             // preview / balanced / quality — controls model + steps
           duration:    projectDuration,
           aspectRatio: projectAspect,
           resolution:  projectResolution,
           imageUrl:    previousFrameUrl || '',
           withMusic:   false,                 // music gets added once at the combine step
           generateCaption: false,
+          silentWake:  true,                  // skip Telegram alert (N shots = N noisy notifications otherwise)
         },
       )
       if (submitError || !submitData?.jobId) {
@@ -631,7 +638,7 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
               {expanded && shotRow.jobId && (
                 <div className="mt-2">
                   <JobLogsAgentPlan
-                    lane="ai-video"
+                    lane="video"
                     jobId={shotRow.jobId}
                     status={shotRow.status}
                     error={shotRow.error}

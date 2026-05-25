@@ -268,8 +268,31 @@ export default function Cinema({ embedded = false, view = 'all' }) {
 // + the "Render all shots" button. Clicking creates a cinema_renders
 // row on the BE + navigates to /cinema/render/<renderId> where the
 // chain actually runs (refresh-safe, live logs, persistent state).
+// PROVIDER + MODE pickers for the Cinema chain. The render row stores
+// whichever the user picked here; CinemaRenderer reads them when it
+// fires generateVideo per shot. Default is 5090 Optimized · Balanced
+// (Wan 2.2 5B, 14 steps, ~60-90s per shot — what the chain has always
+// used). 'Preview' swaps to LTX-distilled for a fast scout (~15s),
+// 'Quality' bumps Wan 2.2 to 30 steps for hero-grade output (~3-4m).
+const CINEMA_PROVIDERS = [
+  { id: 'optimized', label: '5090 Optimized', blurb: 'Wan 2.2 5B · image-to-video, fastest 5090 lane' },
+  { id: 'local',     label: '5090 Beast',     blurb: 'Full Wan 2.2 14B + Hunyuan, max fidelity, longer' },
+  { id: 'zsky',      label: 'ZSky Cloud',     blurb: 'Hosted GPU pool, no 5090 needed (paid lane)' },
+]
+const CINEMA_MODES = [
+  { id: 'preview',  label: 'Preview',  blurb: 'LTX-distilled · ~15s per shot · scout quality' },
+  { id: 'balanced', label: 'Balanced', blurb: 'Wan 2.2 5B · 14 steps · ~60-90s per shot' },
+  { id: 'quality',  label: 'Quality',  blurb: 'Wan 2.2 5B · 30 steps · ~3-4m per shot · hero output' },
+]
+
 function PlannedShotsPanel({ project, navigate }) {
   const [creating, setCreating] = useState(false)
+  // Pickers — URL-mirrored so refresh keeps the same choice.
+  const [renderProvider, setRenderProvider] = useQueryState('rProv', 'optimized', { allowed: ['optimized', 'local', 'zsky'] })
+  const [renderMode, setRenderMode]         = useQueryState('rMode', 'balanced',  { allowed: ['preview', 'balanced', 'quality'] })
+  // 'mode' only meaningfully changes the chain output for the optimized
+  // provider — the other two ignore it on the BE.
+  const showModePicker = renderProvider === 'optimized'
 
   const onStart = () => {
     Modal.confirm({
@@ -282,8 +305,9 @@ function PlannedShotsPanel({ project, navigate }) {
             into one mp4 at the end.
           </p>
           <p className="text-fg-muted text-xs">
-            Each shot ~60-90s. Total wall time ≈ {Math.ceil(project.shotPrompts.length * 75 / 60)}m.
-            Opens on its own page with live per-shot logs — you can close the tab and
+            Provider: <span className="font-semibold text-amber-300">{CINEMA_PROVIDERS.find(p => p.id === renderProvider)?.label}</span>
+            {showModePicker && <> · Mode: <span className="font-semibold text-amber-300">{CINEMA_MODES.find(m => m.id === renderMode)?.label}</span></>}
+            <br />Opens on its own page with live per-shot logs — you can close the tab and
             come back to the same URL to keep watching.
           </p>
         </div>
@@ -294,7 +318,10 @@ function PlannedShotsPanel({ project, navigate }) {
       centered: true,
       onOk: async () => {
         setCreating(true)
-        const { data, error } = await createCinemaRender(project.projectId)
+        const { data, error } = await createCinemaRender(project.projectId, {
+          provider: renderProvider,
+          optimizedMode: renderMode,
+        })
         setCreating(false)
         if (error || !data?.renderId) {
           antMessage.error(error || 'Failed to create render — try again')
@@ -320,6 +347,44 @@ function PlannedShotsPanel({ project, navigate }) {
         <Button variant="primary" onClick={onStart} loading={creating}>
           Render all shots
         </Button>
+      </div>
+
+      {/* Provider + mode pickers — apply to every shot in the chain. */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+        <div>
+          <p className="text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1.5">Engine</p>
+          <div className="grid grid-cols-1 gap-1.5">
+            {CINEMA_PROVIDERS.map(p => (
+              <button key={p.id} type="button" onClick={() => setRenderProvider(p.id)}
+                className={`text-left p-2.5 rounded-md border transition-colors ${
+                  renderProvider === p.id
+                    ? 'border-amber-400/60 bg-amber-500/12 ring-1 ring-amber-400/40'
+                    : 'border-gray-800 bg-gray-900/40 hover:border-gray-700'
+                }`}>
+                <p className="text-xs font-semibold text-white">{p.label}</p>
+                <p className="text-[11px] text-gray-400 mt-0.5">{p.blurb}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+        {showModePicker && (
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1.5">Mode</p>
+            <div className="grid grid-cols-1 gap-1.5">
+              {CINEMA_MODES.map(m => (
+                <button key={m.id} type="button" onClick={() => setRenderMode(m.id)}
+                  className={`text-left p-2.5 rounded-md border transition-colors ${
+                    renderMode === m.id
+                      ? 'border-amber-400/60 bg-amber-500/12 ring-1 ring-amber-400/40'
+                      : 'border-gray-800 bg-gray-900/40 hover:border-gray-700'
+                  }`}>
+                  <p className="text-xs font-semibold text-white">{m.label}</p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">{m.blurb}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
       <ol className="space-y-2">
         {project.shotPrompts.map((prompt, idx) => (
