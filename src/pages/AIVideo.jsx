@@ -1868,6 +1868,11 @@ const AIVideo = () => {
     if (k === 'generate') next.delete('tab')
     else next.set('tab', k)
     setSearchParams(next, { replace: false })
+    // Bump the shared refreshKey so the newly-active card re-fetches its
+    // list. Without this, deleting in Combine and switching to Cinema
+    // Library would leave the old (now-stale) disk-stats / counts
+    // sitting until the user manually hits Refresh.
+    setRefreshKey(k => k + 1)
   }
 
   useEffect(() => {
@@ -1921,7 +1926,7 @@ const AIVideo = () => {
                     Loading Cinema…
                   </div>
                 }>
-                  <Cinema embedded view="planner" />
+                  <Cinema embedded view="planner" refreshKey={refreshKey} />
                 </Suspense>
               ),
             },
@@ -1934,14 +1939,14 @@ const AIVideo = () => {
                     Loading Cinema Library…
                   </div>
                 }>
-                  <Cinema embedded view="library" />
+                  <Cinema embedded view="library" refreshKey={refreshKey} />
                 </Suspense>
               ),
             },
             {
               key: 'combine',
               label: <span><ToolOutlined /> Combine</span>,
-              children: <VideoCombiner />,
+              children: <VideoCombiner refreshKey={refreshKey} />,
             },
             {
               key: 'jobs',

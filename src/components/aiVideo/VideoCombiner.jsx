@@ -25,6 +25,7 @@ import { Modal, Progress, Tag, Input, InputNumber, Pagination, Tabs, message as 
 import { DownloadOutlined, DeleteOutlined, ReloadOutlined, CheckOutlined, LockOutlined, GlobalOutlined, ToolOutlined, BookOutlined, ThunderboltOutlined, RocketOutlined, VideoCameraOutlined } from '@ant-design/icons'
 import {
   combineCreate, combineList, combineDelete, combineFileUrl,
+  combineUpload,
   listVideos,
 } from '../../api/ai'
 import useQueryState from '../../hooks/useQueryState'
@@ -163,6 +164,16 @@ function BuildTab({
   const [title, setTitle] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
+  // ── upload state (local mp4s) ──
+  const [uploadPct, setUploadPct] = useState(null)
+  const [uploadName, setUploadName] = useState('')
+  const fileInputRef = useRef(null)
+
+  // ── combined-library picker (chain combines together) ──
+  const [combinedItems, setCombinedItems] = useState([])
+  const [combinedLoading, setCombinedLoading] = useState(false)
+  const [showCombined, setShowCombined] = useState(false)
+
   // Load library page whenever pagination changes.
   useEffect(() => {
     let cancelled = false
@@ -217,12 +228,74 @@ function BuildTab({
     setManualUrl('')
   }
 
+  // ── local mp4 upload — sends multipart to /api/combine/upload,
+  // receives an uploadId, and adds an entry to the picked list with
+  // that id so the BE can resolve it when /api/combine fires.
+  const onPickFile = async (file) => {
+    if (!file) return
+    if (!/^video\//i.test(file.type) && !/\.mp4$/i.test(file.name)) {
+      antMessage.warning('Only mp4 / video uploads')
+      return
+    }
+    setUploadName(file.name)
+    setUploadPct(0)
+    const { data, error: err } = await combineUpload(file, { onProgress: setUploadPct })
+    setUploadPct(null)
+    setUploadName('')
+    if (err) { antMessage.error(`Upload failed: ${err}`); return }
+    setPicked(prev => [...prev, {
+      uploadId: data.uploadId,
+      title: data.name?.slice(0, 60) || `upload-${data.uploadId.slice(0, 6)}`,
+      bytes: data.size || null,
+    }])
+    antMessage.success('Uploaded — added to selection')
+  }
+  const onFileInputChange = (e) => {
+    const f = e.target.files?.[0]
+    onPickFile(f)
+    e.target.value = ''     // allow re-uploading the same file
+  }
+  const onDropFile = (e) => {
+    e.preventDefault()
+    const f = e.dataTransfer?.files?.[0]
+    onPickFile(f)
+  }
+
+  // ── chain-combine picker — load the combine library once on expand.
+  const loadCombined = useCallback(async () => {
+    setCombinedLoading(true)
+    const { data } = await combineList({ status: 'completed', page: 1, pageSize: 100 })
+    setCombinedLoading(false)
+    setCombinedItems(Array.isArray(data?.items) ? data.items : [])
+  }, [])
+  useEffect(() => {
+    if (showCombined && combinedItems.length === 0) loadCombined()
+  }, [showCombined, combinedItems.length, loadCombined])
+  const addCombined = (row) => {
+    if (picked.find(p => p.combineId === row.id)) {
+      antMessage.info(`Combine #${row.id} is already in your selection`)
+      return
+    }
+    setPicked(prev => [...prev, {
+      combineId: row.id,
+      title: row.title?.slice(0, 60) || `combine-${row.id}`,
+      bytes: row.fileSize || null,
+    }])
+  }
+
   // ── submit ──
   const onSubmit = async () => {
     if (picked.length < 2) return antMessage.warning('Pick at least 2 videos to combine')
     if (picked.length > 12) return antMessage.warning('Cap is 12 videos per combine')
     setSubmitting(true)
-    const sources = picked.map(p => p.videoId ? { videoId: p.videoId, title: p.title } : { url: p.url, title: p.title })
+    // Pass through whichever source-shape the row carries. The BE's
+    // resolveSource handles videoId / url / combineId / uploadId.
+    const sources = picked.map(p => {
+      if (p.videoId)   return { videoId: p.videoId,     title: p.title }
+      if (p.combineId) return { combineId: p.combineId, title: p.title }
+      if (p.uploadId)  return { uploadId: p.uploadId,   title: p.title }
+      return { url: p.url, title: p.title }
+    })
     const { data, error } = await combineCreate({ sources, title: title.trim() || null })
     setSubmitting(false)
     if (error) { antMessage.error(error); return }
@@ -338,6 +411,73 @@ function BuildTab({
             </button>
           </div>
         </div>
+
+        {/* Local-mp4 upload — drag-drop or file-picker. The BE keeps a
+            registry of uploadIds so the source spec can reference one
+            without copying bytes through Cloudinary. */}
+        <div className='luxe-card p-4 sm:p-5'>
+          <h3 className='text-sm font-semibold uppercase tracking-wider text-fg-primary mb-2'>Or upload a local mp4</h3>
+          <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={onDropFile}
+            onClick={() => fileInputRef.current?.click()}
+            className='cursor-pointer rounded-lg border-2 border-dashed border-line hover:border-amber-400/50 hover:bg-amber-500/5 transition-colors p-5 text-center'
+          >
+            <input
+              ref={fileInputRef}
+              type='file'
+              accept='video/*,.mp4'
+              onChange={onFileInputChange}
+              className='hidden'
+            />
+            {uploadPct === null ? (
+              <p className='text-xs text-fg-muted'>
+                Drag an mp4 here or <span className='text-amber-300'>click to pick</span> — up to 500 MB.
+              </p>
+            ) : (
+              <div className='space-y-1.5'>
+                <p className='text-[11px] font-mono text-fg-secondary truncate'>{uploadName || 'Uploading…'}</p>
+                <Progress percent={uploadPct} size='small' strokeColor='#fbbf24' trailColor='#1f2937' />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Pick from the Combine Library — chain combines together
+            (combine the output of A+B with C, etc.). The BE feeds the
+            previous combine's local file straight into ffmpeg. */}
+        <div className='luxe-card p-4 sm:p-5'>
+          <div className='flex items-center justify-between mb-2'>
+            <h3 className='text-sm font-semibold uppercase tracking-wider text-fg-primary'>Or chain a previous combine</h3>
+            <button onClick={() => setShowCombined(s => !s)}
+              className='text-[10px] font-semibold px-2 py-1 rounded-full border border-line hover:border-line-strong text-fg-muted'>
+              {showCombined ? 'Hide' : 'Browse'}
+            </button>
+          </div>
+          {showCombined && (
+            <>
+              {combinedLoading && <p className='text-xs text-fg-muted'>Loading…</p>}
+              {!combinedLoading && combinedItems.length === 0 && (
+                <p className='text-xs text-fg-muted py-2'>No completed combines yet.</p>
+              )}
+              <ul className='space-y-1.5 max-h-64 overflow-y-auto'>
+                {combinedItems.map(row => (
+                  <li key={row.id}
+                    className='flex items-center justify-between gap-2 p-2 rounded-lg bg-surface-elevated border border-line'>
+                    <div className='min-w-0 flex-1'>
+                      <p className='text-xs text-fg-secondary truncate'>{row.title || `Combine #${row.id}`}</p>
+                      <p className='text-[10px] font-mono text-fg-muted'>#{row.id} · {fmtBytes(row.fileSize)}</p>
+                    </div>
+                    <button onClick={() => addCombined(row)}
+                      className='text-[10px] font-semibold px-2 py-1 rounded border border-amber-500/40 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20 shrink-0'>
+                      + Add
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
       </div>
 
       {/* ── Right rail: ordered selection + submit + tracked jobs ─── */}
@@ -350,11 +490,23 @@ function BuildTab({
             <p className='text-xs text-fg-muted py-4 text-center'>Pick 2+ videos from the library →</p>
           )}
           <ul className='space-y-1.5'>
-            {picked.map((p, idx) => (
-              <li key={`${p.videoId || p.url}-${idx}`}
+            {picked.map((p, idx) => {
+              // Stable key across all source kinds. Falls back to idx if
+              // nothing identifying is set (shouldn't happen).
+              const key = p.videoId || p.uploadId || (p.combineId ? `cmb-${p.combineId}` : null) || p.url || `slot-${idx}`
+              const kindBadge =
+                p.uploadId  ? <span className='text-[9px] text-amber-300 font-mono'>UPLOAD</span>
+                : p.combineId ? <span className='text-[9px] text-fuchsia-300 font-mono'>COMBINE #{p.combineId}</span>
+                : p.url     ? <span className='text-[9px] text-cyan-300 font-mono'>URL</span>
+                : null
+              return (
+              <li key={key}
                 className='flex items-center gap-2 text-xs p-2 rounded-lg bg-surface-elevated border border-line'>
                 <span className='font-mono text-fg-muted shrink-0 w-5 text-center'>{idx + 1}</span>
-                <span className='flex-1 truncate text-fg-secondary'>{p.title}</span>
+                <span className='flex-1 truncate text-fg-secondary'>
+                  {kindBadge && <span className='mr-1.5'>{kindBadge}</span>}
+                  {p.title}
+                </span>
                 <div className='flex items-center gap-0.5 shrink-0'>
                   <button onClick={() => move(idx, -1)} disabled={idx === 0}
                     className='tap-44 text-fg-muted hover:text-fg-primary disabled:opacity-30'>↑</button>
@@ -365,7 +517,7 @@ function BuildTab({
                   </button>
                 </div>
               </li>
-            ))}
+            )})}
           </ul>
           {picked.length >= 2 && (
             <div className='mt-3 space-y-2'>
@@ -540,13 +692,20 @@ function LibraryTab({ onDelete, refreshKey }) {
 // Outer component — owns the shared state that both tabs care about
 // (tracked jobs + the polling history of those tracked jobs).
 // ─────────────────────────────────────────────────────────────────────
-export default function VideoCombiner() {
+export default function VideoCombiner({ refreshKey = 0 } = {}) {
   const [tab, setTab] = useQueryState('cTab', 'build', { allowed: ['build', 'library'] })
   const [trackedIds, setTrackedIds] = useState(loadTracked)
   const [history, setHistory] = useState([])
   const [logsByJob, setLogsByJob] = useState({})
   const [libraryRefreshKey, setLibraryRefreshKey] = useState(0)
   const notifiedRef = useRef(new Set())
+
+  // Parent (AIVideo Tabs) bumps `refreshKey` on every tab change so the
+  // library + tracked-history view both reload their counts. Mirrors
+  // the same plumbing Cinema uses.
+  useEffect(() => {
+    if (refreshKey) setLibraryRefreshKey(k => k + 1)
+  }, [refreshKey])
 
   useEffect(() => { saveTracked(trackedIds) }, [trackedIds])
 

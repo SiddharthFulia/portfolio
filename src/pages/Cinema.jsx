@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Input, Select, Modal, Alert, message as antMessage } from 'antd'
-import { VideoCameraOutlined, ThunderboltOutlined, ReloadOutlined, BulbOutlined, DeleteOutlined } from '@ant-design/icons'
+import { VideoCameraOutlined, ThunderboltOutlined, ReloadOutlined, BulbOutlined, DeleteOutlined, DownloadOutlined } from '@ant-design/icons'
 import { submitCinema, listCinemaProjects, cinemaBulkAction, createCinemaRender, patchCinemaProject, reviewCinemaShot, getCinemaDiskStats } from '../api/ai'
 import PromptHelper from '../components/PromptHelper'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
@@ -22,7 +22,7 @@ import useQueryState from '../hooks/useQueryState'
 // This is what lets AIVideo expose two clean sibling tabs ("Cinema" and
 // "Cinema Library") instead of embedding the whole standalone Cinema
 // page as one nested-feeling tab.
-export default function Cinema({ embedded = false, view = 'all' }) {
+export default function Cinema({ embedded = false, view = 'all', refreshKey = 0 }) {
   const navigate = useNavigate()
   const [masterPrompt, setMasterPrompt] = useState('')
   // Card-style selectors mirrored to URL so refresh restores the user's
@@ -44,6 +44,14 @@ export default function Cinema({ embedded = false, view = 'all' }) {
   useEffect(() => {
     if (!embedded) document.title = 'Cinema · Sid'
   }, [embedded])
+
+  // Parent (AIVideo Tabs) bumps `refreshKey` on every tab change so the
+  // newly-active tab reloads its lists. Without this, deleting in
+  // Combine + switching to Cinema Library leaves stale counts +
+  // disk-stats sitting on screen.
+  useEffect(() => {
+    if (refreshKey) setLibraryRefresh(k => k + 1)
+  }, [refreshKey])
 
   const plan = async () => {
     if (!masterPrompt.trim() || masterPrompt.trim().length < 5) {
@@ -628,9 +636,17 @@ function CinemaCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
     if (selectMode) { e.preventDefault(); onToggleSelect?.(); return }
     // Anywhere else on the card → open the project detail page so the user
     // sees the master prompt + planned shots + render buttons in one shot.
-    if (e.target.closest('button')) return
+    if (e.target.closest('button') || e.target.closest('a')) return
     navigate(`/cinema/${encodeURIComponent(item.projectId)}`)
   }
+  // Resolve the final mp4 download URL. `outputUrl` is patched onto the
+  // cinema_projects row by the BE orchestrator on combine-success
+  // (`/api/combine/file/<combineId>`). Prepend VITE_BE_URL so the FE
+  // doesn't try to fetch from its own domain.
+  const beBase = import.meta.env.VITE_BE_URL || ''
+  const downloadHref = item.outputUrl
+    ? (item.outputUrl.startsWith('http') ? item.outputUrl : `${beBase}${item.outputUrl}`)
+    : null
   return (
     <div onClick={handleClick}
       className={`group relative rounded-lg overflow-hidden border transition-colors bg-gray-900/40 p-3 cursor-pointer ${
@@ -650,6 +666,18 @@ function CinemaCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
         }`}>{item.status}</span>
       </div>
       <p className="text-[11px] text-gray-300 line-clamp-3 leading-snug">{item.masterPrompt}</p>
+
+      {/* Download button — completed cinemas with a combine URL get a
+          one-click save right here so the user doesn't have to open the
+          detail page just to grab the mp4. */}
+      {downloadHref && item.status === 'completed' && !selectMode && (
+        <a href={downloadHref}
+          onClick={(e) => e.stopPropagation()}
+          className="mt-2 inline-flex items-center justify-center gap-1 w-full text-[11px] font-semibold px-3 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/12 text-emerald-200 hover:bg-emerald-500/22 transition-colors">
+          <DownloadOutlined /> Download mp4
+        </a>
+      )}
+
       {selectMode && <SelectCheckbox checked={checked} onToggle={onToggleSelect} />}
       {!selectMode && onDelete && (
         // Always visible (was hover-only). Touch users couldn't find it

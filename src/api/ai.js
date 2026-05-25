@@ -852,6 +852,36 @@ export function combineFileUrl(id) {
   const base = import.meta.env.VITE_BE_URL || '';
   return `${base}${ENDPOINTS.COMBINE_FILE}/${id}`;
 }
+// Upload a local mp4 to the BE so it can be used as a combine source.
+// FormData-based multipart upload. Returns { uploadId, name, size, mimetype }.
+export async function combineUpload(file, { onProgress } = {}) {
+  try {
+    const base = import.meta.env.VITE_BE_URL || '';
+    const form = new FormData();
+    form.append('file', file, file.name);
+    // Plain fetch — `post()` is JSON-only; multipart needs raw FormData.
+    // XHR rather than fetch so we can wire onProgress for the upload bar.
+    const data = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${base}${ENDPOINTS.COMBINE_UPLOAD}`);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+      xhr.onload = () => {
+        try {
+          const body = JSON.parse(xhr.responseText || '{}');
+          if (xhr.status >= 200 && xhr.status < 300) resolve(body?.data || body);
+          else reject(new Error(body?.message || body?.error || `HTTP ${xhr.status}`));
+        } catch (err) { reject(err); }
+      };
+      xhr.onerror = () => reject(new Error('Network error during upload'));
+      xhr.send(form);
+    });
+    return { data, error: null };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+}
 
 export async function ytdlCreate({ url, format, quality, worker = 'cobalt' }) {
   try {

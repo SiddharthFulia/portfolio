@@ -73,6 +73,11 @@ const fmtSec = (s) => {
 export default function JobDetailPage({
   lane, title, accentClass, backTo,
   getStatus, renderOutput, renderError, idKey = 'jobId',
+  // hideLogs — for lanes whose logs live in a separate stream (e.g.
+  // Cinema, where logs are tagged by cinemaRenderId, not the project's
+  // own jobId). The renderOutput callback can show its own log panel
+  // instead. Skips the "Worker transcript · 0 events" section entirely.
+  hideLogs = false,
 }) {
   const params = useParams()
   const navigate = useNavigate()
@@ -225,6 +230,7 @@ export default function JobDetailPage({
         </section>
 
         {/* Live log feed — always rendered when there are any logs */}
+        {!hideLogs && (
         <section className="rounded-2xl border border-gray-800 bg-gray-900/40 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-800 bg-gradient-to-r from-cyan-500/5 to-fuchsia-500/5">
             <div className="flex items-center gap-2">
@@ -285,6 +291,7 @@ export default function JobDetailPage({
             </div>
           </button>
         </section>
+        )}
 
         {/* Full-history modal */}
         <Modal open={logsOpen} onCancel={() => setLogsOpen(false)} footer={null}

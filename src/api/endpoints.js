@@ -72,6 +72,7 @@ export const ENDPOINTS = {
   CHESS_MATCHES:        '/api/chess/matches',     // /:id, /:id/join, /:id/move, /:id/resign appended at call site
   // Multi-video concatenation (ffmpeg-concat lane)
   COMBINE:              '/api/combine',
+  COMBINE_UPLOAD:       '/api/combine/upload',
   COMBINE_STATUS:       '/api/combine/status',       // /:id appended at call site
   COMBINE_LIST:         '/api/combine/list',
   COMBINE_FILE:         '/api/combine/file',         // /:id appended at call site
