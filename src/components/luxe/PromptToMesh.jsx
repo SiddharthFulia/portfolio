@@ -19,7 +19,7 @@
 //   - Fullscreen toggle, camera view chips, stats panel.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { submitMeshJob, getMeshStatus } from '../../api/ai'
+import { submitMeshJob, getMeshStatus, uploadSourceImage } from '../../api/ai'
 import notify from '../../utils/notify'
 import JobLogsAgentPlan from '../JobLogsAgentPlan'
 import MeshViewerCanvas, {
@@ -243,6 +243,13 @@ export default function PromptToMesh() {
   const [textureQuality, setTextureQuality]       = useState(50)
   const [textureResolution, setTextureResolution] = useState(1024)
   const [polygonTarget, setPolygonTarget]         = useState(80000)
+  // Reference image for image-conditioned 3D (TRELLIS / TRELLIS v2 / Hunyuan3D).
+  // Null = pure text-to-3D path. URL = image-to-3D — the worker downloads the
+  // image and uses it as the structural conditioning signal. Either pasted as
+  // a URL or uploaded as a file (the file goes via /api/ai-video/upload-image
+  // first to get a public URL the worker can fetch).
+  const [referenceImageUrl, setReferenceImageUrl] = useState('')
+  const [imageUploading, setImageUploading]       = useState(false)
 
   const [submitting, setSubmitting]           = useState(false)
   const [jobId, setJobId]                     = useState('')
@@ -317,6 +324,24 @@ export default function PromptToMesh() {
     }, POLL_MS)
   }
 
+  // Upload a local image file to /api/ai-video/upload-image (reusable —
+  // the same endpoint is used by AIVideo's image-to-video source image)
+  // and fill `referenceImageUrl` with the returned Cloudinary URL.
+  const handleReferenceImageFile = async (event) => {
+    const fileList = event.target?.files
+    const file = fileList && fileList[0]
+    if (!file) return
+    setImageUploading(true)
+    const { data, error: uploadError } = await uploadSourceImage(file)
+    setImageUploading(false)
+    event.target.value = ''
+    if (uploadError || !data?.url) {
+      notify.error(uploadError || 'Upload returned no URL', { title: 'Reference image upload failed' })
+      return
+    }
+    setReferenceImageUrl(data.url)
+  }
+
   const generate = async () => {
     const text = prompt.trim()
     if (!text || isWorking) return
@@ -339,6 +364,11 @@ export default function PromptToMesh() {
         textureQuality,
         textureResolution,
         polygonTarget,
+      } : {}),
+      // Reference image is only valid on the quality models. The BE
+      // 400s if you send it for shap-e / tripo, so omit it explicitly.
+      ...(sendsQuality && referenceImageUrl.trim() ? {
+        imageUrl: referenceImageUrl.trim(),
       } : {}),
     }
     const { data, error: subErr } = await submitMeshJob(payload)
@@ -645,6 +675,63 @@ export default function PromptToMesh() {
                   })}
                 </div>
               </div>
+
+              {/* Reference image — optional input for image-conditioned 3D
+                  on TRELLIS / TRELLIS v2 / Hunyuan3D. Paste a URL or upload
+                  a local file; the file roundtrips through the existing
+                  upload-image endpoint that AIVideo uses, so any image
+                  the worker can fetch is fair game. Leave blank for pure
+                  text-to-3D. */}
+              {MODELS.find(m => m.id === model)?.quality && (
+                <div className="mt-4 pt-3 border-t border-gray-800/60">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-300 mb-1.5">
+                    Reference image · optional
+                  </p>
+                  <p className="text-[10px] text-gray-500 mb-2">
+                    Pure text-to-3D if left blank. Add an image to do image-to-3D — the engine uses it as the structural conditioning signal.
+                  </p>
+                  <div className="flex gap-1.5 items-start">
+                    <input
+                      type="text"
+                      value={referenceImageUrl}
+                      onChange={e => setReferenceImageUrl(e.target.value)}
+                      placeholder="https://… (paste an image URL)"
+                      disabled={isWorking}
+                      className="luxe-input text-xs flex-1 font-mono"
+                    />
+                    <label className={`px-3 py-2 rounded-md text-[11px] font-semibold border border-amber-400/40 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20 cursor-pointer whitespace-nowrap ${
+                      isWorking || imageUploading ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}>
+                      {imageUploading ? 'Uploading…' : 'Upload'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleReferenceImageFile}
+                        disabled={isWorking || imageUploading}
+                        className="hidden"
+                      />
+                    </label>
+                    {referenceImageUrl && (
+                      <button type="button"
+                        onClick={() => setReferenceImageUrl('')}
+                        disabled={isWorking}
+                        className="px-2 py-2 rounded-md text-[11px] text-gray-400 hover:text-rose-300 border border-transparent">
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  {referenceImageUrl && (
+                    <div className="mt-2 rounded-md overflow-hidden border border-gray-800 bg-gray-900/40 inline-block max-w-[160px]">
+                      <img
+                        src={referenceImageUrl}
+                        alt="Reference"
+                        className="w-full h-auto block"
+                        onError={(e) => { e.currentTarget.style.display = 'none' }}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Mesh & Texture Quality — only meaningful for TRELLIS /
                   TRELLIS v2 / Hunyuan3D. Each slider maps to engine-
