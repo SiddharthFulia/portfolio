@@ -209,25 +209,34 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
   }
 
   // Hydrate per-shot REAL status + videoUrl from the BE for each
-  // populated jobId. The render row only stores jobIds, not status or
-  // videoUrl, so without this the cards on refresh would show:
+  // populated jobId. The render row only stores jobIds (not status or
+  // videoUrl), so without this the cards would show:
   //   - all shots as 'processing' even when several are completed
   //   - no inline <video> preview because shotRow.videoUrl is missing
-  // Fetch /api/ai-video/status/:jobId in parallel for every shot that
-  // has a jobId, then patch each card. Re-runs every time the page
-  // poll refreshes the render row (so a shot that finishes mid-view
-  // populates its videoUrl + flips to 'completed' on the next tick).
+  //
+  // Polls in two modes:
+  //   1) ONE-SHOT — whenever the render row's shotJobIds array changes
+  //      (a new shot was queued by the orchestrator). Re-hydrates every
+  //      shot's status + videoUrl.
+  //   2) PERIODIC — every 3s as long as ANY shot is still in a
+  //      non-terminal state. This is the critical bit for the
+  //      BE-driven chain: after all N shots are queued the array
+  //      stops changing, so without periodic polling we'd never see
+  //      shot 4's completion or its videoUrl until a manual refresh.
+  //      Stops on its own once every shot is terminal.
   useEffect(() => {
     const jobIdsToHydrate = (initialRender?.shotJobIds || [])
       .map((jobId, idx) => ({ jobId, idx }))
       .filter(entry => entry.jobId)
     if (jobIdsToHydrate.length === 0) return
     let cancelled = false
-    Promise.all(jobIdsToHydrate.map(async ({ jobId, idx }) => {
-      const { data } = await getJobStatus(jobId)
-      return { idx, jobId, data }
-    })).then(results => {
-      if (cancelled) return
+
+    const hydrateOnce = async () => {
+      const results = await Promise.all(jobIdsToHydrate.map(async ({ jobId, idx }) => {
+        const { data } = await getJobStatus(jobId)
+        return { idx, jobId, data }
+      }))
+      if (cancelled) return results
       setShots(previousShots => previousShots.map((shotRow, rowIndex) => {
         const result = results.find(r => r.idx === rowIndex)
         if (!result?.data) return shotRow
@@ -242,10 +251,34 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
           error: job.error || shotRow.error,
         }
       }))
-    })
-    return () => { cancelled = true }
-    // Re-fetch whenever the render row's shotJobIds reference changes
-    // (new shot kicked off / new tick from CinemaRenderPage's poll).
+      return results
+    }
+
+    // Schedule periodic re-polls. Each tick decides whether to keep
+    // going based on the freshest set of statuses (not the React
+    // state, which lags by one render).
+    let timer = null
+    const scheduleNext = (latestResults) => {
+      if (cancelled) return
+      const anyLive = (latestResults || []).some(r => {
+        const status = r?.data?.status
+        return status === 'queued' || status === 'processing'
+      })
+      if (!anyLive) return
+      timer = setTimeout(async () => {
+        const next = await hydrateOnce()
+        scheduleNext(next)
+      }, 3000)
+    }
+
+    hydrateOnce().then(scheduleNext)
+
+    return () => {
+      cancelled = true
+      if (timer) clearTimeout(timer)
+    }
+    // Restart whenever shotJobIds changes (orchestrator queued a new
+    // shot). The previous effect run is cancelled by the cleanup above.
   }, [initialRender?.shotJobIds?.join(',') || ''])
 
   // Re-sync the live fields from the BE row on every poll tick. The
