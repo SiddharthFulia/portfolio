@@ -1,6 +1,34 @@
 import { useState, useEffect, useRef } from 'react'
-import { Modal, message as antMessage } from 'antd'
+import { Modal, Pagination, InputNumber, message as antMessage } from 'antd'
 import { DeleteOutlined, CheckOutlined, AppstoreOutlined, ReloadOutlined, CheckSquareOutlined } from '@ant-design/icons'
+
+const PAGE_SIZE_OPTIONS = ['10', '20', '30', '50', '100']
+const DEFAULT_PAGE_SIZE = 24
+
+// Reusable page-size picker — antd's Pagination dropdown plus a Custom
+// InputNumber (1..1000) for the times when the user wants to see all
+// 243 items at once. Same component the Combine + Mesh libraries use,
+// extracted here so the pattern stays consistent across every library.
+function PageSizeStrip({ pageSize, setPageSize }) {
+  const [draft, setDraft] = useState(pageSize)
+  useEffect(() => { setDraft(pageSize) }, [pageSize])
+  const apply = () => {
+    const n = Math.max(1, Math.min(1000, parseInt(draft, 10) || pageSize))
+    setPageSize(n)
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="text-[10px] uppercase tracking-wider text-gray-500">Custom</span>
+      <InputNumber size="small" min={1} max={1000} value={draft}
+        onChange={setDraft} onPressEnter={apply}
+        style={{ width: 80 }} />
+      <button onClick={apply}
+        className="text-[10px] px-2 py-1 rounded border border-gray-700 hover:border-gray-500 text-gray-300 inline-flex items-center">
+        <CheckOutlined />
+      </button>
+    </span>
+  )
+}
 
 // Cheap structural compare: same length, same id order, same status per item.
 // Used so the library doesn't repaint card by card when polling returns the
@@ -39,6 +67,7 @@ export default function StudioLibrary({
 }) {
   const [filter, setFilter] = useState('completed')
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [data, setData] = useState({ items: [], total: 0, pages: 1 })
   const [loading, setLoading] = useState(true)
   const [selectMode, setSelectMode] = useState(false)
@@ -64,7 +93,7 @@ export default function StudioLibrary({
     // Subsequent silent refetches keep existing cards on screen and just swap
     // them when the data actually differs — no flash, no flicker.
     setLoading(prev => (data.items.length === 0 ? true : prev))
-    listFnRef.current({ status: filter, page, limit: 24 }).then(({ data: result }) => {
+    listFnRef.current({ status: filter, page, limit: pageSize }).then(({ data: result }) => {
       if (cancelled) return
       if (result) {
         // Shallow-diff: if the items array is logically identical (same ids in
@@ -76,7 +105,7 @@ export default function StudioLibrary({
       setLoading(false)
     })
     return () => { cancelled = true }
-  }, [filter, page, refreshKey, internalReload])
+  }, [filter, page, pageSize, refreshKey, internalReload])
 
   const toggleSelect = (id) => {
     setSelected(prev => {
@@ -217,17 +246,29 @@ export default function StudioLibrary({
         </div>
       )}
 
-      {selectMode && selCount > 0 && (
-        <div className="sticky bottom-3 z-30 mx-auto max-w-xl mt-4">
-          <div className={`rounded-lg border bg-gray-950/95 backdrop-blur p-3 shadow-sm ${accentClasses} flex items-center justify-between gap-3 flex-wrap`}>
-            <span className="text-xs text-gray-300">
-              <span className="font-mono text-cyan-300">{selCount}</span> selected
-            </span>
-            <button onClick={doBulkDelete} disabled={bulkBusy}
-              className="flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-200 border border-rose-500/40 font-semibold disabled:opacity-50">
-              <DeleteOutlined /> Delete {selCount}
-            </button>
-          </div>
+      {/* Sticky-bottom delete bar removed — the inline "Delete N" button
+          on the header row (right next to Select) is the only delete
+          control now. The floating bar was duplicating it AND making the
+          user scroll past every card to reach it. */}
+
+      {/* Pagination + custom page-size strip — same pattern Combine and
+          Mesh libraries use. Lets the user blow through hundreds of past
+          items without overloading the BE per request. */}
+      {data.total > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 mt-4 pt-3 border-t border-gray-800">
+          <Pagination
+            current={page}
+            pageSize={pageSize}
+            total={data.total}
+            showSizeChanger
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
+            size="small"
+            showQuickJumper
+            showTotal={(t, [a, b]) => `${a}-${b} of ${t.toLocaleString()}`}
+            onChange={(p, s) => { setPage(p); if (s !== pageSize) setPageSize(s) }}
+            onShowSizeChange={(_p, s) => { setPageSize(s); setPage(1) }}
+          />
+          <PageSizeStrip pageSize={pageSize} setPageSize={(n) => { setPageSize(n); setPage(1) }} />
         </div>
       )}
     </section>
