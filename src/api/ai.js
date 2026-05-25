@@ -461,7 +461,8 @@ export async function getCinemaDiskStats() {
 export async function createCinemaRender(projectId, body = {}) {
   try {
     // body: { provider?: 'optimized' | 'local' | 'zsky',
-    //         optimizedMode?: 'preview' | 'balanced' | 'quality' }
+    //         optimizedMode?: 'preview' | 'balanced' | 'quality',
+    //         beastModel?: 'wan-2.2'|'wan-2.1'|'wan-2.1-i2v'|'hunyuan'|'ltx-video'|'mochi'|'svd' }
     const data = await post(`${ENDPOINTS.CINEMA_RENDER_CREATE}/${projectId}/render`, body, { timeout: 10000 });
     return { data: data?.data || data, error: null };
   } catch (err) { return { data: null, error: err.message }; }

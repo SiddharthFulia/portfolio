@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Input, Select, Modal, Alert, message as antMessage } from 'antd'
-import { VideoCameraOutlined, ThunderboltOutlined, ReloadOutlined, BulbOutlined, DeleteOutlined, DownloadOutlined } from '@ant-design/icons'
-import { submitCinema, listCinemaProjects, cinemaBulkAction, createCinemaRender, patchCinemaProject, reviewCinemaShot, getCinemaDiskStats } from '../api/ai'
+import { VideoCameraOutlined, ThunderboltOutlined, ReloadOutlined, BulbOutlined, DeleteOutlined, DownloadOutlined, LockOutlined, UnlockOutlined, PictureOutlined, UploadOutlined } from '@ant-design/icons'
+import { submitCinema, listCinemaProjects, cinemaBulkAction, createCinemaRender, patchCinemaProject, reviewCinemaShot, getCinemaDiskStats, uploadSourceImage } from '../api/ai'
 import PromptHelper from '../components/PromptHelper'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
 import { Button, Slider } from '../components/ui'
@@ -314,24 +314,50 @@ function PlannedShotsPanel({ project, navigate }) {
   // Pickers — URL-mirrored so refresh keeps the same choice.
   const [renderProvider, setRenderProvider] = useQueryState('rProv', 'optimized', { allowed: ['optimized', 'local', 'zsky'] })
   const [renderMode, setRenderMode]         = useQueryState('rMode', 'balanced',  { allowed: ['preview', 'balanced', 'quality'] })
+  const [beastModel, setBeastModel]         = useQueryState('rModel', DEFAULT_BEAST_MODEL, {
+    allowed: BEAST_MODELS.map(m => m.id),
+  })
   // 'mode' only meaningfully changes the chain output for the optimized
   // provider — the other two ignore it on the BE.
-  const showModePicker = renderProvider === 'optimized'
-  // 5090 Beast lets the user pick a model PER SHOT (LTX, Wan 2.1, …);
-  // optimized + zsky pick server-side, so the per-shot dropdown is
-  // hidden in those modes.
-  const showPerShotModel = renderProvider === 'local'
+  const showModePicker  = renderProvider === 'optimized'
+  // 5090 Beast picks ONE model for the whole render. Per-shot mixing
+  // was removed because it broke continuity (different models =
+  // different face/lighting/lens interpretations).
+  const showBeastModelPicker = renderProvider === 'local'
+  // Motion strength slider — only Wan / Hunyuan honour it. LTX ignores.
+  const motionApplies = renderProvider === 'local'
+    && ['wan-2.1', 'wan-2.1-i2v', 'wan-2.2', 'hunyuan'].includes(beastModel)
 
-  // Per-shot arrays — local state for snappy UX, PATCHed to the BE on
-  // every change so a refresh restores them. Initialised from the
-  // project row + padded to shotCount when missing.
+  // Per-shot music array — same as before. Default OFF everywhere.
   const shotCount = project.shotPrompts.length
-  const [shotMusic, setShotMusic]   = useState(() =>
+  const [shotMusic, setShotMusic] = useState(() =>
     Array.from({ length: shotCount }, (_, i) => !!project.shotMusic?.[i])
   )
-  const [shotModels, setShotModels] = useState(() =>
-    Array.from({ length: shotCount }, (_, i) => project.shotModels?.[i] || DEFAULT_BEAST_MODEL)
-  )
+
+  // Continuity bible — JSON object pre-populated by Groq at project
+  // creation. Locked-edit by default (click 🔓 to enable typing); the
+  // lock is just a UX guard to avoid mid-render typos. Save debounce
+  // is 600ms after the last keystroke per field.
+  const [bible, setBible] = useState(() => project.continuityBible || {})
+  const [bibleLocked, setBibleLocked] = useState(true)
+
+  // Locked seed — single integer. The chain uses this to init noise on
+  // every shot so the model rolls the same starting point each clip.
+  // Defaults to whatever the BE stamped at creation (random 0..1e9).
+  const [seed, setSeed] = useState(() => Number(project.lockedSeed ?? 0))
+  const [seedLocked, setSeedLocked] = useState(true)
+
+  // Motion strength — 0.1..1.0; defaults to 0.6 (Wan/Hunyuan can
+  // identity-mutate above ~0.75).
+  const [motion, setMotion] = useState(() => Number(project.motionStrength ?? 0.6))
+
+  // Hero image URL — the master first-frame that anchors the whole
+  // render. When set, the chain uses this as shot 1's source image
+  // (I2V→I2V→… instead of T2V→I2V→…) so the chain doesn't drift on
+  // its first generation.
+  const [heroImageUrl, setHeroImageUrl] = useState(() => project.heroImageUrl || '')
+  const [heroUploading, setHeroUploading] = useState(false)
+  const heroFileInputRef = useRef(null)
 
   const patchProject = async (patch) => {
     const { error: err } = await patchCinemaProject(project.projectId, patch)
@@ -341,20 +367,59 @@ function PlannedShotsPanel({ project, navigate }) {
     const next = [...shotMusic]; next[idx] = !!v; setShotMusic(next)
     patchProject({ shotMusic: next })
   }
-  const setModelAt = (idx, m) => {
-    const next = [...shotModels]; next[idx] = m; setShotModels(next)
-    patchProject({ shotModels: next })
-  }
   const bulkMusic = (v) => {
     const next = shotMusic.map(() => !!v); setShotMusic(next)
     patchProject({ shotMusic: next })
   }
-  const bulkModel = (m) => {
-    const next = shotModels.map(() => m); setShotModels(next)
-    patchProject({ shotModels: next })
-  }
   const anyMusicOn = shotMusic.some(Boolean)
   const allMusicOn = shotMusic.length > 0 && shotMusic.every(Boolean)
+
+  // Debounced bible save — one timer for all 6 fields so a fast
+  // tabbing edit only fires one PATCH.
+  const bibleSaveTimer = useRef(null)
+  const updateBibleField = (key, value) => {
+    const next = { ...bible, [key]: value }
+    setBible(next)
+    if (bibleSaveTimer.current) clearTimeout(bibleSaveTimer.current)
+    bibleSaveTimer.current = setTimeout(() => patchProject({ continuityBible: next }), 600)
+  }
+
+  // Seed save — only on blur or when toggling the lock off + back on.
+  const commitSeed = () => {
+    const n = parseInt(seed, 10)
+    if (!Number.isFinite(n) || n < 0) { antMessage.error('Seed must be a positive integer'); return }
+    patchProject({ lockedSeed: n })
+  }
+  const rerollSeed = () => {
+    const n = Math.floor(Math.random() * 1_000_000_000)
+    setSeed(n)
+    patchProject({ lockedSeed: n })
+  }
+  const commitMotion = (v) => {
+    setMotion(v)
+    patchProject({ motionStrength: v })
+  }
+
+  // Hero image — upload via the existing /api/ai-video/upload-image
+  // endpoint (returns a Cloudinary URL), then PATCH heroImageUrl onto
+  // the project so a refresh restores it.
+  const onPickHeroFile = async (file) => {
+    if (!file) return
+    if (!/^image\//i.test(file.type)) { antMessage.warning('Only image uploads'); return }
+    setHeroUploading(true)
+    const { data, error: err } = await uploadSourceImage(file)
+    setHeroUploading(false)
+    if (err) { antMessage.error(`Upload failed: ${err}`); return }
+    const url = data?.url || data?.secure_url || ''
+    if (!url) { antMessage.error('Upload returned no URL'); return }
+    setHeroImageUrl(url)
+    patchProject({ heroImageUrl: url })
+    antMessage.success('Hero image set — will anchor shot 1')
+  }
+  const clearHero = () => {
+    setHeroImageUrl('')
+    patchProject({ heroImageUrl: '' })
+  }
 
   const onStart = () => {
     Modal.confirm({
@@ -383,6 +448,7 @@ function PlannedShotsPanel({ project, navigate }) {
         const { data, error } = await createCinemaRender(project.projectId, {
           provider: renderProvider,
           optimizedMode: renderMode,
+          beastModel: renderProvider === 'local' ? beastModel : undefined,
         })
         setCreating(false)
         if (error || !data?.renderId) {
@@ -447,10 +513,174 @@ function PlannedShotsPanel({ project, navigate }) {
             </div>
           </div>
         )}
+        {showBeastModelPicker && (
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1.5">
+              Model — applies to ALL shots
+            </p>
+            <Select
+              value={beastModel}
+              onChange={setBeastModel}
+              style={{ width: '100%' }}
+              options={BEAST_MODELS.map(m => ({
+                value: m.id,
+                label: (
+                  <div>
+                    <div className="font-semibold text-white text-xs">{m.label}</div>
+                    <div className="text-[10px] text-gray-400">{m.blurb}</div>
+                  </div>
+                ),
+              }))}
+            />
+            <p className="text-[10px] text-gray-500 font-mono mt-1.5">
+              One model · one seed · one bible · across every shot. The key to continuity.
+            </p>
+          </div>
+        )}
       </div>
-      {/* Bulk shot-level controls — toggle music on/off for ALL shots
-          at once, or stamp the same Beast model across every shot.
-          Per-shot overrides still win after a bulk apply. */}
+
+      {/* ── Continuity bible ─────────────────────────────────────────
+          Locked world facts prepended to every shot's prompt. Without
+          this, each shot is its own world and the character mutates
+          between clips. The chain glues these as "same X, same Y, …"
+          to the front of every shot's action prompt at submit time. */}
+      <div className="luxe-card p-4 mb-4 border-amber-500/30 bg-amber-500/[0.03]">
+        <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80">
+              — Continuity bible
+            </p>
+            <p className="text-[11px] text-gray-400 mt-0.5">
+              Locked world facts. Prepended to every shot's prompt so the model rebuilds the same world each clip.
+            </p>
+          </div>
+          <button type="button" onClick={() => setBibleLocked(l => !l)}
+            className={`text-[10px] font-semibold inline-flex items-center gap-1 px-2 py-1 rounded border ${
+              bibleLocked
+                ? 'border-amber-400/40 bg-amber-500/10 text-amber-200'
+                : 'border-emerald-400/50 bg-emerald-500/10 text-emerald-200'
+            }`}>
+            {bibleLocked ? <><LockOutlined /> Locked · click to edit</> : <><UnlockOutlined /> Editing · click to lock</>}
+          </button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          {['subject', 'wardrobe', 'environment', 'lighting', 'camera', 'palette'].map(key => (
+            <div key={key}>
+              <label className="text-[10px] font-mono uppercase tracking-wider text-gray-500">{key}</label>
+              <Input
+                size="small"
+                value={bible[key] || ''}
+                onChange={(e) => updateBibleField(key, e.target.value)}
+                disabled={bibleLocked}
+                placeholder={
+                  key === 'subject'     ? 'young woman astronaut, athletic, mid-twenties'
+                  : key === 'wardrobe'   ? 'white damaged NASA suit, orange chest stripe, gold visor'
+                  : key === 'environment'? 'wet black alien sand, cyan crystals, twin red suns'
+                  : key === 'lighting'   ? 'warm twin-sunset rim right, cool cyan bounce left'
+                  : key === 'camera'     ? 'anamorphic 50mm, soft halation, fine grain'
+                  : 'obsidian, cyan, amber, ember red'
+                }
+                className="!font-mono !text-[12px]"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Seed + motion + hero image — three small but critical knobs ── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+        {/* Seed */}
+        <div className="luxe-card p-3 border-line">
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-gray-400">Locked seed</p>
+            <button type="button" onClick={() => setSeedLocked(l => !l)}
+              className={`text-[10px] inline-flex items-center gap-1 px-1.5 py-0.5 rounded border ${
+                seedLocked
+                  ? 'border-amber-400/40 text-amber-200'
+                  : 'border-emerald-400/50 text-emerald-200'
+              }`}>
+              {seedLocked ? <LockOutlined /> : <UnlockOutlined />}
+            </button>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Input
+              size="small"
+              value={seed}
+              onChange={(e) => setSeed(e.target.value.replace(/\D/g, ''))}
+              onBlur={commitSeed}
+              disabled={seedLocked}
+              className="!font-mono"
+            />
+            <button type="button" onClick={rerollSeed} disabled={seedLocked}
+              title="Roll a new random seed"
+              className="text-[10px] px-1.5 py-1 rounded border border-line hover:border-line-strong text-fg-muted disabled:opacity-40">
+              ↻
+            </button>
+          </div>
+          <p className="text-[10px] text-gray-500 mt-1">
+            Same seed = same noise init across every shot. Don't change mid-render.
+          </p>
+        </div>
+
+        {/* Motion strength — only when model honours it */}
+        <div className={`luxe-card p-3 border-line ${motionApplies ? '' : 'opacity-40 pointer-events-none'}`}>
+          <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-gray-400 mb-1.5">
+            Motion strength <span className="text-amber-300">{motion.toFixed(2)}</span>
+          </p>
+          <Slider
+            accent="amber"
+            min={0.1}
+            max={1.0}
+            step={0.05}
+            value={motion}
+            onChange={(v) => setMotion(Number(v))}
+            onChangeComplete={(v) => commitMotion(Number(v))}
+          />
+          <p className="text-[10px] text-gray-500 mt-1">
+            Lower = subject identity stable. Higher = bigger motion, more mutation. {motionApplies ? '' : 'Pick a Wan/Hunyuan model first.'}
+          </p>
+        </div>
+
+        {/* Hero image — anchor the look on shot 1 */}
+        <div className="luxe-card p-3 border-line">
+          <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-gray-400 mb-1.5">
+            <PictureOutlined /> Hero image
+          </p>
+          {heroImageUrl ? (
+            <div className="space-y-1.5">
+              <img src={heroImageUrl} alt="hero" className="w-full aspect-video object-cover rounded border border-line" />
+              <div className="flex items-center gap-1.5">
+                <button type="button" onClick={() => heroFileInputRef.current?.click()}
+                  className="text-[10px] flex-1 px-2 py-1 rounded border border-line hover:border-line-strong text-fg-muted">
+                  Replace
+                </button>
+                <button type="button" onClick={clearHero}
+                  className="text-[10px] px-2 py-1 rounded border border-rose-500/40 text-rose-300 hover:bg-rose-500/10">
+                  <DeleteOutlined />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" onClick={() => heroFileInputRef.current?.click()}
+              disabled={heroUploading}
+              className="w-full text-[11px] py-3 rounded border-2 border-dashed border-line hover:border-amber-400/50 hover:bg-amber-500/5 text-fg-muted inline-flex items-center justify-center gap-1.5">
+              {heroUploading ? 'Uploading…' : <><UploadOutlined /> Upload hero frame</>}
+            </button>
+          )}
+          <input
+            ref={heroFileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={(e) => { onPickHeroFile(e.target.files?.[0]); e.target.value = '' }}
+            className="hidden"
+          />
+          <p className="text-[10px] text-gray-500 mt-1">
+            When set, becomes shot 1's source image — anchors the look so shot 1 doesn't drift.
+          </p>
+        </div>
+      </div>
+
+      {/* Bulk music controls (per-shot toggle stays in the card row). */}
       <div className="flex flex-wrap items-center gap-3 mb-3 pt-3 border-t border-line/40">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-mono uppercase tracking-wider text-gray-400">Music</span>
@@ -474,19 +704,6 @@ function PlannedShotsPanel({ project, navigate }) {
             ({shotMusic.filter(Boolean).length}/{shotCount} on)
           </span>
         </div>
-        {showPerShotModel && (
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-gray-400">Apply model to all</span>
-            <Select
-              size="small"
-              value={null}
-              placeholder="Pick…"
-              onChange={(m) => m && bulkModel(m)}
-              style={{ minWidth: 180 }}
-              options={BEAST_MODELS.map(m => ({ value: m.id, label: m.label }))}
-            />
-          </div>
-        )}
       </div>
 
       {/* Editable shot list — each row is its own component so its
@@ -500,9 +717,6 @@ function PlannedShotsPanel({ project, navigate }) {
             durationPerShot={project.durationPerShot || 5}
             initialPrompt={prompt}
             allPrompts={project.shotPrompts}
-            showModel={showPerShotModel}
-            currentModel={shotModels[idx]}
-            onChangeModel={(m) => setModelAt(idx, m)}
             musicOn={!!shotMusic[idx]}
             onToggleMusic={(v) => setMusicAt(idx, v)}
           />
@@ -521,9 +735,8 @@ function PlannedShotsPanel({ project, navigate }) {
 // button that writes the suggestion back into the textarea + saves.
 function ShotPromptRow({
   projectId, shotIndex, durationPerShot, initialPrompt, allPrompts,
-  // Per-shot config — supplied by PlannedShotsPanel which owns the
-  // arrays + persists changes to the BE.
-  showModel = false, currentModel, onChangeModel,
+  // Per-shot music toggle — model is render-level now (single model for
+  // the whole chain so continuity holds).
   musicOn = false, onToggleMusic,
 }) {
   const [text, setText] = useState(initialPrompt)
@@ -603,7 +816,7 @@ function ShotPromptRow({
     <li className="luxe-card p-3">
       <div className="flex items-center justify-between mb-1.5 gap-2 flex-wrap">
         <p className="text-[10px] font-mono text-amber-400 font-bold tabular-nums">
-          SHOT {String(shotIndex + 1).padStart(2, '0')}
+          SHOT {String(shotIndex + 1).padStart(2, '0')} <span className="text-gray-500 font-normal normal-case tracking-normal">· action only</span>
           <span className="ml-2 text-gray-500">· {durationPerShot}s budget</span>
         </p>
         <div className="flex items-center gap-2">
@@ -624,25 +837,9 @@ function ShotPromptRow({
         className="!font-mono !text-[12px]"
       />
 
-      {/* Per-shot configuration row — Beast model dropdown (hidden on
-          optimized + zsky) and background-music toggle. Both state-
-          managed by the parent PlannedShotsPanel so bulk apply works. */}
+      {/* Per-shot music toggle — model + seed + bible all live at the
+          render level so continuity holds across the chain. */}
       <div className="mt-2 flex flex-wrap items-center gap-3 pt-2 border-t border-line/30">
-        {showModel && (
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-gray-500">Model</span>
-            <Select
-              size="small"
-              value={currentModel || DEFAULT_BEAST_MODEL}
-              onChange={onChangeModel}
-              style={{ minWidth: 180 }}
-              options={BEAST_MODELS.map(m => ({
-                value: m.id,
-                label: <span><span className="font-mono">{m.label}</span> <span className="text-gray-500 text-[10px]">· {m.blurb}</span></span>,
-              }))}
-            />
-          </div>
-        )}
         <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
           <span className="text-[10px] font-mono uppercase tracking-wider text-gray-500">Music</span>
           <input
