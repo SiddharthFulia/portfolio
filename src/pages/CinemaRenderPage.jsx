@@ -17,11 +17,11 @@
 // renderId can't cause duplicate generations (the second tab sees the
 // shotJobIds populated and the chain skips them).
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Alert, Modal, message as antMessage } from 'antd'
 import { ArrowLeftOutlined, ReloadOutlined, ExpandAltOutlined } from '@ant-design/icons'
-import { getCinemaRender } from '../api/ai'
+import { getCinemaRender, getCinemaRenderLogs } from '../api/ai'
 import CinemaRenderer from '../components/cinema/CinemaRenderer'
 
 const POLL_INTERVAL_MS = 3000
@@ -33,6 +33,14 @@ export default function CinemaRenderPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [titleModalOpen, setTitleModalOpen] = useState(false)
+  // Unified-by-render log stream. Aggregates every log line across all
+  // shots + the combine step into one chronologically-ordered list.
+  // Default-collapsed (the per-shot accordions inside CinemaRenderer
+  // already give an organised view; the unified stream is for when the
+  // user wants to scroll across everything at once / debug the chain).
+  const [unifiedLogsOpen, setUnifiedLogsOpen] = useState(false)
+  const [unifiedLogs, setUnifiedLogs] = useState([])
+  const unifiedSinceRef = useRef(0)
 
   useEffect(() => {
     document.title = `Cinema render · ${renderId?.slice(-8) || ''}`
@@ -71,6 +79,25 @@ export default function CinemaRenderPage() {
     return () => { cancelled = true; clearInterval(id) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [renderId])
+
+  // Unified log poller — runs only when the user has the panel open.
+  // Cursor-based via `since` so each tick only fetches new lines.
+  useEffect(() => {
+    if (!unifiedLogsOpen || !renderId) return undefined
+    let cancelled = false
+    const fetchTail = async () => {
+      const { data } = await getCinemaRenderLogs(renderId, unifiedSinceRef.current, 500)
+      if (cancelled || !data) return
+      const incoming = Array.isArray(data.logs) ? data.logs : []
+      if (incoming.length > 0) {
+        setUnifiedLogs(prev => [...prev, ...incoming].slice(-2000))
+        unifiedSinceRef.current = data.nextSince || unifiedSinceRef.current
+      }
+    }
+    fetchTail()
+    const id = setInterval(fetchTail, 1500)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [unifiedLogsOpen, renderId])
 
   if (loading) {
     return (
@@ -173,6 +200,56 @@ export default function CinemaRenderPage() {
             initialRender={render}
           />
         )}
+
+        {/* Unified-by-render logs — one chronologically-ordered stream
+            across every shot + the combine step. Default-collapsed
+            because the per-shot accordions inside CinemaRenderer above
+            already provide an organised view; this is for the user
+            who wants to scroll across everything at once (or debug
+            the chain across shots). */}
+        <section className="luxe-card p-4">
+          <button
+            type="button"
+            onClick={() => setUnifiedLogsOpen(open => !open)}
+            aria-expanded={unifiedLogsOpen}
+            className="w-full flex items-center justify-between text-left">
+            <div>
+              <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80">— Unified logs</p>
+              <p className="text-xs text-fg-muted mt-1">
+                Every log line across all {render.shotCount} shots + the combine step, ordered by time.
+              </p>
+            </div>
+            <span className="text-[11px] font-mono text-gray-400">
+              {unifiedLogsOpen ? '▾ collapse' : '▸ open'}
+            </span>
+          </button>
+          {unifiedLogsOpen && (
+            <div className="mt-3 max-h-[480px] overflow-y-auto rounded-md border border-gray-800 bg-black/40 p-2">
+              {unifiedLogs.length === 0 ? (
+                <p className="text-xs text-gray-500 py-6 text-center">
+                  No logs yet — they stream in as each shot runs.
+                </p>
+              ) : (
+                <ul className="space-y-0.5 text-[11px] font-mono leading-snug">
+                  {unifiedLogs.map((line, idx) => {
+                    const shotLabel = line.shotIndex === -1
+                      ? 'COMBINE'
+                      : (line.shotIndex != null ? `SHOT ${String(line.shotIndex + 1).padStart(2, '0')}` : '─')
+                    const shotTone = line.shotIndex === -1
+                      ? 'text-violet-300'
+                      : (line.shotIndex != null ? 'text-amber-300' : 'text-gray-500')
+                    return (
+                      <li key={`${line.ts}-${idx}`} className="grid grid-cols-[80px_1fr] gap-2 items-baseline">
+                        <span className={`${shotTone} text-[9px] uppercase tracking-wider`}>{shotLabel}</span>
+                        <span className="text-gray-300 break-words">{line.msg}</span>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
+          )}
+        </section>
       </div>
     </div>
   )

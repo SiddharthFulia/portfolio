@@ -467,6 +467,15 @@ export async function deleteCinemaRender(renderId) {
     return { data: data?.data || data, error: null };
   } catch (err) { return { data: null, error: err.message }; }
 }
+// Unified-by-render log stream. Returns every log line across every
+// shot + the combine step in one ordered timeline, each annotated with
+// jobId + lane + shotIndex (or -1 for combine).
+export async function getCinemaRenderLogs(renderId, sinceTs = 0, limit = 500) {
+  try {
+    const data = await get(`${ENDPOINTS.CINEMA_RENDER}/${renderId}/logs`, { since: sinceTs, limit }, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
 export async function cinemaBulkAction(action, ids) {
   try {
     const data = await post(ENDPOINTS.CINEMA_BULK, { action, ids }, { timeout: 15000 });
