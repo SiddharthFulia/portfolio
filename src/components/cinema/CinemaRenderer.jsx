@@ -25,6 +25,7 @@ import { Button } from '../ui'
 import {
   generateVideo, getJobStatus, uploadSourceImage,
   combineCreate, combineStatus, combineFileUrl,
+  patchCinemaRender,
 } from '../../api/ai'
 
 const POLL_MS                 = 2500
@@ -139,35 +140,74 @@ async function pollJobUntilTerminal(jobId, onTick, isCancelledRef) {
   return { ok: false, error: 'Cancelled', row: null }
 }
 
-export default function CinemaRenderer({ project }) {
+// CinemaRenderer — now takes optional `renderId` + `initialRender` props.
+// When set (the standalone /cinema/render/:renderId page passes them),
+// the component:
+//   • hydrates initial state from the BE render row (so refresh resumes
+//     where the previous tab stopped — currentShotIndex, shotJobIds,
+//     combineJobId, finalDownloadHref, etc. all come from the row)
+//   • PATCHes the row on every transition so the next refresh / shared
+//     link sees the same state
+//   • does NOT auto-start the chain — the user clicks Start/Resume.
+//     Auto-restart on refresh would risk duplicate shot generations if
+//     two tabs are open.
+// When `renderId` is absent, the component behaves like before (purely
+// in-memory; used by Cinema.jsx's planner view to show the initial UI
+// before kicking off a render).
+export default function CinemaRenderer({ project, renderId, initialRender }) {
   const shotPrompts = Array.isArray(project?.shotPrompts) ? project.shotPrompts : []
   const projectDuration   = project?.durationPerShot || 5
   const projectAspect     = project?.aspectRatio     || '16:9'
   const projectResolution = project?.resolution      || '720p'
 
-  const [shots, setShots] = useState(() => shotPrompts.map(initialShotState))
-  const [phase, setPhase] = useState('idle')
-  const [currentShotIndex, setCurrentShotIndex] = useState(0)
-  const [combineJobId, setCombineJobId] = useState(null)
+  // Hydrate per-shot state from `initialRender.shotJobIds` if present:
+  // every populated entry means that shot was at least kicked off, so
+  // we map it to a status='completed' row with the jobId. The chain
+  // skips already-completed shots on Resume.
+  const initialShots = () => {
+    const base = shotPrompts.map(initialShotState)
+    if (initialRender?.shotJobIds) {
+      initialRender.shotJobIds.forEach((jobId, idx) => {
+        if (jobId && base[idx]) {
+          base[idx] = { ...base[idx], jobId, videoId: jobId, status: 'completed', progressPercent: 100 }
+        }
+      })
+    }
+    return base
+  }
+
+  const [shots, setShots] = useState(initialShots)
+  const [phase, setPhase] = useState(() => initialRender?.phase || 'idle')
+  const [currentShotIndex, setCurrentShotIndex] = useState(() => initialRender?.currentShotIndex || 0)
+  const [combineJobId, setCombineJobId] = useState(() => initialRender?.combineJobId || null)
   const [combineRow, setCombineRow] = useState(null)
-  const [finalDownloadHref, setFinalDownloadHref] = useState('')
-  const [pipelineError, setPipelineError] = useState('')
+  const [finalDownloadHref, setFinalDownloadHref] = useState(() => initialRender?.finalDownloadHref || '')
+  const [pipelineError, setPipelineError] = useState(() => initialRender?.error || '')
 
   // Cancellation flag — flipped by the Cancel button. Read inside the
   // poll loop so an in-flight wait can break out cleanly.
   const isCancelledRef = useRef(false)
 
+  // Tiny helper to PATCH the BE render row. Fire-and-forget — the chain
+  // doesn't wait on it. Errors are silently swallowed (the next PATCH
+  // overrides them) so a flaky BE doesn't break the user's render.
+  const persist = (patch) => {
+    if (!renderId) return
+    patchCinemaRender(renderId, patch).catch(() => {})
+  }
+
   // Re-init shots whenever the project changes (new plan).
   useEffect(() => {
-    setShots(shotPrompts.map(initialShotState))
-    setPhase('idle')
-    setCurrentShotIndex(0)
-    setCombineJobId(null)
+    setShots(initialShots())
+    setPhase(initialRender?.phase || 'idle')
+    setCurrentShotIndex(initialRender?.currentShotIndex || 0)
+    setCombineJobId(initialRender?.combineJobId || null)
     setCombineRow(null)
-    setFinalDownloadHref('')
-    setPipelineError('')
+    setFinalDownloadHref(initialRender?.finalDownloadHref || '')
+    setPipelineError(initialRender?.error || '')
     isCancelledRef.current = false
-  }, [project?.projectId, shotPrompts.length])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.projectId, shotPrompts.length, renderId])
 
   // Helper to patch a single shot row by index.
   const patchShot = (shotIndex, patchObject) => {
@@ -176,13 +216,21 @@ export default function CinemaRenderer({ project }) {
     ))
   }
 
-  // startRender — kick off the full chain. Confirmation modal first so
-  // the user sees what they're about to commit (N video generations,
-  // chained, takes ~N×60s).
-  async function startRender() {
+  // startRender — kick off the chain. On the standalone render page
+  // (renderId set) we skip the confirm modal — the user already
+  // confirmed on the previous page. On the planner page (no renderId)
+  // this function isn't called anyway; the planner has its own button
+  // that creates the render row + navigates.
+  async function startRender({ resume = false } = {}) {
     if (!shotPrompts.length) return
     if (phase === 'rendering' || phase === 'extracting' || phase === 'uploading' || phase === 'combining') {
       antMessage.warning('Already running — Cancel first if you want to restart')
+      return
+    }
+    const startFromShotIndex = resume ? (currentShotIndex || 0) : 0
+    if (renderId) {
+      // Standalone page — start immediately, no second confirm.
+      runPipeline({ startFromShotIndex })
       return
     }
     Modal.confirm({
@@ -204,7 +252,7 @@ export default function CinemaRenderer({ project }) {
       cancelText: 'Back',
       autoFocusButton: 'ok',
       centered: true,
-      onOk: () => runPipeline(),
+      onOk: () => runPipeline({ startFromShotIndex }),
     })
   }
 
@@ -212,18 +260,36 @@ export default function CinemaRenderer({ project }) {
   // start frame depends on the previous shot's end frame, so we can't
   // parallelize). Cancellation flag is checked between every async
   // step so the worst-case wait after pressing Cancel is one poll tick.
-  async function runPipeline() {
+  //
+  // When `renderId` is set, every status / phase / shot transition is
+  // PATCHed to the BE render row, so a refresh / new tab can see where
+  // the chain is. When `startFromShotIndex` > 0, the loop SKIPS those
+  // shots — used on Resume after a refresh so completed shots aren't
+  // re-generated (which would duplicate Cloudinary assets + burn GPU
+  // for no reason).
+  async function runPipeline({ startFromShotIndex = 0 } = {}) {
     isCancelledRef.current = false
     setPipelineError('')
-    setShots(shotPrompts.map(initialShotState))
-    setCombineJobId(null)
-    setCombineRow(null)
-    setFinalDownloadHref('')
+    // If resuming, preserve the existing shot rows for already-completed
+    // shots — only the rest get reset. Fresh start (idx=0) resets all.
+    if (startFromShotIndex === 0) {
+      setShots(shotPrompts.map(initialShotState))
+      setCombineJobId(null)
+      setCombineRow(null)
+      setFinalDownloadHref('')
+    }
 
-    const completedVideoIds = []
-    let previousFrameUrl = null
+    // Seed completedVideoIds from already-finished shots in the current
+    // state so the final combine step has the full ordered list.
+    const completedVideoIds = shots.slice(0, startFromShotIndex)
+      .map(s => s.videoId).filter(Boolean)
+    let previousFrameUrl = startFromShotIndex > 0
+      ? shots[startFromShotIndex - 1]?.sourceImageUrl || null
+      : null
 
-    for (let shotIndex = 0; shotIndex < shotPrompts.length; shotIndex += 1) {
+    persist({ status: 'rendering', phase: 'rendering', error: null })
+
+    for (let shotIndex = startFromShotIndex; shotIndex < shotPrompts.length; shotIndex += 1) {
       if (isCancelledRef.current) {
         setPhase('cancelled')
         return
@@ -260,6 +326,13 @@ export default function CinemaRenderer({ project }) {
         return
       }
       patchShot(shotIndex, { jobId: submitData.jobId, status: 'processing' })
+      // Persist the new jobId in the BE row so refresh sees this shot
+      // as in-flight + can tail its logs via /api/job-logs/ai-video/<jobId>.
+      {
+        const nextJobIds = shots.map(s => s.videoId || s.jobId)
+        nextJobIds[shotIndex] = submitData.jobId
+        persist({ shotJobIds: nextJobIds, currentShotIndex: shotIndex, phase: 'rendering' })
+      }
 
       // 2) Poll until terminal.
       const pollResult = await pollJobUntilTerminal(
@@ -298,12 +371,18 @@ export default function CinemaRenderer({ project }) {
         progressPercent: 100,
       })
       completedVideoIds.push(finishedVideoId)
+      {
+        const nextJobIds = shots.map(s => s.videoId || s.jobId)
+        nextJobIds[shotIndex] = finishedVideoId
+        persist({ shotJobIds: nextJobIds, currentShotIndex: shotIndex + 1 })
+      }
 
       // 3) For all shots except the last, extract last frame + upload
       //    so the next iteration can use it as imageUrl.
       const isLastShot = shotIndex === shotPrompts.length - 1
       if (!isLastShot) {
         setPhase('extracting')
+        persist({ phase: 'extracting' })
         let frameBlob
         try {
           frameBlob = await extractLastFrame(finishedVideoUrl)
@@ -315,6 +394,7 @@ export default function CinemaRenderer({ project }) {
         }
 
         setPhase('uploading')
+        persist({ phase: 'uploading' })
         const frameFile = new File([frameBlob], `cinema-${project.projectId}-shot${shotIndex + 1}-tail.jpg`, {
           type: 'image/jpeg',
         })
@@ -337,6 +417,7 @@ export default function CinemaRenderer({ project }) {
 
     // 4) Combine — POST to /api/combine with the ordered videoIds.
     setPhase('combining')
+    persist({ phase: 'combining', status: 'combining' })
     const combineSources = completedVideoIds.map(videoId => ({ videoId }))
     const { data: combineCreateData, error: combineCreateError } = await combineCreate({
       sources: combineSources,
@@ -349,6 +430,7 @@ export default function CinemaRenderer({ project }) {
       return
     }
     setCombineJobId(combineCreateData.jobId)
+    persist({ combineJobId: combineCreateData.jobId })
 
     // 5) Poll combine status until terminal — separate loop because
     //    combine status lives at a different endpoint than per-shot.
@@ -361,14 +443,18 @@ export default function CinemaRenderer({ project }) {
       if (combineStatusData) {
         setCombineRow(combineStatusData)
         if (combineStatusData.status === 'completed') {
-          setFinalDownloadHref(combineFileUrl(combineCreateData.jobId))
+          const href = combineFileUrl(combineCreateData.jobId)
+          setFinalDownloadHref(href)
           setPhase('done')
+          persist({ status: 'completed', phase: 'done', finalDownloadHref: href })
           antMessage.success('Cinema render complete — Download to save the mp4')
           return
         }
         if (combineStatusData.status === 'failed') {
-          setPipelineError(`Combine: ${combineStatusData.error || 'unknown failure'}`)
+          const msg = `Combine: ${combineStatusData.error || 'unknown failure'}`
+          setPipelineError(msg)
           setPhase('failed')
+          persist({ status: 'failed', phase: 'failed', error: msg })
           return
         }
       }
@@ -379,6 +465,7 @@ export default function CinemaRenderer({ project }) {
 
   function cancelPipeline() {
     isCancelledRef.current = true
+    persist({ status: 'cancelled', phase: 'cancelled' })
   }
 
   if (!shotPrompts.length) return null
@@ -404,8 +491,21 @@ export default function CinemaRenderer({ project }) {
             {phaseMeta.label}{isRunning && currentShotIndex >= 0 ? ` ${currentShotIndex + 1}/${shotPrompts.length}` : ''}
           </span>
           {!isRunning && phase !== 'done' && (
-            <Button variant="primary" onClick={startRender}>
-              {phase === 'failed' || phase === 'cancelled' ? 'Retry render' : 'Render all shots'}
+            <Button variant="primary"
+              onClick={() => {
+                // Resume from currentShotIndex when there's already
+                // work done on this render (refresh case). Fresh render
+                // starts from 0.
+                const hasProgress = currentShotIndex > 0
+                  || shots.some(s => s.videoId)
+                  || phase === 'failed' || phase === 'cancelled'
+                startRender({ resume: hasProgress })
+              }}>
+              {phase === 'failed' || phase === 'cancelled'
+                ? `Resume from shot ${(currentShotIndex || 0) + 1}`
+                : (currentShotIndex > 0 || shots.some(s => s.videoId)
+                    ? `Resume from shot ${(currentShotIndex || 0) + 1}`
+                    : 'Render all shots')}
             </Button>
           )}
           {isRunning && (

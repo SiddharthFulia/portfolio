@@ -424,6 +424,43 @@ export async function deleteCinema(projectId) {
     return { data: data?.data || data, error: null };
   } catch (err) { return { data: null, error: err.message }; }
 }
+// Cinema renders — per-attempt resumable state. The FE orchestrator
+// creates one of these, navigates to /cinema/render/:renderId, then
+// PATCHes after each shot transition so the row stays in sync with
+// where the client-side chain is. Refresh resumes from the DB state.
+export async function createCinemaRender(projectId) {
+  try {
+    const data = await post(`${ENDPOINTS.CINEMA_RENDER_CREATE}/${projectId}/render`, {}, { timeout: 10000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function getCinemaRender(renderId) {
+  try {
+    const data = await get(`${ENDPOINTS.CINEMA_RENDER}/${renderId}`, {}, { timeout: 6000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function patchCinemaRender(renderId, body) {
+  try {
+    const data = await patch(`${ENDPOINTS.CINEMA_RENDER}/${renderId}`, body, { timeout: 6000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function listCinemaRenders({ projectId, status, page = 1, pageSize = 24 } = {}) {
+  try {
+    const params = { page, pageSize };
+    if (projectId) params.projectId = projectId;
+    if (status && status !== 'all') params.status = status;
+    const data = await get(ENDPOINTS.CINEMA_RENDERS, params, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function deleteCinemaRender(renderId) {
+  try {
+    const data = await del(`${ENDPOINTS.CINEMA_RENDER}/${renderId}`, { timeout: 6000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
 export async function cinemaBulkAction(action, ids) {
   try {
     const data = await post(ENDPOINTS.CINEMA_BULK, { action, ids }, { timeout: 15000 });

@@ -2,11 +2,10 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Input, Select, Modal, Alert, message as antMessage } from 'antd'
 import { VideoCameraOutlined, ThunderboltOutlined, ReloadOutlined, BulbOutlined, DeleteOutlined } from '@ant-design/icons'
-import { submitCinema, listCinemaProjects, cinemaBulkAction } from '../api/ai'
+import { submitCinema, listCinemaProjects, cinemaBulkAction, createCinemaRender } from '../api/ai'
 import PromptHelper from '../components/PromptHelper'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
 import { Button, Slider } from '../components/ui'
-import CinemaRenderer from '../components/cinema/CinemaRenderer'
 import useQueryState from '../hooks/useQueryState'
 
 // `embedded` mode (passed when Cinema lives inside the AI Video tabs):
@@ -24,6 +23,7 @@ import useQueryState from '../hooks/useQueryState'
 // "Cinema Library") instead of embedding the whole standalone Cinema
 // page as one nested-feeling tab.
 export default function Cinema({ embedded = false, view = 'all' }) {
+  const navigate = useNavigate()
   const [masterPrompt, setMasterPrompt] = useState('')
   // Card-style selectors mirrored to URL so refresh restores the user's
   // choice. Free-text masterPrompt stays plain useState — too long for
@@ -226,10 +226,13 @@ export default function Cinema({ embedded = false, view = 'all' }) {
           onAppend={(text) => setMasterPrompt(masterPrompt.trim() ? `${masterPrompt.trim()} ${text}` : text)}
         />
 
-        {/* Inline multi-shot renderer — sequential chain with last-frame
-            continuity, all client-driven. No redirect to /ai-video. */}
+        {/* Planned shots — preview + the Render all button that creates
+            a cinema_renders row + navigates to /cinema/render/:renderId.
+            The chain itself runs on that page (refresh-safe, live logs
+            per shot, persistent state). Render button is the only thing
+            that fires across pages — no inline chain anymore. */}
         {showPlanner && project && Array.isArray(project.shotPrompts) && project.shotPrompts.length > 0 && (
-          <CinemaRenderer project={project} />
+          <PlannedShotsPanel project={project} navigate={navigate} />
         )}
 
         {showLibrary && (
@@ -257,6 +260,77 @@ export default function Cinema({ embedded = false, view = 'all' }) {
       <div aria-hidden className="ambient-orb -top-32 left-1/2 -translate-x-1/2" />
       <div aria-hidden className="ambient-orb ambient-orb-cool -bottom-40 -right-32" />
       <div className="relative">{content}</div>
+    </section>
+  )
+}
+
+// PlannedShotsPanel — read-only preview of the Groq-split shot prompts
+// + the "Render all shots" button. Clicking creates a cinema_renders
+// row on the BE + navigates to /cinema/render/<renderId> where the
+// chain actually runs (refresh-safe, live logs, persistent state).
+function PlannedShotsPanel({ project, navigate }) {
+  const [creating, setCreating] = useState(false)
+
+  const onStart = () => {
+    Modal.confirm({
+      title: `Render ${project.shotPrompts.length} shots back-to-back?`,
+      content: (
+        <div className="text-sm space-y-2">
+          <p>
+            Generates shot 1 from text, then uses its last frame as the start of shot 2,
+            and so on through shot {project.shotPrompts.length}. Final ffmpeg stitch
+            into one mp4 at the end.
+          </p>
+          <p className="text-fg-muted text-xs">
+            Each shot ~60-90s. Total wall time ≈ {Math.ceil(project.shotPrompts.length * 75 / 60)}m.
+            Opens on its own page with live per-shot logs — you can close the tab and
+            come back to the same URL to keep watching.
+          </p>
+        </div>
+      ),
+      okText: 'Start render',
+      cancelText: 'Back',
+      autoFocusButton: 'ok',
+      centered: true,
+      onOk: async () => {
+        setCreating(true)
+        const { data, error } = await createCinemaRender(project.projectId)
+        setCreating(false)
+        if (error || !data?.renderId) {
+          antMessage.error(error || 'Failed to create render — try again')
+          return
+        }
+        navigate(`/cinema/render/${data.renderId}`)
+      },
+    })
+  }
+
+  return (
+    <section className="luxe-card p-5 sm:p-6 mb-6 border-amber-500/30">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div>
+          <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80">— Planned shots</p>
+          <h3 className="mt-1 text-lg font-bold text-fg-primary tabular-nums">
+            {project.shotPrompts.length} shots · {project.durationPerShot || 5}s each · {project.aspectRatio || '16:9'} · {project.resolution || '720p'}
+          </h3>
+          <p className="mt-1 text-xs text-fg-muted">
+            Sequential chain — last frame of each shot becomes the first frame of the next.
+          </p>
+        </div>
+        <Button variant="primary" onClick={onStart} loading={creating}>
+          Render all shots
+        </Button>
+      </div>
+      <ol className="space-y-2">
+        {project.shotPrompts.map((prompt, idx) => (
+          <li key={idx} className="luxe-card p-3">
+            <p className="text-[10px] font-mono text-amber-400 font-bold tabular-nums mb-1">
+              SHOT {String(idx + 1).padStart(2, '0')}
+            </p>
+            <p className="text-[12px] text-gray-300 font-mono leading-relaxed">{prompt}</p>
+          </li>
+        ))}
+      </ol>
     </section>
   )
 }

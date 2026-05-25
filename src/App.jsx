@@ -84,6 +84,7 @@ const ImageEnhancerDetail = lazyWithReload(() => import("./pages/ImageEnhancerDe
 const LipsyncDetail = lazyWithReload(() => import("./pages/LipsyncDetail"));
 const AudioDetail = lazyWithReload(() => import("./pages/AudioDetail"));
 const CinemaDetail = lazyWithReload(() => import("./pages/CinemaDetail"));
+const CinemaRenderPage = lazyWithReload(() => import("./pages/CinemaRenderPage"));
 
 /* ── Skeleton building blocks ──
  * The legacy hand-rolled pulse blocks (Light/Dark/Science/etc) are
@@ -290,6 +291,10 @@ const App = () => {
           {/* Cinema lives inside AI Video as a tab now — redirect the
               standalone /cinema URL so old links still resolve. */}
           <Route path='/cinema' element={<Navigate to="/ai-video?tab=cinema" replace />} />
+          {/* Render page — resumable live-logs view tied to a single
+              render attempt. Must be registered BEFORE /cinema/:id so
+              /cinema/render/<renderId> isn't swallowed as a projectId. */}
+          <Route path='/cinema/render/:renderId' element={<Suspense fallback={<PageLoader />}><CinemaRenderPage /></Suspense>} />
           <Route path='/cinema/:id' element={<Suspense fallback={<PageLoader />}><CinemaDetail /></Suspense>} />
           {/* Catch-all — any unknown URL bounces to home instead of 404.
               Visitors fat-fingering /settngs or /chses end up somewhere

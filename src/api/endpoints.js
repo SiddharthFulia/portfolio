@@ -45,6 +45,11 @@ export const ENDPOINTS = {
   CINEMA_STATUS:        '/api/cinema/status',
   CINEMA_LIST:          '/api/cinema/list',
   CINEMA_BULK:          '/api/cinema/bulk',
+  // Per-render resumable state — POST /cinema/:projectId/render returns
+  // a renderId; the FE then navigates to /cinema/render/:renderId
+  CINEMA_RENDER_CREATE: '/api/cinema',          // POST <projectId>/render appended at call site
+  CINEMA_RENDER:        '/api/cinema/render',   // /:renderId appended for GET / PATCH / DELETE
+  CINEMA_RENDERS:       '/api/cinema/renders',  // paginated list
   // 3D Mesh generation (Shap-E / Point-E on 5090)
   MESH_GENERATE:        '/api/mesh/generate',
   MESH_STATUS:          '/api/mesh/status',   // /:jobId appended at call site
