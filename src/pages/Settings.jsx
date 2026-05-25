@@ -54,14 +54,25 @@ function SettingsInner() {
   const [diskStats, setDiskStats] = useState(null)
   const [queues, setQueues] = useState(null)
   const [workers, setWorkers] = useState(null)
-  const [loading, setLoading] = useState(true)
+  // Per-card loading flags so each card renders its own data the
+  // moment its endpoint returns — no more waiting for the slowest call
+  // (RabbitMQ queue-check) to gate the whole page. `loading` is now a
+  // derived "any card still has no data yet" boolean used only for the
+  // small spinner pill in the header.
+  const [serverLoading,  setServerLoading]  = useState(true)
+  const [dbLoading,      setDbLoading]      = useState(true)
+  const [diskLoading,    setDiskLoading]    = useState(true)
+  const [queuesLoading,  setQueuesLoading]  = useState(true)
+  const [workersLoading, setWorkersLoading] = useState(true)
   const [err, setErr] = useState(null)
   const timerRef = useRef(null)
-  // Guard against overlapping ticks. With sub-second polling and the BE's
-  // RabbitMQ checkQueue pass taking several seconds under load, ticks
-  // would pile up and surface as "signal timed out" — this ref short-
-  // circuits any tick that fires while the previous one is still running.
-  const inFlightRef = useRef(false)
+  // Per-endpoint overlap guards. Lets the slow queue-check stay
+  // in-flight without blocking the other four from polling on time.
+  const inFlightServer  = useRef(false)
+  const inFlightDb      = useRef(false)
+  const inFlightDisk    = useRef(false)
+  const inFlightQueues  = useRef(false)
+  const inFlightWorkers = useRef(false)
   // Poll-interval control. Stored as raw ms so the timer can use it
   // directly; the UI splits it into "value + unit" for display. Persists
   // across reloads so the user's preference sticks.
@@ -87,37 +98,75 @@ function SettingsInner() {
 
   useEffect(() => { document.title = 'Settings · Sid' }, [])
 
-  const tick = async () => {
-    // Drop the tick if a previous one hasn't returned — happens when a
-    // slow BE response (queue check, big db count) outruns the poll
-    // interval. Without this guard the FE racks up overlapping requests
-    // and AbortSignal.timeout fires on whichever one loses the race.
-    if (inFlightRef.current) return
-    inFlightRef.current = true
+  // Each endpoint owns its own overlap guard + loading flag. Fire-and-
+  // forget on the tick — no Promise.all gating, no single slow call
+  // holding up the rest. When an individual call returns, only its
+  // card's state updates. The page no longer waits for the queue-check
+  // (which can take 5-10s) before showing anything.
+  const fetchServer = async () => {
+    if (inFlightServer.current) return
+    inFlightServer.current = true
     try {
-      // Fire all four in parallel — each helper already returns { data, error }
-      // so a single failing endpoint doesn't break the others.
-      const [s, d, k, q, w] = await Promise.all([
-        adminServerStats(),
-        adminDbStats(),
-        adminDiskStats(),
-        adminQueueStats(),
-        adminWorkers(),
-      ])
-      if (s.data) setServer(s.data)
-      if (d.data) setDbStats(d.data)
-      if (k.data) setDiskStats(k.data)
-      if (q.data) setQueues(q.data)
-      if (w.data) setWorkers(w.data?.workers || [])
-      // Track the worst error so the user knows something's off, but keep
-      // rendering stale data from the cards that did succeed.
-      const firstErr = s.error || d.error || k.error || q.error || w.error || null
-      setErr(firstErr)
-      setLoading(false)
-    } finally {
-      inFlightRef.current = false
-    }
+      const { data, error } = await adminServerStats()
+      if (data) setServer(data)
+      if (error) setErr(error)
+      setServerLoading(false)
+    } finally { inFlightServer.current = false }
   }
+  const fetchDb = async () => {
+    if (inFlightDb.current) return
+    inFlightDb.current = true
+    try {
+      const { data, error } = await adminDbStats()
+      if (data) setDbStats(data)
+      if (error) setErr(error)
+      setDbLoading(false)
+    } finally { inFlightDb.current = false }
+  }
+  const fetchDisk = async () => {
+    if (inFlightDisk.current) return
+    inFlightDisk.current = true
+    try {
+      const { data, error } = await adminDiskStats()
+      if (data) setDiskStats(data)
+      if (error) setErr(error)
+      setDiskLoading(false)
+    } finally { inFlightDisk.current = false }
+  }
+  const fetchQueues = async () => {
+    if (inFlightQueues.current) return
+    inFlightQueues.current = true
+    try {
+      const { data, error } = await adminQueueStats()
+      if (data) setQueues(data)
+      if (error) setErr(error)
+      setQueuesLoading(false)
+    } finally { inFlightQueues.current = false }
+  }
+  const fetchWorkers = async () => {
+    if (inFlightWorkers.current) return
+    inFlightWorkers.current = true
+    try {
+      const { data, error } = await adminWorkers()
+      if (data) setWorkers(data?.workers || [])
+      if (error) setErr(error)
+      setWorkersLoading(false)
+    } finally { inFlightWorkers.current = false }
+  }
+
+  // Fan out — no await. Each promise resolves on its own timeline and
+  // updates its own slice of state. Errors don't block siblings.
+  const tick = () => {
+    fetchServer()
+    fetchDb()
+    fetchDisk()
+    fetchQueues()
+    fetchWorkers()
+  }
+
+  // Aggregate "still loading something" — drives the header spinner pill.
+  // The cards themselves show per-section skeletons via their own flags.
+  const loading = serverLoading || dbLoading || diskLoading || queuesLoading || workersLoading
 
   useEffect(() => {
     tick()
@@ -157,7 +206,9 @@ function SettingsInner() {
           antMessage.error(`Purge failed: ${error}`)
         } else {
           antMessage.success(`Purged ${data?.purged ?? 0} messages from ${queue}`)
-          await tick()
+          // Only the Queues card needs to refresh after a purge — fan-out
+          // tick would re-poll everything else for no reason.
+          fetchQueues()
         }
       },
     })
@@ -225,17 +276,17 @@ function SettingsInner() {
               label: <span className="text-sm inline-flex items-center gap-1.5"><DashboardOutlined /> Overview</span>,
               children: (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <ServerCard data={server} />
-                  <DatabaseCard data={dbStats} />
-                  <QueuesCard data={queues} onPurge={confirmPurge} />
-                  <WorkersCard rows={workers} />
+                  <ServerCard   data={server}  loading={serverLoading} />
+                  <DatabaseCard data={dbStats} loading={dbLoading} />
+                  <QueuesCard   data={queues}  loading={queuesLoading} onPurge={confirmPurge} />
+                  <WorkersCard  rows={workers} loading={workersLoading} />
                 </div>
               ),
             },
             {
               key: 'storage',
               label: <span className="text-sm inline-flex items-center gap-1.5"><DatabaseOutlined /> Storage</span>,
-              children: <StorageCard data={diskStats} />,
+              children: <StorageCard data={diskStats} loading={diskLoading} />,
             },
             {
               key: 'visualize',
@@ -678,12 +729,12 @@ function accentForTable(table, idx) {
 }
 
 // ─── Server card ──────────────────────────────────────────────
-function ServerCard({ data }) {
+function ServerCard({ data, loading }) {
   const used = data?.memUsedPercent ?? 0
   const usedMB = data ? (data.memTotalMB - data.memFreeMB) : 0
   return (
     <Card icon={<CloudServerOutlined />} title="Server" accent="cyan">
-      {!data ? <Empty /> : (
+      {!data ? (loading ? <CardSkeleton rows={4} /> : <Empty />) : (
         <div className="space-y-3 text-sm">
           <Row label="Host" value={`${data.hostname}`} />
           <Row label="Platform" value={`${data.platform} · ${data.arch}`} />
@@ -729,11 +780,11 @@ const BUCKET_ACCENT = {
   other:    ['bg-gray-500/50',    'text-gray-300'],
 }
 
-function StorageCard({ data }) {
+function StorageCard({ data, loading }) {
   if (!data) {
     return (
       <Card icon={<DatabaseOutlined />} title="Storage" accent="emerald">
-        <Empty />
+        {loading ? <CardSkeleton rows={5} /> : <Empty />}
       </Card>
     )
   }
@@ -827,11 +878,11 @@ function StorageCard({ data }) {
 }
 
 // ─── Database card ────────────────────────────────────────────
-function DatabaseCard({ data }) {
+function DatabaseCard({ data, loading }) {
   const tables = data?.tables || []
   return (
     <Card icon={<DatabaseOutlined />} title="Database" accent="fuchsia">
-      {!data ? <Empty /> : (
+      {!data ? (loading ? <CardSkeleton rows={6} /> : <Empty />) : (
         <div className="space-y-3">
           <Row label="File size" value={fmtBytes(data.sizeBytes)} />
           <div className="border-t border-gray-800 pt-2">
@@ -861,10 +912,10 @@ function DatabaseCard({ data }) {
 }
 
 // ─── Queues card ──────────────────────────────────────────────
-function QueuesCard({ data, onPurge }) {
+function QueuesCard({ data, onPurge, loading }) {
   return (
     <Card icon={<ApiOutlined />} title="Queues (RabbitMQ)" accent="amber">
-      {!data ? <Empty /> : data.configured === false ? (
+      {!data ? (loading ? <CardSkeleton rows={8} /> : <Empty />) : data.configured === false ? (
         <p className="text-xs text-gray-500 py-4 text-center">
           RABBITMQ_URL not configured on this BE.
         </p>
@@ -917,10 +968,10 @@ function QueuesCard({ data, onPurge }) {
 }
 
 // ─── Workers card ─────────────────────────────────────────────
-function WorkersCard({ rows }) {
+function WorkersCard({ rows, loading }) {
   return (
     <Card icon={<ClusterOutlined />} title="Workers" accent="emerald">
-      {!rows ? <Empty /> : rows.length === 0 ? (
+      {!rows ? (loading ? <CardSkeleton rows={3} /> : <Empty />) : rows.length === 0 ? (
         <p className="text-xs text-gray-500 py-4 text-center">
           No worker heartbeats recorded.
         </p>
@@ -978,8 +1029,25 @@ function Row({ label, value }) {
   )
 }
 
-function Empty() {
-  return <p className="text-xs text-gray-600 py-4 text-center">Loading…</p>
+// Empty — shown when an endpoint returned no rows (not the same as
+// "still loading"). The single label distinguishes the two states for
+// the user without needing different styling.
+function Empty({ label = 'No data' }) {
+  return <p className="text-xs text-gray-600 py-4 text-center">{label}</p>
+}
+
+// CardSkeleton — pulsing placeholder rows so a card with a pending
+// fetch never collapses to "Loading…" text. Caller picks the row
+// count; default 3 matches the typical server/db card height.
+function CardSkeleton({ rows = 3 }) {
+  return (
+    <div className="space-y-2 py-1">
+      {Array.from({ length: rows }).map((_, idx) => (
+        <div key={idx} className="luxe-skeleton h-3"
+          style={{ width: `${100 - (idx % 3) * 12}%` }} />
+      ))}
+    </div>
+  )
 }
 
 export default function Settings() {
