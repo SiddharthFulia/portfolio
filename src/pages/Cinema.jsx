@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Input, Select, Modal, Alert } from 'antd'
 import { notice } from '../lib/notice'
 import { VideoCameraOutlined, ThunderboltOutlined, ReloadOutlined, BulbOutlined, DeleteOutlined, DownloadOutlined, LockOutlined, UnlockOutlined, PictureOutlined, UploadOutlined } from '@ant-design/icons'
-import { submitCinema, listCinemaProjects, cinemaBulkAction, createCinemaRender, patchCinemaProject, reviewCinemaShot, getCinemaDiskStats, uploadSourceImage } from '../api/ai'
+import { submitCinema, listCinemaProjects, cinemaBulkAction, createCinemaRender, patchCinemaProject, reviewCinemaShot, getCinemaDiskStats, uploadSourceImage, enhanceImage, getImageStatus, promptCoach } from '../api/ai'
 import PromptHelper from '../components/PromptHelper'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
 import { Button, Slider } from '../components/ui'
@@ -642,43 +642,20 @@ function PlannedShotsPanel({ project, navigate }) {
           </p>
         </div>
 
-        {/* Hero image — anchor the look on shot 1 */}
-        <div className="luxe-card p-3 border-line">
-          <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-gray-400 mb-1.5">
-            <PictureOutlined /> Hero image
-          </p>
-          {heroImageUrl ? (
-            <div className="space-y-1.5">
-              <img src={heroImageUrl} alt="hero" className="w-full aspect-video object-cover rounded border border-line" />
-              <div className="flex items-center gap-1.5">
-                <button type="button" onClick={() => heroFileInputRef.current?.click()}
-                  className="text-[10px] flex-1 px-2 py-1 rounded border border-line hover:border-line-strong text-fg-muted">
-                  Replace
-                </button>
-                <button type="button" onClick={clearHero}
-                  className="text-[10px] px-2 py-1 rounded border border-rose-500/40 text-rose-300 hover:bg-rose-500/10">
-                  <DeleteOutlined />
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button type="button" onClick={() => heroFileInputRef.current?.click()}
-              disabled={heroUploading}
-              className="w-full text-[11px] py-3 rounded border-2 border-dashed border-line hover:border-amber-400/50 hover:bg-amber-500/5 text-fg-muted inline-flex items-center justify-center gap-1.5">
-              {heroUploading ? 'Uploading…' : <><UploadOutlined /> Upload hero frame</>}
-            </button>
-          )}
-          <input
-            ref={heroFileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={(e) => { onPickHeroFile(e.target.files?.[0]); e.target.value = '' }}
-            className="hidden"
-          />
-          <p className="text-[10px] text-gray-500 mt-1">
-            When set, becomes shot 1's source image — anchors the look so shot 1 doesn't drift.
-          </p>
-        </div>
+        {/* Hero image — anchor the look on shot 1. Split into its own
+            component because the generator (model picker + prompt
+            assist + polling loop) made the inline block unreadable. */}
+        <HeroImagePanel
+          heroImageUrl={heroImageUrl}
+          setHeroImageUrl={(url) => { setHeroImageUrl(url); patchProject({ heroImageUrl: url }) }}
+          heroUploading={heroUploading}
+          onPickFile={onPickHeroFile}
+          fileInputRef={heroFileInputRef}
+          bible={bible}
+          firstShotPrompt={project.shotPrompts?.[0] || ''}
+          aspectRatio={project.aspectRatio || '16:9'}
+          masterPrompt={project.masterPrompt || ''}
+        />
       </div>
 
       {/* Bulk music controls (per-shot toggle stays in the card row). */}
@@ -960,6 +937,281 @@ function CinemaDiskStatsBanner({ refreshKey }) {
       <p className="text-[10px] text-gray-500 font-mono max-w-md text-right">
         Counts Cinema-driven combines only (`combined_videos` rows joined against `cinema_renders.combineJobId`). Build-tab ad-hoc combines aren't included.
       </p>
+    </div>
+  )
+}
+
+// ── HeroImagePanel ────────────────────────────────────────────────
+// The card that owns the master first-frame for a Cinema render.
+// Three ways in:
+//   1) Generate from text — picks Flux Schnell (default, ~8s) /
+//      Flux Dev / SDXL JuggernautXL, polls until done, sets URL.
+//   2) Upload from disk    — existing flow, kept.
+//   3) Toggle off entirely — chain falls back to T2V on shot 1.
+//
+// Prompt assist: "Suggest with AI" feeds the continuity bible + first
+// shot action into Groq's /api/ai/prompt-coach (flux or sdxl family
+// based on the picked model) and pastes the polished result into the
+// prompt textarea — user can still hand-edit before generating.
+const HERO_T2I_MODELS = [
+  { id: 'flux-schnell',  label: 'Flux Schnell',  blurb: '4-step distilled · ~8s · fastest',  family: 'flux', defaults: { steps: 4,  cfg: 1.0 } },
+  { id: 'flux-dev-t2i',  label: 'Flux Dev',      blurb: 'Flux.1 [dev] · ~40s · top photoreal', family: 'flux', defaults: { steps: 28, cfg: 3.5 } },
+  { id: 'sdxl-t2i',      label: 'SDXL (Juggernaut)', blurb: 'JuggernautXL v9 · ~30s · photo-real',  family: 'sdxl', defaults: { steps: 25, cfg: 5.0 } },
+]
+
+// Aspect → (width, height) for the T2I workflows. All Flux/SDXL
+// workflows on the worker pad to square if width/height aren't sent,
+// so explicit is better.
+function _heroDims(aspect) {
+  if (aspect === '9:16')  return { width: 768,  height: 1344 }
+  if (aspect === '16:9')  return { width: 1344, height: 768  }
+  if (aspect === '21:9')  return { width: 1536, height: 640  }
+  return { width: 1024, height: 1024 }
+}
+
+function HeroImagePanel({
+  heroImageUrl, setHeroImageUrl,
+  heroUploading, onPickFile, fileInputRef,
+  bible, firstShotPrompt, aspectRatio, masterPrompt,
+}) {
+  // useHero = true means the panel is enabled. When false, we hide
+  // the generator/upload UI and (if URL was set) clear it. Pure-FE
+  // boolean — when off the row's heroImageUrl is empty so the chain
+  // T2Vs shot 1 naturally; no extra BE column needed.
+  const [useHero, setUseHero] = useState(!!heroImageUrl || true)
+  const [genOpen, setGenOpen] = useState(false)
+  const [model, setModel] = useState('flux-schnell')
+  const [prompt, setPrompt] = useState('')
+  const [coaching, setCoaching] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const pollAbortRef = useRef(false)
+
+  const composeBaseIdea = () => {
+    // Compose the "starter prompt" from the bible + first shot. The
+    // user can edit before generating — this is just a sensible
+    // pre-fill so they don't stare at an empty textarea.
+    const bibleLine = ['subject', 'wardrobe', 'environment', 'lighting', 'camera', 'palette']
+      .map(k => (bible?.[k] || '').trim()).filter(Boolean).join(', ')
+    const shot = (firstShotPrompt || masterPrompt || '').trim()
+    if (bibleLine && shot) return `${bibleLine}. ${shot}`
+    return bibleLine || shot || ''
+  }
+
+  const openGenerator = () => {
+    setPrompt(composeBaseIdea())
+    setGenOpen(true)
+  }
+
+  // Polish the auto-composed prompt via Groq → /api/ai/prompt-coach.
+  // The `family` param tunes the system prompt (flux vs sdxl).
+  const suggestWithAI = async () => {
+    const idea = (prompt.trim() || composeBaseIdea())
+    if (!idea) { notice.warning('Type a starter idea first'); return }
+    setCoaching(true)
+    const family = HERO_T2I_MODELS.find(m => m.id === model)?.family || 'flux'
+    const { data, error: err } = await promptCoach({ idea, family })
+    setCoaching(false)
+    if (err) { notice.error(`Suggest failed: ${err}`); return }
+    const polished = (data?.prompt || data?.coached || data?.text || '').trim()
+    if (polished) { setPrompt(polished); notice.success('Prompt polished — review and Generate.') }
+  }
+
+  const startGenerate = async () => {
+    const p = prompt.trim()
+    if (!p) { notice.warning('Add a prompt first'); return }
+    setGenerating(true)
+    setProgress(5)
+    pollAbortRef.current = false
+    const wf = HERO_T2I_MODELS.find(m => m.id === model) || HERO_T2I_MODELS[0]
+    const dims = _heroDims(aspectRatio)
+    const { data, error: err } = await enhanceImage({
+      type: 't2i',
+      engine: 'atelier',
+      workflow: wf.id,
+      prompt: p,
+      steps: wf.defaults.steps,
+      cfg: wf.defaults.cfg,
+      width: dims.width,
+      height: dims.height,
+    })
+    if (err || !data?.imageId) {
+      setGenerating(false); setProgress(0)
+      notice.error(err || 'Failed to start hero generation')
+      return
+    }
+    const imageId = data.imageId
+    // Poll status every 2s. The image-enhance lane sets outputUrl
+    // when the worker finishes; we promote that to heroImageUrl.
+    for (let i = 0; i < 240 && !pollAbortRef.current; i++) {  // 240 × 2s = 8min cap
+      await new Promise(r => setTimeout(r, 2000))
+      const { data: row } = await getImageStatus(imageId)
+      if (!row) continue
+      setProgress(Math.min(95, 5 + (i * 90 / 60)))
+      if (row.status === 'completed' && row.outputUrl) {
+        setHeroImageUrl(row.outputUrl)
+        setProgress(100)
+        setGenerating(false)
+        setGenOpen(false)
+        notice.success('Hero image ready — will anchor shot 1.')
+        return
+      }
+      if (row.status === 'failed') {
+        notice.error(`Hero generation failed: ${row.error || 'unknown'}`)
+        setGenerating(false); setProgress(0)
+        return
+      }
+    }
+    if (!pollAbortRef.current) {
+      notice.error('Hero generation timed out')
+      setGenerating(false); setProgress(0)
+    }
+  }
+  const cancelGenerate = () => { pollAbortRef.current = true; setGenerating(false); setProgress(0) }
+
+  const clearHero = () => setHeroImageUrl('')
+  const toggleUseHero = (next) => {
+    setUseHero(next)
+    if (!next && heroImageUrl) clearHero()   // turning off clears the URL → chain T2Vs shot 1
+  }
+
+  return (
+    <div className="luxe-card p-3 border-line">
+      <div className="flex items-center justify-between mb-1.5">
+        <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-gray-400">
+          <PictureOutlined /> Hero image
+        </p>
+        <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={useHero}
+            onChange={(e) => toggleUseHero(e.target.checked)}
+            className="accent-amber-400"
+          />
+          <span className={`text-[10px] font-mono ${useHero ? 'text-emerald-300' : 'text-gray-500'}`}>
+            {useHero ? 'ON' : 'off'}
+          </span>
+        </label>
+      </div>
+
+      {!useHero ? (
+        <p className="text-[11px] text-gray-500">
+          Hero disabled — shot 1 will text-to-video from the bible + first shot prompt. Other shots still chain from last-frame.
+        </p>
+      ) : heroImageUrl ? (
+        <div className="space-y-1.5">
+          <img src={heroImageUrl} alt="hero" className="w-full aspect-video object-cover rounded border border-line" />
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button type="button" onClick={openGenerator}
+              className="text-[10px] flex-1 px-2 py-1 rounded border border-amber-400/40 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20">
+              ↻ Regenerate
+            </button>
+            <button type="button" onClick={() => fileInputRef.current?.click()}
+              className="text-[10px] flex-1 px-2 py-1 rounded border border-line hover:border-line-strong text-fg-muted">
+              Replace
+            </button>
+            <button type="button" onClick={clearHero}
+              className="text-[10px] px-2 py-1 rounded border border-rose-500/40 text-rose-300 hover:bg-rose-500/10">
+              <DeleteOutlined />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          <button type="button" onClick={openGenerator}
+            className="w-full text-[11px] py-3 rounded border-2 border-dashed border-amber-400/40 hover:border-amber-400 hover:bg-amber-500/5 text-amber-200 inline-flex items-center justify-center gap-1.5">
+            ✨ Generate hero image
+          </button>
+          <button type="button" onClick={() => fileInputRef.current?.click()} disabled={heroUploading}
+            className="w-full text-[11px] py-2 rounded border border-line hover:border-line-strong text-fg-muted inline-flex items-center justify-center gap-1.5">
+            {heroUploading ? 'Uploading…' : <><UploadOutlined /> Or upload a frame</>}
+          </button>
+        </div>
+      )}
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={(e) => { onPickFile(e.target.files?.[0]); e.target.value = '' }}
+        className="hidden"
+      />
+      {useHero && (
+        <p className="text-[10px] text-gray-500 mt-1">
+          Becomes shot 1's source image. Anchors the look so the chain is I2V→I2V→… instead of T2V→I2V→…
+        </p>
+      )}
+
+      {/* Generator modal — model picker + prompt textarea + AI assist */}
+      <Modal
+        title="Generate hero image"
+        open={genOpen}
+        onCancel={() => { if (!generating) setGenOpen(false) }}
+        footer={null}
+        centered
+        width={620}
+        maskClosable={!generating}
+      >
+        <div className="space-y-3">
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-wider text-gray-500 mb-1.5">Model</p>
+            <div className="grid grid-cols-1 gap-1.5">
+              {HERO_T2I_MODELS.map(m => (
+                <button key={m.id} type="button"
+                  onClick={() => !generating && setModel(m.id)}
+                  disabled={generating}
+                  className={`text-left p-2 rounded-md border ${
+                    model === m.id
+                      ? 'border-amber-400/60 bg-amber-500/12 ring-1 ring-amber-400/40'
+                      : 'border-gray-800 bg-gray-900/40 hover:border-gray-700'
+                  }`}>
+                  <p className="text-xs font-semibold text-white">{m.label}</p>
+                  <p className="text-[10px] text-gray-400">{m.blurb}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[10px] font-mono uppercase tracking-wider text-gray-500">
+                Prompt — auto-filled from bible + first shot
+              </p>
+              <button type="button" onClick={suggestWithAI} disabled={generating || coaching}
+                className="text-[10px] font-semibold inline-flex items-center gap-1 px-2 py-0.5 rounded border border-amber-400/40 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20 disabled:opacity-50">
+                <BulbOutlined /> {coaching ? 'Polishing…' : 'Suggest with AI'}
+              </button>
+            </div>
+            <Input.TextArea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              disabled={generating}
+              autoSize={{ minRows: 3, maxRows: 8 }}
+              className="!font-mono !text-[12px]"
+            />
+          </div>
+
+          {generating && (
+            <div className="space-y-1">
+              <p className="text-[10px] font-mono text-amber-300">Generating · {Math.round(progress)}%</p>
+              <div className="h-1.5 rounded bg-gray-800 overflow-hidden">
+                <div className="h-full bg-amber-400 transition-all" style={{ width: `${progress}%` }} />
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-1">
+            {generating ? (
+              <Button variant="secondary" onClick={cancelGenerate}>Cancel</Button>
+            ) : (
+              <>
+                <Button variant="secondary" onClick={() => setGenOpen(false)}>Close</Button>
+                <Button variant="primary" onClick={startGenerate}>Generate</Button>
+              </>
+            )}
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
