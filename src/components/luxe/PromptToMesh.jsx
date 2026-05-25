@@ -19,9 +19,11 @@
 //   - Fullscreen toggle, camera view chips, stats panel.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { BulbOutlined } from '@ant-design/icons'
 import { submitMeshJob, getMeshStatus, uploadSourceImage } from '../../api/ai'
 import notify from '../../utils/notify'
 import JobLogsAgentPlan from '../JobLogsAgentPlan'
+import PromptHelper from '../PromptHelper'
 import MeshViewerCanvas, {
   MATERIAL_MODES, ENV_PRESETS, BACKGROUND_PRESETS, CAMERA_VIEWS,
 } from './MeshViewerCanvas'
@@ -430,6 +432,16 @@ export default function PromptToMesh({ presetGlbUrl = '', clearPreset } = {}) {
   // tool elsewhere. Toggle persists for the page session.
   const [exportUntextured, setExportUntextured] = useState(false)
 
+  // PromptHelper modal state — the helper is shared across lanes
+  // (music / cinema / video / mesh) and the parent owns the coach state
+  // so it survives open/close. `family="mesh"` tells the BE to use the
+  // mesh-tuned system prompt (single-object, material-first, no
+  // lighting/camera chatter — engines bake geometry, not photos).
+  const [helperOpen,   setHelperOpen]   = useState(false)
+  const [coachIdea,    setCoachIdea]    = useState('')
+  const [coachResult,  setCoachResult]  = useState(null)
+  const [coachError,   setCoachError]   = useState('')
+
   const exportAs = async (format) => {
     if (!glbUrl) return
     const ok = await viewerRef.current?.exportMesh?.(format, {
@@ -666,7 +678,16 @@ export default function PromptToMesh({ presetGlbUrl = '', clearPreset } = {}) {
 
             {/* Prompt */}
             <div className="luxe-card p-4">
-              <p className="luxe-eyebrow text-amber-300/90 mb-2">— Real mesh on the 5090</p>
+              <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                <p className="luxe-eyebrow text-amber-300/90">— Real mesh on the 5090</p>
+                <button type="button"
+                  onClick={() => setHelperOpen(true)}
+                  disabled={isWorking}
+                  title="Open the Groq-powered prompt helper (knows the 3D-mesh writing style)"
+                  className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded border border-amber-400/40 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20 disabled:opacity-50">
+                  <BulbOutlined /> Help me write
+                </button>
+              </div>
               <textarea
                 value={prompt}
                 onChange={e => setPrompt(e.target.value)}
@@ -1004,6 +1025,20 @@ export default function PromptToMesh({ presetGlbUrl = '', clearPreset } = {}) {
           </div>
         )}
       </div>
+
+      {/* Groq-powered prompt helper — knows the 3D-mesh writing style
+          (single object, material-first, no lighting/camera chatter).
+          Same modal pattern Cinema / Music / AI Video use. */}
+      <PromptHelper
+        open={helperOpen} onClose={() => setHelperOpen(false)}
+        family="mesh"
+        currentPrompt={prompt}
+        idea={coachIdea} setIdea={setCoachIdea}
+        coachResult={coachResult} setCoachResult={setCoachResult}
+        coachError={coachError} setCoachError={setCoachError}
+        onApply={(text) => { setPrompt(text); setHelperOpen(false) }}
+        onAppend={(text) => setPrompt(prompt.trim() ? `${prompt.trim()} ${text}` : text)}
+      />
     </div>
   )
 }

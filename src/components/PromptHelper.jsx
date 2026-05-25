@@ -37,6 +37,11 @@ export const FAMILY_TIPS = {
     blurb: 'One short clip — subject, motion, lighting, camera. Keep it sensory and short (15-40 words). Avoid abstract words.',
     cfg: '',
   },
+  mesh: {
+    label: '3D mesh · Shap-E / TripoSR / TRELLIS / Hunyuan3D',
+    blurb: 'A single OBJECT, 5-15 words. Mention material + style ("marble", "low-poly", "gold"). No lighting / camera / scene chatter — meshes are static geometry, not photos.',
+    cfg: '',
+  },
 }
 
 export const PROMPT_SAMPLES = {
@@ -85,6 +90,24 @@ export const PROMPT_SAMPLES = {
       text: 'A detective walks through neon-lit rainy streets of a cyberpunk city at night, follows a lead into an underground bar, confronts a mysterious figure.' },
     { title: '🌅 Surfer story', tags: ['cinematic'],
       text: 'A surfer paddles out at sunrise, catches the perfect wave through a barrel of spray, emerges into golden light, paddles back smiling.' },
+  ],
+  mesh: [
+    { title: 'Low-poly fox', tags: ['stylised'],
+      text: 'a low-poly fox, autumn colours, stylised' },
+    { title: 'Marble chess knight', tags: ['realistic'],
+      text: 'a chess knight, marble, polished' },
+    { title: 'Gold dragon', tags: ['ornate'],
+      text: 'a coiled dragon, gold scales, jade eyes' },
+    { title: 'Oak treasure chest', tags: ['game-asset'],
+      text: 'a treasure chest, oak with brass corners' },
+    { title: 'Crystal mushroom', tags: ['fantasy'],
+      text: 'a crystal mushroom, translucent purple, sculpted' },
+    { title: 'Wooden boat', tags: ['simple'],
+      text: 'a small wooden boat, weathered planks, hand-carved' },
+    { title: 'Robot toy', tags: ['tinker'],
+      text: 'a tiny robot toy, matte ceramic, retro 1950s' },
+    { title: 'Ceramic teapot', tags: ['minimal'],
+      text: 'a stylised teapot, glossy ceramic, single curved spout' },
   ],
   video: [
     { title: '🐱 Dancing cat', tags: ['cute'],
@@ -199,6 +222,7 @@ export default function PromptHelper({
               : family === 'tts' ? 'e.g. "calm explainer voice intro"'
               : family === 'cinema' ? 'e.g. "samurai finds an abandoned shrine in misty bamboo"'
               : family === 'video' ? 'e.g. "a cat dancing on a wooden floor at sunset"'
+              : family === 'mesh' ? 'e.g. "low-poly fox" or "marble chess knight"'
               : 'describe what you want in plain English'
             }
             disabled={coachLoading} maxLength={500} showCount
