@@ -428,6 +428,23 @@ export async function deleteCinema(projectId) {
     return { data: data?.data || data, error: null };
   } catch (err) { return { data: null, error: err.message }; }
 }
+// PATCH /api/cinema/:projectId — body accepts shotPrompts[] (editable
+// after planning), shotJobIds[], status, outputUrl, errorMsg.
+export async function patchCinemaProject(projectId, body) {
+  try {
+    const data = await patch(`${ENDPOINTS.CINEMA}/${projectId}`, body, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+// POST /api/cinema/:projectId/shots/:shotIndex/review
+//   { currentPrompt?: string, engine?: 'groq' | 'gemini' }
+// → { assessment, feedback, suggested, engine }
+export async function reviewCinemaShot(projectId, shotIndex, body = {}) {
+  try {
+    const data = await post(`${ENDPOINTS.CINEMA}/${projectId}/shots/${shotIndex}/review`, body, { timeout: 20000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
 // Cinema renders — per-attempt resumable state. The FE orchestrator
 // creates one of these, navigates to /cinema/render/:renderId, then
 // PATCHes after each shot transition so the row stays in sync with

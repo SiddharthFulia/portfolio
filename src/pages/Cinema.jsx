@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Input, Select, Modal, Alert, message as antMessage } from 'antd'
 import { VideoCameraOutlined, ThunderboltOutlined, ReloadOutlined, BulbOutlined, DeleteOutlined } from '@ant-design/icons'
-import { submitCinema, listCinemaProjects, cinemaBulkAction, createCinemaRender } from '../api/ai'
+import { submitCinema, listCinemaProjects, cinemaBulkAction, createCinemaRender, patchCinemaProject, reviewCinemaShot } from '../api/ai'
 import PromptHelper from '../components/PromptHelper'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
 import { Button, Slider } from '../components/ui'
@@ -386,17 +386,187 @@ function PlannedShotsPanel({ project, navigate }) {
           </div>
         )}
       </div>
+      {/* Editable shot list — each row is its own component so its
+          local edit + review state doesn't churn the whole panel. */}
       <ol className="space-y-2">
         {project.shotPrompts.map((prompt, idx) => (
-          <li key={idx} className="luxe-card p-3">
-            <p className="text-[10px] font-mono text-amber-400 font-bold tabular-nums mb-1">
-              SHOT {String(idx + 1).padStart(2, '0')}
-            </p>
-            <p className="text-[12px] text-gray-300 font-mono leading-relaxed">{prompt}</p>
-          </li>
+          <ShotPromptRow
+            key={idx}
+            projectId={project.projectId}
+            shotIndex={idx}
+            durationPerShot={project.durationPerShot || 5}
+            initialPrompt={prompt}
+            allPrompts={project.shotPrompts}
+          />
         ))}
       </ol>
     </section>
+  )
+}
+
+// ── ShotPromptRow ────────────────────────────────────────────────
+// One row in the planner's shot list. Editable textarea with a
+// save-on-blur PATCH to /api/cinema/:projectId, plus a "Check with
+// AI" button that asks Groq (default) or Gemini to assess the prompt
+// against the shot's duration budget. The review opens in a modal
+// with the original prompt vs. AI suggestion side-by-side + an Apply
+// button that writes the suggestion back into the textarea + saves.
+function ShotPromptRow({ projectId, shotIndex, durationPerShot, initialPrompt, allPrompts }) {
+  const [text, setText] = useState(initialPrompt)
+  const [savedText, setSavedText] = useState(initialPrompt)
+  const [saving, setSaving] = useState(false)
+  // Review modal state — all local so opening shot 2's review doesn't
+  // unmount shot 1's editor.
+  const [reviewOpen, setReviewOpen] = useState(false)
+  const [reviewLoading, setReviewLoading] = useState(false)
+  const [reviewEngine, setReviewEngine] = useState('groq')   // 'groq' | 'gemini'
+  const [reviewResult, setReviewResult] = useState(null)
+
+  // Push the edit when the textarea loses focus AND the value differs
+  // from what's already on the server. Cuts down PATCH spam while the
+  // user is still typing.
+  const saveIfChanged = async () => {
+    if (text.trim() === savedText.trim()) return
+    setSaving(true)
+    // Rebuild the full shotPrompts array so the BE can rewrite the
+    // single column atomically. allPrompts is the live parent state.
+    const nextPrompts = [...allPrompts]
+    nextPrompts[shotIndex] = text.trim()
+    const { error: err } = await patchCinemaProject(projectId, { shotPrompts: nextPrompts })
+    setSaving(false)
+    if (err) {
+      antMessage.error(`Save failed: ${err}`)
+      return
+    }
+    setSavedText(text.trim())
+  }
+
+  const runReview = async () => {
+    setReviewLoading(true)
+    setReviewResult(null)
+    const { data, error: err } = await reviewCinemaShot(projectId, shotIndex, {
+      currentPrompt: text,
+      engine: reviewEngine,
+    })
+    setReviewLoading(false)
+    if (err) {
+      antMessage.error(`Review failed: ${err}`)
+      return
+    }
+    setReviewResult(data)
+  }
+
+  const applySuggestion = async () => {
+    if (!reviewResult?.suggested) return
+    setText(reviewResult.suggested)
+    // Save immediately so the planner's allPrompts is in sync next
+    // time the user opens a review modal.
+    const nextPrompts = [...allPrompts]
+    nextPrompts[shotIndex] = reviewResult.suggested
+    const { error: err } = await patchCinemaProject(projectId, { shotPrompts: nextPrompts })
+    if (err) { antMessage.error(`Apply failed: ${err}`); return }
+    setSavedText(reviewResult.suggested)
+    setReviewOpen(false)
+    antMessage.success('Applied AI suggestion')
+  }
+
+  const assessmentTone =
+    reviewResult?.assessment === 'too_detailed' ? 'text-rose-300'
+    : reviewResult?.assessment === 'too_vague'   ? 'text-amber-300'
+    : 'text-emerald-300'
+
+  return (
+    <li className="luxe-card p-3">
+      <div className="flex items-center justify-between mb-1.5 gap-2 flex-wrap">
+        <p className="text-[10px] font-mono text-amber-400 font-bold tabular-nums">
+          SHOT {String(shotIndex + 1).padStart(2, '0')}
+          <span className="ml-2 text-gray-500">· {durationPerShot}s budget</span>
+        </p>
+        <div className="flex items-center gap-2">
+          {saving && <span className="text-[10px] font-mono text-gray-500">saving…</span>}
+          <button
+            type="button"
+            onClick={() => { setReviewOpen(true); setReviewResult(null) }}
+            className="text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded border border-amber-400/40 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20 inline-flex items-center gap-1.5">
+            <BulbOutlined /> Check with AI
+          </button>
+        </div>
+      </div>
+      <Input.TextArea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={saveIfChanged}
+        autoSize={{ minRows: 2, maxRows: 6 }}
+        className="!font-mono !text-[12px]"
+      />
+
+      <Modal
+        title={`Review · Shot ${shotIndex + 1}`}
+        open={reviewOpen}
+        onCancel={() => setReviewOpen(false)}
+        footer={null}
+        centered
+        width={620}
+      >
+        {/* Engine toggle — Groq default for speed, Gemini optional */}
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-gray-500">Engine</span>
+          {['groq', 'gemini'].map(engineId => (
+            <button key={engineId} type="button"
+              onClick={() => setReviewEngine(engineId)}
+              disabled={reviewLoading}
+              className={`text-[11px] px-2 py-1 rounded border ${
+                reviewEngine === engineId
+                  ? 'border-amber-400/60 bg-amber-500/15 text-amber-200'
+                  : 'border-gray-800 text-gray-400 hover:border-gray-700'
+              }`}>
+              {engineId === 'groq' ? 'Groq · 70b (fast)' : 'Gemini 2.5 Flash'}
+            </button>
+          ))}
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-wider text-gray-500 mb-1">Current prompt</p>
+            <div className="p-2.5 rounded-md border border-gray-800 bg-gray-900/40 text-[12px] font-mono leading-relaxed text-gray-200">
+              {text || <span className="text-gray-500 italic">empty</span>}
+            </div>
+          </div>
+
+          {!reviewResult && (
+            <Button variant="primary" loading={reviewLoading} onClick={runReview}>
+              {reviewLoading ? 'Checking…' : `Check this prompt against ${durationPerShot}s budget`}
+            </Button>
+          )}
+
+          {reviewResult && (
+            <>
+              <div>
+                <p className="text-[10px] font-mono uppercase tracking-wider text-gray-500 mb-1">
+                  Assessment · <span className={assessmentTone}>{reviewResult.assessment.replace('_', ' ')}</span>
+                  <span className="text-gray-600 ml-2">({reviewResult.engine})</span>
+                </p>
+                <p className="text-[12px] text-gray-300 leading-relaxed">{reviewResult.feedback}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-mono uppercase tracking-wider text-gray-500 mb-1">AI suggestion</p>
+                <div className="p-2.5 rounded-md border border-amber-400/40 bg-amber-500/8 text-[12px] font-mono leading-relaxed text-amber-100">
+                  {reviewResult.suggested}
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="secondary" onClick={runReview} disabled={reviewLoading}>
+                  Re-run
+                </Button>
+                <Button variant="primary" onClick={applySuggestion}>
+                  Apply suggestion
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      </Modal>
+    </li>
   )
 }
 
