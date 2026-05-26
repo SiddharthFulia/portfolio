@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Input, Select, Modal, Alert, Popover } from 'antd'
 import { notice } from '../lib/notice'
 import { VideoCameraOutlined, ThunderboltOutlined, ReloadOutlined, BulbOutlined, DeleteOutlined, DownloadOutlined, LockOutlined, UnlockOutlined, PictureOutlined, UploadOutlined, InfoCircleOutlined } from '@ant-design/icons'
-import { submitCinema, listCinemaProjects, cinemaBulkAction, createCinemaRender, patchCinemaProject, reviewCinemaShot, getCinemaDiskStats, uploadSourceImage, enhanceImage, getImageStatus, promptCoach, cinemaFixAction } from '../api/ai'
+import { submitCinema, listCinemaProjects, cinemaBulkAction, createCinemaRender, patchCinemaProject, reviewCinemaShot, getCinemaDiskStats, uploadSourceImage, enhanceImage, getImageStatus, promptCoach, cinemaFixAction, listCinemaRenders, cancelCinemaRender, deleteCinemaRender } from '../api/ai'
 import PromptHelper from '../components/PromptHelper'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
 import { Button, Slider } from '../components/ui'
@@ -247,6 +247,8 @@ export default function Cinema({ embedded = false, view = 'all', refreshKey = 0 
         {showLibrary && (
           <>
             <CinemaDiskStatsBanner refreshKey={libraryRefresh} />
+            <ActiveRendersPanel refreshKey={libraryRefresh}
+              onChanged={() => setLibraryRefresh(k => k + 1)} />
             <StudioLibrary
               refreshKey={libraryRefresh}
               title="Your Cinema projects"
@@ -1492,6 +1494,182 @@ function ShotPromptRow({
 // know". Stat is computed from combined_videos.fileSize joined against
 // cinema_renders.combineJobId, so it only counts Cinema-driven combines
 // (ad-hoc Build-tab combines are excluded).
+// ── ActiveRendersPanel ────────────────────────────────────────────
+// "Manage Cinema" — lists every cinema_render that's NOT completed
+// (queued, processing, rendering, combining, failed, cancelled) with
+// per-row Cancel (stop the chain) and Purge (delete the render row)
+// buttons. Lets the user kill a runaway render that's tying up the
+// 5090 — important on Hunyuan where a single shot can crash Windows
+// via TDR if VRAM tops out.
+//
+// Polls every 4s when there's anything active, every 20s when only
+// failed/cancelled rows remain. Auto-hides when there's nothing to
+// manage (so the card doesn't clutter a clean library view).
+function ActiveRendersPanel({ refreshKey, onChanged }) {
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [acting, setActing] = useState(null)   // renderId mid-action
+  const navigate = useNavigate()
+
+  const ACTIVE_STATES = ['queued', 'processing', 'rendering', 'combining', 'extracting', 'uploading']
+  const TERMINAL_BAD  = ['failed', 'cancelled']
+
+  const load = async () => {
+    setLoading(true)
+    // Pull a page big enough for the worst-case "user spammed Render"
+    // case. 50 is plenty.
+    const { data } = await listCinemaRenders({ page: 1, pageSize: 50 })
+    const items = Array.isArray(data?.items) ? data.items : []
+    // Show only rows the user can act on — completed renders live in
+    // the library below, not in the manage panel.
+    const filtered = items.filter(r =>
+      ACTIVE_STATES.includes(r.status) || TERMINAL_BAD.includes(r.status)
+    )
+    setRows(filtered)
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey])
+
+  useEffect(() => {
+    const anyLive = rows.some(r => ACTIVE_STATES.includes(r.status))
+    const id = setInterval(load, anyLive ? 4000 : 20000)
+    return () => clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows.map(r => `${r.renderId}:${r.status}`).join(',')])
+
+  if (rows.length === 0) return null
+
+  const onCancel = (row) => {
+    Modal.confirm({
+      title: `Cancel render ${row.renderId.slice(-10)}?`,
+      content: (
+        <div className="text-xs space-y-2">
+          <p>Marks the render as cancelled, drops any queued shot jobs, and tells the chain to stop. The shot the GPU is CURRENTLY rendering will finish on its own — we can't kill ComfyUI mid-shot — but no new shots will be queued.</p>
+          <p className="text-fg-muted">After cancel, you can hit <span className="text-amber-300">Resume</span> on the render page to keep going from the last completed shot.</p>
+        </div>
+      ),
+      okText: 'Cancel render', cancelText: 'Back',
+      okType: 'danger', okButtonProps: { danger: true },
+      centered: true,
+      onOk: async () => {
+        setActing(row.renderId)
+        const { data, error: err } = await cancelCinemaRender(row.renderId)
+        setActing(null)
+        if (err) { notice.error(`Cancel failed: ${err}`); return }
+        notice.success(`Cancelled · ${data?.cancelledShotJobs?.length || 0} pending shot jobs dropped`)
+        load()
+        onChanged?.()
+      },
+    })
+  }
+
+  const onPurge = (row) => {
+    Modal.confirm({
+      title: `Purge render ${row.renderId.slice(-10)}?`,
+      content: (
+        <div className="text-xs space-y-2">
+          <p>Deletes the render row entirely. The parent Cinema project + its planned shots stay; only this render attempt is removed.</p>
+          <p className="text-fg-muted">Use Cancel first if the render is still active — Purge alone doesn't stop the chain.</p>
+        </div>
+      ),
+      okText: 'Purge', cancelText: 'Back',
+      okType: 'danger', okButtonProps: { danger: true },
+      centered: true,
+      onOk: async () => {
+        setActing(row.renderId)
+        const { error: err } = await deleteCinemaRender(row.renderId)
+        setActing(null)
+        if (err) { notice.error(`Purge failed: ${err}`); return }
+        notice.success('Render purged.')
+        load()
+        onChanged?.()
+      },
+    })
+  }
+
+  const statusTone = (s) =>
+    s === 'failed' || s === 'cancelled' ? 'bg-rose-500/15 text-rose-300 border-rose-500/40'
+    : s === 'processing' || s === 'rendering' ? 'bg-cyan-500/15 text-cyan-200 border-cyan-500/40 animate-pulse'
+    : s === 'combining' || s === 'extracting' || s === 'uploading' ? 'bg-fuchsia-500/15 text-fuchsia-200 border-fuchsia-500/40'
+    : 'bg-amber-500/15 text-amber-300 border-amber-500/40'
+
+  return (
+    <div className="luxe-card p-4 mb-3 border-amber-500/30">
+      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+        <div>
+          <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80">— Manage Cinema · {rows.length} active</p>
+          <p className="text-[11px] text-fg-muted mt-0.5">
+            In-flight + failed renders. Cancel stops the chain (GPU finishes current shot, no new ones queued). Purge deletes the render row.
+          </p>
+        </div>
+        <button onClick={load} disabled={loading}
+          className="text-[10px] font-semibold px-2 py-1 rounded-full border border-line hover:border-line-strong text-fg-muted inline-flex items-center gap-1">
+          <ReloadOutlined /> Refresh
+        </button>
+      </div>
+
+      <ul className="space-y-2">
+        {rows.map((r) => {
+          const completed = r.shotJobIds?.filter(Boolean).length || 0
+          const total     = r.shotCount || 0
+          return (
+            <li key={r.renderId} className="rounded-lg border border-line bg-surface-elevated p-3">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${statusTone(r.status)}`}>
+                      {r.status}
+                    </span>
+                    <span className="text-[10px] font-mono text-gray-500">
+                      shot {Math.min(completed, total) || 0}/{total}
+                    </span>
+                    {r.phase && (
+                      <span className="text-[10px] font-mono text-cyan-300/70">
+                        · phase {r.phase}
+                      </span>
+                    )}
+                    {r.provider && (
+                      <span className="text-[10px] font-mono text-fg-muted">
+                        · {r.provider}{r.beastModel ? ` · ${r.beastModel}` : ''}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] font-mono text-gray-400 truncate">
+                    render <span className="text-gray-200">{r.renderId}</span>
+                  </p>
+                  {r.error && (
+                    <p className="text-[10px] font-mono text-rose-400 mt-1 break-words">{r.error}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                  <button onClick={() => navigate(`/cinema/render/${r.renderId}`)}
+                    className="text-[10px] font-semibold px-2 py-1 rounded border border-cyan-400/40 text-cyan-200 hover:bg-cyan-500/10">
+                    Open
+                  </button>
+                  {ACTIVE_STATES.includes(r.status) && (
+                    <button onClick={() => onCancel(r)} disabled={acting === r.renderId}
+                      className="text-[10px] font-semibold px-2 py-1 rounded border border-amber-500/40 text-amber-200 hover:bg-amber-500/10 disabled:opacity-40">
+                      Cancel
+                    </button>
+                  )}
+                  <button onClick={() => onPurge(r)} disabled={acting === r.renderId}
+                    className="text-[10px] font-semibold px-2 py-1 rounded border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 disabled:opacity-40 inline-flex items-center gap-1">
+                    <DeleteOutlined /> Purge
+                  </button>
+                </div>
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
 function CinemaDiskStatsBanner({ refreshKey }) {
   const [stats, setStats] = useState(null)
   useEffect(() => {

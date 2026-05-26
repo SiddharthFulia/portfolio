@@ -494,6 +494,21 @@ export async function deleteCinemaRender(renderId) {
     return { data: data?.data || data, error: null };
   } catch (err) { return { data: null, error: err.message }; }
 }
+// Cancel + purge an in-flight Cinema render. Marks the render row as
+// cancelled, drops queued shot jobs from the inflight table, marks
+// processing shots as cancelled (the GPU finishes the current one
+// but the chain won't advance). Returns { renderId, cancelledShotJobs }.
+export async function cancelCinemaRender(renderId) {
+  try {
+    const data = await post(
+      `${ENDPOINTS.CINEMA_RENDER}/${renderId}/cancel`,
+      {},
+      { timeout: 10000 }
+    );
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+
 // Cinematic Continuity Director — rewrite a single shot's action as a
 // safe continuation. Returns { saferAction, reason, riskBefore, riskAfter }.
 export async function cinemaFixAction(projectId, shotIndex, body = {}) {
