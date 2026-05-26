@@ -390,7 +390,11 @@ function PlannedShotsPanel({ project, navigate }) {
   })()
   const stepsEtaSec = (() => {
     const baseSps = renderProvider === 'local' ? (SECONDS_PER_STEP[beastModel] || 3.0) : 3.0
-    const resMult = (resolution || '').toLowerCase() === '1080p' ? 1.8 : 1.0
+    // Use the project's resolution (PlannedShotsPanel doesn't have the
+    // outer `resolution` state in scope; it lives on Cinema's outer
+    // component). Default 720p when missing.
+    const projRes = (project?.resolution || '720p').toLowerCase()
+    const resMult = projRes === '1080p' ? 1.8 : 1.0
     return Math.round(baseSps * stepsNum * resMult + 25)   // +25s overhead (load + VAE + upload)
   })()
   const stepsEtaLabel = stepsEtaSec >= 60
