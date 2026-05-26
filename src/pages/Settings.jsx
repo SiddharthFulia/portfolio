@@ -103,13 +103,32 @@ function SettingsInner() {
   // holding up the rest. When an individual call returns, only its
   // card's state updates. The page no longer waits for the queue-check
   // (which can take 5-10s) before showing anything.
+  // Distinguish transient browser-level fetch failures (TypeError:
+  // Failed to fetch — CORS preflight, BE briefly down, Wi-Fi blip)
+  // from real BE-side errors (500 / 401 / 404). The transient kind
+  // is shown as a small "Reconnecting…" hint that disappears the
+  // moment ANY endpoint succeeds. Real errors stay until the next
+  // successful tick. Without this, every single poll cycle stamped
+  // "Failed to fetch" into a scary red banner.
+  const isTransientNetError = (e) =>
+    typeof e === 'string' && (
+      e.toLowerCase().includes('failed to fetch') ||
+      e.toLowerCase().includes('network') ||
+      e.toLowerCase().includes('load failed')
+    )
+  // Centralized "any endpoint completed" reconcile — keeps the err
+  // state from going stale after recovery.
+  const reconcile = (data, error) => {
+    if (data && err) setErr(null)             // any success clears the banner
+    else if (error)  setErr(error)
+  }
   const fetchServer = async () => {
     if (inFlightServer.current) return
     inFlightServer.current = true
     try {
       const { data, error } = await adminServerStats()
       if (data) setServer(data)
-      if (error) setErr(error)
+      reconcile(data, error)
       setServerLoading(false)
     } finally { inFlightServer.current = false }
   }
@@ -119,7 +138,7 @@ function SettingsInner() {
     try {
       const { data, error } = await adminDbStats()
       if (data) setDbStats(data)
-      if (error) setErr(error)
+      reconcile(data, error)
       setDbLoading(false)
     } finally { inFlightDb.current = false }
   }
@@ -129,7 +148,7 @@ function SettingsInner() {
     try {
       const { data, error } = await adminDiskStats()
       if (data) setDiskStats(data)
-      if (error) setErr(error)
+      reconcile(data, error)
       setDiskLoading(false)
     } finally { inFlightDisk.current = false }
   }
@@ -139,7 +158,7 @@ function SettingsInner() {
     try {
       const { data, error } = await adminQueueStats()
       if (data) setQueues(data)
-      if (error) setErr(error)
+      reconcile(data, error)
       setQueuesLoading(false)
     } finally { inFlightQueues.current = false }
   }
@@ -149,7 +168,7 @@ function SettingsInner() {
     try {
       const { data, error } = await adminWorkers()
       if (data) setWorkers(data?.workers || [])
-      if (error) setErr(error)
+      reconcile(data, error)
       setWorkersLoading(false)
     } finally { inFlightWorkers.current = false }
   }
@@ -281,7 +300,18 @@ function SettingsInner() {
             </span>
           </div>
           {err && (
-            <p className="text-rose-400 text-xs mt-2 font-mono">{err}</p>
+            isTransientNetError(err) ? (
+              // Transient network blip — Oracle BE momentarily
+              // unreachable, CORS preflight delayed, browser put
+              // the request to sleep. Don't scare the user; the
+              // next poll tick recovers on its own.
+              <p className="text-amber-300/80 text-xs mt-2 font-mono inline-flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                Reconnecting to backend… (will resume on next successful poll)
+              </p>
+            ) : (
+              <p className="text-rose-400 text-xs mt-2 font-mono">{err}</p>
+            )
           )}
         </header>
 
@@ -470,7 +500,19 @@ function VisualizeTab({ pollMs }) {
             <ReloadOutlined spin /> loading
           </span>
         )}
-        {err && <span className="text-rose-400 text-xs font-mono">{err}</span>}
+        {err && (
+          // Same transient-vs-real split as Overview — "Failed to fetch"
+          // is browser-level (CORS / network / BE restart), not a real
+          // error worth scaring the user. Render an amber pulse hint.
+          (typeof err === 'string' && (err.toLowerCase().includes('failed to fetch') || err.toLowerCase().includes('network') || err.toLowerCase().includes('load failed')))
+            ? (
+              <span className="text-amber-300/80 text-xs font-mono inline-flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                Reconnecting…
+              </span>
+            )
+            : <span className="text-rose-400 text-xs font-mono">{err}</span>
+        )}
       </div>
 
       {/* Mesh details — by-status + by-model breakdown + BLOB totals.
