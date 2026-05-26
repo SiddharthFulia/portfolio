@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Input, Select, Modal, Alert } from 'antd'
+import { Input, Select, Modal, Alert, Popover } from 'antd'
 import { notice } from '../lib/notice'
-import { VideoCameraOutlined, ThunderboltOutlined, ReloadOutlined, BulbOutlined, DeleteOutlined, DownloadOutlined, LockOutlined, UnlockOutlined, PictureOutlined, UploadOutlined } from '@ant-design/icons'
+import { VideoCameraOutlined, ThunderboltOutlined, ReloadOutlined, BulbOutlined, DeleteOutlined, DownloadOutlined, LockOutlined, UnlockOutlined, PictureOutlined, UploadOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import { submitCinema, listCinemaProjects, cinemaBulkAction, createCinemaRender, patchCinemaProject, reviewCinemaShot, getCinemaDiskStats, uploadSourceImage, enhanceImage, getImageStatus, promptCoach, cinemaFixAction } from '../api/ai'
 import PromptHelper from '../components/PromptHelper'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
@@ -901,6 +901,79 @@ function PlannedShotsPanel({ project, navigate }) {
 // against the shot's duration budget. The review opens in a modal
 // with the original prompt vs. AI suggestion side-by-side + an Apply
 // button that writes the suggestion back into the textarea + saves.
+// ── Continuity-risk legend ────────────────────────────────────────
+// Hover (desktop) or tap (phone) the (i) next to a risk badge to
+// open this. Three-row antd table with the threshold buckets +
+// the six contributing factors. Lives outside ShotPromptRow so it
+// can be reused on the render page later without duplicating JSX.
+const RISK_LEGEND_CONTENT = (
+  <div className="text-[12px] leading-relaxed text-fg-secondary max-w-[320px] sm:max-w-[420px]">
+    <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-amber-300/80 mb-2">
+      — Continuity risk score
+    </p>
+    <p className="text-[11px] text-gray-400 mb-3">
+      Live-updates as you type. 0–100, higher = more likely to break continuity between shots.
+    </p>
+
+    <table className="w-full text-[11px] border-collapse">
+      <thead>
+        <tr className="border-b border-line/60">
+          <th className="text-left font-mono uppercase tracking-wider text-gray-500 py-1.5 pr-2">Score</th>
+          <th className="text-left font-mono uppercase tracking-wider text-gray-500 py-1.5 pr-2">Level</th>
+          <th className="text-left font-mono uppercase tracking-wider text-gray-500 py-1.5">What it's saying</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr className="border-b border-line/30 align-top">
+          <td className="py-1.5 pr-2 font-mono text-emerald-300">0–19</td>
+          <td className="py-1.5 pr-2"><span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-emerald-500/40 bg-emerald-500/10 text-emerald-300">safe</span></td>
+          <td className="py-1.5 text-gray-300">Continuation-friendly. World locked, action fits budget, model + motion well-matched.</td>
+        </tr>
+        <tr className="border-b border-line/30 align-top">
+          <td className="py-1.5 pr-2 font-mono text-amber-300">20–44</td>
+          <td className="py-1.5 pr-2"><span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-300">medium</span></td>
+          <td className="py-1.5 text-gray-300">Some risk — action a bit too wordy, weaker model, or hero missing. Often still renders OK.</td>
+        </tr>
+        <tr className="align-top">
+          <td className="py-1.5 pr-2 font-mono text-rose-300">45–100</td>
+          <td className="py-1.5 pr-2"><span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-rose-500/40 bg-rose-500/10 text-rose-300">risky</span></td>
+          <td className="py-1.5 text-gray-300">Likely to break. Drift words, action too complex, motion too high. Use "Fix with AI".</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-amber-300/80 mt-3 mb-1.5">
+      — Six factors that bump the score
+    </p>
+    <ul className="text-[11px] text-gray-300 space-y-0.5 list-disc pl-4">
+      <li>Drift words detected (<span className="font-mono">teleport · surreal · whip pan · transforms · …</span>)</li>
+      <li>Action too wordy for the duration (&gt; 6 words/sec)</li>
+      <li>Weak model for continuity (LTX) or duration over model's max</li>
+      <li>Motion strength too high (&gt; 0.65)</li>
+      <li>Shot 1 with no hero image (T2V drift)</li>
+      <li>Bible &lt; 3 / 6 fields filled</li>
+    </ul>
+    <p className="text-[10px] text-gray-500 italic mt-2">Hover the badge itself to see the exact warnings for this shot.</p>
+  </div>
+)
+
+function RiskLegendButton() {
+  return (
+    <Popover
+      content={RISK_LEGEND_CONTENT}
+      trigger={['hover', 'click']}
+      placement="bottom"
+      overlayClassName="risk-legend-popover"
+      arrow={{ pointAtCenter: true }}
+    >
+      <button type="button" aria-label="What does the risk score mean?"
+        className="inline-flex items-center justify-center w-4 h-4 rounded-full text-gray-500 hover:text-amber-200 hover:bg-amber-500/10 transition-colors">
+        <InfoCircleOutlined className="text-[12px]" />
+      </button>
+    </Popover>
+  )
+}
+
 function ShotPromptRow({
   projectId, shotIndex, durationPerShot, initialPrompt, allPrompts,
   // Per-shot music toggle — model is render-level now (single model for
@@ -1054,11 +1127,16 @@ function ShotPromptRow({
       <div className="flex items-center justify-between mb-1.5 gap-2 flex-wrap">
         <p className="text-[10px] font-mono text-amber-400 font-bold tabular-nums inline-flex items-center gap-2 flex-wrap">
           <span>SHOT {String(shotIndex + 1).padStart(2, '0')} <span className="text-gray-500 font-normal normal-case tracking-normal">· action only</span> <span className="text-gray-500">· {durationPerShot}s budget</span></span>
-          {/* Continuity risk badge — live-updates as the user types */}
+          {/* Continuity risk badge — live-updates as the user types.
+              The (i) next to it opens a Popover with the full
+              legend (hover on desktop, tap on phone). */}
           {continuityMode && (
-            <span title={riskScore.warnings.join('\n') || 'continuity looks safe'}
-              className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${riskTone} inline-flex items-center gap-1`}>
-              risk {riskScore.score} · {riskScore.level}
+            <span className="inline-flex items-center gap-1">
+              <span title={riskScore.warnings.join('\n') || 'continuity looks safe'}
+                className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${riskTone} inline-flex items-center gap-1`}>
+                risk {riskScore.score} · {riskScore.level}
+              </span>
+              <RiskLegendButton />
             </span>
           )}
         </p>
