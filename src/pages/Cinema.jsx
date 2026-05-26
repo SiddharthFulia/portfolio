@@ -352,6 +352,55 @@ function PlannedShotsPanel({ project, navigate }) {
   // identity-mutate above ~0.75).
   const [motion, setMotion] = useState(() => Number(project.motionStrength ?? 0.6))
 
+  // Steps per shot — locked at 30 by default. Click 🔓 to edit.
+  // Bounded [4, 200] on the BE. Render quality scales with steps
+  // (more = sharper but linearly longer). The ETA hint below the
+  // input shows how much wall time the current value costs per shot
+  // for the chosen model + resolution.
+  const [stepsOverride, setStepsOverride] = useState(() => {
+    const v = project.stepsPerShot
+    return Number.isFinite(v) && v > 0 ? String(v) : '30'
+  })
+  const [stepsLocked, setStepsLocked] = useState(true)
+  const commitSteps = () => {
+    const trimmed = (stepsOverride || '').trim()
+    if (trimmed === '') {
+      setStepsOverride('30')
+      patchProject({ stepsPerShot: 30 })
+      return
+    }
+    const n = parseInt(trimmed, 10)
+    if (!Number.isFinite(n) || n < 4) { notice.error('Steps must be ≥ 4'); setStepsOverride('30'); return }
+    const clamped = Math.min(200, n)
+    if (clamped !== n) notice.warning(`Steps clamped to ${clamped} (max 200)`)
+    setStepsOverride(String(clamped))
+    patchProject({ stepsPerShot: clamped })
+  }
+  // Per-model seconds-per-step (matches the BE worker's table) so the
+  // ETA hint matches what the user will actually wait for.
+  const SECONDS_PER_STEP = {
+    'ltx-video':   1.7,  'ltx-distilled': 0.5,
+    'wan-2.1':     2.6,  'wan-2.1-i2v':  18.0,
+    'wan-2.2':    12.0,  'hunyuan':      64.0,
+    'mochi':      15.0,  'svd':           2.0,
+  }
+  const stepsNum = (() => {
+    const n = parseInt((stepsOverride || '').trim(), 10)
+    return Number.isFinite(n) && n > 0 ? n : 30
+  })()
+  const stepsEtaSec = (() => {
+    const baseSps = renderProvider === 'local' ? (SECONDS_PER_STEP[beastModel] || 3.0) : 3.0
+    const resMult = (resolution || '').toLowerCase() === '1080p' ? 1.8 : 1.0
+    return Math.round(baseSps * stepsNum * resMult + 25)   // +25s overhead (load + VAE + upload)
+  })()
+  const stepsEtaLabel = stepsEtaSec >= 60
+    ? `${Math.floor(stepsEtaSec / 60)}m ${stepsEtaSec % 60}s`
+    : `${stepsEtaSec}s`
+  // Red-flag tone above ~10 min / shot.
+  const stepsEtaTone = stepsEtaSec >= 1800 ? 'text-rose-300'
+                      : stepsEtaSec >= 600 ? 'text-amber-300'
+                      : 'text-emerald-300'
+
   // Hero image URL — the master first-frame that anchors the whole
   // render. When set, the chain uses this as shot 1's source image
   // (I2V→I2V→… instead of T2V→I2V→…) so the chain doesn't drift on
@@ -770,8 +819,39 @@ function PlannedShotsPanel({ project, navigate }) {
         </div>
       </div>
 
-      {/* ── Seed + motion + hero image — three small but critical knobs ── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+      {/* ── Seed + motion + steps + hero image — four small but critical knobs ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        {/* Steps per shot — default 30, locked. Unlock to override.
+            Live ETA below shows the wall time per shot at the chosen
+            value for the chosen model + resolution. */}
+        <div className="luxe-card p-3 border-line">
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-gray-400">Steps per shot</p>
+            <button type="button" onClick={() => setStepsLocked(l => !l)}
+              className={`text-[10px] inline-flex items-center gap-1 px-1.5 py-0.5 rounded border ${
+                stepsLocked
+                  ? 'border-amber-400/40 text-amber-200'
+                  : 'border-emerald-400/50 text-emerald-200'
+              }`}>
+              {stepsLocked ? <LockOutlined /> : <UnlockOutlined />}
+            </button>
+          </div>
+          <Input
+            size="small"
+            value={stepsOverride}
+            onChange={(e) => setStepsOverride(e.target.value.replace(/[^0-9]/g, ''))}
+            onBlur={commitSteps}
+            disabled={stepsLocked}
+            className="!font-mono"
+          />
+          <p className={`text-[10px] mt-1 ${stepsEtaTone} font-mono tabular-nums`}>
+            ≈ {stepsEtaLabel} per shot
+            {stepsEtaSec >= 1800 && <span className="ml-1 text-rose-200">⚠ slow — {Math.ceil(stepsEtaSec * (project.shotPrompts?.length || 1) / 60)}m total</span>}
+          </p>
+          <p className="text-[10px] text-gray-500 mt-1">
+            Locked at 30 by default. Same value across every shot. Range 4–200.
+          </p>
+        </div>
         {/* Seed */}
         <div className="luxe-card p-3 border-line">
           <div className="flex items-center justify-between mb-1.5">

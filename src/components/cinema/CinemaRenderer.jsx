@@ -450,6 +450,17 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
       // the planner — chain ended up mixing models, breaking
       // continuity.
       const chainBeastModel = initialRender?.beastModel  || 'wan-2.2'
+      // §71 — same step count across every shot in the render. Pull
+      // from project.stepsPerShot if the user overrode it, else
+      // continuity-default per model. Shots 2+ use the same value
+      // (BE chain reads project.stepsPerShot).
+      const STEP_DEFAULTS = {
+        'ltx-video': 30, 'ltx-distilled': 8, 'wan-2.1': 20, 'wan-2.1-i2v': 20,
+        'wan-2.2': 18, 'hunyuan': 20, 'mochi': 30, 'svd': 25,
+      }
+      const chainSteps = Number.isFinite(project?.stepsPerShot) && project.stepsPerShot > 0
+        ? project.stepsPerShot
+        : (chainProvider === 'local' ? (STEP_DEFAULTS[chainBeastModel] || 18) : undefined)
 
       const { data, error: submitError } = await generateVideo(
         shotPrompts[0],
@@ -459,6 +470,7 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
           // Only pass model on the local lane — optimized derives its
           // model from `mode`, ZSky picks server-side.
           ...(chainProvider === 'local' ? { model: chainBeastModel } : {}),
+          ...(chainSteps ? { steps: chainSteps } : {}),
           duration:    projectDuration,
           aspectRatio: projectAspect,
           resolution:  projectResolution,
@@ -566,6 +578,15 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
       const chainProvider    = initialRender?.provider     || 'optimized'
       const chainMode        = initialRender?.optimizedMode || 'balanced'
       const chainBeastModel  = initialRender?.beastModel  || 'wan-2.2'
+      // §71 — same step lookup as doSubmitShot0 so retried shots
+      // never drift to the BE default 30.
+      const STEP_DEFAULTS = {
+        'ltx-video': 30, 'ltx-distilled': 8, 'wan-2.1': 20, 'wan-2.1-i2v': 20,
+        'wan-2.2': 18, 'hunyuan': 20, 'mochi': 30, 'svd': 25,
+      }
+      const chainSteps = Number.isFinite(project?.stepsPerShot) && project.stepsPerShot > 0
+        ? project.stepsPerShot
+        : (chainProvider === 'local' ? (STEP_DEFAULTS[chainBeastModel] || 18) : undefined)
       const { data: submitData, error: submitError } = await generateVideo(
         shotPrompts[shotIndex],
         {
@@ -576,6 +597,7 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
           // falls through to its default 'ltx-video' and the chain
           // silently mixes models, killing continuity.
           ...(chainProvider === 'local' ? { model: chainBeastModel } : {}),
+          ...(chainSteps ? { steps: chainSteps } : {}),
           duration:    projectDuration,
           aspectRatio: projectAspect,
           resolution:  projectResolution,
