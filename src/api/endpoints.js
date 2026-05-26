@@ -73,6 +73,7 @@ export const ENDPOINTS = {
   // Multi-video concatenation (ffmpeg-concat lane)
   COMBINE:              '/api/combine',
   COMBINE_UPLOAD:       '/api/combine/upload',
+  CINEMA_FIX_ACTION:    '/api/cinema',   // /:projectId/shots/:shotIndex/fix-action appended at call site
   COMBINE_STATUS:       '/api/combine/status',       // /:id appended at call site
   COMBINE_LIST:         '/api/combine/list',
   COMBINE_FILE:         '/api/combine/file',         // /:id appended at call site

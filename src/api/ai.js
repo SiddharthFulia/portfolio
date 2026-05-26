@@ -494,6 +494,19 @@ export async function deleteCinemaRender(renderId) {
     return { data: data?.data || data, error: null };
   } catch (err) { return { data: null, error: err.message }; }
 }
+// Cinematic Continuity Director — rewrite a single shot's action as a
+// safe continuation. Returns { saferAction, reason, riskBefore, riskAfter }.
+export async function cinemaFixAction(projectId, shotIndex, body = {}) {
+  try {
+    const data = await post(
+      `${ENDPOINTS.CINEMA_FIX_ACTION}/${projectId}/shots/${shotIndex}/fix-action`,
+      body,
+      { timeout: 20000 }
+    );
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+
 // Unified-by-render log stream. Returns every log line across every
 // shot + the combine step in one ordered timeline, each annotated with
 // jobId + lane + shotIndex (or -1 for combine).

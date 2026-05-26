@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Input, Select, Modal, Alert } from 'antd'
 import { notice } from '../lib/notice'
 import { VideoCameraOutlined, ThunderboltOutlined, ReloadOutlined, BulbOutlined, DeleteOutlined, DownloadOutlined, LockOutlined, UnlockOutlined, PictureOutlined, UploadOutlined } from '@ant-design/icons'
-import { submitCinema, listCinemaProjects, cinemaBulkAction, createCinemaRender, patchCinemaProject, reviewCinemaShot, getCinemaDiskStats, uploadSourceImage, enhanceImage, getImageStatus, promptCoach } from '../api/ai'
+import { submitCinema, listCinemaProjects, cinemaBulkAction, createCinemaRender, patchCinemaProject, reviewCinemaShot, getCinemaDiskStats, uploadSourceImage, enhanceImage, getImageStatus, promptCoach, cinemaFixAction } from '../api/ai'
 import PromptHelper from '../components/PromptHelper'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
 import { Button, Slider } from '../components/ui'
@@ -360,6 +360,50 @@ function PlannedShotsPanel({ project, navigate }) {
   const [heroUploading, setHeroUploading] = useState(false)
   const heroFileInputRef = useRef(null)
 
+  // ─── Cinematic Continuity Director (§69) ──────────────────────────
+  // directorState = { physicalState, cameraState, emotionArc,
+  //                   negativeContinuityRules }
+  // Filled by Groq at project creation; user can edit any sub-field.
+  // Three accompanying toggles control how aggressive the director is.
+  const [directorState, setDirectorState] = useState(() => project.directorState || {})
+  const [continuityMode, setContinuityMode] = useState(() =>
+    project.continuityMode === undefined ? true : !!project.continuityMode
+  )
+  const [realismMode,    setRealismMode]    = useState(() =>
+    project.realismMode    === undefined ? true : !!project.realismMode
+  )
+  const [overlapMode,    setOverlapMode]    = useState(() => !!project.overlapMode)
+  const directorSaveTimer = useRef(null)
+  const updateDirectorField = (group, key, value) => {
+    const next = { ...directorState, [group]: { ...(directorState[group] || {}), [key]: value } }
+    setDirectorState(next)
+    if (directorSaveTimer.current) clearTimeout(directorSaveTimer.current)
+    directorSaveTimer.current = setTimeout(() => patchProject({ directorState: next }), 600)
+  }
+  const updateNegativeRule = (i, value) => {
+    const rules = Array.isArray(directorState.negativeContinuityRules) ? [...directorState.negativeContinuityRules] : []
+    rules[i] = value
+    const next = { ...directorState, negativeContinuityRules: rules.filter(s => typeof s === 'string') }
+    setDirectorState(next)
+    if (directorSaveTimer.current) clearTimeout(directorSaveTimer.current)
+    directorSaveTimer.current = setTimeout(() => patchProject({ directorState: next }), 600)
+  }
+  const addNegativeRule = () => {
+    const rules = Array.isArray(directorState.negativeContinuityRules) ? [...directorState.negativeContinuityRules] : []
+    if (rules.length >= 16) return
+    rules.push('')
+    const next = { ...directorState, negativeContinuityRules: rules }
+    setDirectorState(next)
+    patchProject({ directorState: next })
+  }
+  const removeNegativeRule = (i) => {
+    const rules = Array.isArray(directorState.negativeContinuityRules) ? [...directorState.negativeContinuityRules] : []
+    rules.splice(i, 1)
+    const next = { ...directorState, negativeContinuityRules: rules }
+    setDirectorState(next)
+    patchProject({ directorState: next })
+  }
+
   const patchProject = async (patch) => {
     const { error: err } = await patchCinemaProject(project.projectId, patch)
     if (err) notice.error(`Save failed: ${err}`)
@@ -540,6 +584,143 @@ function PlannedShotsPanel({ project, navigate }) {
         )}
       </div>
 
+      {/* ── Cinematic Continuity Director — three modes ─────────────
+          §69. Three boolean toggles control how aggressive the
+          director layer is. Default all ON for new projects; user
+          can opt out at any time. */}
+      <div className="luxe-card p-3 mb-4 flex flex-wrap items-center gap-3 border-amber-500/30">
+        <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80">
+          — Director modes
+        </p>
+        {[
+          { id: 'continuity', label: 'Continuity', tip: 'Prepend bible + physical + camera state to every shot, sanitize drift words, build a negative prompt',
+            value: continuityMode, onChange: (v) => { setContinuityMode(v); patchProject({ continuityMode: v }) } },
+          { id: 'realism',    label: 'Realism',    tip: 'Append a documentary-realism layer to each prompt (handheld sway, natural physics, no plastic AI texture)',
+            value: realismMode, onChange: (v) => { setRealismMode(v); patchProject({ realismMode: v }) } },
+          { id: 'overlap',    label: 'Overlap',    tip: 'Render slightly longer per shot + trim the wobbly edges (slower, more stable)',
+            value: overlapMode, onChange: (v) => { setOverlapMode(v); patchProject({ overlapMode: v }) } },
+        ].map(t => (
+          <label key={t.id} title={t.tip}
+            className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+            <input type="checkbox" checked={!!t.value}
+              onChange={(e) => t.onChange(e.target.checked)} className="accent-amber-400" />
+            <span className={`text-[11px] font-mono ${t.value ? 'text-emerald-300' : 'text-gray-500'}`}>
+              {t.label}{t.value ? ' · ON' : ' · off'}
+            </span>
+          </label>
+        ))}
+      </div>
+
+      {/* ── Director state — physicalState / cameraState / emotionArc /
+          negativeContinuityRules. Filled by Groq at project creation;
+          all fields editable, debounce-saved 600ms after the last
+          keystroke. */}
+      <div className="luxe-card p-4 mb-4 border-cyan-500/30 bg-cyan-500/[0.03]">
+        <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-cyan-300/80">
+              — Continuity director state
+            </p>
+            <p className="text-[11px] text-gray-400 mt-0.5">
+              Physical + camera state stays locked across every shot. Emotion arc shapes the narrative; negative rules forbid world resets.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {/* physicalState */}
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-wider text-gray-500 mb-1">Physical state</p>
+            <div className="space-y-1.5">
+              {[
+                ['screenDirection', 'left_to_right'],
+                ['subjectMotion',    'walking forward slowly'],
+                ['windDirection',    'left_to_right'],
+                ['snowDirection',    'left_to_right or not_applicable'],
+                ['weatherIntensity', 'light | medium | heavy | none'],
+                ['terrain',          'snow-covered rocky mountain pass'],
+                ['timeOfDay',        'golden hour'],
+              ].map(([k, ph]) => (
+                <div key={k} className="grid grid-cols-[120px_1fr] gap-2 items-center">
+                  <span className="text-[10px] font-mono text-gray-500 uppercase tracking-wider">{k}</span>
+                  <Input size="small" value={directorState.physicalState?.[k] || ''}
+                    onChange={(e) => updateDirectorField('physicalState', k, e.target.value)}
+                    placeholder={ph} className="!font-mono !text-[11px]" />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* cameraState + emotionArc */}
+          <div className="space-y-3">
+            <div>
+              <p className="text-[10px] font-mono uppercase tracking-wider text-gray-500 mb-1">Camera state</p>
+              <div className="space-y-1.5">
+                {[
+                  ['lens',          '35mm anamorphic'],
+                  ['height',        'wolf-eye level'],
+                  ['movement',      'slow forward tracking'],
+                  ['energy',        'calm tense documentary realism'],
+                  ['stabilization', 'slightly handheld with subtle operator sway'],
+                ].map(([k, ph]) => (
+                  <div key={k} className="grid grid-cols-[120px_1fr] gap-2 items-center">
+                    <span className="text-[10px] font-mono text-gray-500 uppercase tracking-wider">{k}</span>
+                    <Input size="small" value={directorState.cameraState?.[k] || ''}
+                      onChange={(e) => updateDirectorField('cameraState', k, e.target.value)}
+                      placeholder={ph} className="!font-mono !text-[11px]" />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-[10px] font-mono uppercase tracking-wider text-gray-500 mb-1">Emotion arc</p>
+              <div className="space-y-1.5">
+                {[
+                  ['start',  'searching and alert'],
+                  ['middle', 'leader senses something'],
+                  ['end',    'reveal and recognition'],
+                ].map(([k, ph]) => (
+                  <div key={k} className="grid grid-cols-[120px_1fr] gap-2 items-center">
+                    <span className="text-[10px] font-mono text-gray-500 uppercase tracking-wider">{k}</span>
+                    <Input size="small" value={directorState.emotionArc?.[k] || ''}
+                      onChange={(e) => updateDirectorField('emotionArc', k, e.target.value)}
+                      placeholder={ph} className="!font-mono !text-[11px]" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* negative continuity rules */}
+        <div className="mt-3 pt-3 border-t border-cyan-500/20">
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-[10px] font-mono uppercase tracking-wider text-gray-500">Negative continuity rules</p>
+            <button type="button" onClick={addNegativeRule}
+              className="text-[10px] font-semibold px-2 py-0.5 rounded border border-line hover:border-line-strong text-fg-muted">
+              + Add rule
+            </button>
+          </div>
+          <div className="space-y-1">
+            {(directorState.negativeContinuityRules || []).map((rule, i) => (
+              <div key={i} className="flex items-center gap-1.5">
+                <Input size="small" value={rule}
+                  onChange={(e) => updateNegativeRule(i, e.target.value)}
+                  placeholder="do not change the subject design"
+                  className="!font-mono !text-[11px]" />
+                <button type="button" onClick={() => removeNegativeRule(i)}
+                  className="text-[10px] px-1.5 py-0.5 rounded border border-rose-500/40 text-rose-300 hover:bg-rose-500/10">
+                  <DeleteOutlined />
+                </button>
+              </div>
+            ))}
+            {(directorState.negativeContinuityRules || []).length === 0 && (
+              <p className="text-[10px] text-gray-500 italic">No rules yet — Groq usually adds 10 by default. Hit "+ Add rule" to start one manually.</p>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* ── Continuity bible ─────────────────────────────────────────
           Locked world facts prepended to every shot's prompt. Without
           this, each shot is its own world and the character mutates
@@ -697,6 +878,15 @@ function PlannedShotsPanel({ project, navigate }) {
             allPrompts={project.shotPrompts}
             musicOn={!!shotMusic[idx]}
             onToggleMusic={(v) => setMusicAt(idx, v)}
+            // §69 continuity director context — used for risk
+            // scoring + Fix-with-AI prompt.
+            bible={bible}
+            directorState={directorState}
+            model={renderProvider === 'local' ? beastModel : 'wan-2.2'}
+            motionStrength={motion}
+            hasHeroImage={!!heroImageUrl}
+            continuityMode={continuityMode}
+            realismMode={realismMode}
           />
         ))}
       </ol>
@@ -716,6 +906,10 @@ function ShotPromptRow({
   // Per-shot music toggle — model is render-level now (single model for
   // the whole chain so continuity holds).
   musicOn = false, onToggleMusic,
+  // §69 director context — used for local risk scoring + Fix-with-AI.
+  bible = {}, directorState = {},
+  model = 'wan-2.2', motionStrength = 0.5,
+  hasHeroImage = false, continuityMode = true, realismMode = true,
 }) {
   const [text, setText] = useState(initialPrompt)
   const [savedText, setSavedText] = useState(initialPrompt)
@@ -735,6 +929,71 @@ function ShotPromptRow({
     { id: 'gemini-pro',        engine: 'gemini', model: 'gemini-pro',      label: 'Gemini 2.5 Pro' },
   ]
   const selectedEngine = ENGINE_OPTIONS.find(o => o.id === reviewEngineId) || ENGINE_OPTIONS[0]
+
+  // ─── Fix-with-AI modal state (separate from Review) ──────────────
+  const [fixOpen, setFixOpen] = useState(false)
+  const [fixLoading, setFixLoading] = useState(false)
+  const [fixEngineId, setFixEngineId] = useState('groq')
+  const [fixResult, setFixResult] = useState(null)
+
+  // ─── Local continuity risk score (cheap, runs on every keystroke) ─
+  // Mirrors the BE's calculateContinuityRisk so the user sees the
+  // same number without a round-trip. Re-implemented inline because
+  // we can't import a BE module from the FE.
+  const riskScore = (() => {
+    if (!continuityMode) return { score: 0, level: 'safe', warnings: [] }
+    const a = (text || '').toLowerCase()
+    let score = 0; const warnings = []
+    const DRIFT = [
+      'different location','new world','suddenly','transforms','changes into','different animal',
+      'new character','teleport','surreal','dreamlike','fantasy transformation','whip pan','crash zoom',
+      'rapid zoom','camera flies above','moonlight','new place','different scene',
+    ]
+    const driftHits = DRIFT.filter(d => a.includes(d))
+    if (driftHits.length) { score += 25 + (driftHits.length - 1) * 5; warnings.push(`drift: ${driftHits.join(', ')}`) }
+    const wc = a.trim().split(/\s+/).filter(Boolean).length
+    if (wc / Math.max(1, durationPerShot) > 6) { score += 15; warnings.push(`action may be too complex for ${durationPerShot}s`) }
+    if (model === 'ltx-video' || model === 'ltx-distilled') { score += 15; warnings.push('LTX weak for multi-shot continuity') }
+    if (motionStrength > 0.65) { score += 20; warnings.push(`motionStrength ${motionStrength} is high`) }
+    else if (motionStrength > 0.55) score += 8
+    if (shotIndex === 0 && !hasHeroImage) { score += 12; warnings.push('no hero image — shot 1 will T2V') }
+    const filled = ['subject','wardrobe','environment','lighting','camera','palette'].filter(k => bible[k]).length
+    if (filled < 3) { score += 15; warnings.push(`bible only ${filled}/6 filled`) }
+    score = Math.max(0, Math.min(100, Math.round(score)))
+    return { score, level: score >= 45 ? 'risky' : score >= 20 ? 'medium' : 'safe', warnings }
+  })()
+  const riskTone = riskScore.level === 'risky' ? 'text-rose-300 bg-rose-500/10 border-rose-500/40'
+                  : riskScore.level === 'medium' ? 'text-amber-300 bg-amber-500/10 border-amber-500/40'
+                  : 'text-emerald-300 bg-emerald-500/10 border-emerald-500/40'
+
+  const FIX_ENGINE_OPTIONS = [
+    { id: 'groq',              engine: 'groq',   model: 'llama-3.3-70b',     label: 'Groq · 70b' },
+    { id: 'gemini-flash',      engine: 'gemini', model: 'gemini-flash',      label: 'Gemini Flash' },
+    { id: 'gemini-flash-lite', engine: 'gemini', model: 'gemini-flash-lite', label: 'Flash-Lite' },
+    { id: 'gemini-pro',        engine: 'gemini', model: 'gemini-pro',        label: 'Gemini Pro' },
+  ]
+  const selectedFixEngine = FIX_ENGINE_OPTIONS.find(o => o.id === fixEngineId) || FIX_ENGINE_OPTIONS[0]
+
+  const runFixAction = async () => {
+    setFixLoading(true); setFixResult(null)
+    const { data, error: err } = await cinemaFixAction(projectId, shotIndex, {
+      engine: selectedFixEngine.engine,
+      model:  selectedFixEngine.model,
+    })
+    setFixLoading(false)
+    if (err) { notice.error(`Fix failed: ${err}`); return }
+    setFixResult(data)
+  }
+  const applyFix = async () => {
+    if (!fixResult?.saferAction) return
+    setText(fixResult.saferAction)
+    const nextPrompts = [...allPrompts]; nextPrompts[shotIndex] = fixResult.saferAction
+    const { error: err } = await patchCinemaProject(projectId, { shotPrompts: nextPrompts })
+    if (err) { notice.error(`Apply failed: ${err}`); return }
+    setSavedText(fixResult.saferAction)
+    setFixOpen(false)
+    notice.success('Continuity-safe rewrite applied.')
+  }
 
   // Push the edit when the textarea loses focus AND the value differs
   // from what's already on the server. Cuts down PATCH spam while the
@@ -793,12 +1052,24 @@ function ShotPromptRow({
   return (
     <li className="luxe-card p-3">
       <div className="flex items-center justify-between mb-1.5 gap-2 flex-wrap">
-        <p className="text-[10px] font-mono text-amber-400 font-bold tabular-nums">
-          SHOT {String(shotIndex + 1).padStart(2, '0')} <span className="text-gray-500 font-normal normal-case tracking-normal">· action only</span>
-          <span className="ml-2 text-gray-500">· {durationPerShot}s budget</span>
+        <p className="text-[10px] font-mono text-amber-400 font-bold tabular-nums inline-flex items-center gap-2 flex-wrap">
+          <span>SHOT {String(shotIndex + 1).padStart(2, '0')} <span className="text-gray-500 font-normal normal-case tracking-normal">· action only</span> <span className="text-gray-500">· {durationPerShot}s budget</span></span>
+          {/* Continuity risk badge — live-updates as the user types */}
+          {continuityMode && (
+            <span title={riskScore.warnings.join('\n') || 'continuity looks safe'}
+              className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${riskTone} inline-flex items-center gap-1`}>
+              risk {riskScore.score} · {riskScore.level}
+            </span>
+          )}
         </p>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {saving && <span className="text-[10px] font-mono text-gray-500">saving…</span>}
+          <button type="button" onClick={() => { setFixOpen(true); setFixResult(null) }}
+            disabled={!continuityMode}
+            title={continuityMode ? 'Rewrite as a continuation-safe action' : 'Turn Continuity mode on to use Fix with AI'}
+            className="text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded border border-cyan-400/40 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-40 inline-flex items-center gap-1.5">
+            <ThunderboltOutlined /> Fix with AI
+          </button>
           <button
             type="button"
             onClick={() => { setReviewOpen(true); setReviewResult(null) }}
@@ -895,6 +1166,80 @@ function ShotPromptRow({
                 <Button variant="primary" onClick={applySuggestion}>
                   Apply suggestion
                 </Button>
+              </div>
+            </>
+          )}
+        </div>
+      </Modal>
+
+      {/* Fix-with-AI modal — rewrites the action as a continuation-safe
+          version that respects bible + director state. Shows risk
+          before vs after so the user sees the win. */}
+      <Modal
+        title={`Fix · Shot ${shotIndex + 1}`}
+        open={fixOpen}
+        onCancel={() => setFixOpen(false)}
+        footer={null}
+        centered
+        width={640}
+      >
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-gray-500">Engine</span>
+          {FIX_ENGINE_OPTIONS.map(opt => (
+            <button key={opt.id} type="button"
+              onClick={() => setFixEngineId(opt.id)} disabled={fixLoading}
+              className={`text-[11px] px-2 py-1 rounded border ${
+                fixEngineId === opt.id
+                  ? 'border-cyan-400/60 bg-cyan-500/15 text-cyan-200'
+                  : 'border-gray-800 text-gray-400 hover:border-gray-700'
+              }`}>
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        <div className="space-y-3">
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-wider text-gray-500 mb-1">Current action</p>
+            <div className="p-2.5 rounded-md border border-gray-800 bg-gray-900/40 text-[12px] font-mono leading-relaxed text-gray-200">
+              {text || <span className="text-gray-500 italic">empty</span>}
+            </div>
+          </div>
+          {!fixResult && (
+            <Button variant="primary" loading={fixLoading} onClick={runFixAction}>
+              {fixLoading ? 'Rewriting…' : 'Rewrite as continuation-safe'}
+            </Button>
+          )}
+          {fixResult && (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <p className="text-[10px] font-mono uppercase tracking-wider text-rose-300/80 mb-1">Risk before</p>
+                  <p className="text-lg font-bold text-rose-200 tabular-nums">
+                    {fixResult.riskBefore?.score ?? '—'}
+                    <span className="text-[10px] text-rose-300/70 ml-1">{fixResult.riskBefore?.level}</span>
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-mono uppercase tracking-wider text-emerald-300/80 mb-1">Risk after</p>
+                  <p className="text-lg font-bold text-emerald-200 tabular-nums">
+                    {fixResult.riskAfter?.score ?? '—'}
+                    <span className="text-[10px] text-emerald-300/70 ml-1">{fixResult.riskAfter?.level}</span>
+                  </p>
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] font-mono uppercase tracking-wider text-gray-500 mb-1">Why</p>
+                <p className="text-[12px] text-gray-300 leading-relaxed">{fixResult.reason}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-mono uppercase tracking-wider text-gray-500 mb-1">Safer action</p>
+                <div className="p-2.5 rounded-md border border-cyan-400/40 bg-cyan-500/8 text-[12px] font-mono leading-relaxed text-cyan-100">
+                  {fixResult.saferAction}
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="secondary" onClick={runFixAction} disabled={fixLoading}>Re-run</Button>
+                <Button variant="primary" onClick={applyFix}>Apply</Button>
               </div>
             </>
           )}
