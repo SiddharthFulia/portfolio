@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Input, Select, Modal, Alert, Popover } from 'antd'
 import { notice } from '../lib/notice'
 import { VideoCameraOutlined, ThunderboltOutlined, ReloadOutlined, BulbOutlined, DeleteOutlined, DownloadOutlined, LockOutlined, UnlockOutlined, PictureOutlined, UploadOutlined, InfoCircleOutlined } from '@ant-design/icons'
-import { submitCinema, listCinemaProjects, cinemaBulkAction, createCinemaRender, patchCinemaProject, reviewCinemaShot, getCinemaDiskStats, uploadSourceImage, enhanceImage, getImageStatus, promptCoach, cinemaFixAction, listCinemaRenders, cancelCinemaRender, deleteCinemaRender } from '../api/ai'
+import { submitCinema, listCinemaProjects, cinemaBulkAction, createCinemaRender, patchCinemaProject, reviewCinemaShot, getCinemaDiskStats, uploadSourceImage, enhanceImage, getImageStatus, promptCoach, cinemaFixAction, listCinemaRenders, cancelCinemaRender, deleteCinemaRender, getCinemaStatus } from '../api/ai'
 import PromptHelper from '../components/PromptHelper'
 import JobLogsAgentPlan from '../components/JobLogsAgentPlan'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
@@ -24,8 +24,19 @@ import useQueryState from '../hooks/useQueryState'
 // This is what lets AIVideo expose two clean sibling tabs ("Cinema" and
 // "Cinema Library") instead of embedding the whole standalone Cinema
 // page as one nested-feeling tab.
+// localStorage key — bookmark of the in-progress project so a fresh
+// page-load can resume it. Only written after a "real" trigger
+// (heroImageUrl set OR render-all clicked) so casual visitors who
+// type a prompt + bounce don't litter the page.
+const CINEMA_ACTIVE_KEY = 'sid-cinema-active-project'
+
 export default function Cinema({ embedded = false, view = 'all', refreshKey = 0 }) {
   const navigate = useNavigate()
+  // URL param `?p=<projectId>` is the source of truth for "which
+  // project is the planner editing right now". When set, the planner
+  // hydrates state from /api/cinema/status/:projectId on mount.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const projectIdFromUrl = searchParams.get('p') || null
   const [masterPrompt, setMasterPrompt] = useState('')
   // Card-style selectors mirrored to URL so refresh restores the user's
   // choice. Free-text masterPrompt stays plain useState — too long for
@@ -55,6 +66,70 @@ export default function Cinema({ embedded = false, view = 'all', refreshKey = 0 
     if (refreshKey) setLibraryRefresh(k => k + 1)
   }, [refreshKey])
 
+  // ─── Resume an in-progress planner session ─────────────────────────
+  // On mount, look for a projectId to hydrate from. Priority order:
+  //   1. ?p=<projectId> URL param (shareable, takes precedence)
+  //   2. localStorage `sid-cinema-active-project` (only set after a
+  //      "real" trigger fires — hero generated/uploaded, or render-all
+  //      clicked. So casual visitors don't get a stale resume banner.)
+  // Fetches the project row + sets master prompt + project state. The
+  // existing child components (PlannedShotsPanel) already PATCH every
+  // edit through patchCinemaProject, so the user just continues from
+  // where they left off.
+  useEffect(() => {
+    let cancelled = false
+    let candidate = projectIdFromUrl
+    if (!candidate) {
+      try { candidate = localStorage.getItem(CINEMA_ACTIVE_KEY) || null } catch {}
+    }
+    if (!candidate) return
+    getCinemaStatus(candidate).then(({ data, error: err }) => {
+      if (cancelled) return
+      if (err || !data) {
+        // Bookmark points at a deleted/missing project — clean up.
+        try { localStorage.removeItem(CINEMA_ACTIVE_KEY) } catch {}
+        return
+      }
+      setProject(data)
+      setMasterPrompt(data.masterPrompt || '')
+      // Stamp the URL if it wasn't already set, so refresh = resume.
+      if (!projectIdFromUrl) {
+        const next = new URLSearchParams(searchParams)
+        next.set('p', candidate)
+        setSearchParams(next, { replace: true })
+      }
+      notice.info(`Resuming draft · ${data.shotPrompts?.length || data.shotCount || 0} shots`)
+    })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // When the project's heroImageUrl gets set (Groq-gen or upload),
+  // promote the projectId from "ephemeral draft" to "bookmarked draft"
+  // by writing it into localStorage. This is the gate the user asked
+  // for — drafts don't get auto-saved until they did real work.
+  // Render-all clicks navigate to /cinema/render/:renderId so the
+  // bookmark also doubles as "where I was". Discarding the draft
+  // clears localStorage (handled in requestClearPrompt below).
+  useEffect(() => {
+    if (project?.projectId && project?.heroImageUrl) {
+      try { localStorage.setItem(CINEMA_ACTIVE_KEY, project.projectId) } catch {}
+    }
+  }, [project?.projectId, project?.heroImageUrl])
+
+  // Discard the in-progress draft — clears the URL param + the
+  // localStorage bookmark + resets local state. Used by the "Start
+  // over" link in the resume banner.
+  const discardDraft = () => {
+    try { localStorage.removeItem(CINEMA_ACTIVE_KEY) } catch {}
+    const next = new URLSearchParams(searchParams)
+    next.delete('p')
+    setSearchParams(next, { replace: true })
+    setProject(null)
+    setMasterPrompt('')
+    notice.info('Draft cleared.')
+  }
+
   const plan = async () => {
     if (!masterPrompt.trim() || masterPrompt.trim().length < 5) {
       setError('Master prompt must be at least 5 characters'); return
@@ -67,6 +142,16 @@ export default function Cinema({ embedded = false, view = 'all', refreshKey = 0 
     if (err) { setError(err); return }
     setProject(data)
     setLibraryRefresh(k => k + 1)
+    // Stamp the new project's id into the URL so refresh resumes the
+    // draft right where the user left off. The localStorage bookmark
+    // is held back until the user clears a higher gate (hero set or
+    // render-all clicked) so we don't pollute the dashboard with
+    // abandoned drafts. The URL alone is enough for a refresh-resume.
+    if (data?.projectId) {
+      const next = new URLSearchParams(searchParams)
+      next.set('p', data.projectId)
+      setSearchParams(next, { replace: false })
+    }
     notice.success(`Planned ${data.shotCount} shots — review and render below.`)
   }
 
@@ -242,7 +327,24 @@ export default function Cinema({ embedded = false, view = 'all', refreshKey = 0 
             per shot, persistent state). Render button is the only thing
             that fires across pages — no inline chain anymore. */}
         {showPlanner && project && Array.isArray(project.shotPrompts) && project.shotPrompts.length > 0 && (
-          <PlannedShotsPanel project={project} navigate={navigate} />
+          <>
+            {/* Resume banner — visible whenever a project is hydrated.
+                The "× Discard" button clears the URL + localStorage
+                bookmark + resets local state so the user can start a
+                completely fresh draft. */}
+            <div className="luxe-card p-2.5 mb-3 flex items-center justify-between gap-3 flex-wrap border-cyan-500/30 bg-cyan-500/[0.04]">
+              <p className="text-[11px] text-cyan-200/80 font-mono">
+                <span className="text-cyan-300">●</span> Resuming draft <span className="text-amber-300">{project.projectId.slice(-12)}</span> · {project.shotPrompts.length} shots
+                {project.heroImageUrl ? ' · hero set' : ' · no hero yet'}
+                {' · auto-save on'}
+              </p>
+              <button type="button" onClick={discardDraft}
+                className="text-[10px] font-semibold px-2 py-1 rounded border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 inline-flex items-center gap-1">
+                <DeleteOutlined /> Discard draft
+              </button>
+            </div>
+            <PlannedShotsPanel project={project} navigate={navigate} />
+          </>
         )}
 
         {showLibrary && (
