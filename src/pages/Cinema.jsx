@@ -589,8 +589,9 @@ function PlannedShotsPanel({ project, navigate }) {
           director layer is. Default all ON for new projects; user
           can opt out at any time. */}
       <div className="luxe-card p-3 mb-4 flex flex-wrap items-center gap-3 border-amber-500/30">
-        <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80">
+        <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80 inline-flex items-center gap-1.5">
           — Director modes
+          <DirectorModesLegendButton />
         </p>
         {[
           { id: 'continuity', label: 'Continuity', tip: 'Prepend bible + physical + camera state to every shot, sanitize drift words, build a negative prompt',
@@ -967,6 +968,79 @@ function RiskLegendButton() {
       arrow={{ pointAtCenter: true }}
     >
       <button type="button" aria-label="What does the risk score mean?"
+        className="inline-flex items-center justify-center w-4 h-4 rounded-full text-gray-500 hover:text-amber-200 hover:bg-amber-500/10 transition-colors">
+        <InfoCircleOutlined className="text-[12px]" />
+      </button>
+    </Popover>
+  )
+}
+
+// ── Director modes legend ─────────────────────────────────────────
+// Mirrors the RiskLegendButton pattern — (i) icon next to "Director
+// modes" header opens a Popover with a tone-colored table explaining
+// what each of the three toggles (Continuity / Realism / Overlap)
+// actually does + an honesty note that Overlap is still stubbed.
+const DIRECTOR_MODES_LEGEND_CONTENT = (
+  <div className="text-[12px] leading-relaxed text-fg-secondary max-w-[340px] sm:max-w-[460px]">
+    <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-amber-300/80 mb-2">
+      — Director modes
+    </p>
+    <p className="text-[11px] text-gray-400 mb-3">
+      Three toggles that change how aggressive the continuity director is. All persist on the project row.
+    </p>
+
+    <table className="w-full text-[11px] border-collapse">
+      <thead>
+        <tr className="border-b border-line/60">
+          <th className="text-left font-mono uppercase tracking-wider text-gray-500 py-1.5 pr-2">Mode</th>
+          <th className="text-left font-mono uppercase tracking-wider text-gray-500 py-1.5">What it does</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr className="border-b border-line/30 align-top">
+          <td className="py-1.5 pr-2">
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-emerald-500/40 bg-emerald-500/10 text-emerald-300">Continuity</span>
+            <p className="text-[9px] text-gray-500 mt-0.5">default ON</p>
+          </td>
+          <td className="py-1.5 text-gray-300">
+            Glues the <span className="text-amber-300">bible + physical state + camera state + continuation language</span> to the front of every shot. Strips drift words like "teleport / surreal / whip pan", builds a tone-aware <span className="text-amber-300">negative prompt</span>, and shows the live risk badge per shot. Off = chain falls back to the old bible-only path.
+          </td>
+        </tr>
+        <tr className="border-b border-line/30 align-top">
+          <td className="py-1.5 pr-2">
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-300">Realism</span>
+            <p className="text-[9px] text-gray-500 mt-0.5">default ON</p>
+          </td>
+          <td className="py-1.5 text-gray-300">
+            Appends a documentary-cinematography line to every prompt: <span className="font-mono">"natural imperfect motion, subtle camera operator sway, real lens behaviour, no plastic AI texture, no over-smoothed AI look"</span>. Helps the model avoid the slick CGI look. Off = no realism line.
+          </td>
+        </tr>
+        <tr className="align-top">
+          <td className="py-1.5 pr-2">
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-cyan-500/40 bg-cyan-500/10 text-cyan-300">Overlap</span>
+            <p className="text-[9px] text-gray-500 mt-0.5">default OFF</p>
+          </td>
+          <td className="py-1.5 text-gray-300">
+            Render each shot a bit <span className="text-amber-300">longer than needed</span> (say 6s for a 5s budget), then ffmpeg-trim the wobbly first 0.5s + last 0.5s before stitching. AI models tend to jitter at clip starts + drift at clip ends; the trimmed middle is the cleanest part. Costs ~30% more GPU per shot.<br/>
+            <span className="text-rose-300/80 text-[10px] italic">⚠ Toggle wired but trim pass is still stubbed — turning it on today is currently a no-op. Coming in §70.</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p className="text-[10px] text-gray-500 italic mt-2">Hover any of the three labels in the card for a one-line tooltip.</p>
+  </div>
+)
+
+function DirectorModesLegendButton() {
+  return (
+    <Popover
+      content={DIRECTOR_MODES_LEGEND_CONTENT}
+      trigger={['hover', 'click']}
+      placement="bottom"
+      arrow={{ pointAtCenter: true }}
+    >
+      <button type="button" aria-label="What do these director modes do?"
         className="inline-flex items-center justify-center w-4 h-4 rounded-full text-gray-500 hover:text-amber-200 hover:bg-amber-500/10 transition-colors">
         <InfoCircleOutlined className="text-[12px]" />
       </button>
