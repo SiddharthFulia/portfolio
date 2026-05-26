@@ -406,12 +406,21 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
       // for back-compat with old rows.
       const chainProvider = initialRender?.provider     || 'optimized'
       const chainMode     = initialRender?.optimizedMode || 'balanced'
+      // §69 — when engine is 5090 Beast, send the picked beast model
+      // through. Before this, shot 0 fell through to the BE's
+      // default ('ltx-video') even when the user picked Hunyuan in
+      // the planner — chain ended up mixing models, breaking
+      // continuity.
+      const chainBeastModel = initialRender?.beastModel  || 'wan-2.2'
 
       const { data, error: submitError } = await generateVideo(
         shotPrompts[0],
         {
           provider:    chainProvider,
           mode:        chainMode,
+          // Only pass model on the local lane — optimized derives its
+          // model from `mode`, ZSky picks server-side.
+          ...(chainProvider === 'local' ? { model: chainBeastModel } : {}),
           duration:    projectDuration,
           aspectRatio: projectAspect,
           resolution:  projectResolution,
@@ -516,13 +525,19 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
       // (set when the user clicked "Render all shots" on the planner).
       // Defaults match the old hardcoded behaviour so legacy rows
       // without these fields still work.
-      const chainProvider = initialRender?.provider     || 'optimized'
-      const chainMode     = initialRender?.optimizedMode || 'balanced'
+      const chainProvider    = initialRender?.provider     || 'optimized'
+      const chainMode        = initialRender?.optimizedMode || 'balanced'
+      const chainBeastModel  = initialRender?.beastModel  || 'wan-2.2'
       const { data: submitData, error: submitError } = await generateVideo(
         shotPrompts[shotIndex],
         {
           provider:    chainProvider,         // 5090 lane — Wan 2.2 5B, supports i2v
           mode:        chainMode,             // preview / balanced / quality — controls model + steps
+          // §69 — when on the local lane, send the picked beast model
+          // (Hunyuan / Wan 2.1 I2V 14B / etc.). Without this the BE
+          // falls through to its default 'ltx-video' and the chain
+          // silently mixes models, killing continuity.
+          ...(chainProvider === 'local' ? { model: chainBeastModel } : {}),
           duration:    projectDuration,
           aspectRatio: projectAspect,
           resolution:  projectResolution,
