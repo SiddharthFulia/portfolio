@@ -955,6 +955,22 @@ export async function adminServerStats() { try { const data = await get(ENDPOINT
 export async function adminDbStats() { try { const data = await get(ENDPOINTS.ADMIN_DB_STATS, {}, { timeout: 15000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 export async function adminDiskStats() { try { const data = await get(ENDPOINTS.ADMIN_DISK_STATS, {}, { timeout: 20000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 export async function adminMeshStats() { try { const data = await get(ENDPOINTS.ADMIN_MESH_STATS, {}, { timeout: 10000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+// Cloudinary management (§74) — Settings → Cloudinary tab.
+export async function adminCloudinaryUsage() { try { const data = await get(ENDPOINTS.ADMIN_CLOUDINARY_USAGE, {}, { timeout: 10000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+export async function adminCloudinaryResources({ type = 'video', prefix = 'ai-videos', max = 30, next } = {}) {
+  try {
+    const params = { type, prefix, max };
+    if (next) params.next = next;
+    const data = await get(ENDPOINTS.ADMIN_CLOUDINARY_RESOURCES, params, { timeout: 15000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function adminCloudinaryDelete({ publicIds, resourceType = 'video' }) {
+  try {
+    const data = await post(ENDPOINTS.ADMIN_CLOUDINARY_DELETE, { publicIds, resourceType }, { timeout: 20000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
 export async function adminQueueStats() { try { const data = await get(ENDPOINTS.ADMIN_QUEUES, {}, { timeout: 20000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 export async function adminWorkers() { try { const data = await get(ENDPOINTS.ADMIN_WORKERS, {}, { timeout: 10000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 export async function adminPurgeQueue(queue) { try { const data = await post(ENDPOINTS.ADMIN_PURGE_QUEUE, { queue }, { timeout: 15000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Modal, InputNumber, Select, Tabs, Segmented } from 'antd'
 import { notice } from '../lib/notice'
-import { LockOutlined, ReloadOutlined, DatabaseOutlined, CloudServerOutlined, ApiOutlined, ClusterOutlined, DashboardOutlined, BarChartOutlined } from '@ant-design/icons'
+import { LockOutlined, ReloadOutlined, DatabaseOutlined, CloudServerOutlined, ApiOutlined, ClusterOutlined, DashboardOutlined, BarChartOutlined, DeleteOutlined, CheckOutlined } from '@ant-design/icons'
 import {
   ResponsiveContainer, LineChart, Line, AreaChart, Area, BarChart, Bar, Cell,
   XAxis, YAxis, Tooltip, CartesianGrid, Legend,
@@ -10,6 +10,7 @@ import VaultGate from '../components/VaultGate'
 import {
   adminServerStats, adminDbStats, adminDiskStats, adminQueueStats, adminWorkers, adminPurgeQueue,
   adminActivity, adminMeshStats,
+  adminCloudinaryUsage, adminCloudinaryResources, adminCloudinaryDelete,
 } from '../api/ai'
 import useQueryState from '../hooks/useQueryState'
 
@@ -340,6 +341,11 @@ function SettingsInner() {
               key: 'visualize',
               label: <span className="text-sm inline-flex items-center gap-1.5"><BarChartOutlined /> Visualize</span>,
               children: <VisualizeTab pollMs={pollMs} />,
+            },
+            {
+              key: 'cloudinary',
+              label: <span className="text-sm inline-flex items-center gap-1.5"><CloudServerOutlined /> Cloudinary</span>,
+              children: <CloudinaryTab />,
             },
           ]}
         />
@@ -1118,5 +1124,266 @@ export default function Settings() {
     >
       <SettingsInner />
     </VaultGate>
+  )
+}
+
+// ── CloudinaryTab ────────────────────────────────────────────────
+// Settings → Cloudinary. Free-tier monitoring + asset purge.
+//
+// Top card: live usage (storage + bandwidth + credits remaining +
+// resource count). BE caches the /usage response for 60s.
+//
+// Below it: type + prefix selector + paginated asset list. Multi-
+// select via checkboxes. "Delete selected" hits the bulk delete
+// endpoint, invalidates the usage cache so the savings show on the
+// next poll, and pops a Modal.confirm before firing.
+function CloudinaryTab() {
+  const [usage, setUsage] = useState(null)
+  const [usageLoading, setUsageLoading] = useState(true)
+  const [usageErr, setUsageErr] = useState(null)
+  const [resourceType, setResourceType] = useState('video')
+  const [prefix, setPrefix] = useState('ai-videos')
+  const [items, setItems] = useState([])
+  const [nextCursor, setNextCursor] = useState(null)
+  const [listLoading, setListLoading] = useState(false)
+  const [listErr, setListErr] = useState(null)
+  const [selected, setSelected] = useState(new Set())
+  const [deleting, setDeleting] = useState(false)
+
+  const fmtBytesLocal = (b) => {
+    if (!b) return '0 B'
+    const mb = b / (1024 * 1024)
+    if (mb < 1024) return `${mb.toFixed(1)} MB`
+    return `${(mb / 1024).toFixed(2)} GB`
+  }
+  const pct = (used, limit) => {
+    if (!limit) return null
+    return Math.min(100, Math.round((used / limit) * 100))
+  }
+
+  const loadUsage = async () => {
+    setUsageLoading(true)
+    const { data, error } = await adminCloudinaryUsage()
+    setUsageLoading(false)
+    if (error) { setUsageErr(error); return }
+    setUsage(data || null); setUsageErr(null)
+  }
+
+  const loadResources = async ({ reset = true, cursor } = {}) => {
+    setListLoading(true)
+    const { data, error } = await adminCloudinaryResources({
+      type: resourceType,
+      prefix: prefix.trim() || 'ai-videos',
+      max: 30,
+      next: cursor,
+    })
+    setListLoading(false)
+    if (error) { setListErr(error); return }
+    setListErr(null)
+    setNextCursor(data?.nextCursor || null)
+    setItems(prev => reset ? (data?.items || []) : [...prev, ...(data?.items || [])])
+    if (reset) setSelected(new Set())
+  }
+
+  useEffect(() => { loadUsage(); loadResources({ reset: true }) /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [])
+  useEffect(() => { loadResources({ reset: true }) /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [resourceType, prefix])
+
+  const toggleSelect = (publicId) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(publicId)) next.delete(publicId); else next.add(publicId)
+      return next
+    })
+  }
+  const selectAllOnPage = () => {
+    if (selected.size === items.length && items.length > 0) setSelected(new Set())
+    else setSelected(new Set(items.map(it => it.publicId)))
+  }
+
+  const onDeleteSelected = () => {
+    if (selected.size === 0) return
+    const ids = Array.from(selected).slice(0, 50)
+    Modal.confirm({
+      title: `Delete ${ids.length} Cloudinary asset${ids.length === 1 ? '' : 's'}?`,
+      content: (
+        <div className="text-xs space-y-2">
+          <p>Removes the {resourceType}{ids.length === 1 ? '' : 's'} from Cloudinary permanently. The corresponding DB rows on Oracle are NOT touched — only the binary on Cloudinary.</p>
+          <p className="text-rose-300/80">Cannot be undone. Cloudinary has no trash.</p>
+        </div>
+      ),
+      okText: 'Delete', cancelText: 'Back',
+      okType: 'danger', okButtonProps: { danger: true },
+      centered: true,
+      onOk: async () => {
+        setDeleting(true)
+        const { data, error } = await adminCloudinaryDelete({ publicIds: ids, resourceType })
+        setDeleting(false)
+        if (error) { notice.error(`Delete failed: ${error}`); return }
+        const deletedMap = data?.deleted || {}
+        const okCount = Object.values(deletedMap).filter(v => v === 'deleted' || v === 'ok').length
+        notice.success(`${okCount}/${ids.length} deleted on Cloudinary`)
+        setSelected(new Set())
+        loadUsage()
+        loadResources({ reset: true })
+      },
+    })
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="luxe-card p-4">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80">— Cloudinary free tier</p>
+            <p className="text-[11px] text-fg-muted mt-0.5">
+              {usage?.cached ? `cached ${usage.cacheAgeSec}s ago` : 'live'} · plan {usage?.plan || 'Free'}
+            </p>
+          </div>
+          <button onClick={loadUsage} disabled={usageLoading}
+            className="text-[10px] font-semibold px-2 py-1 rounded-full border border-line hover:border-line-strong text-fg-muted inline-flex items-center gap-1">
+            <ReloadOutlined /> Refresh
+          </button>
+        </div>
+        {usageErr && <p className="text-[11px] font-mono text-rose-400 mb-2">{usageErr}</p>}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-wider text-gray-500">Storage</p>
+            <p className="text-lg font-bold text-amber-200 tabular-nums">
+              {fmtBytesLocal(usage?.storage?.used || 0)}
+              {usage?.storage?.limit ? <span className="text-[10px] text-gray-500 ml-1">/ {fmtBytesLocal(usage.storage.limit)}</span> : null}
+            </p>
+            {pct(usage?.storage?.used, usage?.storage?.limit) != null && (
+              <div className="h-1 mt-1 rounded bg-gray-800 overflow-hidden">
+                <div className="h-full bg-amber-400" style={{ width: `${pct(usage.storage.used, usage.storage.limit)}%` }} />
+              </div>
+            )}
+          </div>
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-wider text-gray-500">Bandwidth (this month)</p>
+            <p className="text-lg font-bold text-amber-200 tabular-nums">
+              {fmtBytesLocal(usage?.bandwidth?.used || 0)}
+              {usage?.bandwidth?.limit ? <span className="text-[10px] text-gray-500 ml-1">/ {fmtBytesLocal(usage.bandwidth.limit)}</span> : null}
+            </p>
+            {pct(usage?.bandwidth?.used, usage?.bandwidth?.limit) != null && (
+              <div className="h-1 mt-1 rounded bg-gray-800 overflow-hidden">
+                <div className="h-full bg-amber-400" style={{ width: `${pct(usage.bandwidth.used, usage.bandwidth.limit)}%` }} />
+              </div>
+            )}
+          </div>
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-wider text-gray-500">Credits used</p>
+            <p className="text-lg font-bold text-amber-200 tabular-nums">
+              {typeof usage?.credits?.used === 'number' ? usage.credits.used.toFixed(2) : '—'}
+              {usage?.credits?.limit ? <span className="text-[10px] text-gray-500 ml-1">/ {usage.credits.limit}</span> : null}
+            </p>
+          </div>
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-wider text-gray-500">Assets</p>
+            <p className="text-lg font-bold text-amber-200 tabular-nums">
+              {(usage?.objects ?? usage?.resources ?? 0).toLocaleString()}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="luxe-card p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-gray-500">Type</span>
+            <Segmented size="small" value={resourceType}
+              onChange={(v) => setResourceType(v)}
+              options={[
+                { label: 'Video', value: 'video' },
+                { label: 'Image', value: 'image' },
+                { label: 'Raw',   value: 'raw'   },
+              ]} />
+            <span className="text-[10px] font-mono uppercase tracking-wider text-gray-500 ml-2">Prefix</span>
+            <input value={prefix}
+              onChange={(e) => setPrefix(e.target.value)}
+              placeholder="ai-videos"
+              className="bg-surface-elevated border border-line rounded px-2 py-1 text-[12px] font-mono text-fg-primary w-48 focus:outline-none focus:border-amber-400/50" />
+            <button onClick={() => loadResources({ reset: true })}
+              className="text-[10px] font-semibold px-2 py-1 rounded-full border border-line hover:border-line-strong text-fg-muted inline-flex items-center gap-1">
+              <ReloadOutlined /> Refresh
+            </button>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] font-mono text-gray-500">
+              {selected.size} selected · {items.length} on this page
+            </span>
+            <button onClick={selectAllOnPage}
+              className="text-[10px] font-semibold px-2 py-1 rounded border border-line hover:border-line-strong text-fg-muted inline-flex items-center gap-1">
+              <CheckOutlined /> {selected.size === items.length && items.length > 0 ? 'Clear' : 'Select all'}
+            </button>
+            <button onClick={onDeleteSelected} disabled={selected.size === 0 || deleting}
+              className="text-[10px] font-semibold px-2 py-1 rounded border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 inline-flex items-center gap-1 disabled:opacity-40">
+              <DeleteOutlined /> Delete {selected.size > 0 ? `(${Math.min(selected.size, 50)})` : ''}
+            </button>
+          </div>
+        </div>
+
+        {listErr && <p className="text-[11px] font-mono text-rose-400 mb-2">{listErr}</p>}
+
+        {listLoading && items.length === 0 ? (
+          <p className="text-xs text-gray-500 py-8 text-center">Loading…</p>
+        ) : items.length === 0 ? (
+          <p className="text-xs text-gray-500 py-8 text-center">No assets under <span className="font-mono">{prefix}</span> ({resourceType}).</p>
+        ) : (
+          <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {items.map(it => {
+              const isSel = selected.has(it.publicId)
+              return (
+                <li key={it.publicId}
+                  className={`rounded-lg border p-2 transition cursor-pointer ${
+                    isSel
+                      ? 'border-amber-400/60 bg-amber-500/10'
+                      : 'border-line bg-surface-elevated hover:border-line-strong'
+                  }`}
+                  onClick={() => toggleSelect(it.publicId)}>
+                  <div className="flex items-start gap-2">
+                    <input type="checkbox" checked={isSel} onChange={() => toggleSelect(it.publicId)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="mt-1 accent-amber-400" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-mono text-fg-primary truncate">{it.publicId}</p>
+                      <p className="text-[10px] font-mono text-gray-500 tabular-nums">
+                        {fmtBytesLocal(it.bytes)} · {it.format || '—'}
+                        {it.duration ? ` · ${it.duration.toFixed(1)}s` : ''}
+                        {it.width && it.height ? ` · ${it.width}×${it.height}` : ''}
+                      </p>
+                      <p className="text-[10px] font-mono text-gray-600 tabular-nums">
+                        {new Date(it.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                  {resourceType === 'image' && (
+                    <img src={it.url} alt={it.publicId}
+                      className="mt-2 w-full aspect-video object-cover rounded border border-line"
+                      loading="lazy"
+                      onClick={(e) => e.stopPropagation()} />
+                  )}
+                  {resourceType === 'video' && (
+                    <video src={it.url}
+                      muted playsInline preload="metadata"
+                      className="mt-2 w-full aspect-video object-cover rounded border border-line bg-black"
+                      onClick={(e) => e.stopPropagation()} />
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+
+        {nextCursor && (
+          <div className="flex justify-center mt-3">
+            <button onClick={() => loadResources({ reset: false, cursor: nextCursor })}
+              disabled={listLoading}
+              className="text-[11px] font-semibold px-3 py-1.5 rounded-full border border-line hover:border-line-strong text-fg-muted disabled:opacity-40">
+              {listLoading ? 'Loading…' : 'Load more'}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }

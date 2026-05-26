@@ -83,6 +83,9 @@ export const ENDPOINTS = {
   YTDL_LIST:            '/api/yt-dl/list',
   YTDL_FILE:            '/api/yt-dl/file',        // /:id appended at call site
   // Vault-gated admin dashboard
+  ADMIN_CLOUDINARY_USAGE:     '/api/admin/cloudinary/usage',
+  ADMIN_CLOUDINARY_RESOURCES: '/api/admin/cloudinary/resources',
+  ADMIN_CLOUDINARY_DELETE:    '/api/admin/cloudinary/delete',
   ADMIN_SERVER_STATS:   '/api/admin/server-stats',
   ADMIN_DB_STATS:       '/api/admin/db-stats',
   ADMIN_DISK_STATS:     '/api/admin/disk-stats',
