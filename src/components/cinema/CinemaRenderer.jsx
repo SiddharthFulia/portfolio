@@ -379,21 +379,59 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
       return
     }
 
-    // Resume path: hit the BE /resume endpoint which advances the
-    // existing render from currentShotIndex without re-running any
-    // already-completed shots. Useful after a failure.
+    // Resume path: figure out if ANY shot has completed yet.
+    // - If yes → POST /resume. BE chain advances from the last completed
+    //   shot (extracts frame + queues next, or fires combine on last).
+    // - If no  → fall through to doSubmitShot0(). Nothing completed
+    //   means the BE has no jobId to resume from — we need to re-submit
+    //   shot 0 from the FE.
+    // Previous behaviour silently fired /resume regardless, and the BE
+    // returned 400 ("No completed shots yet…") which the FE swallowed
+    // with no user feedback. Hence "Resume button doesn't work".
     if (resume && renderId) {
-      const { error: resumeError } = await patchCinemaRender(renderId, { status: 'rendering', phase: 'rendering', error: null })
-      // Then ask the BE to advance from the last-completed shot.
-      // (The orchestrator does the right thing — if the last shot is
-      // already done it triggers combine; if a middle shot is done it
-      // extracts + queues the next.)
-      try {
-        const base = import.meta.env.VITE_BE_URL || ''
-        await fetch(`${base}/api/cinema/render/${renderId}/resume`, { method: 'POST' })
-      } catch (e) { /* polling will catch the next state change */ }
-      if (resumeError) notice.error(resumeError)
-      return
+      // Decide based on local shot state. shots[i].status === 'completed'
+      // means we have a usable videoUrl for that index. Also accept
+      // currentShotIndex > 0 (BE thinks we've moved past shot 0) as a
+      // signal at least one shot finished.
+      const hasAnyCompleted = shots.some(s => s?.status === 'completed' && s?.videoUrl)
+        || (currentShotIndex && currentShotIndex > 0)
+
+      // Always clear the error + flip status FIRST so the polling
+      // loop sees the new state immediately, even on the BE failure path.
+      const { error: resumeError } = await patchCinemaRender(renderId, {
+        status: 'rendering', phase: 'rendering', error: null,
+      })
+      if (resumeError) notice.error(`Resume PATCH failed: ${resumeError}`)
+
+      if (hasAnyCompleted) {
+        // Real BE chain resume. Parse the response so we can surface
+        // failures to the user instead of swallowing them.
+        try {
+          const base = import.meta.env.VITE_BE_URL || ''
+          const resp = await fetch(`${base}/api/cinema/render/${renderId}/resume`, { method: 'POST' })
+          const body = await resp.json().catch(() => null)
+          if (!resp.ok || body?.status === false) {
+            const msg = body?.message || body?.error || `Resume failed (${resp.status})`
+            notice.error(msg)
+            setPhase('failed')
+            persist({ status: 'failed', phase: 'failed', error: msg })
+          } else {
+            notice.success(`Resuming from shot ${(body?.data?.resumedFromShotIndex ?? 0) + 1}…`)
+          }
+        } catch (e) {
+          notice.error(`Resume request failed: ${e.message || e}`)
+        }
+        return
+      }
+
+      // No shot ever completed — re-submit shot 0 from scratch.
+      // Same FE-driven path as the initial "Render all shots" click.
+      notice.info('Nothing has completed yet — restarting from shot 1.')
+      // doSubmitShot0 is defined below; we hoist by running it after
+      // the closure is set up. Set phase first so user sees progress.
+      setPhase('rendering')
+      // Fall through; the closure below is reached because we DON'T
+      // return, and the Modal.confirm branch is gated on `!renderId`.
     }
 
     const doSubmitShot0 = async () => {
