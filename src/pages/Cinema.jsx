@@ -5,6 +5,7 @@ import { notice } from '../lib/notice'
 import { VideoCameraOutlined, ThunderboltOutlined, ReloadOutlined, BulbOutlined, DeleteOutlined, DownloadOutlined, LockOutlined, UnlockOutlined, PictureOutlined, UploadOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import { submitCinema, listCinemaProjects, cinemaBulkAction, createCinemaRender, patchCinemaProject, reviewCinemaShot, getCinemaDiskStats, uploadSourceImage, enhanceImage, getImageStatus, promptCoach, cinemaFixAction, listCinemaRenders, cancelCinemaRender, deleteCinemaRender } from '../api/ai'
 import PromptHelper from '../components/PromptHelper'
+import JobLogsAgentPlan from '../components/JobLogsAgentPlan'
 import StudioLibrary, { SelectCheckbox } from '../components/StudioLibrary'
 import { Button, Slider } from '../components/ui'
 import useQueryState from '../hooks/useQueryState'
@@ -1743,11 +1744,14 @@ function HeroImagePanel({
   const [prompt, setPrompt] = useState('')
   const [coaching, setCoaching] = useState(false)
   const [generating, setGenerating] = useState(false)
-  const [progress, setProgress] = useState(0)
-  // Live worker-log tail while T2I is running. Cursor-based via
-  // `since=<lastTs>` so each poll only pulls new lines.
-  const [genLogs, setGenLogs] = useState([])
-  const logsSinceRef = useRef(0)
+  // Track the running image-enhance imageId + its latest status so the
+  // JobLogsAgentPlan can subscribe to /api/job-logs/image/:imageId.
+  // We don't paint a progress bar anymore — the agentic log tree
+  // shows real per-step activity (sampler X/Y · upload · done).
+  const [genImageId, setGenImageId] = useState(null)
+  const [genJobStatus, setGenJobStatus] = useState(null)
+  // Lightbox for click-to-enlarge on the hero preview.
+  const [lightboxOpen, setLightboxOpen] = useState(false)
   const pollAbortRef = useRef(false)
 
   const composeBaseIdea = () => {
@@ -1780,30 +1784,12 @@ function HeroImagePanel({
     if (polished) { setPrompt(polished); notice.success('Prompt polished — review and Generate.') }
   }
 
-  // Fetch new log lines since the cursor. Plain fetch (no helper) keeps
-  // this independent of the api/ai.js layer; the job-logs endpoint is
-  // a thin read so a custom call here keeps the surface small.
-  const fetchHeroLogs = async (imageId) => {
-    try {
-      const base = import.meta.env.VITE_BE_URL || ''
-      const url = `${base}/api/job-logs/image/${imageId}?since=${logsSinceRef.current}&limit=80`
-      const r = await fetch(url)
-      const body = await r.json()
-      const lines = body?.data?.logs || []
-      if (lines.length) {
-        setGenLogs(prev => [...prev, ...lines].slice(-200))
-        logsSinceRef.current = lines[lines.length - 1].ts || logsSinceRef.current
-      }
-    } catch {}
-  }
-
   const startGenerate = async () => {
     const p = prompt.trim()
     if (!p) { notice.warning('Add a prompt first'); return }
     setGenerating(true)
-    setProgress(5)
-    setGenLogs([])
-    logsSinceRef.current = 0
+    setGenImageId(null)
+    setGenJobStatus('queued')
     pollAbortRef.current = false
     const wf = HERO_T2I_MODELS.find(m => m.id === model) || HERO_T2I_MODELS[0]
     const dims = _heroDims(aspectRatio)
@@ -1818,45 +1804,41 @@ function HeroImagePanel({
       height: dims.height,
     })
     if (err || !data?.imageId) {
-      setGenerating(false); setProgress(0)
+      setGenerating(false)
+      setGenJobStatus(null)
       notice.error(err || 'Failed to start hero generation')
       return
     }
     const imageId = data.imageId
-    // Poll status + logs every 2s. The image-enhance lane sets
-    // outputUrl when the worker finishes; we promote that to
-    // heroImageUrl. Worker writes log lines under lane='image' to
-    // job_logs as it goes (queue → submit → sampler X/Y → upload).
+    setGenImageId(imageId)
+    // Poll status only (no log scraping — JobLogsAgentPlan does that
+    // directly via /api/job-logs/image/:imageId, same as the AI Video
+    // detail page). We just watch for completed/failed transitions
+    // to capture the outputUrl + close the modal cleanly.
     for (let i = 0; i < 240 && !pollAbortRef.current; i++) {  // 240 × 2s = 8min cap
       await new Promise(r => setTimeout(r, 2000))
-      await fetchHeroLogs(imageId)
       const { data: row } = await getImageStatus(imageId)
       if (!row) continue
-      setProgress(Math.min(95, 5 + (i * 90 / 60)))
+      setGenJobStatus(row.status)
       if (row.status === 'completed' && row.outputUrl) {
-        // One last log fetch so the user sees the "✓ done" line
-        // before the modal closes.
-        await fetchHeroLogs(imageId)
         setHeroImageUrl(row.outputUrl)
-        setProgress(100)
         setGenerating(false)
         setGenOpen(false)
         notice.success('Hero image ready — will anchor shot 1.')
         return
       }
       if (row.status === 'failed') {
-        await fetchHeroLogs(imageId)
         notice.error(`Hero generation failed: ${row.error || 'unknown'}`)
-        setGenerating(false); setProgress(0)
+        setGenerating(false)
         return
       }
     }
     if (!pollAbortRef.current) {
       notice.error('Hero generation timed out')
-      setGenerating(false); setProgress(0)
+      setGenerating(false)
     }
   }
-  const cancelGenerate = () => { pollAbortRef.current = true; setGenerating(false); setProgress(0) }
+  const cancelGenerate = () => { pollAbortRef.current = true; setGenerating(false); setGenJobStatus('cancelled') }
 
   const clearHero = () => setHeroImageUrl('')
   const toggleUseHero = (next) => {
@@ -1889,7 +1871,16 @@ function HeroImagePanel({
         </p>
       ) : heroImageUrl ? (
         <div className="space-y-1.5">
-          <img src={heroImageUrl} alt="hero" className="w-full aspect-video object-cover rounded border border-line" />
+          {/* Click the thumb → opens the lightbox modal with the
+              full-size image. Cursor-zoom + subtle ring on hover so
+              the user knows it's clickable; pointer aria for screen
+              readers. */}
+          <button type="button" onClick={() => setLightboxOpen(true)}
+            aria-label="Enlarge hero image"
+            className="block w-full rounded border border-line hover:border-amber-400/60 hover:ring-2 hover:ring-amber-400/20 transition cursor-zoom-in">
+            <img src={heroImageUrl} alt="hero"
+              className="w-full aspect-video object-cover rounded" />
+          </button>
           <div className="flex items-center gap-1.5 flex-wrap">
             <button type="button" onClick={openGenerator}
               className="text-[10px] flex-1 px-2 py-1 rounded border border-amber-400/40 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20">
@@ -1980,36 +1971,18 @@ function HeroImagePanel({
             />
           </div>
 
-          {generating && (
-            <div className="space-y-2">
-              <div className="space-y-1">
-                <p className="text-[10px] font-mono text-amber-300">Generating · {Math.round(progress)}%</p>
-                <div className="h-1.5 rounded bg-gray-800 overflow-hidden">
-                  <div className="h-full bg-amber-400 transition-all" style={{ width: `${progress}%` }} />
-                </div>
-              </div>
-
-              {/* Live worker log tail — same job_logs stream the AI
-                  Video detail page reads, filtered to lane='image'.
-                  Newest at the bottom; scrolls to show ~last 12 lines
-                  worth of room without growing the modal too tall. */}
-              <div className="rounded-md border border-gray-800 bg-black/40 p-2 max-h-48 overflow-y-auto">
-                {genLogs.length === 0 ? (
-                  <p className="text-[10px] font-mono text-gray-600 py-3 text-center">
-                    Waiting for the worker to start the T2I pass…
-                  </p>
-                ) : (
-                  <ul className="space-y-0.5">
-                    {genLogs.slice(-50).map((line, idx) => (
-                      <li key={`${line.ts}-${idx}`}
-                          className="text-[10px] font-mono leading-snug text-gray-300 break-all">
-                        {line.msg || ''}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
+          {generating && genImageId && (
+            // Agentic AI log tree — same component the per-shot Cinema
+            // accordion uses, just pointed at lane='image' for the
+            // T2I job. Replaces the old "% bar + raw text log tail"
+            // pair; this surfaces sampler-step + upload + done lines
+            // in the same Setup / Generate / Post-process buckets
+            // the rest of the app already uses.
+            <JobLogsAgentPlan
+              lane="image"
+              jobId={genImageId}
+              status={genJobStatus}
+            />
           )}
 
           <div className="flex justify-end gap-2 pt-1">
@@ -2023,6 +1996,30 @@ function HeroImagePanel({
             )}
           </div>
         </div>
+      </Modal>
+
+      {/* Lightbox — click the hero thumb to see it at full size.
+          Centered Modal with the chrome stripped so the image is the
+          subject; click anywhere outside or hit Escape to close. */}
+      <Modal
+        open={lightboxOpen}
+        onCancel={() => setLightboxOpen(false)}
+        footer={null}
+        centered
+        width="auto"
+        styles={{
+          content: { background: 'transparent', boxShadow: 'none', padding: 0 },
+          body: { padding: 0 },
+          mask: { backdropFilter: 'blur(8px)', background: 'rgba(0,0,0,0.7)' },
+          header: { display: 'none' },
+        }}
+        closeIcon={null}
+      >
+        {heroImageUrl && (
+          <img src={heroImageUrl} alt="hero (large)"
+            className="block max-w-[90vw] max-h-[85vh] object-contain rounded-lg"
+            onClick={() => setLightboxOpen(false)} />
+        )}
       </Modal>
     </div>
   )
