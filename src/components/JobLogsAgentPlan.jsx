@@ -227,15 +227,32 @@ export default function JobLogsAgentPlan({
   // want a denser view.
   const defaultExpanded = useMemo(() => ['setup', 'generate', 'post'], [])
 
+  // Surface an explicit "waiting" banner when expanded but no logs
+  // have arrived yet. Without this the agent tree just shows three
+  // empty group titles and the user thinks the polling is broken.
+  const noLogsYet = logs.length === 0 && !error
+  const waitingLabel = status === 'queued'
+    ? '⏳ Queued — waiting for worker to pick this up…'
+    : status === 'processing'
+    ? '🟢 Worker active — first log line incoming…'
+    : status === 'completed'
+    ? '✓ Completed (no logs were captured for this job)'
+    : status === 'failed'
+    ? '✗ Failed'
+    : 'Listening for events…'
+
   return (
     <div className="rounded-xl border border-gray-800 bg-black/40 overflow-hidden">
-      {(progressMessage || error) && (
+      {(progressMessage || error || noLogsYet) && (
         <div className="px-4 py-2 border-b border-gray-800/80 bg-cyan-500/5">
           {progressMessage && (
             <p className="text-xs text-gray-300">{progressMessage}</p>
           )}
           {error && (
             <p className="text-xs text-rose-400 mt-1">{error}</p>
+          )}
+          {noLogsYet && !progressMessage && !error && (
+            <p className="text-xs text-cyan-200 font-mono">{waitingLabel}</p>
           )}
         </div>
       )}

@@ -820,10 +820,20 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
       <ol className="space-y-2">
         {shots.map((shotRow, shotIndex) => {
           const expanded = expandedShots.has(shotIndex)
+          // "pending" reads as ambiguous to the user — they wanted
+          // "queued" everywhere a shot hasn't started yet. The
+          // underlying state machine keeps `pending` for code clarity;
+          // we just relabel at display time.
+          const displayStatus =
+            shotRow.status === 'pending'    ? 'queued'
+            : shotRow.status === 'queued'     ? 'queued'
+            : shotRow.status === 'processing' ? 'processing'
+            : shotRow.status
           const headerStatusTone =
             shotRow.status === 'completed' ? 'text-emerald-300'
             : shotRow.status === 'failed' ? 'text-rose-300'
-            : shotRow.status === 'processing' || shotRow.status === 'queued' ? 'text-amber-300'
+            : shotRow.status === 'processing' ? 'text-cyan-300 animate-pulse'
+            : shotRow.status === 'queued' || shotRow.status === 'pending' ? 'text-amber-300'
             : 'text-fg-muted'
           return (
             <li key={shotIndex} className="luxe-card p-3">
@@ -833,32 +843,42 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
                 className="w-full text-left flex items-start justify-between gap-3 flex-wrap"
                 aria-expanded={expanded}>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className="text-[10px] font-mono text-amber-400 font-bold tabular-nums">
+                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                    <span className="text-[11px] font-mono text-amber-400 font-bold tabular-nums">
                       SHOT {String(shotIndex + 1).padStart(2, '0')}
                     </span>
-                    <span className={`text-[10px] font-mono uppercase tracking-wider ${headerStatusTone}`}>
-                      {shotRow.status}
+                    <span className={`text-[10px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                      shotRow.status === 'completed' ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/40'
+                      : shotRow.status === 'failed' ? 'bg-rose-500/15 text-rose-300 border border-rose-500/40'
+                      : shotRow.status === 'processing' ? 'bg-cyan-500/15 text-cyan-200 border border-cyan-500/40'
+                      : shotRow.status === 'queued' || shotRow.status === 'pending' ? 'bg-amber-500/15 text-amber-300 border border-amber-500/40'
+                      : 'bg-gray-500/15 text-gray-400 border border-gray-500/40'
+                    }`}>
+                      {displayStatus}
                     </span>
                     {shotRow.sourceImageUrl && (
                       <span className="text-[10px] font-mono text-cyan-300/80">
                         ← from shot {shotIndex} tail frame
                       </span>
                     )}
-                    <span className="ml-auto text-[10px] font-mono text-gray-500">
-                      {expanded ? '▾ collapse' : '▸ logs'}
+                    {/* Collapse / expand chip — was a faint grey arrow,
+                        now a proper outlined chip with bold copy + tone
+                        switch between collapsed and expanded states.
+                        Mobile users were missing the click target. */}
+                    <span className={`ml-auto inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md border transition-colors ${
+                      expanded
+                        ? 'border-cyan-400/60 bg-cyan-500/15 text-cyan-200'
+                        : 'border-line bg-surface-elevated text-fg-secondary hover:border-amber-400/50 hover:text-amber-200'
+                    }`}>
+                      {expanded ? <>▾ Collapse logs</> : <>▸ Show live logs</>}
                     </span>
                   </div>
                   <p className="text-[12px] text-gray-300 font-mono leading-relaxed">
                     {shotRow.prompt}
                   </p>
-                  {(shotRow.status === 'queued' || shotRow.status === 'processing') && (
-                    <Progress
-                      percent={shotRow.progressPercent || 0} size="small" showInfo={false}
-                      strokeColor="#fbbf24" trailColor="#1f2937"
-                      className="!mt-2 !mb-0"
-                    />
-                  )}
+                  {/* Progress bar removed per user request — the live
+                      log tree already shows sampler step / VAE decode
+                      progress more clearly than a percent bar. */}
                   {shotRow.error && (
                     <p className="mt-2 text-[10px] font-mono text-rose-400 break-words">{shotRow.error}</p>
                   )}
