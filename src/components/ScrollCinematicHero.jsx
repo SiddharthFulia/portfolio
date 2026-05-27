@@ -28,8 +28,10 @@ import { useEffect, useRef, useState } from 'react'
 import { ArrowRightOutlined, RightOutlined, DownOutlined } from '@ant-design/icons'
 
 // The first 3 frames of the source mp4 were identical (static intro)
-// and the source carries a small Gemini watermark in the lower-right
-// that we mask in CSS. Frame count + extract script reflect both.
+// and the source carried a small Gemini watermark in the lower-right.
+// We dropped frames 1..3 and cropped the bottom 15 % off each frame
+// (1280×720 → 1280×612) so the watermark is physically gone. Frame
+// count + extract script reflect both edits.
 const FRAME_COUNT       = 117
 const FRAME_PATH        = (i) => `/hero-frames/frame_${String(i).padStart(4, '0')}.webp`
 const FIRST_FRAME       = FRAME_PATH(1)
@@ -277,15 +279,6 @@ export default function ScrollCinematicHero({
         style={{ backgroundImage:
           "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")",
           backgroundSize: '200px 200px',
-        }} />
-
-      {/* Bottom-right corner mask — covers the Gemini watermark that
-          the source video carries. Tuned as a dense radial so it
-          blends into the surrounding vignette and doesn't read as
-          a UI element. */}
-      <div aria-hidden className="absolute inset-0 pointer-events-none"
-        style={{ background:
-          'radial-gradient(28% 22% at 100% 100%, rgba(7,7,11,0.98) 0%, rgba(7,7,11,0.85) 35%, rgba(7,7,11,0) 70%)'
         }} />
 
       {/* Foreground */}

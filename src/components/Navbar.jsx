@@ -104,11 +104,14 @@ const Navbar = () => {
 
   return (
     <header className={`header transition-colors ${isDark ? 'bg-gray-950/80 backdrop-blur-md' : ''}`}>
-      <NavLink to='/' className="shrink-0">
+      <NavLink to='/' className="shrink-0 group">
         <img
           src={LOGO_SRC}
           alt='Siddharth Fulia logo'
-          className='w-12 h-12 sm:w-14 sm:h-14 object-contain drop-shadow-[0_0_12px_rgba(239,68,68,0.45)]'
+          className='w-16 h-16 sm:w-20 sm:h-20 object-contain
+                     drop-shadow-[0_0_22px_rgba(239,68,68,0.85)]
+                     [filter:drop-shadow(0_0_4px_rgba(239,68,68,0.95))_drop-shadow(0_0_18px_rgba(239,68,68,0.6))_contrast(1.15)_saturate(1.25)_brightness(1.08)]
+                     transition-transform duration-300 group-hover:scale-105'
         />
       </NavLink>
 

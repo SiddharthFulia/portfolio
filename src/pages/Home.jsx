@@ -11,19 +11,31 @@ const PRIMARY = [
     to: "/about",
     label: "About",
     desc: "Experience, GitHub heatmap, terminal — the engineer behind the work.",
-    accent: "from-amber-500/20 to-rose-500/10 ring-amber-400/30",
+    badge: "/about",
+    gradient: "from-amber-500/35 via-orange-500/20 to-rose-500/25",
+    ring: "ring-amber-400/60 group-hover:ring-amber-300",
+    glow: "shadow-[0_0_60px_-12px_rgba(245,158,11,0.55)] group-hover:shadow-[0_0_80px_-12px_rgba(245,158,11,0.8)]",
+    dot: "bg-amber-300",
   },
   {
     to: "/projects",
     label: "Projects",
     desc: "Shipped work — full-stack apps, AI lanes, generative tools.",
-    accent: "from-cyan-500/20 to-violet-500/10 ring-cyan-400/30",
+    badge: "/projects",
+    gradient: "from-cyan-500/35 via-sky-500/20 to-violet-500/25",
+    ring: "ring-cyan-400/60 group-hover:ring-cyan-300",
+    glow: "shadow-[0_0_60px_-12px_rgba(34,211,238,0.55)] group-hover:shadow-[0_0_80px_-12px_rgba(34,211,238,0.8)]",
+    dot: "bg-cyan-300",
   },
   {
     to: "/contact",
     label: "Contact",
     desc: "Email me through the contact form · open to opportunities.",
-    accent: "from-fuchsia-500/20 to-rose-500/10 ring-fuchsia-400/30",
+    badge: "/contact",
+    gradient: "from-fuchsia-500/35 via-pink-500/20 to-rose-500/25",
+    ring: "ring-fuchsia-400/60 group-hover:ring-fuchsia-300",
+    glow: "shadow-[0_0_60px_-12px_rgba(232,121,249,0.55)] group-hover:shadow-[0_0_80px_-12px_rgba(232,121,249,0.85)]",
+    dot: "bg-fuchsia-300",
   },
 ];
 
@@ -117,27 +129,44 @@ const Home = () => {
             </div>
           </div>
 
-          {/* Primary trio — About / Projects / Contact, big cards. */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-14">
+          {/* Primary trio — About / Projects / Contact. Promoted to
+              full-bleed glow cards so they pull the eye on first
+              paint. Bigger type, brighter rings, color-matched glow. */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 sm:gap-6 mt-14">
             {PRIMARY.map((card) => (
               <button
                 key={card.to}
                 onClick={() => navigate(card.to)}
-                className={`group relative overflow-hidden rounded-2xl p-6 text-left ring-1 transition-all bg-gradient-to-br ${card.accent} hover:-translate-y-1 hover:shadow-[0_18px_40px_rgba(0,0,0,0.4)]`}
+                className={`group relative overflow-hidden rounded-3xl p-7 sm:p-8 text-left ring-2 transition-all duration-300
+                            bg-gradient-to-br ${card.gradient}
+                            ${card.ring} ${card.glow}
+                            hover:-translate-y-1.5 min-h-[220px]`}
               >
-                <div className="absolute inset-0 bg-white/[0.02] group-hover:bg-white/[0.04] transition-colors" />
-                <div className="relative">
-                  <div className="text-[10px] font-mono uppercase tracking-[0.28em] text-white/60 mb-3">
-                    {card.to}
+                {/* Soft white wash + sheen */}
+                <div className="absolute inset-0 bg-white/[0.04] group-hover:bg-white/[0.07] transition-colors" />
+                <div aria-hidden className="absolute -top-20 -right-20 w-56 h-56 rounded-full bg-white/10 blur-3xl opacity-50 group-hover:opacity-70 transition-opacity" />
+
+                <div className="relative h-full flex flex-col">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className={`w-2 h-2 rounded-full ${card.dot} animate-pulse`} />
+                    <span className="text-[10px] font-mono uppercase tracking-[0.32em] text-white/80">
+                      {card.badge}
+                    </span>
                   </div>
-                  <h3 className="text-2xl font-poppins font-bold text-white mb-2">
+
+                  <h3 className="text-3xl sm:text-4xl font-poppins font-black tracking-tight text-white mb-3 [text-shadow:0_2px_18px_rgba(0,0,0,0.45)]">
                     {card.label}
                   </h3>
-                  <p className="text-sm text-white/70 leading-relaxed mb-5">
+
+                  <p className="text-[15px] text-white/85 leading-relaxed mb-6 flex-1">
                     {card.desc}
                   </p>
-                  <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-white/90 group-hover:text-white">
-                    Open <ArrowRightOutlined className="text-[12px] transition-transform group-hover:translate-x-0.5" />
+
+                  <span className="inline-flex items-center gap-2 text-sm font-bold text-white">
+                    Open
+                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white/15 group-hover:bg-white/25 transition-all">
+                      <ArrowRightOutlined className="text-[12px] transition-transform group-hover:translate-x-0.5" />
+                    </span>
                   </span>
                 </div>
               </button>
