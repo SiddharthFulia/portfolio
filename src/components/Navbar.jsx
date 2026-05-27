@@ -10,7 +10,12 @@ const LOGO_SRC = "/logo-sf.png";
 
 const Navbar = () => {
   const { pathname } = useLocation();
-  const isDark = ['/lab', '/learn', '/creative', '/chess', '/science', '/face', '/vision', '/explore', '/ai', '/studio', '/ai-studio', '/ai-video', '/video', '/image-enhancer', '/enhance', '/hand', '/hands', '/draw', '/lipsync', '/audio', '/cinema', '/about', '/projects', '/contact'].some(r => pathname.startsWith(r));
+  // Home (`/`) is now a dark cinematic hero too, so it joins the
+  // dark-mode list — otherwise the primary nav links + Workshop
+  // button render with `text-gray-700` (light-mode style) and
+  // disappear against the obsidian backdrop. We match `/` exactly
+  // because `pathname.startsWith('/')` would be true for everything.
+  const isDark = pathname === '/' || ['/lab', '/learn', '/creative', '/chess', '/science', '/face', '/vision', '/explore', '/ai', '/studio', '/ai-studio', '/ai-video', '/video', '/image-enhancer', '/enhance', '/hand', '/hands', '/draw', '/lipsync', '/audio', '/cinema', '/about', '/projects', '/contact'].some(r => pathname.startsWith(r));
 
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
@@ -121,18 +126,19 @@ const Navbar = () => {
           back at xl. flex-wrap is the safety net — if a future addition pushes
           past the budget, items wrap to a second row instead of clipping. */}
       <nav className='hidden lg:flex flex-wrap items-center gap-x-1.5 gap-y-1 font-medium max-w-[calc(100%-200px)]'>
-        {/* Primary links — animated underline on hover/active */}
+        {/* Primary links — bigger + bolder so About / Projects /
+            Contact pull the eye against the cinematic backdrop. */}
         {primaryLinks.map(l => (
           <NavLink key={l.to} to={l.to} className={({ isActive }) =>
-            `group relative text-[12px] xl:text-sm px-1.5 xl:px-2 py-1 transition-colors ${
+            `group relative text-sm xl:text-[15px] font-semibold px-2.5 xl:px-3 py-1.5 rounded-lg transition-colors ${
               isActive
-                ? 'text-amber-300'
-                : isDark ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-black'
+                ? (isDark ? 'text-amber-300 bg-amber-500/10' : 'text-amber-600 bg-amber-50')
+                : isDark ? 'text-white hover:text-amber-200 hover:bg-white/[0.06]' : 'text-gray-800 hover:text-black hover:bg-gray-100'
             }`}>
             {({ isActive }) => (
               <>
                 <span>{l.label}</span>
-                <span className={`absolute left-1.5 right-1.5 -bottom-0.5 h-px bg-amber-400 transition-transform origin-left ${
+                <span className={`absolute left-2.5 right-2.5 -bottom-0.5 h-px bg-amber-400 transition-transform origin-left ${
                   isActive ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
                 }`} />
               </>
