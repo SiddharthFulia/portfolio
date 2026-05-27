@@ -14,7 +14,7 @@ import {
   FullscreenOutlined, GlobalOutlined, LockOutlined, PictureOutlined,
 } from '@ant-design/icons'
 import {
-  generateVideo, getJobStatus, getTodayVideo, getVideoProviders, listVideos, deleteVideo,
+  generateVideo, getJobStatus, getTodayVideo, getVideoProviders, listVideos, deleteVideo, videoBulkAction,
   uploadSourceImage, listJobs, listEnhancedImages,
 } from '../api/ai'
 import { getVaultToken } from '../components/VaultGate'
@@ -1410,17 +1410,38 @@ const LANE_COPY = {
   zsky:      { label: 'ZSky',           bg: 'bg-sky-500' },
 }
 
-const JobCard = ({ job, onDelete }) => {
+const JobCard = ({ job, onDelete, checked = false, onToggleSelect }) => {
   const meta = JOB_STATUS_META[job.status] || JOB_STATUS_META.queued
   const lane = LANE_COPY[job.lane] || { label: job.lane || '?', bg: 'bg-gray-700' }
   const created = job.createdAt ? new Date(job.createdAt) : null
   const ago = created ? timeAgo(created) : ''
   const errShort = (job.error || '').slice(0, 120)
   const isLive = job.status === 'queued' || job.status === 'processing'
+  const selectable = typeof onToggleSelect === 'function'
 
   return (
-    <div className={`luxe-card luxe-card-hover group relative overflow-hidden ring-1 ${meta.ring.replace('border-', 'ring-')}`}>
-      <div className="aspect-video bg-black/40 relative overflow-hidden">
+    <div className={`luxe-card luxe-card-hover group relative overflow-hidden ring-1 transition-shadow ${
+      checked ? 'ring-amber-400' : meta.ring.replace('border-', 'ring-')
+    }`}>
+      {/* Multi-select checkbox — top-left corner. Click anywhere on
+          the card (outside the existing buttons) ALSO toggles, so
+          the user doesn't have to hit the tiny checkbox. */}
+      {selectable && (
+        <button
+          type="button"
+          onClick={onToggleSelect}
+          aria-label={checked ? 'Deselect job' : 'Select job'}
+          className={`absolute top-2 left-2 z-10 w-6 h-6 rounded-md grid place-items-center border transition-colors ${
+            checked
+              ? 'border-amber-400 bg-amber-500/30 text-amber-100'
+              : 'border-line bg-black/60 text-fg-muted opacity-0 group-hover:opacity-100 focus:opacity-100'
+          }`}>
+          {checked ? '✓' : '☐'}
+        </button>
+      )}
+      <div className="aspect-video bg-black/40 relative overflow-hidden"
+        onClick={selectable ? onToggleSelect : undefined}
+        style={selectable ? { cursor: 'pointer' } : undefined}>
         {job.status === 'completed' && job.videoUrl ? (
           <video src={job.videoUrl} muted loop playsInline
             onMouseEnter={(e) => e.currentTarget.play().catch(()=>{})}
@@ -1487,14 +1508,55 @@ const JobsTab = ({ refreshKey }) => {
   const [page, setPage] = useState(1)
   const [data, setData] = useState({ items: [], total: 0, pages: 1, counts: { queued: 0, processing: 0, completed: 0, failed: 0 } })
   const [loading, setLoading] = useState(true)
-  // Internal bump triggers an immediate refetch after a delete — without
-  // it, the user would have to wait for the next auto-poll (or only see
-  // the change if the row was queued/processing). Same pattern Library
-  // uses after its bulk ops.
   const [internalReload, setInternalReload] = useState(0)
+  // Multi-select state for bulk delete. Set of videoIds; reset on
+  // filter / page / refresh change so the user doesn't accidentally
+  // delete from a different page.
+  const [selected, setSelected] = useState(new Set())
+  const [bulkActing, setBulkActing] = useState(false)
 
   // Reset page on filter change so we don't paginate to ghost pages
   useEffect(() => { setPage(1) }, [statusFilter, refreshKey])
+  // Clear multi-select when the visible page changes so the user
+  // can't accidentally delete a row they're no longer looking at.
+  useEffect(() => { setSelected(new Set()) }, [statusFilter, page, refreshKey, internalReload])
+
+  const toggleSelect = (vid) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(vid)) next.delete(vid); else next.add(vid)
+      return next
+    })
+  }
+  const selectAllOnPage = () => {
+    if (selected.size === data.items.length && data.items.length > 0) setSelected(new Set())
+    else setSelected(new Set(data.items.map(j => j.videoId)))
+  }
+  const onBulkDelete = () => {
+    if (selected.size === 0) return
+    const ids = Array.from(selected).slice(0, 100)
+    Modal.confirm({
+      title: `Delete ${ids.length} job${ids.length === 1 ? '' : 's'}?`,
+      content: (
+        <div className="text-xs space-y-2">
+          <p>Removes the row(s) + Cloudinary asset(s) for completed videos. In-flight jobs are cancelled (the GPU may still finish the current one but the row is gone).</p>
+          <p className="text-rose-300/80">Cannot be undone.</p>
+        </div>
+      ),
+      okText: 'Delete', cancelText: 'Back',
+      okType: 'danger', okButtonProps: { danger: true },
+      centered: true,
+      onOk: async () => {
+        setBulkActing(true)
+        const { data: resp, error } = await videoBulkAction('delete', ids)
+        setBulkActing(false)
+        if (error) { notice.error(`Bulk delete failed: ${error}`); return }
+        notice.success(`${resp?.affected ?? ids.length} job(s) deleted`)
+        setSelected(new Set())
+        setInternalReload(n => n + 1)
+      },
+    })
+  }
 
   // Fetch on mount + on dependency change. Auto-refresh every 4s ONLY if
   // there are active (queued/processing) jobs visible — otherwise idle.
@@ -1574,6 +1636,29 @@ const JobsTab = ({ refreshKey }) => {
         })}
       </div>
 
+      {/* Multi-select action bar — only when there's at least one
+          selected, so the bar doesn't clutter the page on a fresh
+          load. "Select all on page" + bulk delete chip. */}
+      {!loading && data.items.length > 0 && (
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button onClick={selectAllOnPage}
+              className="text-[10px] font-semibold px-2 py-1 rounded border border-line hover:border-line-strong text-fg-muted inline-flex items-center gap-1">
+              {selected.size === data.items.length && data.items.length > 0 ? '☐ Clear selection' : '☑ Select all on page'}
+            </button>
+            <span className="text-[10px] font-mono text-gray-500">
+              {selected.size} selected · {data.items.length} on this page
+            </span>
+          </div>
+          {selected.size > 0 && (
+            <button onClick={onBulkDelete} disabled={bulkActing}
+              className="text-[11px] font-semibold px-3 py-1.5 rounded border border-rose-500/40 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20 inline-flex items-center gap-1.5 disabled:opacity-40">
+              <DeleteOutlined /> Delete {selected.size} job{selected.size === 1 ? '' : 's'}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Cards grid */}
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1587,7 +1672,12 @@ const JobsTab = ({ refreshKey }) => {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {data.items.map(j => <JobCard key={`${j.src}-${j.videoId}-${j.ts}`} job={j} onDelete={requestDelete} />)}
+          {data.items.map(j => (
+            <JobCard key={`${j.src}-${j.videoId}-${j.ts}`} job={j}
+              onDelete={requestDelete}
+              checked={selected.has(j.videoId)}
+              onToggleSelect={() => toggleSelect(j.videoId)} />
+          ))}
         </div>
       )}
 
