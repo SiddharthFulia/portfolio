@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { Tabs } from 'antd'
 import {
   ThunderboltOutlined, VideoCameraOutlined, BulbOutlined,
-  AppstoreOutlined, EyeOutlined,
+  AppstoreOutlined, EyeOutlined, CompassOutlined,
 } from '@ant-design/icons'
 import SplineScene from '../components/luxe/SplineScene'
 import PromptToThree from '../components/luxe/PromptToThree'
 import PromptToMesh from '../components/luxe/PromptToMesh'
 import MeshLibrary from '../components/luxe/MeshLibrary'
 import MeshVisualize from '../components/luxe/MeshVisualize'
+import IslandFlyScene from '../components/luxe/IslandFlyScene'
 import useQueryState from '../hooks/useQueryState'
 
 // /3d — five tabs:
@@ -32,7 +33,7 @@ export default function Dragon3D() {
   // pane (Studio Pro / Library / Visualize / Showcase). Default
   // 'generate' is omitted from the URL.
   const [tab, setTab] = useQueryState('tab', 'generate', {
-    allowed: ['generate', '5090', 'library', 'visualize', 'showcase'],
+    allowed: ['generate', '5090', 'library', 'visualize', 'island', 'showcase'],
   })
   // When the user clicks "Open in viewer" on a Library row, we set this
   // and switch to Studio Pro so the existing PromptToMesh viewer renders
@@ -83,6 +84,20 @@ export default function Dragon3D() {
               key: 'visualize',
               label: <span><EyeOutlined /> Visualize</span>,
               children: <MeshVisualize />,
+            },
+            {
+              key: 'island',
+              label: <span><CompassOutlined /> Island Fly</span>,
+              children: (
+                <div className="luxe-card overflow-hidden p-0">
+                  <IslandFlyScene heightClass="h-[72vh]" />
+                  <div className="px-5 py-4 text-[12px] text-gray-400 border-t border-white/5">
+                    Drag left / right to fly through the four stages — the original
+                    homepage island scene, kept here on /3d so the new cinematic hero
+                    can lead the landing page.
+                  </div>
+                </div>
+              ),
             },
             {
               key: 'showcase',
