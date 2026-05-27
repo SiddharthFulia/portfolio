@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "extract:hero-frames": "ffmpeg -y -i \"C:/Users/Admin/Downloads/You_are_creating_a_cinematic_l.mp4\" -vf \"fps=12,scale=1280:-2\" -c:v libwebp -quality 75 -loop 0 public/hero-frames/frame_%04d.webp"
+    "extract:hero-frames": "ffmpeg -y -ss 0.25 -i \"C:/Users/Admin/Downloads/You_are_creating_a_cinematic_l.mp4\" -vf \"fps=12,scale=1280:-2\" -c:v libwebp -quality 75 -loop 0 public/hero-frames/frame_%04d.webp"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.1",

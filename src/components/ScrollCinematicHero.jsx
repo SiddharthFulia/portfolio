@@ -27,7 +27,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowRightOutlined, RightOutlined, DownOutlined } from '@ant-design/icons'
 
-const FRAME_COUNT       = 120
+// The first 3 frames of the source mp4 were identical (static intro)
+// and the source carries a small Gemini watermark in the lower-right
+// that we mask in CSS. Frame count + extract script reflect both.
+const FRAME_COUNT       = 117
 const FRAME_PATH        = (i) => `/hero-frames/frame_${String(i).padStart(4, '0')}.webp`
 const FIRST_FRAME       = FRAME_PATH(1)
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)'
@@ -276,6 +279,15 @@ export default function ScrollCinematicHero({
           backgroundSize: '200px 200px',
         }} />
 
+      {/* Bottom-right corner mask — covers the Gemini watermark that
+          the source video carries. Tuned as a dense radial so it
+          blends into the surrounding vignette and doesn't read as
+          a UI element. */}
+      <div aria-hidden className="absolute inset-0 pointer-events-none"
+        style={{ background:
+          'radial-gradient(28% 22% at 100% 100%, rgba(7,7,11,0.98) 0%, rgba(7,7,11,0.85) 35%, rgba(7,7,11,0) 70%)'
+        }} />
+
       {/* Foreground */}
       <div className="relative z-10 h-full w-full grid place-items-center px-6">
         <div className="max-w-3xl text-center">
@@ -288,7 +300,7 @@ export default function ScrollCinematicHero({
 
           <h1 className="font-poppins font-black text-white leading-[1.05]
                          text-[clamp(2.5rem,7vw,5.5rem)] mb-5
-                         [text-shadow:0_2px_30px_rgba(0,0,0,0.45)]">
+                         [text-shadow:0_0_20px_rgba(0,0,0,0.85),0_2px_36px_rgba(0,0,0,0.65)]">
             {title.split(' ').map((word, idx, arr) => (
               <span key={idx} className={idx === arr.length - 1 ? 'text-rose-500' : ''}>
                 {word}{idx < arr.length - 1 ? ' ' : ''}
@@ -296,9 +308,14 @@ export default function ScrollCinematicHero({
             ))}
           </h1>
 
-          <p className="text-white/80 leading-relaxed mb-9
-                        text-[clamp(0.95rem,1.4vw,1.15rem)] max-w-2xl mx-auto
-                        [text-shadow:0_2px_18px_rgba(0,0,0,0.5)]">
+          {/* Subtitle sits on its own dark frosted plate so it can't
+              get lost in bright frames (sunset / sky shots, etc.). */}
+          <p className="text-white leading-relaxed mb-9 max-w-2xl mx-auto
+                        text-[clamp(0.95rem,1.4vw,1.15rem)] font-medium
+                        inline-block px-5 py-3 rounded-2xl
+                        bg-black/40 backdrop-blur-md
+                        border border-white/10
+                        [text-shadow:0_0_10px_rgba(0,0,0,0.85)]">
             {subtitle}
           </p>
 
