@@ -1258,11 +1258,14 @@ function ShotPromptRow({
   // Chat exposes. We translate it to { engine, model } at submit time.
   const [reviewEngineId, setReviewEngineId] = useState('groq')
   const [reviewResult, setReviewResult] = useState(null)
+  // §76 — Gemini disabled to save cost. Groq is the only review engine
+  // now. The 3 Gemini entries are kept here as commented references in
+  // case the user re-enables Gemini via GEMINI_ENABLED=1 on the BE.
   const ENGINE_OPTIONS = [
     { id: 'groq',              engine: 'groq',   model: 'llama-3.3-70b',   label: 'Groq · 70b (fast)' },
-    { id: 'gemini-flash',      engine: 'gemini', model: 'gemini-flash',    label: 'Gemini 2.5 Flash' },
-    { id: 'gemini-flash-lite', engine: 'gemini', model: 'gemini-flash-lite', label: 'Gemini Flash-Lite' },
-    { id: 'gemini-pro',        engine: 'gemini', model: 'gemini-pro',      label: 'Gemini 2.5 Pro' },
+    // { id: 'gemini-flash',      engine: 'gemini', model: 'gemini-flash',    label: 'Gemini 2.5 Flash' },
+    // { id: 'gemini-flash-lite', engine: 'gemini', model: 'gemini-flash-lite', label: 'Gemini Flash-Lite' },
+    // { id: 'gemini-pro',        engine: 'gemini', model: 'gemini-pro',      label: 'Gemini 2.5 Pro' },
   ]
   const selectedEngine = ENGINE_OPTIONS.find(o => o.id === reviewEngineId) || ENGINE_OPTIONS[0]
 
@@ -1302,11 +1305,12 @@ function ShotPromptRow({
                   : riskScore.level === 'medium' ? 'text-amber-300 bg-amber-500/10 border-amber-500/40'
                   : 'text-emerald-300 bg-emerald-500/10 border-emerald-500/40'
 
+  // §76 — Gemini disabled (cost). Same comment as ENGINE_OPTIONS.
   const FIX_ENGINE_OPTIONS = [
     { id: 'groq',              engine: 'groq',   model: 'llama-3.3-70b',     label: 'Groq · 70b' },
-    { id: 'gemini-flash',      engine: 'gemini', model: 'gemini-flash',      label: 'Gemini Flash' },
-    { id: 'gemini-flash-lite', engine: 'gemini', model: 'gemini-flash-lite', label: 'Flash-Lite' },
-    { id: 'gemini-pro',        engine: 'gemini', model: 'gemini-pro',        label: 'Gemini Pro' },
+    // { id: 'gemini-flash',      engine: 'gemini', model: 'gemini-flash',      label: 'Gemini Flash' },
+    // { id: 'gemini-flash-lite', engine: 'gemini', model: 'gemini-flash-lite', label: 'Flash-Lite' },
+    // { id: 'gemini-pro',        engine: 'gemini', model: 'gemini-pro',        label: 'Gemini Pro' },
   ]
   const selectedFixEngine = FIX_ENGINE_OPTIONS.find(o => o.id === fixEngineId) || FIX_ENGINE_OPTIONS[0]
 

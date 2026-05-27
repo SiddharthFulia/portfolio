@@ -29,10 +29,13 @@ import {
 // id keys are stable for the BE; labels are visitor-facing. The local
 // runtime gets a premium-sounding name — visitors should perceive it
 // as a powerful feature, not "running on someone's PC".
+// §76 — Gemini disabled (cost). cloud-gemini entry commented out so
+// the provider switcher doesn't surface it. Restore the line + set
+// GEMINI_ENABLED=1 in BE .env to re-enable.
 const PROVIDERS = [
   { id: '5090',          label: 'Studio Pro',     icon: <ThunderboltOutlined />, blurb: 'Premium · private · multimodal',                      accent: 'bg-amber-500' },
   { id: 'cloud-groq',    label: 'Groq Cloud',     icon: <CloudOutlined />,      blurb: 'Hosted · sub-second tokens · Llama / GPT-OSS',         accent: 'bg-cyan-500' },
-  { id: 'cloud-gemini',  label: 'Gemini',         icon: <GoogleOutlined />,    blurb: 'Google · multimodal · fast + free tier',               accent: 'bg-cyan-500' },
+  // { id: 'cloud-gemini',  label: 'Gemini',         icon: <GoogleOutlined />,    blurb: 'Google · multimodal · fast + free tier',               accent: 'bg-cyan-500' },
   { id: 'oracle-ollama', label: 'Standby',        icon: <DesktopOutlined />,    blurb: 'Lightweight fallback when other lanes are busy',       accent: 'bg-emerald-500' },
 ]
 
@@ -896,7 +899,8 @@ function VisionSwitchHint({ provider, available5090Vision, onSwitchProvider, onS
               <CheckOutlined className="text-[9px]" /> {m.name}
             </button>
           ))}
-          {provider !== 'cloud-gemini' && (
+          {/* §76 — "Use Gemini" suggestion chip hidden (Gemini disabled). */}
+          {false && provider !== 'cloud-gemini' && (
             <button onClick={() => onSwitchProvider('cloud-gemini')}
               className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-cyan-400/50 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-100 hover:text-white transition-colors">
               <GoogleOutlined /> Use Gemini

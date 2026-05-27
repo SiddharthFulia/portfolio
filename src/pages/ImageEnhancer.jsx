@@ -763,10 +763,13 @@ export default function ImageEnhancer() {
                 <span className="sm:hidden">{isLoggedIn ? 'Vault' : 'Lock'}</span>
               </button>
             </div>
-            {/* Engine toggle — Cloud (Gemini) vs Local Atelier (5090) */}
+            {/* Engine toggle — only Atelier (5090) for now. Cloud
+                (Gemini 2.5 Flash Image) is disabled to save cost.
+                Restore the cloud option + set GEMINI_ENABLED=1 on BE
+                to re-enable. §76 */}
             <div className="flex items-center gap-1 p-1 rounded-lg bg-gray-900/60 border border-gray-800">
               {[
-                { id: 'cloud',   label: 'Cloud',   icon: <CloudOutlined />,   sub: 'Gemini · 10-15s' },
+                // { id: 'cloud',   label: 'Cloud',   icon: <CloudOutlined />,   sub: 'Gemini · 10-15s' },
                 { id: 'atelier', label: 'Atelier', icon: <DesktopOutlined />, sub: '5090 local · 8 workflows' },
               ].map(opt => (
                 <button key={opt.id} onClick={() => setEngine(opt.id)}
@@ -867,14 +870,13 @@ export default function ImageEnhancer() {
               label: <span><ThunderboltOutlined /> Fast Gen</span>,
               children: <FastImageGen />,
             },
-            {
-              // Gemini Vision image analysis. Was the /vision standalone
-              // page; consolidated here so the Image Studio is the
-              // one-stop image lane.
-              key: 'vision',
-              label: <span><PictureOutlined /> Explain Image</span>,
-              children: <VisionAI />,
-            },
+            // §76 — Gemini-Vision "Explain Image" tab disabled (cost).
+            // Uncomment + set GEMINI_ENABLED=1 on BE to re-enable.
+            // {
+            //   key: 'vision',
+            //   label: <span><PictureOutlined /> Explain Image</span>,
+            //   children: <VisionAI />,
+            // },
           ]}
         />
 
