@@ -47,9 +47,9 @@ const TIER_CONFIG = {
 
 export default function ScrollCinematicHero({
   title    = 'Siddharth Fulia',
-  subtitle = 'AI Engineer building cinematic intelligence systems, GPU-powered creative tools, and next-generation web experiences.',
-  ctaPrimary   = { label: 'Explore AI Lab',  href: '/lab' },
-  ctaSecondary = { label: 'View Projects',   href: '/projects' },
+  subtitle = 'AI Engineer building cinematic intelligence systems and next-generation web experiences.',
+  ctaPrimary   = { label: 'Contact Me',    href: '/contact'  },
+  ctaSecondary = { label: 'View Projects', href: '/projects' },
 }) {
   const canvasRef    = useRef(null)
   const framesRef    = useRef([])
@@ -183,30 +183,35 @@ export default function ScrollCinematicHero({
     })
   }
 
-  // ── Lock body scroll while the video is still playing ───────────
+  // ── Wheel / touch → progress (with reverse-on-scroll-up) ────────
+  // We don't lock body scroll globally. Instead the wheel/touch
+  // handlers preventDefault only when the hero "owns" the gesture:
+  //   - Hero at top of viewport AND wheel down AND progress < 1   → advance
+  //   - Hero at top of viewport AND wheel up   AND progress > 0   → rewind
+  //   - Anything else → let the event pass through so the page
+  //     scrolls naturally (down past the hero, or up to it).
   useEffect(() => {
     if (renderMode === 'fallback') return undefined
-    if (videoComplete) return undefined
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = prev }
-  }, [videoComplete, renderMode])
-
-  // ── Wheel / touch → progress ────────────────────────────────────
-  useEffect(() => {
-    if (renderMode === 'fallback') return undefined
-    if (videoComplete) return undefined
 
     const advance = (delta) => {
       const next = Math.max(0, Math.min(1, progressRef.current + delta))
       progressRef.current = next
       scheduleDraw()
-      if (next >= 1 && !videoComplete) {
-        setVideoComplete(true)
-      }
+      if (next >= 1 && !videoComplete) setVideoComplete(true)
+      // Reverse case: if user rewound past 0 we leave videoComplete
+      // alone — once they've finished it once we don't re-lock them
+      // out, but the Continue link stays visible.
+    }
+
+    const heroOwnsWheel = (deltaY) => {
+      if (window.scrollY > 0) return false                     // hero not at top
+      if (deltaY > 0 && progressRef.current < 1) return true   // play forward
+      if (deltaY < 0 && progressRef.current > 0) return true   // play reverse
+      return false
     }
 
     const onWheel = (e) => {
+      if (!heroOwnsWheel(e.deltaY)) return
       e.preventDefault()
       advance(e.deltaY * WHEEL_PER_PX)
     }
@@ -217,10 +222,9 @@ export default function ScrollCinematicHero({
       const y = e.touches[0].clientY
       const dy = touchStartY - y
       touchStartY = y
-      if (Math.abs(dy) > 0) {
-        e.preventDefault()
-        advance(dy * TOUCH_PER_PX)
-      }
+      if (!heroOwnsWheel(dy)) return
+      e.preventDefault()
+      advance(dy * TOUCH_PER_PX)
     }
 
     window.addEventListener('wheel',      onWheel,      { passive: false })
@@ -232,7 +236,7 @@ export default function ScrollCinematicHero({
       window.removeEventListener('touchmove',  onTouchMove)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [videoComplete, renderMode])
+  }, [renderMode, videoComplete])
 
   return (
     <section

@@ -2,8 +2,11 @@ import { NavLink, useLocation } from "react-router-dom";
 import { useRef, useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { LockOutlined } from "@ant-design/icons";
-import { logo } from "../assets/images";
 import sakura from "../assets/sakura.mp3";
+
+// New SF crimson logo lives under public/ — referenced by absolute
+// path so Vite serves it directly and we avoid bundling a 2 MB PNG.
+const LOGO_SRC = "/logo-sf.png";
 
 const Navbar = () => {
   const { pathname } = useLocation();
@@ -39,31 +42,25 @@ const Navbar = () => {
     { to: '/contact', label: 'Contact' },
   ];
 
-  // Featured pills — slimmed down to the 4 flagship AI lanes. The
-  // long bar with every studio was overflowing on lg viewports; the
-  // rest live in the More dropdown grouped by category.
-  const featuredPills = [
-    { to: '/ai-video',       label: 'AI Video',     color: 'bg-amber-500' },
-    { to: '/image-enhancer', label: 'Image Studio', color: 'bg-amber-500' },
-    { to: '/3d',             label: '3D',           color: 'bg-cyan-500' },
-    { to: '/ai',             label: 'AI Chat',      color: 'bg-cyan-500' },
-  ];
+  // Featured pills were removed from the desktop bar per user request —
+  // every tool now lives inside the More dropdown only. Resume stays
+  // outside (golden) because it's the most-clicked link.
+  const featuredPills = [];
 
-  // Mega-menu groups — AI lanes kept together, Play (non-AI demos)
-  // kept separate. Science / Explore (NASA + public APIs) removed
-  // from the nav per user request — routes still exist for any
-  // direct deep links but they're hidden from discovery.
+  // Mega-menu groups — every tool lives here now. Sections mirror the
+  // home-page card grid so users see the same layout in both places.
   const moreGroups = [
     {
       title: 'AI Studios',
       accent: 'text-amber-300',
       items: [
-        // Image Studio now hosts Vision AI + Fast Image Gen as tabs (the
-        // old standalone /vision and /ai-studio pages are sunset).
-        { to: '/image-enhancer', label: 'Image Studio', desc: 'Enhance · Fast gen · Vision · T2I' },
-        // Audio Studio now hosts Lip Sync as a tab too.
-        { to: '/audio',          label: 'Audio Studio', desc: 'Music · TTS · STT · Voice clone · Lip sync' },
-        { to: '/hand',           label: 'Hand Tracking', desc: '50 filters · 2-hand draw · cursor · laser' },
+        { to: '/ai-video',       label: 'AI Video Studio', desc: 'T2V · I2V · ZSky / LTX / Wan / Hunyuan' },
+        { to: '/image-enhancer', label: 'Image Studio',    desc: 'Enhance · Fast Gen · T2I · Vision' },
+        { to: '/audio',          label: 'Audio Studio',    desc: 'Music · TTS · STT · Voice clone · Lip sync' },
+        { to: '/ai',             label: 'AI Chat',         desc: 'Groq · Beast (Ollama 5090) · multimodal' },
+        { to: '/3d',             label: '3D Studio',       desc: 'Generate · Studio Pro · Library · Visualize' },
+        { to: '/cinema',         label: 'Cinema',          desc: 'Multi-shot AI cinema with planner + queue' },
+        { to: '/hand',           label: 'Hand Tracking',   desc: '50 filters · 2-hand draw · cursor · laser' },
       ],
     },
     {
@@ -108,7 +105,11 @@ const Navbar = () => {
   return (
     <header className={`header transition-colors ${isDark ? 'bg-gray-950/80 backdrop-blur-md' : ''}`}>
       <NavLink to='/' className="shrink-0">
-        <img src={logo} alt='logo' className='w-12 h-12 sm:w-14 sm:h-14 object-contain' />
+        <img
+          src={LOGO_SRC}
+          alt='Siddharth Fulia logo'
+          className='w-12 h-12 sm:w-14 sm:h-14 object-contain drop-shadow-[0_0_12px_rgba(239,68,68,0.45)]'
+        />
       </NavLink>
 
       {/* Desktop nav.
@@ -138,21 +139,7 @@ const Navbar = () => {
 
         <div className={`w-px h-4 mx-0.5 xl:mx-1 ${isDark ? 'bg-gray-700' : 'bg-gray-300'}`} />
 
-        {/* Featured pills — shrink on lg, normal on xl */}
-        {featuredPills.map(l => (
-          <NavLink key={l.to} to={l.to} className={({ isActive }) =>
-            `text-[10px] xl:text-[11px] px-2 xl:px-2.5 py-1 xl:py-1.5 rounded-lg font-semibold transition-all whitespace-nowrap ${
-              isActive
-                ? `text-black ${l.color}`
-                : isDark
-                  ? 'text-gray-400 hover:text-white bg-gray-800/80 hover:bg-gray-700'
-                  : 'text-gray-600 hover:text-black bg-gray-100 hover:bg-gray-200'
-            }`}>
-            {l.label}
-          </NavLink>
-        ))}
-
-        {/* Mega-menu — AI Studios + Play, grouped */}
+        {/* Mega-menu — every tool lives here now (no inline pills) */}
         <div className="relative">
           <button
             onClick={() => setMoreOpen(o => !o)}
@@ -163,7 +150,7 @@ const Navbar = () => {
                   ? 'text-gray-300 hover:text-white bg-gray-800/60 border-gray-700 hover:border-amber-400/40 hover:bg-gray-800'
                   : 'text-gray-600 hover:text-black bg-gray-100 border-gray-200 hover:bg-gray-200'
             }`}>
-            More
+            The Workshop
             <svg className={`w-3 h-3 transition-transform ${moreOpen ? 'rotate-180' : 'group-hover:translate-y-0.5'}`}
               fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
@@ -274,17 +261,8 @@ const Navbar = () => {
             className={`absolute top-full left-0 right-0 z-50 py-4 px-6 flex flex-col gap-1 shadow-xl border-t
               ${isDark ? 'bg-gray-950/95 border-gray-800' : 'bg-white/95 border-gray-200'}`}>
 
-          {/* AI & Cool stuff first */}
-          <div className={`text-[10px] uppercase tracking-wider font-semibold px-2 pt-2 pb-1 ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>AI & Tools</div>
-          {featuredPills.map(l => (
-            <NavLink key={l.to} to={l.to} className={({ isActive }) =>
-              `py-2.5 px-2 text-sm font-medium rounded-lg ${isActive ? 'text-cyan-400 bg-cyan-500/10' : isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-              {l.label}
-            </NavLink>
-          ))}
-
-          {/* Main pages */}
-          <div className={`text-[10px] uppercase tracking-wider font-semibold px-2 pt-3 pb-1 ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>Pages</div>
+          {/* Main pages — the only "always visible" links now */}
+          <div className={`text-[10px] uppercase tracking-wider font-semibold px-2 pt-2 pb-1 ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>Pages</div>
           {primaryLinks.map(l => (
             <NavLink key={l.to} to={l.to} className={({ isActive }) =>
               `py-2.5 px-2 text-sm font-medium rounded-lg ${isActive ? 'text-blue-400 bg-blue-500/10' : isDark ? 'text-gray-300' : 'text-gray-700'}`}>
