@@ -34,15 +34,26 @@ import * as GaussianSplats3D from "@mkkellogg/gaussian-splats-3d";
 import * as THREE from "three";
 
 const ACCEPTED_EXT = ".ply,.splat,.ksplat,.spz";
+
+// Sample scenes are served through the BE rather than fetched
+// directly from Hugging Face — the HF repo returns 401 to anonymous
+// browsers, so the BE proxies + caches them using HF_TOKEN. First
+// click takes ~30s to download; subsequent clicks are instant from
+// the on-disk cache.
+const BE_URL = import.meta.env.VITE_BE_URL || "http://localhost:4001";
+// Extension is appended so guessFormat() picks the right parser
+// (the BE serves the file regardless of the suffix — it's matched
+// on slug only). Without `.ksplat` here the library defaults to
+// PLY parsing and the splat shows up as confetti.
 const SAMPLE_SCENES = [
   {
     label: "Garden (INRIA)",
-    url: "https://huggingface.co/cakewalk/sample-splat/resolve/main/garden_high.ksplat",
+    url: `${BE_URL}/api/splat-sample/garden.ksplat`,
     note: "Classic Gaussian-Splat benchmark scene · ~28 MB ksplat",
   },
   {
     label: "Truck",
-    url: "https://huggingface.co/cakewalk/sample-splat/resolve/main/truck_high.ksplat",
+    url: `${BE_URL}/api/splat-sample/truck.ksplat`,
     note: "TanksAndTemples · ~18 MB ksplat",
   },
 ];
