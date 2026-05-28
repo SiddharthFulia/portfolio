@@ -128,7 +128,8 @@ export default function SplatViewer() {
   // the camera + orbit-controls target so the scene is centered in
   // the frame. Without this every scene needs hand-tuned camera
   // values (mkkellogg's demo has per-scene presets) because each
-  // .ksplat lives in its own world-space coordinate system.
+  // .ksplat lives in its own world-space coordinate system, and
+  // scales vary wildly (bonsai's diag ~0.5, garden's ~5).
   const fitCameraToScene = (viewer) => {
     try {
       const mesh = viewer.getSplatMesh?.();
@@ -138,14 +139,23 @@ export default function SplatViewer() {
       if (!box || !box.isBox3) return;
       const center = box.getCenter(new THREE.Vector3());
       const size   = box.getSize(new THREE.Vector3());
-      // Use the diagonal so the camera frames the whole bounding
-      // sphere of the cloud, not just one axis.
-      const diag   = Math.max(Math.hypot(size.x, size.y, size.z), 0.5);
-      const dist   = diag * 0.9;
-      // Place the camera at +Z from the center; controls target the
-      // center so the orbit rotates around what the user actually
-      // wants to see.
-      viewer.camera.position.set(center.x, center.y, center.z + dist);
+      // FOV-based distance — the safest framing math. For a perspective
+      // camera with vertical FOV f, the distance needed to fit a
+      // sphere of radius R inside the frustum is R / tan(f/2).
+      // Three.js cameras default to 50° FOV; the splat library uses
+      // 65° but we read it back to be safe. 2.2× padding gives the
+      // cloud breathing room + space to orbit.
+      const radius = Math.hypot(size.x, size.y, size.z) / 2 || 0.5;
+      const fovDeg = viewer.camera?.fov || 65;
+      const fovRad = (fovDeg * Math.PI) / 180;
+      const dist   = (radius / Math.tan(fovRad / 2)) * 2.2;
+      // Camera lives below + forward so the scene fills the canvas.
+      // cameraUp is [0,-1,0] (INRIA), so "below" means + Y in world.
+      viewer.camera.position.set(
+        center.x,
+        center.y + radius * 0.3,
+        center.z + dist
+      );
       viewer.camera.lookAt(center);
       if (viewer.controls?.target) {
         viewer.controls.target.copy(center);
