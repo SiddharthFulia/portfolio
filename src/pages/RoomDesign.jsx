@@ -86,6 +86,7 @@ export default function RoomDesign() {
   const [jobId, setJobId]         = useState(null);
   const [mp4Url, setMp4Url]       = useState(null);
   const [resumed, setResumed]     = useState(false);  // true if we re-attached
+  const [logs, setLogs]           = useState([]);     // live job_logs tail
   const [errorMsg, setErrorMsg]   = useState(null);
   const pollRef                   = useRef(null);
 
@@ -128,9 +129,13 @@ export default function RoomDesign() {
         if (row.pickedItems?.length) {
           setPicked(new Set(row.pickedItems.map((i) => i.id).filter(Boolean)));
         }
+        if (Array.isArray(row.logs)) setLogs(row.logs);
         setResumed(true);
 
-        if (row.status === "rendering") {
+        if (row.status === "analyzing") {
+          setStage("analyzing");
+          beginAnalyzePoll(id);
+        } else if (row.status === "rendering") {
           setStage("rendering");
           beginRenderPoll(id);
         } else if (row.status === "completed" && row.mp4Url) {
@@ -175,6 +180,7 @@ export default function RoomDesign() {
     pollRef.current = setInterval(async () => {
       try {
         const row = await getRoomStatus(id);
+        if (Array.isArray(row?.logs)) setLogs(row.logs);
         if (row?.status === "completed" && row.mp4Url) {
           clearInterval(pollRef.current);
           pollRef.current = null;
@@ -229,15 +235,50 @@ export default function RoomDesign() {
     setStage("analyzing");
     setErrorMsg(null);
     setResumed(false);
+    setLogs([]);
+
+    // The /analyze endpoint is now async: it creates the row,
+    // returns the jobId, and runs the pipeline in the background.
+    // We poll /status/:jobId every 1.5s for live progress logs +
+    // the eventual analysis JSON.
     try {
-      const out = await uploadAndAnalyze(file, { jobId: newJob });
-      if (!out?.analysis) throw new Error('Empty analysis');
-      setAnalysis(out.analysis);
-      setStage("analyzed");
+      const ack = await uploadAndAnalyze(file, { jobId: newJob });
+      if (!ack?.jobId) throw new Error('No jobId returned');
+      beginAnalyzePoll(newJob);
     } catch (err) {
-      setErrorMsg(err.message || 'Analysis failed');
+      setErrorMsg(err.message || 'Analysis upload failed');
       setStage("idle");
     }
+  };
+
+  // Poll while analyzing. Faster cadence than render because analyze
+  // is short (10-15s) so the user sees each step land.
+  const beginAnalyzePoll = (id) => {
+    const started = Date.now();
+    const HARD_CEILING_MS = 90 * 1000;
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
+      try {
+        const row = await getRoomStatus(id);
+        if (Array.isArray(row?.logs)) setLogs(row.logs);
+        if (row?.status === 'analyzed' && row.analysis) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+          setAnalysis(row.analysis);
+          setStage("analyzed");
+        } else if (row?.status === 'failed') {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+          setErrorMsg(row.error || 'Analyze failed on server');
+          setStage("idle");
+        } else if (Date.now() - started > HARD_CEILING_MS) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+          setErrorMsg('Analyze timed out (>90s)');
+          setStage("idle");
+        }
+      } catch (_) { /* transient — keep polling */ }
+    }, 1500);
   };
 
   const togglePick = (id) => {
@@ -407,6 +448,10 @@ export default function RoomDesign() {
 
               {analysis && stage !== "rendering" && stage !== "done" && (
                 <AnalysisCard analysis={analysis} />
+              )}
+
+              {(stage === "analyzing" || stage === "rendering") && (
+                <LogStrip logs={logs} stage={stage} />
               )}
             </div>
           </div>
@@ -635,6 +680,43 @@ function ControlPanel({ stage, file, pickedCount, onAnalyze, onRender, onReset }
           <ReloadOutlined /> Start over
         </button>
       </div>
+    </div>
+  );
+}
+
+// Live transcript of room_jobs progress. Reads the last ~12 lines
+// from the polled status payload so the user sees what the pipeline
+// is actually doing during analyze (10-15s) and render (60-180s).
+function LogStrip({ logs, stage }) {
+  const tail = (logs || []).slice(-12);
+  return (
+    <div className="rounded-2xl ring-1 ring-white/10 bg-black/40 backdrop-blur p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
+        <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-gray-400">
+          Live · {stage === "analyzing" ? "analyze pipeline" : "render pipeline"}
+        </p>
+      </div>
+      {tail.length === 0 ? (
+        <p className="text-[11px] text-gray-500 font-mono">waiting for first log line…</p>
+      ) : (
+        <div className="space-y-1 max-h-[260px] overflow-y-auto pr-1">
+          {tail.map((line, i) => {
+            const msg = typeof line === "string" ? line : (line?.msg ?? line?.message ?? String(line));
+            const ts  = typeof line === "object" && line?.ts ? new Date(line.ts) : null;
+            return (
+              <div key={i} className="text-[11px] font-mono leading-snug flex gap-2">
+                {ts && (
+                  <span className="text-gray-600 shrink-0">
+                    {ts.toLocaleTimeString([], { hour12: false }).slice(3)}
+                  </span>
+                )}
+                <span className="text-gray-200">{msg}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
