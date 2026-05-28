@@ -50,7 +50,7 @@ function SettingsInner() {
   // ?tab= mirrors the active Tabs key so refreshing or sharing the URL
   // preserves which pane the user was viewing. Defaults to 'overview',
   // which is omitted from the URL so /settings stays clean.
-  const [tab, setTab] = useQueryState('tab', 'overview', { allowed: ['overview', 'storage', 'visualize'] })
+  const [tab, setTab] = useQueryState('tab', 'overview', { allowed: ['overview', 'storage', 'visualize', 'cloudinary'] })
   const [server, setServer] = useState(null)
   const [dbStats, setDbStats] = useState(null)
   const [diskStats, setDiskStats] = useState(null)
