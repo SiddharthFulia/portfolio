@@ -41,21 +41,28 @@ const ACCEPTED_EXT = ".ply,.splat,.ksplat,.spz";
 // click takes ~30s to download; subsequent clicks are instant from
 // the on-disk cache.
 const BE_URL = import.meta.env.VITE_BE_URL || "http://localhost:4001";
-// Sample chips are served through the BE cache (/api/splat-sample/:slug).
-// Add curated slugs here when you have working upstream URLs.
-// Cakewalk/sample-splat repo was deleted from Hugging Face, so the
-// chip row is empty for now — users drag-drop or paste a URL.
-//
-// Free public sources to grab a test file from:
-//   - mkkellogg demo data ZIP — projects.markkellogg.org/downloads/gaussian_splat_data.zip
-//   - Polycam exports (signed-in users can download .ply / .splat)
-//   - Luma AI exports (.ply / .glb / .splat depending on capture)
-//   - Polycam Gaussian Splatting samples on GitHub Releases
-//
-// To add a new sample once you have a URL:
-//   1. Add entry to sid-be/controllers/room/splatSamples.js SAMPLES map
-//   2. Add a chip below with `${BE_URL}/api/splat-sample/<slug>.ksplat`
-const SAMPLE_SCENES = [];
+// Sample scenes are pre-staged on the BE disk under
+// data/splat-cache/<slug>.ksplat — extracted from mkkellogg's
+// official Gaussian-Splats-3D demo bundle. The .ksplat suffix is
+// kept on the URL so the library's URL-based format autodetect
+// picks the right parser (BE matches on slug, ignores the suffix).
+const SAMPLE_SCENES = [
+  {
+    label: "Bonsai",
+    url: `${BE_URL}/api/splat-sample/bonsai.ksplat`,
+    note: "Mip-NeRF 360 · ~4 MB · fastest first-load",
+  },
+  {
+    label: "Truck",
+    url: `${BE_URL}/api/splat-sample/truck.ksplat`,
+    note: "TanksAndTemples · ~28 MB",
+  },
+  {
+    label: "Garden",
+    url: `${BE_URL}/api/splat-sample/garden.ksplat`,
+    note: "Mip-NeRF 360 benchmark scene · ~72 MB",
+  },
+];
 
 const guessFormat = (nameOrUrl) => {
   const n = (nameOrUrl || "").toLowerCase();
