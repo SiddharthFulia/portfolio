@@ -130,42 +130,73 @@ export default function SplatViewer() {
   // values (mkkellogg's demo has per-scene presets) because each
   // .ksplat lives in its own world-space coordinate system, and
   // scales vary wildly (bonsai's diag ~0.5, garden's ~5).
-  const fitCameraToScene = (viewer) => {
-    try {
-      const mesh = viewer.getSplatMesh?.();
-      if (!mesh) return;
-      if (mesh.computeBoundingBox) mesh.computeBoundingBox();
-      const box = mesh.boundingBox;
-      if (!box || !box.isBox3) return;
-      const center = box.getCenter(new THREE.Vector3());
-      const size   = box.getSize(new THREE.Vector3());
-      // FOV-based distance — the safest framing math. For a perspective
-      // camera with vertical FOV f, the distance needed to fit a
-      // sphere of radius R inside the frustum is R / tan(f/2).
-      // Three.js cameras default to 50° FOV; the splat library uses
-      // 65° but we read it back to be safe. 2.2× padding gives the
-      // cloud breathing room + space to orbit.
-      const radius = Math.hypot(size.x, size.y, size.z) / 2 || 0.5;
-      const fovDeg = viewer.camera?.fov || 65;
-      const fovRad = (fovDeg * Math.PI) / 180;
-      const dist   = (radius / Math.tan(fovRad / 2)) * 2.2;
-      // Camera lives below + forward so the scene fills the canvas.
-      // cameraUp is [0,-1,0] (INRIA), so "below" means + Y in world.
-      viewer.camera.position.set(
-        center.x,
-        center.y + radius * 0.3,
-        center.z + dist
-      );
-      viewer.camera.lookAt(center);
-      if (viewer.controls?.target) {
-        viewer.controls.target.copy(center);
-        viewer.controls.update?.();
-      }
-    } catch (err) {
-      // Library-API drift is OK to swallow — user can still orbit
-      // manually with the mouse to find the scene.
-      console.warn('[splat] auto-fit skipped:', err?.message);
+  //
+  // CRITICAL — the splat loader streams splats progressively, so
+  // mesh.computeBoundingBox() right after addSplatScene resolves
+  // often returns a tiny / empty box. We poll every 120 ms for up
+  // to 4 s waiting for the box to settle past 0.01 units before
+  // applying the camera fit. If we never get a useful box we still
+  // place the camera at a reasonable default + log so we can see
+  // what happened.
+  const doFit = (viewer, box) => {
+    const center = box.getCenter(new THREE.Vector3());
+    const size   = box.getSize(new THREE.Vector3());
+    const radius = Math.hypot(size.x, size.y, size.z) / 2 || 0.5;
+    const fovDeg = viewer.camera?.fov || 65;
+    const fovRad = (fovDeg * Math.PI) / 180;
+    // Distance to fit a sphere of radius R at FOV f is R / tan(f/2).
+    // 2.4× padding gives breathing room + orbit space.
+    const dist   = (radius / Math.tan(fovRad / 2)) * 2.4;
+    viewer.camera.position.set(
+      center.x,
+      center.y + radius * 0.3,
+      center.z + dist
+    );
+    viewer.camera.lookAt(center);
+    if (viewer.controls?.target) {
+      viewer.controls.target.copy(center);
+      viewer.controls.update?.();
     }
+    console.log(
+      `[splat] fit · center=(${center.x.toFixed(2)},${center.y.toFixed(2)},${center.z.toFixed(2)}) ` +
+      `size=(${size.x.toFixed(2)},${size.y.toFixed(2)},${size.z.toFixed(2)}) ` +
+      `radius=${radius.toFixed(2)} dist=${dist.toFixed(2)} fov=${fovDeg}°`
+    );
+  };
+
+  const fitCameraToScene = async (viewer) => {
+    const MAX_ATTEMPTS = 33;        // ~4 s @ 120 ms
+    const MIN_SIZE     = 0.01;      // sub-cm boxes are still-loading
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      try {
+        const mesh = viewer.getSplatMesh?.();
+        if (mesh) {
+          if (mesh.computeBoundingBox) mesh.computeBoundingBox();
+          const box = mesh.boundingBox;
+          if (box && box.isBox3 && (!box.isEmpty || !box.isEmpty())) {
+            const size = box.getSize(new THREE.Vector3());
+            const big  = Math.max(size.x, size.y, size.z);
+            if (big > MIN_SIZE) {
+              doFit(viewer, box);
+              return;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[splat] fit attempt error:', err?.message);
+      }
+      await new Promise((r) => setTimeout(r, 120));
+    }
+    // Bounds never settled — pull the camera way back so the scene
+    // is at least visible somewhere in the canvas instead of stuck
+    // inside the cloud.
+    try {
+      viewer.camera.position.set(0, 0, 8);
+      viewer.camera.lookAt(new THREE.Vector3(0, 0, 0));
+      viewer.controls?.target?.set(0, 0, 0);
+      viewer.controls?.update?.();
+    } catch (_) {}
+    console.warn('[splat] bounds never settled — using safe default camera');
   };
 
   const loadFromSource = async (src, displayName) => {
