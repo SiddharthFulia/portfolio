@@ -179,7 +179,19 @@ export default function SplatViewer() {
       while (viewer.getSceneCount() > 0) {
         await viewer.removeSplatScene(0);
       }
-      const fmt = guessFormat(src);
+      // Format autodetect: blob: URLs (drag-drop uploads) don't carry
+      // a file extension, so guessFormat(src) returns undefined. Fall
+      // back to the displayName, which is set to file.name for picks
+      // and to the URL's tail for pasted URLs — either gives us a
+      // proper extension.
+      const fmt = guessFormat(src) ?? guessFormat(displayName);
+      if (fmt === undefined) {
+        throw new Error(
+          `Unknown splat format. Filename "${displayName}" needs ` +
+          `to end in .ply, .splat, .ksplat, or .spz so the library ` +
+          `knows which parser to use.`
+        );
+      }
       await viewer.addSplatScene(src, {
         format: fmt,
         showLoadingUI: false,
