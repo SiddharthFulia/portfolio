@@ -85,6 +85,13 @@ export default function SplatViewer() {
   const [hudOpen, setHudOpen]     = useState(true);
   const [splatScale, setSplatScale] = useState(1);   // 1× default; some files export with tiny splats
   const [yFlipped,  setYFlipped]    = useState(true); // INRIA cameraUp [0,-1,0]; flip for Y-up files
+  const [logs, setLogs]             = useState([]);
+  const logTime = () => new Date().toLocaleTimeString([], { hour12: false }).slice(3);
+  const log     = (line) => {
+    const stamped = `${logTime()}  ${line}`;
+    console.log("[splat]", line);
+    setLogs((prev) => [...prev.slice(-24), stamped]);
+  };
 
   // Build the viewer on mount; tear it down on unmount.
   useEffect(() => {
@@ -182,11 +189,11 @@ export default function SplatViewer() {
       viewer.controls.target.copy(center);
       viewer.controls.update?.();
     }
-    console.log(
-      `[splat] fit · center=(${center.x.toFixed(2)},${center.y.toFixed(2)},${center.z.toFixed(2)}) ` +
-      `size=(${size.x.toFixed(2)},${size.y.toFixed(2)},${size.z.toFixed(2)}) ` +
-      `radius=${radius.toFixed(2)} dist=${dist.toFixed(2)} fov=${fovDeg}°`
-    );
+    const fitMsg =
+      `fit · center=(${center.x.toFixed(2)},${center.y.toFixed(2)},${center.z.toFixed(2)}) ` +
+      `radius=${radius.toFixed(2)} dist=${dist.toFixed(2)} fov=${fovDeg}°`;
+    console.log("[splat]", fitMsg);
+    log(fitMsg);
   };
 
   const fitCameraToScene = async (viewer) => {
@@ -222,12 +229,14 @@ export default function SplatViewer() {
       viewer.controls?.update?.();
     } catch (_) {}
     console.warn('[splat] bounds never settled — using safe default camera');
+    log('bounds never settled · using (0,0,8) fallback — try Pull-back + crank scale');
   };
 
   const loadFromSource = async (src, displayName) => {
     const viewer = viewerRef.current;
     if (!viewer) return;
     setStatus({ phase: "loading", msg: `Decoding ${displayName}…` });
+    log(`load · ${displayName}`);
     try {
       // If a previous scene is mounted, drop it first. The library
       // queues scenes by index so we tear them all down to keep memory
@@ -248,6 +257,8 @@ export default function SplatViewer() {
           `knows which parser to use.`
         );
       }
+      log(`format detected · ${["UNKNOWN","Ply","Splat","KSplat","Spz"][fmt] || fmt}`);
+      log(`fetching scene…`);
       await viewer.addSplatScene(src, {
         format: fmt,
         showLoadingUI: false,
@@ -255,15 +266,22 @@ export default function SplatViewer() {
         position: [0, 0, 0],
         rotation: [0, 0, 0, 1],
         scale: [1, 1, 1],
+        onProgress: (pct, stage) => {
+          if (pct == null) return;
+          const p = Math.round(pct * 100);
+          if (p % 10 === 0) log(`${stage || "progress"} ${p}%`);
+        },
       });
+      log(`scene loaded · framing camera…`);
       // Frame the actual content — the library's default camera is
       // generic and bonsai/garden/truck are all offset differently
       // in world space, so we re-target after every load.
-      fitCameraToScene(viewer);
+      await fitCameraToScene(viewer);
       setSceneName(displayName);
       setStatus({ phase: "ready", msg: "Scene loaded · drag to look · scroll to dolly" });
     } catch (err) {
       console.error("[splat] load failed", err);
+      log(`ERROR · ${err?.message || err}`);
       setStatus({
         phase: "error",
         msg: err?.message?.slice(0, 220) || "Failed to decode splat",
@@ -271,13 +289,46 @@ export default function SplatViewer() {
     }
   };
 
-  const onPickFile = (file) => {
+  // When the user drops or picks a file, upload it to the BE first
+  // so it has a real, stream-able URL with Range support — same
+  // path as the sample chips. Two wins:
+  //   1. Huge captures (200–600 MB) don't sit in browser memory
+  //      forever as a blob.
+  //   2. The library can progress-bar the decode via HTTP, instead
+  //      of just exposing parse-time progress on a blob URL.
+  // Falls back to a blob URL if the BE is unreachable so dev /
+  // offline still works.
+  const uploadAndLoad = async (file) => {
     if (!file) return;
-    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-    const url = URL.createObjectURL(file);
-    objectUrlRef.current = url;
-    loadFromSource(url, file.name);
+    log(`picked file · ${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`);
+    setStatus({ phase: "loading", msg: "Uploading to server…" });
+    try {
+      const fd = new FormData();
+      fd.append("splat", file, file.name);
+      log("uploading to BE…");
+      const res = await fetch(`${BE_URL}/api/splat-upload`, { method: "POST", body: fd });
+      if (!res.ok) throw new Error(`BE returned ${res.status}`);
+      const body = await res.json();
+      const remoteUrl = body?.data?.url || body?.url;
+      if (!remoteUrl) throw new Error("BE did not return a URL");
+      const absolute = remoteUrl.startsWith("http") ? remoteUrl : `${BE_URL}${remoteUrl}`;
+      log(`upload OK · ${absolute.split("/").pop()}`);
+      // The BE filename ends with the original extension so the
+      // library's URL-based format autodetect picks the right parser.
+      await loadFromSource(absolute, file.name);
+    } catch (err) {
+      log(`BE upload failed (${err.message}) · falling back to local blob`);
+      console.warn("[splat] BE upload failed, using blob fallback:", err);
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+      const url = URL.createObjectURL(file);
+      objectUrlRef.current = url;
+      await loadFromSource(url, file.name);
+    }
   };
+
+  // Kept as the entry from the file input + drag-drop. Async errors
+  // are caught inside uploadAndLoad so this is fire-and-forget.
+  const onPickFile = (file) => { uploadAndLoad(file); };
 
   const onUrlSubmit = (e) => {
     e?.preventDefault?.();
@@ -511,6 +562,42 @@ export default function SplatViewer() {
             </button>
           </form>
         </div>
+
+        {/* Live activity log — same shape as the Cinema/Room log
+            strips. Fires for every pick, upload, format detect,
+            decode-progress %, camera fit, and error. */}
+        {logs.length > 0 && (
+          <div className="mt-6 rounded-2xl ring-1 ring-white/10 bg-black/40 backdrop-blur p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
+              <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-gray-400">
+                Live · viewer log
+              </p>
+              <button
+                onClick={() => setLogs([])}
+                className="ml-auto text-[10px] font-mono uppercase tracking-[0.18em] text-gray-500 hover:text-gray-200"
+              >
+                clear
+              </button>
+            </div>
+            <div className="space-y-1 max-h-[200px] overflow-y-auto pr-1 text-[11px] font-mono leading-snug">
+              {logs.slice(-16).map((line, i) => (
+                <div
+                  key={i}
+                  className={
+                    line.includes("ERROR")
+                      ? "text-rose-300"
+                      : line.includes("upload") || line.includes("BE")
+                        ? "text-amber-200"
+                        : "text-gray-300"
+                  }
+                >
+                  {line}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Sample chips — only render when we have curated slugs.
             Otherwise drop a "where to get a test file" hint card. */}
