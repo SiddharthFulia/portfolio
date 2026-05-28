@@ -576,7 +576,7 @@ export default function HandTracking() {
     // overflow-x-hidden defensively prevents any overlong row (chips,
     // status pill, gesture chip) from forcing a horizontal scrollbar
     // on narrow phones.
-    <div className="min-h-screen bg-black text-gray-100 pt-20 sm:pt-24 pb-12 overflow-x-hidden">
+    <div className="min-h-screen bg-black text-gray-100 pt-24 sm:pt-32 pb-12 overflow-x-hidden">
       <div className="relative max-w-5xl mx-auto px-3 sm:px-6">
         {/* Hero — mobile-tuned: shorter pill text, smaller H1 + body on
             phone, no horizontal overflow. */}

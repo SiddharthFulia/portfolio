@@ -69,7 +69,7 @@ const Contact = () => {
         },
       }}
     >
-      <section className='relative min-h-screen bg-surface-base text-fg-primary pt-28 pb-24 px-4 sm:px-6 overflow-hidden'>
+      <section className='relative min-h-screen bg-surface-base text-fg-primary pt-28 sm:pt-32 pb-24 px-4 sm:px-6 overflow-hidden'>
         {/* Ambient orbs — primary anchor + cool secondary off-right */}
         <div aria-hidden className='ambient-orb absolute -top-24 left-1/4 -translate-x-1/2' />
         <div aria-hidden className='ambient-orb ambient-orb-cool absolute top-1/2 -right-40 opacity-70' />

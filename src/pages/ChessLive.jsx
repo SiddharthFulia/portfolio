@@ -375,7 +375,7 @@ export default function ChessLive() {
   // No match yet, but we're still trying (or first fetch hasn't come back).
   if (!match && !error && !givenUp) {
     return (
-      <div className="min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 pb-16 px-4 flex items-center justify-center">
+      <div className="min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 sm:pt-32 pb-16 px-4 flex items-center justify-center">
         <div className="luxe-card p-6 max-w-md w-full text-center space-y-2">
           <div className="text-sm text-gray-300">
             {notFoundAttempts > 0 ? 'Waiting for match to start…' : 'Loading match…'}
@@ -394,7 +394,7 @@ export default function ChessLive() {
   // refresh-to-try-again copy explicitly.
   if (!match && givenUp) {
     return (
-      <div className="min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 pb-16 px-4 flex items-center justify-center">
+      <div className="min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 sm:pt-32 pb-16 px-4 flex items-center justify-center">
         <div className="luxe-card p-6 max-w-md w-full text-center space-y-3">
           <h2 className="text-lg font-bold text-rose-300">Match not found</h2>
           <p className="text-xs text-gray-400">Refresh to try again.</p>
@@ -415,7 +415,7 @@ export default function ChessLive() {
 
   if (error && !match) {
     return (
-      <div className="min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 pb-16 px-4 flex items-center justify-center">
+      <div className="min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 sm:pt-32 pb-16 px-4 flex items-center justify-center">
         <div className="luxe-card p-6 max-w-md w-full text-center space-y-3">
           <h2 className="text-lg font-bold text-rose-300">Match unavailable</h2>
           <p className="text-xs text-gray-400 font-mono break-all">{error}</p>
@@ -467,7 +467,7 @@ export default function ChessLive() {
   })()
 
   return (
-    <div className="min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 pb-16 px-4 sm:px-6">
+    <div className="min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 sm:pt-32 pb-16 px-4 sm:px-6">
       {pendingPromotion && (
         <PromotionPicker
           color={pendingPromotion.color}

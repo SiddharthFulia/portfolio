@@ -151,7 +151,7 @@ function DeepfakeInner() {
   const outputUrl = job?.outputUrl
 
   return (
-    <section className="relative min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 pb-16 px-4 sm:px-6 overflow-hidden">
+    <section className="relative min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 sm:pt-32 pb-16 px-4 sm:px-6 overflow-hidden">
       <div aria-hidden className="ambient-orb -top-32 left-1/2 -translate-x-1/2" />
       <div aria-hidden className="ambient-orb ambient-orb-cool -bottom-40 -right-32" />
       <div className="relative max-w-5xl mx-auto">

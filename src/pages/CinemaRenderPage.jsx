@@ -104,7 +104,7 @@ export default function CinemaRenderPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 pb-16 px-4 sm:px-6">
+      <div className="min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 sm:pt-32 pb-16 px-4 sm:px-6">
         <div className="max-w-5xl mx-auto">
           <p className="text-xs text-gray-500 font-mono">
             <ReloadOutlined spin /> Loading render…
@@ -116,7 +116,7 @@ export default function CinemaRenderPage() {
 
   if (error || !render) {
     return (
-      <div className="min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 pb-16 px-4 sm:px-6">
+      <div className="min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 sm:pt-32 pb-16 px-4 sm:px-6">
         <div className="max-w-5xl mx-auto space-y-3">
           <Link to="/ai-video?tab=cinema" className="text-xs text-gray-400 hover:text-gray-200 inline-flex items-center gap-1">
             <ArrowLeftOutlined /> Back to Cinema

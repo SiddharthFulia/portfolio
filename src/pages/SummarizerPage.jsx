@@ -9,7 +9,7 @@ import { Summarizer } from '../components/aitools'
 export default function SummarizerPage() {
   useEffect(() => { document.title = 'Summarizer · Sid' }, [])
   return (
-    <div className="relative min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 pb-16 px-4 sm:px-6 overflow-hidden">
+    <div className="relative min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 sm:pt-32 pb-16 px-4 sm:px-6 overflow-hidden">
       {/* Ambient orb — single subtle accent on a single-tool page */}
       <div aria-hidden className="ambient-orb ambient-orb-cool -top-32 -right-32 opacity-50 pointer-events-none" />
 

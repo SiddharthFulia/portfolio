@@ -515,7 +515,7 @@ export default function ChessPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 pb-16 px-3 sm:px-6">
+    <div className="min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 sm:pt-32 pb-16 px-3 sm:px-6">
       {promotionPicker}
       <div className="max-w-6xl mx-auto">
         <Header engineHealth={engineHealth} onFullscreen={() => setFullscreen(true)} />

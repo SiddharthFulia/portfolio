@@ -19,7 +19,7 @@ export default function ChessViz() {
       <div className='fixed inset-0 pointer-events-none opacity-[0.03]'
         style={{ backgroundImage: 'radial-gradient(circle, #22d3ee 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
 
-      <div className='relative max-w-6xl mx-auto px-3 sm:px-6 pt-24 sm:pt-28 pb-16 sm:pb-24'>
+      <div className='relative max-w-6xl mx-auto px-3 sm:px-6 pt-24 sm:pt-32 pb-16 sm:pb-24'>
         {/* Breadcrumb */}
         <div className='flex items-center gap-2 text-sm text-gray-500 mb-6'>
           <Link to='/projects' className='hover:text-gray-300 transition-colors'>Projects</Link>

@@ -727,7 +727,7 @@ export default function ImageEnhancer() {
   const status = job?.status
 
   return (
-    <div className="min-h-screen bg-black text-gray-100 pt-20 pb-16 px-3 sm:px-6">
+    <div className="min-h-screen bg-black text-gray-100 pt-24 sm:pt-32 pb-16 px-3 sm:px-6">
       <div>
       <div className="max-w-5xl mx-auto">
         <header className="mb-8">

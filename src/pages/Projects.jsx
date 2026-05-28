@@ -135,7 +135,7 @@ const Projects = () => {
   const totalCount = LIVE_PROJECTS.length + projects.length;
 
   return (
-    <section className="relative min-h-screen bg-surface-base text-fg-primary pt-28 pb-24 px-4 sm:px-6 overflow-hidden">
+    <section className="relative min-h-screen bg-surface-base text-fg-primary pt-28 sm:pt-32 pb-24 px-4 sm:px-6 overflow-hidden">
       {/* ── Ambient hero glow — now uses the canonical `ambient-orb` helper. ── */}
       <div aria-hidden className="ambient-orb absolute -top-24 left-1/2 -translate-x-1/2" />
       <div aria-hidden className="ambient-orb ambient-orb-cool absolute top-1/3 -right-20 w-[420px] h-[420px] opacity-80" />

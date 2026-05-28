@@ -547,7 +547,7 @@ const AIChat = () => {
 
   // ─── Render ─────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-black text-gray-100 pt-20">
+    <div className="min-h-screen bg-black text-gray-100 pt-24 sm:pt-32">
       <div className="flex">
         <ChatSidebar
           refreshKey={sidebarRefresh}

@@ -166,7 +166,7 @@ export default function JobDetailPage({
     /* pt-28 (was pt-20) — the global Navbar is `fixed` and ~80px tall.
        Old padding put the Back button right under the navbar, clipping
        it on phones + producing a "where's the button" moment on desktop. */
-    <div className="min-h-screen bg-black text-gray-100 pt-28 pb-16 px-3 sm:px-6">
+    <div className="min-h-screen bg-black text-gray-100 pt-28 sm:pt-32 pb-16 px-3 sm:px-6">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <header className="mb-6">

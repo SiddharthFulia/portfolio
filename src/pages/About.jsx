@@ -210,7 +210,7 @@ function SkillGroupCard({ group }) {
 
 const About = () => {
   return (
-    <section className="relative min-h-screen bg-surface-base text-fg-primary pt-28 pb-24 px-4 sm:px-6 overflow-hidden">
+    <section className="relative min-h-screen bg-surface-base text-fg-primary pt-28 sm:pt-32 pb-24 px-4 sm:px-6 overflow-hidden">
       {/* ── Ambient hero orbs — primary anchor behind the headline + cool secondary off-right ── */}
       <div aria-hidden className="ambient-orb absolute -top-32 left-1/2 -translate-x-1/2" />
       <div aria-hidden className="ambient-orb ambient-orb-cool absolute top-[40%] -right-40 opacity-70" />

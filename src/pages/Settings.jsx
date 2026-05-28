@@ -253,7 +253,7 @@ function SettingsInner() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-gray-100 pt-20 pb-16 px-3 sm:px-6" style={{ fontVariantNumeric: 'tabular-nums' }}>
+    <div className="min-h-screen bg-black text-gray-100 pt-24 sm:pt-32 pb-16 px-3 sm:px-6" style={{ fontVariantNumeric: 'tabular-nums' }}>
       <div className="max-w-6xl mx-auto">
         <header className="mb-6">
           <div className="eyebrow-mono mb-2 flex items-center gap-2">

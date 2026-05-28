@@ -2010,7 +2010,7 @@ export default function Learn() {
       <div className="fixed inset-0 pointer-events-none opacity-[0.03]"
         style={{ backgroundImage: 'radial-gradient(circle, #a855f7 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
 
-      <div className="relative max-w-6xl mx-auto px-6 pt-28 pb-8 overflow-hidden">
+      <div className="relative max-w-6xl mx-auto px-6 pt-28 sm:pt-32 pb-8 overflow-hidden">
         {/* Ambient orbs behind hero */}
         <div aria-hidden className="ambient-orb -top-40 -left-32 opacity-70" />
         <div aria-hidden className="ambient-orb ambient-orb-cool -top-24 right-0 opacity-50" />
