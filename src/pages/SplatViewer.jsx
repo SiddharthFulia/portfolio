@@ -88,13 +88,18 @@ export default function SplatViewer() {
   useEffect(() => {
     if (!mountRef.current) return undefined;
 
+    // Camera setup is intentionally generic — after each scene loads
+    // we call fitCameraToScene() which reads the actual bounding
+    // box from the SplatMesh and re-positions the camera so the
+    // scene is framed regardless of where the .ksplat author put it
+    // in world space.
     const viewer = new GaussianSplats3D.Viewer({
       rootElement: mountRef.current,
-      cameraUp: [0, -1, 0],
-      initialCameraPosition: [0, -1, -3],
+      cameraUp: [0, -1, 0],            // INRIA convention; fitCameraToScene re-targets
+      initialCameraPosition: [0, 0, 5],
       initialCameraLookAt: [0, 0, 0],
       sphericalHarmonicsDegree: 0,
-      sharedMemoryForWorkers: false, // safer cross-origin default
+      sharedMemoryForWorkers: false,
       gpuAcceleratedSort: true,
       enableSIMDInSort: true,
       dynamicScene: false,
@@ -119,6 +124,40 @@ export default function SplatViewer() {
     };
   }, []);
 
+  // Read the freshly-loaded SplatMesh's bounding box and reposition
+  // the camera + orbit-controls target so the scene is centered in
+  // the frame. Without this every scene needs hand-tuned camera
+  // values (mkkellogg's demo has per-scene presets) because each
+  // .ksplat lives in its own world-space coordinate system.
+  const fitCameraToScene = (viewer) => {
+    try {
+      const mesh = viewer.getSplatMesh?.();
+      if (!mesh) return;
+      if (mesh.computeBoundingBox) mesh.computeBoundingBox();
+      const box = mesh.boundingBox;
+      if (!box || !box.isBox3) return;
+      const center = box.getCenter(new THREE.Vector3());
+      const size   = box.getSize(new THREE.Vector3());
+      // Use the diagonal so the camera frames the whole bounding
+      // sphere of the cloud, not just one axis.
+      const diag   = Math.max(Math.hypot(size.x, size.y, size.z), 0.5);
+      const dist   = diag * 0.9;
+      // Place the camera at +Z from the center; controls target the
+      // center so the orbit rotates around what the user actually
+      // wants to see.
+      viewer.camera.position.set(center.x, center.y, center.z + dist);
+      viewer.camera.lookAt(center);
+      if (viewer.controls?.target) {
+        viewer.controls.target.copy(center);
+        viewer.controls.update?.();
+      }
+    } catch (err) {
+      // Library-API drift is OK to swallow — user can still orbit
+      // manually with the mouse to find the scene.
+      console.warn('[splat] auto-fit skipped:', err?.message);
+    }
+  };
+
   const loadFromSource = async (src, displayName) => {
     const viewer = viewerRef.current;
     if (!viewer) return;
@@ -139,6 +178,10 @@ export default function SplatViewer() {
         rotation: [0, 0, 0, 1],
         scale: [1, 1, 1],
       });
+      // Frame the actual content — the library's default camera is
+      // generic and bonsai/garden/truck are all offset differently
+      // in world space, so we re-target after every load.
+      fitCameraToScene(viewer);
       setSceneName(displayName);
       setStatus({ phase: "ready", msg: "Scene loaded · drag to look · scroll to dolly" });
     } catch (err) {
@@ -173,12 +216,7 @@ export default function SplatViewer() {
   const recenter = () => {
     const v = viewerRef.current;
     if (!v) return;
-    try {
-      v.camera.position.set(0, -1, -3);
-      v.camera.lookAt(new THREE.Vector3(0, 0, 0));
-      v.controls?.target?.set(0, 0, 0);
-      v.controls?.update?.();
-    } catch (_) {}
+    fitCameraToScene(v);
   };
 
   return (
