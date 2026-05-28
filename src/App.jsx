@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Route, BrowserRouter as Router, Routes, useLocation, Navigate } from "react-router-dom";
 import { ConfigProvider, theme } from "antd";
 import { Footer, Navbar } from "./components";
@@ -215,6 +215,64 @@ const ConditionalFooter = () => {
   return <Footer />;
 };
 
+/* ── Document title manager ──
+ * Sets the browser-tab title based on the active route. Previously
+ * only a subset of pages (Chess, Settings, AIChat, etc.) called
+ * document.title in their own useEffect, so navigating to one of
+ * those and then to About / Home left the *previous* page's title
+ * stuck. This component runs once on every navigation and writes a
+ * route-specific title. Pages that still set document.title locally
+ * will fire AFTER this effect and take precedence on their own
+ * route — both behaviors are intentional. */
+const ROUTE_TITLES = {
+  '/'              : 'Siddharth Fulia · AI Engineer',
+  '/about'         : 'About · Sid',
+  '/projects'      : 'Projects · Sid',
+  '/contact'       : 'Contact · Sid',
+  '/lab'           : 'Interactive Lab · Sid',
+  '/learn'         : 'Learn DSA · Sid',
+  '/creative'      : 'Creative UI · Sid',
+  '/chess'         : 'Chess · Sid',
+  '/chess-classic' : 'Chess (classic) · Sid',
+  '/chess-viz'     : 'Chess Viz · Sid',
+  '/3d'            : '3D Studio · Sid',
+  '/dragon'        : '3D Studio · Sid',
+  '/ai'            : 'AI Chat · Sid',
+  '/ai-video'      : 'AI Video Studio · Sid',
+  '/image-enhancer': 'Image Studio · Sid',
+  '/audio'         : 'Audio Studio · Sid',
+  '/cinema'        : 'Cinema · Sid',
+  '/hand'          : 'Hand Tracking · Sid',
+  '/runner'        : 'Hand Runner · Sid',
+  '/game'          : 'Hand Runner · Sid',
+  '/summarizer'    : 'Summarizer · Sid',
+  '/yt-dl'         : 'YouTube DL · Sid',
+  '/science'       : 'Explore Space · Sid',
+  '/explore'       : 'Web Playground · Sid',
+  '/deepfake'      : 'Deepfake Studio · Sid',
+  '/settings'      : 'Settings · Sid',
+  '/vision'        : 'Vision AI · Sid',
+  '/face'          : 'Vision AI · Sid',
+  '/lipsync'       : 'Lip Sync · Sid',
+};
+const DEFAULT_TITLE = 'Siddharth Fulia · AI Engineer';
+const TitleManager = () => {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    // Exact match first; then prefix match for nested routes
+    // like /science/:module, /explore/:module, /render/:id, etc.
+    let title = ROUTE_TITLES[pathname];
+    if (!title) {
+      const prefix = Object.keys(ROUTE_TITLES).find(
+        (p) => p !== '/' && pathname.startsWith(p + '/')
+      );
+      title = prefix ? ROUTE_TITLES[prefix] : DEFAULT_TITLE;
+    }
+    document.title = title;
+  }, [pathname]);
+  return null;
+};
+
 /* ── Site-wide route error boundary ──
  * Wraps every <Routes> render. Keying it on pathname means each
  * navigation mounts a FRESH boundary instance, so an error on one page
@@ -234,6 +292,7 @@ const App = () => {
     }}>
     <main className='bg-slate-300/20'>
       <Router>
+        <TitleManager />
         <Navbar />
         <RoutesWithBoundary>
         <Routes>
