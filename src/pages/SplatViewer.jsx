@@ -196,22 +196,55 @@ export default function SplatViewer() {
     log(fitMsg);
   };
 
+  // Compute bounds by SAMPLING splat centers directly via
+  // mesh.getSplatCenter(i). This is way more reliable than the
+  // library's boundingBox property which never seems to populate
+  // for ksplat scenes in v0.4.7. Samples up to N evenly-spaced
+  // splat indices, expands a Box3 over each. Returns null if the
+  // mesh isn't ready or has zero splats.
+  const computeMeshBounds = (mesh) => {
+    if (!mesh || typeof mesh.getSplatCount !== "function") return null;
+    const count = mesh.getSplatCount();
+    if (!count || count < 1) return null;
+    const N    = Math.min(2000, count);
+    const step = Math.max(1, Math.floor(count / N));
+    const box  = new THREE.Box3();
+    const tmp  = new THREE.Vector3();
+    let added = 0;
+    for (let i = 0; i < count; i += step) {
+      try {
+        // API: getSplatCenter(index, outVector3, applyTransform=false)
+        mesh.getSplatCenter(i, tmp);
+        if (Number.isFinite(tmp.x) && Number.isFinite(tmp.y) && Number.isFinite(tmp.z)) {
+          box.expandByPoint(tmp);
+          added += 1;
+        }
+      } catch (_) { /* skip bad sample */ }
+    }
+    if (added === 0) return null;
+    return box;
+  };
+
   const fitCameraToScene = async (viewer) => {
     const MAX_ATTEMPTS = 33;        // ~4 s @ 120 ms
-    const MIN_SIZE     = 0.01;      // sub-cm boxes are still-loading
+    const MIN_SIZE     = 0.001;     // anything smaller is empty / not loaded
+    let lastCount = 0;
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       try {
         const mesh = viewer.getSplatMesh?.();
-        if (mesh) {
-          if (mesh.computeBoundingBox) mesh.computeBoundingBox();
-          const box = mesh.boundingBox;
-          if (box && box.isBox3 && (!box.isEmpty || !box.isEmpty())) {
-            const size = box.getSize(new THREE.Vector3());
-            const big  = Math.max(size.x, size.y, size.z);
-            if (big > MIN_SIZE) {
-              doFit(viewer, box);
-              return;
-            }
+        const count = mesh?.getSplatCount?.() || 0;
+        if (count > 0 && count !== lastCount) {
+          // splat count grew — bounds may have changed
+          lastCount = count;
+        }
+        const box = computeMeshBounds(mesh);
+        if (box && !box.isEmpty()) {
+          const size = box.getSize(new THREE.Vector3());
+          const big  = Math.max(size.x, size.y, size.z);
+          if (big > MIN_SIZE) {
+            log(`bounds settled · ${count.toLocaleString()} splats sampled`);
+            doFit(viewer, box);
+            return;
           }
         }
       } catch (err) {
@@ -229,7 +262,7 @@ export default function SplatViewer() {
       viewer.controls?.update?.();
     } catch (_) {}
     console.warn('[splat] bounds never settled — using safe default camera');
-    log('bounds never settled · using (0,0,8) fallback — try Pull-back + crank scale');
+    log(`bounds never settled · ${lastCount.toLocaleString()} splats seen · fallback (0,0,8)`);
   };
 
   const loadFromSource = async (src, displayName) => {
@@ -257,8 +290,12 @@ export default function SplatViewer() {
           `knows which parser to use.`
         );
       }
-      log(`format detected · ${["UNKNOWN","Ply","Splat","KSplat","Spz"][fmt] || fmt}`);
+      // SceneFormat enum (verified from library source):
+      //   Splat=0, KSplat=1, Ply=2, Spz=3
+      const FORMAT_NAMES = ["Splat", "KSplat", "Ply", "Spz"];
+      log(`format detected · ${FORMAT_NAMES[fmt] || `#${fmt}`}`);
       log(`fetching scene…`);
+      let lastLogged = -1;
       await viewer.addSplatScene(src, {
         format: fmt,
         showLoadingUI: false,
@@ -267,9 +304,15 @@ export default function SplatViewer() {
         rotation: [0, 0, 0, 1],
         scale: [1, 1, 1],
         onProgress: (pct, stage) => {
+          // Library passes pct as 0-100 already (not 0-1).
           if (pct == null) return;
-          const p = Math.round(pct * 100);
-          if (p % 10 === 0) log(`${stage || "progress"} ${p}%`);
+          const p = Math.round(pct);
+          // Only log every 20% so we don't flood; final 100% always lands.
+          const tier = Math.floor(p / 20) * 20;
+          if (tier !== lastLogged) {
+            lastLogged = tier;
+            log(`${stage || "decode"} ${p}%`);
+          }
         },
       });
       log(`scene loaded · framing camera…`);
