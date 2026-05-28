@@ -18,11 +18,24 @@ function vaultHeaders() {
   } catch { return {}; }
 }
 
+// Generate a stable jobId on the client. The FE sends it with the
+// upload so the BE writes it on the row immediately — that way the
+// FE can persist the breadcrumb BEFORE the analyze response lands.
+// If the tab closes mid-analyze, the BE still finishes (the request
+// handler runs to completion regardless of who's listening), and a
+// subsequent visit picks the same jobId up from URL / localStorage
+// and re-fetches state via /status/:jobId.
+export function newRoomJobId() {
+  const rnd = (Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)).slice(0, 12);
+  return `room_${Date.now()}_${rnd}`;
+}
+
 // Multipart upload — fetch directly because the shared post() in
 // request.js force-sets Content-Type: application/json.
-export async function uploadAndAnalyze(file, { signal } = {}) {
+export async function uploadAndAnalyze(file, { signal, jobId } = {}) {
   const fd = new FormData();
   fd.append('video', file);
+  if (jobId) fd.append('jobId', jobId);
   const res = await fetch(`${BE_URL}/api/room/analyze`, {
     method: 'POST',
     body: fd,

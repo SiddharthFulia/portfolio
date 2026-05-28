@@ -32,7 +32,7 @@ import {
   RocketOutlined,
   InfoCircleOutlined,
 } from "@ant-design/icons";
-import { uploadAndAnalyze, startRender, getRoomStatus } from "../api/room";
+import { uploadAndAnalyze, startRender, getRoomStatus, newRoomJobId } from "../api/room";
 
 // ── Mock analysis — what the real worker chain will eventually return.
 // Shape is intentional: keep parity with the planned `/api/room/analyze`
@@ -85,6 +85,7 @@ export default function RoomDesign() {
   const [picked, setPicked]       = useState(new Set());
   const [jobId, setJobId]         = useState(null);
   const [mp4Url, setMp4Url]       = useState(null);
+  const [resumed, setResumed]     = useState(false);  // true if we re-attached
   const [errorMsg, setErrorMsg]   = useState(null);
   const pollRef                   = useRef(null);
 
@@ -93,6 +94,106 @@ export default function RoomDesign() {
     if (objUrlRef.current) URL.revokeObjectURL(objUrlRef.current);
     if (pollRef.current)   clearInterval(pollRef.current);
   }, []);
+
+  // Resume on mount — if a previous session left a jobId in the URL
+  // (`?j=room_...`) or localStorage, re-fetch its current state from
+  // the BE and rehydrate the UI. Both analyze + render are persisted
+  // server-side (room_jobs row), so closing the tab never loses work.
+  // Loop:
+  //   localStorage `sid-room-active-job` ← latest jobId
+  //   URL `?j=jobId` ← shareable / refresh-safe handle
+  // Either source wins; URL takes precedence so a deep link works.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const url = new URL(window.location.href);
+        const urlJob = url.searchParams.get("j");
+        const lsJob  = (typeof localStorage !== "undefined")
+                     ? localStorage.getItem("sid-room-active-job")
+                     : null;
+        const id = urlJob || lsJob;
+        if (!id) return;
+        const row = await getRoomStatus(id);
+        if (cancelled || !row) return;
+        if (row.status === "failed") {
+          setErrorMsg(row.error || "Previous render failed");
+          return;
+        }
+        // Rehydrate whatever state we can. We don't have the source
+        // file (browser can't recover it), but the analysis + result
+        // are server-truth so the user picks up where they left off.
+        setJobId(id);
+        if (row.analysis) setAnalysis(row.analysis);
+        if (row.pickedItems?.length) {
+          setPicked(new Set(row.pickedItems.map((i) => i.id).filter(Boolean)));
+        }
+        setResumed(true);
+
+        if (row.status === "rendering") {
+          setStage("rendering");
+          beginRenderPoll(id);
+        } else if (row.status === "completed" && row.mp4Url) {
+          setMp4Url(row.mp4Url);
+          setStage("done");
+        } else if (row.status === "analyzed") {
+          setStage("analyzed");
+        }
+      } catch (_) {
+        // Stale id is fine — drop it and let the user start fresh.
+        try { localStorage.removeItem("sid-room-active-job"); } catch {}
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Mirror the active jobId to URL + localStorage so any close /
+  // refresh leaves a resume breadcrumb. Only writes when jobId is set
+  // and a meaningful stage is in flight — clears on reset.
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      if (jobId && stage !== "idle") {
+        url.searchParams.set("j", jobId);
+        window.history.replaceState(null, "", url.toString());
+        localStorage.setItem("sid-room-active-job", jobId);
+      } else if (!jobId) {
+        url.searchParams.delete("j");
+        window.history.replaceState(null, "", url.toString());
+        localStorage.removeItem("sid-room-active-job");
+      }
+    } catch {}
+  }, [jobId, stage]);
+
+  // Extracted so both runRender and the resume effect can use the
+  // same polling logic.
+  const beginRenderPoll = (id) => {
+    const started = Date.now();
+    const HARD_CEILING_MS = 12 * 60 * 1000;
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
+      try {
+        const row = await getRoomStatus(id);
+        if (row?.status === "completed" && row.mp4Url) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+          setMp4Url(row.mp4Url);
+          setStage("done");
+        } else if (row?.status === "failed") {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+          setErrorMsg(row.error || "Render failed on worker");
+          setStage("analyzed");
+        } else if (Date.now() - started > HARD_CEILING_MS) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+          setErrorMsg("Render timed out (>12 min)");
+          setStage("analyzed");
+        }
+      } catch (_) { /* transient — keep polling */ }
+    }, 4000);
+  };
 
   const onPickFile = (f) => {
     if (!f) return;
@@ -115,14 +216,23 @@ export default function RoomDesign() {
   // V2.0 — hit the real BE /api/room/analyze. The endpoint is
   // synchronous (~10-15s) so the request hangs until the analysis
   // JSON comes back. The UI shows "Reading the room…" the whole time.
+  // The BE inserts the room_jobs row BEFORE running the pipeline, so
+  // even if the user closes the tab mid-analyze the row is on disk
+  // and the analysis completes server-side — the resume effect will
+  // pick it up on the next visit.
   const runAnalysis = async () => {
+    // Mint the jobId BEFORE the upload starts so the breadcrumb
+    // effect persists it immediately. If the tab closes mid-upload,
+    // the next visit can still re-attach via /status/:jobId.
+    const newJob = newRoomJobId();
+    setJobId(newJob);
     setStage("analyzing");
     setErrorMsg(null);
+    setResumed(false);
     try {
-      const out = await uploadAndAnalyze(file);
+      const out = await uploadAndAnalyze(file, { jobId: newJob });
       if (!out?.analysis) throw new Error('Empty analysis');
       setAnalysis(out.analysis);
-      setJobId(out.jobId);
       setStage("analyzed");
     } catch (err) {
       setErrorMsg(err.message || 'Analysis failed');
@@ -159,33 +269,7 @@ export default function RoomDesign() {
       setStage("analyzed");
       return;
     }
-    // Poll until completed | failed. Bail after 12 min as a hard ceiling.
-    const started = Date.now();
-    const HARD_CEILING_MS = 12 * 60 * 1000;
-    if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = setInterval(async () => {
-      try {
-        const row = await getRoomStatus(jobId);
-        if (row?.status === 'completed' && row.mp4Url) {
-          clearInterval(pollRef.current);
-          pollRef.current = null;
-          setMp4Url(row.mp4Url);
-          setStage("done");
-        } else if (row?.status === 'failed') {
-          clearInterval(pollRef.current);
-          pollRef.current = null;
-          setErrorMsg(row.error || 'Render failed on worker');
-          setStage("analyzed");
-        } else if (Date.now() - started > HARD_CEILING_MS) {
-          clearInterval(pollRef.current);
-          pollRef.current = null;
-          setErrorMsg('Render timed out (>12 min)');
-          setStage("analyzed");
-        }
-      } catch (_) {
-        // transient network errors — keep polling
-      }
-    }, 4000);
+    beginRenderPoll(jobId);
   };
 
   const reset = () => {
@@ -229,6 +313,26 @@ export default function RoomDesign() {
             it back in and exports an MP4 of the new room.
           </p>
         </header>
+
+        {/* Resume banner — only when we hydrated from URL / localStorage */}
+        {resumed && jobId && (
+          <div className="mb-4 rounded-xl ring-1 ring-emerald-400/30 bg-emerald-500/10 px-4 py-2.5 flex items-center gap-3 text-[12px]">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
+            <span className="text-emerald-100">
+              Resumed <code className="text-emerald-200">{jobId}</code> · processing continued on the server while you were away
+            </span>
+            <button
+              onClick={() => {
+                if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+                setJobId(null); setAnalysis(null); setPicked(new Set());
+                setMp4Url(null); setStage("idle"); setResumed(false);
+              }}
+              className="ml-auto text-emerald-200/70 hover:text-emerald-100 text-xs"
+            >
+              × Discard
+            </button>
+          </div>
+        )}
 
         {/* Step bar */}
         <StepBar stage={stage} />
