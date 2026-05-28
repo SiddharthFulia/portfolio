@@ -86,6 +86,9 @@ const LipsyncDetail = lazyWithReload(() => import("./pages/LipsyncDetail"));
 const AudioDetail = lazyWithReload(() => import("./pages/AudioDetail"));
 const CinemaDetail = lazyWithReload(() => import("./pages/CinemaDetail"));
 const CinemaRenderPage = lazyWithReload(() => import("./pages/CinemaRenderPage"));
+const SplatViewer = lazyWithReload(() => import("./pages/SplatViewer"));
+const Showreel = lazyWithReload(() => import("./pages/Showreel"));
+const RoomDesign = lazyWithReload(() => import("./pages/RoomDesign"));
 
 /* ── Skeleton building blocks ──
  * The legacy hand-rolled pulse blocks (Light/Dark/Science/etc) are
@@ -254,6 +257,9 @@ const ROUTE_TITLES = {
   '/vision'        : 'Vision AI · Sid',
   '/face'          : 'Vision AI · Sid',
   '/lipsync'       : 'Lip Sync · Sid',
+  '/splat'         : 'Splat Viewer · Sid',
+  '/showreel'      : 'Showreel · Sid',
+  '/room'          : 'Room Designer · Sid',
 };
 const DEFAULT_TITLE = 'Siddharth Fulia · AI Engineer';
 const TitleManager = () => {
@@ -356,6 +362,16 @@ const App = () => {
               /cinema/render/<renderId> isn't swallowed as a projectId. */}
           <Route path='/cinema/render/:renderId' element={<Suspense fallback={<PageLoader />}><CinemaRenderPage /></Suspense>} />
           <Route path='/cinema/:id' element={<Suspense fallback={<PageLoader />}><CinemaDetail /></Suspense>} />
+
+          {/* Splat viewer — in-browser Gaussian splat camera. */}
+          <Route path='/splat'    element={<Suspense fallback={<PageLoader />}><SplatViewer /></Suspense>} />
+          <Route path='/splats'   element={<Navigate to='/splat' replace />} />
+          {/* Showreel — cinematic scroll showcase of the AI video stack. */}
+          <Route path='/showreel' element={<Suspense fallback={<PageLoader />}><Showreel /></Suspense>} />
+          {/* Room Designer — upload a room video, get an AI critique +
+              furniture suggestions, render the new room out as MP4. */}
+          <Route path='/room'     element={<Suspense fallback={<PageLoader />}><RoomDesign /></Suspense>} />
+
           {/* Catch-all — any unknown URL bounces to home instead of 404.
               Visitors fat-fingering /settngs or /chses end up somewhere
               real instead of staring at a blank page. */}
