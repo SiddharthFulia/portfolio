@@ -41,22 +41,21 @@ const ACCEPTED_EXT = ".ply,.splat,.ksplat,.spz";
 // click takes ~30s to download; subsequent clicks are instant from
 // the on-disk cache.
 const BE_URL = import.meta.env.VITE_BE_URL || "http://localhost:4001";
-// Extension is appended so guessFormat() picks the right parser
-// (the BE serves the file regardless of the suffix — it's matched
-// on slug only). Without `.ksplat` here the library defaults to
-// PLY parsing and the splat shows up as confetti.
-const SAMPLE_SCENES = [
-  {
-    label: "Garden (INRIA)",
-    url: `${BE_URL}/api/splat-sample/garden.ksplat`,
-    note: "Classic Gaussian-Splat benchmark scene · ~28 MB ksplat",
-  },
-  {
-    label: "Truck",
-    url: `${BE_URL}/api/splat-sample/truck.ksplat`,
-    note: "TanksAndTemples · ~18 MB ksplat",
-  },
-];
+// Sample chips are served through the BE cache (/api/splat-sample/:slug).
+// Add curated slugs here when you have working upstream URLs.
+// Cakewalk/sample-splat repo was deleted from Hugging Face, so the
+// chip row is empty for now — users drag-drop or paste a URL.
+//
+// Free public sources to grab a test file from:
+//   - mkkellogg demo data ZIP — projects.markkellogg.org/downloads/gaussian_splat_data.zip
+//   - Polycam exports (signed-in users can download .ply / .splat)
+//   - Luma AI exports (.ply / .glb / .splat depending on capture)
+//   - Polycam Gaussian Splatting samples on GitHub Releases
+//
+// To add a new sample once you have a URL:
+//   1. Add entry to sid-be/controllers/room/splatSamples.js SAMPLES map
+//   2. Add a chip below with `${BE_URL}/api/splat-sample/<slug>.ksplat`
+const SAMPLE_SCENES = [];
 
 const guessFormat = (nameOrUrl) => {
   const n = (nameOrUrl || "").toLowerCase();
@@ -339,26 +338,53 @@ export default function SplatViewer() {
           </form>
         </div>
 
-        {/* Sample chips */}
-        <div className="mt-6">
-          <p className="text-[10px] font-mono uppercase tracking-[0.28em] text-gray-500 mb-3">
-            Try a sample scene
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {SAMPLE_SCENES.map((s) => (
-              <button
-                key={s.url}
-                onClick={() => loadFromSource(s.url, s.label)}
-                className="group rounded-xl px-4 py-3 ring-1 ring-white/10 bg-white/[0.03] hover:bg-white/[0.06] hover:ring-rose-400/30 text-left transition-all"
-              >
-                <p className="text-sm font-semibold text-white group-hover:text-rose-200">
-                  {s.label}
-                </p>
-                <p className="text-[11px] text-gray-500">{s.note}</p>
-              </button>
-            ))}
+        {/* Sample chips — only render when we have curated slugs.
+            Otherwise drop a "where to get a test file" hint card. */}
+        {SAMPLE_SCENES.length > 0 ? (
+          <div className="mt-6">
+            <p className="text-[10px] font-mono uppercase tracking-[0.28em] text-gray-500 mb-3">
+              Try a sample scene
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {SAMPLE_SCENES.map((s) => (
+                <button
+                  key={s.url}
+                  onClick={() => loadFromSource(s.url, s.label)}
+                  className="group rounded-xl px-4 py-3 ring-1 ring-white/10 bg-white/[0.03] hover:bg-white/[0.06] hover:ring-rose-400/30 text-left transition-all"
+                >
+                  <p className="text-sm font-semibold text-white group-hover:text-rose-200">
+                    {s.label}
+                  </p>
+                  <p className="text-[11px] text-gray-500">{s.note}</p>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="mt-6 rounded-xl ring-1 ring-white/10 bg-white/[0.02] px-5 py-4 text-[12px] text-gray-400">
+            <p className="text-[10px] font-mono uppercase tracking-[0.28em] text-gray-500 mb-2">
+              Don&apos;t have a splat file?
+            </p>
+            <p>
+              Grab one from{" "}
+              <a
+                href="https://projects.markkellogg.org/downloads/gaussian_splat_data.zip"
+                target="_blank"
+                rel="noreferrer"
+                className="text-rose-300 hover:text-rose-200 underline"
+              >
+                mkkellogg&apos;s demo bundle
+              </a>{" "}
+              (zip of curated scenes), export a capture from{" "}
+              <a href="https://lumalabs.ai" target="_blank" rel="noreferrer" className="text-rose-300 hover:text-rose-200 underline">Luma</a>
+              {" "}or{" "}
+              <a href="https://poly.cam" target="_blank" rel="noreferrer" className="text-rose-300 hover:text-rose-200 underline">Polycam</a>
+              , or train your own with{" "}
+              <a href="https://github.com/graphdeco-inria/gaussian-splatting" target="_blank" rel="noreferrer" className="text-rose-300 hover:text-rose-200 underline">INRIA&apos;s repo</a>
+              {" "}— then drop the file into the viewer above.
+            </p>
+          </div>
+        )}
 
         {/* Spec note */}
         <div className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-3 text-[12px]">
