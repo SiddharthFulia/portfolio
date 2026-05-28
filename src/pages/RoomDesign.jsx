@@ -32,6 +32,7 @@ import {
   RocketOutlined,
   InfoCircleOutlined,
 } from "@ant-design/icons";
+import { uploadAndAnalyze, startRender, getRoomStatus } from "../api/room";
 
 // ── Mock analysis — what the real worker chain will eventually return.
 // Shape is intentional: keep parity with the planned `/api/room/analyze`
@@ -82,10 +83,15 @@ export default function RoomDesign() {
   // 'idle' | 'analyzing' | 'analyzed' | 'rendering' | 'done'
   const [analysis, setAnalysis]   = useState(null);
   const [picked, setPicked]       = useState(new Set());
+  const [jobId, setJobId]         = useState(null);
+  const [mp4Url, setMp4Url]       = useState(null);
+  const [errorMsg, setErrorMsg]   = useState(null);
+  const pollRef                   = useRef(null);
 
-  // Clean up object URL on unmount.
+  // Clean up object URL + any in-flight render poller on unmount.
   useEffect(() => () => {
     if (objUrlRef.current) URL.revokeObjectURL(objUrlRef.current);
+    if (pollRef.current)   clearInterval(pollRef.current);
   }, []);
 
   const onPickFile = (f) => {
@@ -106,13 +112,22 @@ export default function RoomDesign() {
     if (f && f.type.startsWith("video/")) onPickFile(f);
   };
 
+  // V2.0 — hit the real BE /api/room/analyze. The endpoint is
+  // synchronous (~10-15s) so the request hangs until the analysis
+  // JSON comes back. The UI shows "Reading the room…" the whole time.
   const runAnalysis = async () => {
     setStage("analyzing");
-    // V1 simulates the worker round-trip. V2 will hit
-    // POST /api/room/analyze with the video and poll a job id.
-    await new Promise((r) => setTimeout(r, 1900));
-    setAnalysis(MOCK_ANALYSIS);
-    setStage("analyzed");
+    setErrorMsg(null);
+    try {
+      const out = await uploadAndAnalyze(file);
+      if (!out?.analysis) throw new Error('Empty analysis');
+      setAnalysis(out.analysis);
+      setJobId(out.jobId);
+      setStage("analyzed");
+    } catch (err) {
+      setErrorMsg(err.message || 'Analysis failed');
+      setStage("idle");
+    }
   };
 
   const togglePick = (id) => {
@@ -124,19 +139,63 @@ export default function RoomDesign() {
     });
   };
 
+  // V2.1 — dispatch the render through the queue, then poll
+  // /api/room/status/:jobId every 4s until status becomes
+  // 'completed' (mp4Url set) or 'failed'. Worker reports back via
+  // /api/gpu-worker/room-{progress,complete,failed}.
   const runRender = async () => {
+    if (!jobId) {
+      setErrorMsg('Run Analyze first');
+      return;
+    }
     setStage("rendering");
-    // V1 simulates the compositor + MP4 export. V2 will dispatch a
-    // ComfyUI job: keyframe → IC-Light placement of picked items →
-    // SVD / LTX for motion → ffmpeg concat → Cloudinary upload.
-    await new Promise((r) => setTimeout(r, 2400));
-    setStage("done");
+    setMp4Url(null);
+    setErrorMsg(null);
+    const items = MOCK_CATALOG.filter((c) => picked.has(c.id));
+    try {
+      await startRender(jobId, items);
+    } catch (err) {
+      setErrorMsg(err.message || 'Render dispatch failed');
+      setStage("analyzed");
+      return;
+    }
+    // Poll until completed | failed. Bail after 12 min as a hard ceiling.
+    const started = Date.now();
+    const HARD_CEILING_MS = 12 * 60 * 1000;
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
+      try {
+        const row = await getRoomStatus(jobId);
+        if (row?.status === 'completed' && row.mp4Url) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+          setMp4Url(row.mp4Url);
+          setStage("done");
+        } else if (row?.status === 'failed') {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+          setErrorMsg(row.error || 'Render failed on worker');
+          setStage("analyzed");
+        } else if (Date.now() - started > HARD_CEILING_MS) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+          setErrorMsg('Render timed out (>12 min)');
+          setStage("analyzed");
+        }
+      } catch (_) {
+        // transient network errors — keep polling
+      }
+    }, 4000);
   };
 
   const reset = () => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
     setStage("idle");
     setAnalysis(null);
     setPicked(new Set());
+    setJobId(null);
+    setMp4Url(null);
+    setErrorMsg(null);
   };
 
   return (
@@ -154,9 +213,9 @@ export default function RoomDesign() {
             <p className="text-[10px] font-mono uppercase tracking-[0.32em] text-amber-300/80">
               — AI Room Designer
             </p>
-            <span className="inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-[0.18em] px-2 py-0.5 rounded-full bg-amber-500/10 ring-1 ring-amber-400/30 text-amber-200">
-              <span className="w-1 h-1 rounded-full bg-amber-300 animate-pulse" />
-              V1 · UI · backend lane next session
+            <span className="inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-[0.18em] px-2 py-0.5 rounded-full bg-emerald-500/10 ring-1 ring-emerald-400/30 text-emerald-200">
+              <span className="w-1 h-1 rounded-full bg-emerald-300 animate-pulse" />
+              V2 · live · BE + worker wired
             </span>
           </div>
           <h1 className="font-poppins font-black tracking-tight text-4xl sm:text-5xl md:text-6xl">
@@ -304,33 +363,50 @@ export default function RoomDesign() {
 
         {/* Render result */}
         {stage === "done" && (
-          <section className="mt-12 rounded-3xl overflow-hidden ring-1 ring-emerald-400/40 bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-amber-500/10 p-8 text-center">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-emerald-500/20 ring-1 ring-emerald-400/40 text-emerald-300 text-2xl mb-4">
-              <CheckOutlined />
+          <section className="mt-12 rounded-3xl overflow-hidden ring-1 ring-emerald-400/40 bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-amber-500/10 p-8">
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-emerald-500/20 ring-1 ring-emerald-400/40 text-emerald-300 text-2xl mb-4">
+                <CheckOutlined />
+              </div>
+              <h3 className="text-2xl font-poppins font-bold text-white">
+                Your new room is rendered.
+              </h3>
+              <p className="mt-2 text-sm text-gray-300 max-w-md mx-auto">
+                Worker composited {picked.size} item{picked.size === 1 ? "" : "s"} into the scene
+                and produced a clip below.
+              </p>
             </div>
-            <h3 className="text-2xl font-poppins font-bold text-white">
-              Your new room is rendered.
-            </h3>
-            <p className="mt-2 text-sm text-gray-300 max-w-md mx-auto">
-              <em>V1 simulation</em> — once the worker pipeline lands, this is where
-              the composited MP4 will play. For now: imagine {picked.size} new items,
-              colour-matched and motion-tracked into your original video.
-            </p>
+            {mp4Url && (
+              <div className="max-w-3xl mx-auto rounded-2xl overflow-hidden ring-1 ring-white/10 bg-black aspect-video">
+                <video src={mp4Url} controls playsInline loop className="w-full h-full" />
+              </div>
+            )}
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-              <button
-                disabled
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-500/30 text-emerald-100/70 font-semibold text-sm cursor-not-allowed"
-              >
-                <DownloadOutlined /> Download MP4 (V2)
-              </button>
+              {mp4Url && (
+                <a
+                  href={mp4Url}
+                  target="_blank"
+                  rel="noreferrer"
+                  download="room-redesign.mp4"
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-sm transition-colors"
+                >
+                  <DownloadOutlined /> Download MP4
+                </a>
+              )}
               <button
                 onClick={reset}
                 className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-white/20 bg-white/[0.04] hover:bg-white/[0.08] text-white font-semibold text-sm transition-all"
               >
-                <ReloadOutlined /> Reset
+                <ReloadOutlined /> Start over
               </button>
             </div>
           </section>
+        )}
+
+        {errorMsg && (
+          <div className="mt-6 rounded-xl ring-1 ring-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+            {errorMsg}
+          </div>
         )}
 
         {/* Pipeline architecture spec — what V2 will actually do. */}
