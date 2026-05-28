@@ -83,6 +83,8 @@ export default function SplatViewer() {
   const [sceneName, setSceneName] = useState("");
   const [urlInput, setUrlInput]   = useState("");
   const [hudOpen, setHudOpen]     = useState(true);
+  const [splatScale, setSplatScale] = useState(1);   // 1× default; some files export with tiny splats
+  const [yFlipped,  setYFlipped]    = useState(true); // INRIA cameraUp [0,-1,0]; flip for Y-up files
 
   // Build the viewer on mount; tear it down on unmount.
   useEffect(() => {
@@ -95,8 +97,8 @@ export default function SplatViewer() {
     // in world space.
     const viewer = new GaussianSplats3D.Viewer({
       rootElement: mountRef.current,
-      cameraUp: [0, -1, 0],            // INRIA convention; fitCameraToScene re-targets
-      initialCameraPosition: [0, 0, 5],
+      cameraUp: yFlipped ? [0, -1, 0] : [0, 1, 0],
+      initialCameraPosition: [0, 0, 15],    // far enough that any common splat is visible
       initialCameraLookAt: [0, 0, 0],
       sphericalHarmonicsDegree: 0,
       sharedMemoryForWorkers: false,
@@ -122,7 +124,30 @@ export default function SplatViewer() {
         objectUrlRef.current = null;
       }
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [yFlipped]);   // re-mount when Y-flip toggles (cameraUp is constructor-only)
+
+  // Push the splatScale slider value into the live viewer/mesh.
+  // The library exposes `splatScale` on the mesh; falling back to
+  // `viewer.splatRenderMode` knobs if the API drifts. Wrapped in
+  // try/catch because the value is read every frame so a bad write
+  // would tank the render loop.
+  useEffect(() => {
+    const v = viewerRef.current;
+    if (!v) return;
+    try {
+      const mesh = v.getSplatMesh?.();
+      if (mesh) {
+        if (typeof mesh.splatScale !== "undefined") {
+          mesh.splatScale = splatScale;
+        } else if (typeof mesh.setSplatScale === "function") {
+          mesh.setSplatScale(splatScale);
+        }
+      }
+    } catch (e) {
+      console.warn("[splat] splat-scale write failed:", e?.message);
+    }
+  }, [splatScale]);
 
   // Read the freshly-loaded SplatMesh's bounding box and reposition
   // the camera + orbit-controls target so the scene is centered in
@@ -272,6 +297,20 @@ export default function SplatViewer() {
     fitCameraToScene(v);
   };
 
+  // Hard-reset to a far-back camera so a scene that's "stuck
+  // off-screen" comes back into view. Independent of auto-fit so
+  // even if the bounding box is empty the user has a way out.
+  const pullBack = () => {
+    const v = viewerRef.current;
+    if (!v) return;
+    try {
+      v.camera.position.set(0, 0, 20);
+      v.camera.lookAt(new THREE.Vector3(0, 0, 0));
+      v.controls?.target?.set(0, 0, 0);
+      v.controls?.update?.();
+    } catch (_) {}
+  };
+
   return (
     <div className="relative min-h-screen w-full bg-[#05050a] text-gray-100 pt-24 sm:pt-32 pb-16 px-4 sm:px-6 overflow-hidden">
       {/* Ambient backdrop — pure CSS, no extra Three.js cost. */}
@@ -370,6 +409,43 @@ export default function SplatViewer() {
                 <span><kbd className="px-1.5 py-0.5 rounded bg-white/10 mr-1">drag</kbd>look</span>
                 <span><kbd className="px-1.5 py-0.5 rounded bg-white/10 mr-1">scroll</kbd>dolly</span>
                 <span><kbd className="px-1.5 py-0.5 rounded bg-white/10 mr-1">rt-drag</kbd>pan</span>
+              </div>
+            </div>
+          )}
+
+          {/* Visibility rescue bar — bottom-right. When the auto-fit
+              fails (rare splat formats, tiny clouds) the user has
+              concrete knobs: scale splats up, flip Y, or pull the
+              camera way back. Always visible once a scene's loaded. */}
+          {status.phase === "ready" && (
+            <div className="absolute bottom-3 right-3 z-10">
+              <div className="rounded-xl px-3 py-2 backdrop-blur-md bg-black/40 ring-1 ring-white/10 flex items-center gap-2 text-[10px]">
+                <span className="text-gray-400 font-mono uppercase tracking-[0.18em]">scale</span>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="6"
+                  step="0.25"
+                  value={splatScale}
+                  onChange={(e) => setSplatScale(parseFloat(e.target.value))}
+                  className="w-24 accent-rose-500"
+                />
+                <span className="text-gray-300 font-mono w-8 text-right">{splatScale.toFixed(2)}×</span>
+                <span className="w-px h-4 bg-white/15 mx-1" />
+                <button
+                  onClick={() => setYFlipped((v) => !v)}
+                  title="Flip Y-axis (file format mismatch)"
+                  className="px-2 py-1 rounded-md hover:bg-white/10 text-gray-300 hover:text-white font-mono"
+                >
+                  {yFlipped ? "Y▼" : "Y▲"}
+                </button>
+                <button
+                  onClick={pullBack}
+                  title="Pull camera way back"
+                  className="px-2 py-1 rounded-md hover:bg-white/10 text-gray-300 hover:text-white font-mono"
+                >
+                  Pull back
+                </button>
               </div>
             </div>
           )}
