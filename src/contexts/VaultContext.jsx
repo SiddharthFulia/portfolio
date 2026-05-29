@@ -22,6 +22,17 @@ const STORAGE_KEY  = "sid-vault-token";
 const CHANGE_EVENT = "sid-vault-change";
 const BE_URL = import.meta.env.VITE_BE_URL || "http://localhost:4001";
 
+// Module-level singleton so api/request.js (which doesn't sit inside
+// a React component tree) can still ask for vault unlock when it
+// hits a 401. The Provider registers `requireUnlock` here on mount
+// and any module can call requireVaultUnlock() to await an unlock.
+let vaultBridge = {
+  requireUnlock: () => Promise.resolve(false),
+};
+export function requireVaultUnlock() {
+  return vaultBridge.requireUnlock();
+}
+
 const VaultContext = createContext({
   isUnlocked: false,
   token: null,
@@ -30,6 +41,10 @@ const VaultContext = createContext({
   loginModalOpen: false,
   openLoginModal: () => {},
   closeLoginModal: () => {},
+  // requireUnlock(): returns a Promise<boolean>. Resolves true once the
+  // user has unlocked, false if they cancel the modal. Callers use it
+  // when they hit a 401 to silently prompt for re-login + retry.
+  requireUnlock: async () => false,
 });
 
 function readToken() {
@@ -39,6 +54,10 @@ function readToken() {
 export function VaultProvider({ children }) {
   const [token, setToken] = useState(readToken);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
+  // Pending promise resolvers — when requireUnlock() opens the modal,
+  // it stores its resolver here; the modal calls it after login (true)
+  // or cancel (false), then clears the array.
+  const [pendingResolvers, setPendingResolvers] = useState([]);
 
   // Listen for same-tab changes (custom event) + cross-tab changes
   // (native storage event). Both push the latest token into state.
@@ -67,6 +86,8 @@ export function VaultProvider({ children }) {
     try { localStorage.setItem(STORAGE_KEY, data.data.token); } catch {}
     window.dispatchEvent(new Event(CHANGE_EVENT));
     setToken(data.data.token);
+    // Resolve everyone waiting on requireUnlock() with true.
+    setPendingResolvers((prev) => { prev.forEach((r) => r(true)); return []; });
     return data.data.token;
   }, []);
 
@@ -77,7 +98,32 @@ export function VaultProvider({ children }) {
   }, []);
 
   const openLoginModal  = useCallback(() => setLoginModalOpen(true),  []);
-  const closeLoginModal = useCallback(() => setLoginModalOpen(false), []);
+  const closeLoginModal = useCallback(() => {
+    setLoginModalOpen(false);
+    // If the user dismissed without unlocking, resolve waiters with false.
+    setPendingResolvers((prev) => { prev.forEach((r) => r(false)); return []; });
+  }, []);
+
+  // Public API for "I need vault NOW" — called by fetch wrappers that
+  // just got a 401. If already unlocked: resolves true immediately.
+  // Otherwise opens the modal and resolves when the user logs in (true)
+  // or cancels (false). Callers retry their request on true, give up
+  // on false. NO toast / banner / alert before this — totally silent
+  // until the user actually does something that needs the vault.
+  const requireUnlock = useCallback(() => {
+    if (token) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      setPendingResolvers((prev) => [...prev, resolve]);
+      setLoginModalOpen(true);
+    });
+  }, [token]);
+
+  // Expose to the module-level bridge so non-React modules
+  // (api/request.js, fetch wrappers) can ask for vault unlock too.
+  useEffect(() => {
+    vaultBridge.requireUnlock = requireUnlock;
+    return () => { vaultBridge.requireUnlock = () => Promise.resolve(false); };
+  }, [requireUnlock]);
 
   return (
     <VaultContext.Provider
@@ -89,6 +135,7 @@ export function VaultProvider({ children }) {
         loginModalOpen,
         openLoginModal,
         closeLoginModal,
+        requireUnlock,
       }}
     >
       {children}

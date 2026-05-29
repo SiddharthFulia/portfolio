@@ -51,7 +51,7 @@ function vaultHeaders() {
 
 export default function VideoLibrary() {
   const navigate = useNavigate();
-  const { isUnlocked, openLoginModal } = useVault();
+  const { isUnlocked, requireUnlock } = useVault();
 
   const [items, setItems]       = useState([]);
   const [loading, setLoading]   = useState(true);
@@ -97,14 +97,20 @@ export default function VideoLibrary() {
     else setSelected(new Set(items.map((it) => it.id)));
   };
 
+  // Silent vault gate — we do NOT prompt before the user has actually
+  // tried to delete something. Once they confirm the delete dialog,
+  // if their token is missing/expired we open the login modal, wait
+  // for unlock, then run the request. If they cancel the login modal
+  // the delete just doesn't happen — no toast, no banner, no nag.
   const deleteOne = (id, title) => {
-    if (!isUnlocked) { openLoginModal(); return; }
     Modal.confirm({
       title: `Delete "${title}"?`,
       content: "Removes the MP4 + poster from the BE. This cannot be undone.",
       okText: "Delete",
       okButtonProps: { danger: true },
       onOk: async () => {
+        const ok = await requireUnlock();
+        if (!ok) return;
         try {
           const res = await fetch(`${BE_URL}/api/edit/${id}`, { method: "DELETE", headers: vaultHeaders() });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -118,7 +124,6 @@ export default function VideoLibrary() {
   };
 
   const deleteBulk = () => {
-    if (!isUnlocked) { openLoginModal(); return; }
     const ids = Array.from(selected);
     if (ids.length === 0) return;
     Modal.confirm({
@@ -127,6 +132,8 @@ export default function VideoLibrary() {
       okText: "Delete all",
       okButtonProps: { danger: true },
       onOk: async () => {
+        const ok = await requireUnlock();
+        if (!ok) return;
         try {
           const res = await fetch(`${BE_URL}/api/edit/bulk-delete`, {
             method: "POST",
