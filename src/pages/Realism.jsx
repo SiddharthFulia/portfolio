@@ -215,8 +215,14 @@ export default function Realism() {
     return body?.data?.url || body?.url || "";
   };
 
-  const onSubmit = async () => {
-    if (!enrichResult?.enriched) { message.warning("Enrich the prompt first"); return; }
+  // `useEnriched` controls which prompt actually ships when the user
+  // hits Generate. Two explicit buttons drive it so they can A/B raw
+  // vs enriched without losing the rewrite.
+  const onSubmit = async (variant /* 'enriched' | 'raw' */) => {
+    const finalPrompt = (variant === "raw")
+      ? base.trim()
+      : (enrichResult?.enriched?.trim() || base.trim());
+    if (!finalPrompt) { message.warning("Type a prompt first"); return; }
     if (!isUnlocked && !heroFile) {
       // not a hard block — many AI Video generations are open lane
     }
@@ -229,9 +235,12 @@ export default function Realism() {
         imageUrl = await uploadHero();
       }
       const m = MODELS.find((x) => x.key === model) || MODELS[0];
+      // Negative prompt only travels with the enriched variant — when
+      // shipping raw we don't second-guess what the user wrote.
+      const negativePrompt = (variant !== "raw" && enrichResult?.negative) ? enrichResult.negative : "";
       const body = {
-        prompt:         enrichResult.enriched,
-        negativePrompt: enrichResult.negative || "",
+        prompt:         finalPrompt,
+        negativePrompt,
         provider:       m.provider,
         model:          m.key,
         duration:       m.duration,
@@ -638,22 +647,45 @@ export default function Realism() {
               </p>
             </div>
 
-            {/* Submit */}
+            {/* Submit — two buttons when both raw + enriched are
+                available so you can A/B them without losing the
+                rewrite. Only one button (raw) when there's no
+                enrichment yet. */}
             <div className="rounded-2xl ring-1 ring-rose-400/30 bg-gradient-to-br from-rose-500/10 to-amber-500/5 p-5">
               <p className="text-[10px] uppercase tracking-[0.18em] font-mono text-rose-300 mb-2">Generate</p>
               <p className="text-xs text-gray-300 mb-4">
                 Submits to the same /api/ai-video/generate worker the main AI Video
-                page uses. The realism comes from the enriched prompt + optional hero
-                frame, not from a different model.
+                page uses. {enrichResult?.enriched
+                  ? "Try both — raw is faster to test, enriched usually looks more cinematic."
+                  : "Ship your prompt as-is, or click Enrich first for the cinematic rewrite."}
               </p>
+
+              {/* Enriched submit (only when enrichment exists) */}
+              {enrichResult?.enriched && (
+                <button
+                  onClick={() => onSubmit("enriched")}
+                  disabled={submitting || (status && status.state !== "failed" && status.state !== "completed")}
+                  className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-rose-500 hover:bg-rose-400 disabled:bg-gray-700 disabled:text-gray-500 text-white font-bold text-sm transition-colors"
+                >
+                  {submitting ? <ReloadOutlined spin /> : <RocketOutlined />}
+                  Generate · enriched rewrite
+                </button>
+              )}
+
+              {/* Raw submit — always available when base is non-empty */}
               <button
-                onClick={onSubmit}
-                disabled={submitting || !enrichResult?.enriched || (status && status.state !== "failed" && status.state !== "completed")}
-                className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-rose-500 hover:bg-rose-400 disabled:bg-gray-700 disabled:text-gray-500 text-white font-bold text-sm transition-colors"
+                onClick={() => onSubmit("raw")}
+                disabled={submitting || !base.trim() || (status && status.state !== "failed" && status.state !== "completed")}
+                className={`w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-bold text-sm transition-colors disabled:bg-gray-700 disabled:text-gray-500
+                  ${enrichResult?.enriched
+                    ? "mt-2 border border-rose-400/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-100"
+                    : "bg-rose-500 hover:bg-rose-400 text-white"
+                  }`}
               >
                 {submitting ? <ReloadOutlined spin /> : <RocketOutlined />}
-                {submitting ? "Submitting…" : "Generate realistic video"}
+                Generate · raw prompt
               </button>
+
               <button
                 onClick={reset}
                 className="mt-2 w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-white/15 text-gray-300 hover:text-white hover:bg-white/[0.04] text-xs"
