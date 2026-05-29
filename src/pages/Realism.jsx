@@ -151,10 +151,14 @@ export default function Realism() {
     const res = await fetch(`${BE_URL}/api/ai-video/upload-image`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...vaultHeaders() },
-      body: JSON.stringify({ image: dataUrl }),
+      // BE field name is `dataUrl`, not `image` — the handler validates
+      // it starts with `data:image/` and forwards to Cloudinary.
+      body: JSON.stringify({ dataUrl }),
     });
     const body = await res.json();
     if (!res.ok) throw new Error(body?.message || "Hero upload failed");
+    // postUploadSourceImage returns { url, publicId, bytes, width, height, format }
+    // wrapped in the standard `{ status, data }` envelope.
     return body?.data?.url || body?.url || "";
   };
 
