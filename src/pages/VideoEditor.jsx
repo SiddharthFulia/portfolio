@@ -105,8 +105,8 @@ export default function VideoEditor() {
               Dismissable so it doesn't stay in the way after the user
               has loaded their first clip. */}
           {startHintOpen && (
-            <div className="absolute top-3 left-3 z-10 max-w-[min(420px,calc(100%-100px))] pointer-events-none">
-              <div className="rounded-2xl px-4 py-3 backdrop-blur-xl bg-black/70 ring-1 ring-rose-400/40 shadow-2xl pointer-events-auto">
+            <div className="absolute top-3 left-3 z-10 max-w-[min(440px,calc(100%-100px))] pointer-events-none">
+              <div className="rounded-2xl px-4 py-3 backdrop-blur-xl bg-black/75 ring-1 ring-rose-400/40 shadow-2xl pointer-events-auto">
                 <div className="flex items-start gap-3">
                   <div className="shrink-0 w-9 h-9 rounded-xl bg-rose-500/20 ring-1 ring-rose-400/40 grid place-items-center text-rose-200">
                     <CloudUploadOutlined />
@@ -117,9 +117,17 @@ export default function VideoEditor() {
                       <PlusCircleOutlined className="text-rose-300 text-[12px]" />
                     </p>
                     <p className="text-[11px] text-gray-300 leading-relaxed mt-0.5">
-                      <strong>Drop a video file</strong> anywhere on the editor below, or use{" "}
-                      <strong>+ Import</strong> inside OpenReel's media panel (top-left). Add
-                      audio, images, or text the same way.
+                      <strong>Drag a video file</strong> anywhere on the editor below, or click
+                      the <strong>Import</strong> button in the media panel (top-left of the
+                      editor). Add audio, images, or text the same way.
+                    </p>
+                    <p className="text-[10px] text-rose-200/90 mt-1.5 flex items-center gap-2 font-mono uppercase tracking-[0.15em]">
+                      <span className="inline-flex items-center gap-1">
+                        <CloudUploadOutlined className="text-[10px]" />
+                        MP4 · MOV · WEBM · MKV
+                      </span>
+                      <span className="text-gray-500">·</span>
+                      <span>max 500 MB / file</span>
                     </p>
                   </div>
                   <button
@@ -167,7 +175,7 @@ export default function VideoEditor() {
               <MobileOutlined className="text-rose-300" /> Mobile-ready
             </span>
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.04] ring-1 ring-white/10">
-              <ExportOutlined className="text-rose-300" /> Save → /edit/library
+              <ExportOutlined className="text-rose-300" /> Save to your library
             </span>
             {!isUnlocked && (
               <span className="ml-auto inline-flex items-center gap-1.5 text-[10px] text-amber-200/80">

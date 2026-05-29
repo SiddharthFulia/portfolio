@@ -30,8 +30,16 @@ const Navbar = () => {
     return () => { a.pause(); a.src = ''; };
   }, []);
 
-  // Close menu on route change
-  useEffect(() => { setMenuOpen(false); }, [pathname]);
+  // Close BOTH the Workshop dropdown AND mobile menu on route change.
+  // Without resetting moreOpen here, clicking a NavLink inside the
+  // dropdown leaves moreOpen=true on the next route → body keeps the
+  // workshop-open lock → scrollbar drops → page content shifts right
+  // by ~15px because `mx-auto` re-centers against the now-wider
+  // viewport.
+  useEffect(() => {
+    setMenuOpen(false);
+    setMoreOpen(false);
+  }, [pathname]);
 
   const [moreOpen, setMoreOpen] = useState(false);
 

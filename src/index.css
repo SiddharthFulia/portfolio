@@ -16,6 +16,11 @@ body {
 
 html {
   overflow-x: hidden;
+  /* Always reserve room for a vertical scrollbar so that toggling
+     `body.overflow=hidden` (Workshop dropdown lock, modal opens,
+     etc.) doesn't drop the scrollbar and shift centered content
+     to the right by ~15px. */
+  scrollbar-gutter: stable;
 }
 
 *, *::before, *::after {

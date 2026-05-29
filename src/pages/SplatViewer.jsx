@@ -209,10 +209,6 @@ export default function SplatViewer() {
               />
             </div>
 
-            <p className="mt-8 text-[11px] text-gray-500">
-              SuperSplat is MIT-licensed and self-hosted at{" "}
-              <code className="text-gray-400">/supersplat/</code>.
-            </p>
           </>
         )}
       </div>
