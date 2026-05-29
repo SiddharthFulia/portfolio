@@ -39,6 +39,7 @@ const ASPECT_OPTIONS = [
   { key: "9:16",   label: "9:16",   note: "Reels / Shorts" },
   { key: "1:1",    label: "1:1",    note: "Instagram" },
   { key: "4:5",    label: "4:5",    note: "Feed post" },
+  { key: "custom", label: "Custom", note: "Draw a box" },
 ];
 
 function vaultHeaders() {
@@ -76,6 +77,13 @@ export default function VideoEditor() {
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd]     = useState(0);
   const [aspect, setAspect]       = useState("source");
+  // Custom crop rectangle, kept as percentages of the source video
+  // so it stays correct regardless of how the preview is sized in
+  // the browser. {x, y, w, h} all in 0..1. null = no rect drawn yet.
+  const [customCrop, setCustomCrop] = useState(null);
+  const [drawing, setDrawing] = useState(false);
+  const drawStartRef = useRef(null);
+  const cropLayerRef = useRef(null);
   const [musicFile, setMusicFile] = useState(null);
   const [musicPreview, setMusicPreview] = useState("");
   const [musicVolume, setMusicVolume] = useState(0.7);
@@ -156,6 +164,57 @@ export default function VideoEditor() {
     [trimStart, trimEnd, duration]
   );
 
+  // ─── Custom crop — draw a rectangle on the video preview ─────
+  // Mouse / touch events on the overlay convert pointer position
+  // to a percentage of the visible preview, which IS the percentage
+  // of the source video (object-cover guarantees that). On save we
+  // pass the fractional rect to the BE which converts it to exact
+  // pixel coords for ffmpeg's `crop` filter.
+  const eventPct = (e) => {
+    const layer = cropLayerRef.current;
+    if (!layer) return { x: 0, y: 0 };
+    const r = layer.getBoundingClientRect();
+    const cx = e.touches ? e.touches[0].clientX : e.clientX;
+    const cy = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+      x: Math.max(0, Math.min(1, (cx - r.left) / r.width)),
+      y: Math.max(0, Math.min(1, (cy - r.top)  / r.height)),
+    };
+  };
+
+  const onCropDown = (e) => {
+    if (aspect !== "custom") return;
+    e.preventDefault();
+    const p = eventPct(e);
+    drawStartRef.current = p;
+    setCustomCrop({ x: p.x, y: p.y, w: 0, h: 0 });
+    setDrawing(true);
+  };
+
+  const onCropMove = (e) => {
+    if (!drawing || !drawStartRef.current) return;
+    e.preventDefault();
+    const p = eventPct(e);
+    const s = drawStartRef.current;
+    setCustomCrop({
+      x: Math.min(s.x, p.x),
+      y: Math.min(s.y, p.y),
+      w: Math.abs(p.x - s.x),
+      h: Math.abs(p.y - s.y),
+    });
+  };
+
+  const onCropUp = () => {
+    if (!drawing) return;
+    setDrawing(false);
+    // Enforce a minimum size so a stray click doesn't crop to nothing.
+    setCustomCrop((c) => {
+      if (!c) return c;
+      if (c.w < 0.02 || c.h < 0.02) return null;
+      return c;
+    });
+  };
+
   const onSave = async () => {
     if (!file) return;
     setSaving(true);
@@ -169,6 +228,12 @@ export default function VideoEditor() {
       fd.append("trimEnd",     String(trimEnd || duration));
       fd.append("musicVolume", String(musicVolume));
       fd.append("durationSec", String(trimDurationSec));
+      if (aspect === "custom" && customCrop) {
+        fd.append("cropX", String(customCrop.x));
+        fd.append("cropY", String(customCrop.y));
+        fd.append("cropW", String(customCrop.w));
+        fd.append("cropH", String(customCrop.h));
+      }
 
       const res = await fetch(`${BE_URL}/api/edit/process`, {
         method:  "POST",
@@ -249,16 +314,100 @@ export default function VideoEditor() {
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
             {/* Preview */}
             <div className="lg:col-span-3">
-              <div className="rounded-2xl overflow-hidden ring-1 ring-white/10 bg-black aspect-video">
+              <div className="relative rounded-2xl overflow-hidden ring-1 ring-white/10 bg-black aspect-video">
                 <video
                   ref={videoRef}
                   src={previewUrl}
-                  controls
+                  controls={aspect !== "custom"}
                   playsInline
                   className="w-full h-full object-contain bg-black"
                   onLoadedMetadata={onLoadedMeta}
                 />
+                {/* Crop drawing layer — only when aspect=custom. The
+                    layer captures pointer events so drawing doesn't
+                    fight the video controls; controls are disabled
+                    above while in crop mode. */}
+                {aspect === "custom" && (
+                  <div
+                    ref={cropLayerRef}
+                    className="absolute inset-0 cursor-crosshair touch-none"
+                    onMouseDown={onCropDown}
+                    onMouseMove={onCropMove}
+                    onMouseUp={onCropUp}
+                    onMouseLeave={onCropUp}
+                    onTouchStart={onCropDown}
+                    onTouchMove={onCropMove}
+                    onTouchEnd={onCropUp}
+                  >
+                    {/* Dim mask around the selection */}
+                    {customCrop && (
+                      <>
+                        <div
+                          className="absolute inset-0 pointer-events-none"
+                          style={{
+                            background:
+                              `linear-gradient(rgba(0,0,0,0.55),rgba(0,0,0,0.55))`,
+                            clipPath:
+                              `polygon(0 0, 100% 0, 100% 100%, 0 100%, 0 ${customCrop.y * 100}%, ${customCrop.x * 100}% ${customCrop.y * 100}%, ${customCrop.x * 100}% ${(customCrop.y + customCrop.h) * 100}%, ${(customCrop.x + customCrop.w) * 100}% ${(customCrop.y + customCrop.h) * 100}%, ${(customCrop.x + customCrop.w) * 100}% ${customCrop.y * 100}%, 0 ${customCrop.y * 100}%)`,
+                          }}
+                        />
+                        <div
+                          className="absolute ring-2 ring-rose-400 pointer-events-none"
+                          style={{
+                            left:   `${customCrop.x * 100}%`,
+                            top:    `${customCrop.y * 100}%`,
+                            width:  `${customCrop.w * 100}%`,
+                            height: `${customCrop.h * 100}%`,
+                            boxShadow: "0 0 0 1px rgba(0,0,0,0.6) inset",
+                          }}
+                        >
+                          {/* Corner ticks */}
+                          {[
+                            { t: 0, l: 0 }, { t: 0, r: 0 },
+                            { b: 0, l: 0 }, { b: 0, r: 0 },
+                          ].map((c, i) => (
+                            <span
+                              key={i}
+                              className="absolute w-2.5 h-2.5 bg-rose-400 rounded-sm"
+                              style={{
+                                top:    c.t != null ? `-5px` : undefined,
+                                bottom: c.b != null ? `-5px` : undefined,
+                                left:   c.l != null ? `-5px` : undefined,
+                                right:  c.r != null ? `-5px` : undefined,
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                    {/* Instruction watermark when no rect yet */}
+                    {!customCrop && (
+                      <div className="absolute inset-0 grid place-items-center pointer-events-none">
+                        <div className="rounded-xl px-3 py-1.5 bg-black/60 backdrop-blur-md ring-1 ring-rose-400/40 text-rose-100 text-[11px] font-mono uppercase tracking-[0.2em]">
+                          Click + drag to crop
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
+              {aspect === "custom" && customCrop && (
+                <div className="mt-2 flex items-center gap-2 text-[11px] text-gray-400">
+                  <span className="font-mono">
+                    Crop · {(customCrop.w * 100).toFixed(0)}% × {(customCrop.h * 100).toFixed(0)}%
+                  </span>
+                  <span className="text-gray-600">at</span>
+                  <span className="font-mono">
+                    {(customCrop.x * 100).toFixed(0)}%, {(customCrop.y * 100).toFixed(0)}%
+                  </span>
+                  <button
+                    onClick={() => setCustomCrop(null)}
+                    className="ml-auto px-2 py-1 rounded-md text-gray-300 hover:text-white hover:bg-white/10"
+                  >
+                    Reset
+                  </button>
+                </div>
+              )}
 
               {/* Trim controls */}
               <div className="mt-4 rounded-2xl ring-1 ring-white/10 bg-white/[0.03] p-5">
