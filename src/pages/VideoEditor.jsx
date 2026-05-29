@@ -211,6 +211,13 @@ export default function VideoEditor() {
           </div>
           <div className="flex items-center gap-2 text-xs">
             <button
+              onClick={() => navigate("/edit/advanced")}
+              title="Full multi-track timeline editor"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-rose-400/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-100 font-semibold transition-colors"
+            >
+              Timeline editor →
+            </button>
+            <button
               onClick={() => navigate("/edit/library")}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] text-white font-semibold transition-colors"
             >

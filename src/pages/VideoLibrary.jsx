@@ -19,6 +19,8 @@ import {
   ReloadOutlined,
   ScissorOutlined,
   PlayCircleOutlined,
+  ImportOutlined,
+  LoadingOutlined,
 } from "@ant-design/icons";
 import { useVault } from "../contexts/VaultContext";
 
@@ -57,6 +59,8 @@ export default function VideoLibrary() {
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState(null);
   const [selected, setSelected] = useState(new Set());
+  const [importing, setImporting] = useState(false);
+  const importInputRef = useRef(null);
 
   const fetchList = async () => {
     setLoading(true);
@@ -77,6 +81,43 @@ export default function VideoLibrary() {
   // Re-fetch whenever vault state changes — anonymous → unlocked
   // reveals private rows; unlocked → anonymous hides them.
   useEffect(() => { fetchList(); /* eslint-disable-next-line */ }, [isUnlocked]);
+
+  // Manual import path — any MP4 sitting on the user's machine
+  // (e.g. a download from /edit/advanced's Export, or anywhere
+  // else) gets dropped into the same library used by /edit.
+  const onImportFile = async (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    if (f.size > 500 * 1024 * 1024) {
+      message.error("File is over the 500 MB limit");
+      return;
+    }
+    if (!f.type?.startsWith("video/")) {
+      message.error("Pick a video file");
+      return;
+    }
+    setImporting(true);
+    try {
+      const fd = new FormData();
+      fd.append("video", f);
+      const baseName = f.name.replace(/\.[^.]+$/, "").slice(0, 80);
+      fd.append("title", baseName || "Imported video");
+      const res = await fetch(`${BE_URL}/api/edit/upload`, {
+        method:  "POST",
+        body:    fd,
+        headers: { ...vaultHeaders() },
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body?.message || `Import failed: ${res.status}`);
+      message.success(`Imported ${baseName}`);
+      fetchList();
+    } catch (err) {
+      message.error(err.message || "Import failed");
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const allSelected = useMemo(
     () => items.length > 0 && items.every((it) => selected.has(it.id)),
@@ -187,7 +228,23 @@ export default function VideoLibrary() {
               )}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <input
+              ref={importInputRef}
+              type="file"
+              accept="video/*"
+              className="hidden"
+              onChange={onImportFile}
+            />
+            <button
+              onClick={() => importInputRef.current?.click()}
+              disabled={importing}
+              title="Import any MP4 from your device (e.g. an Export from the timeline editor)"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-rose-400/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-100 text-sm font-semibold transition-colors disabled:opacity-50"
+            >
+              {importing ? <LoadingOutlined /> : <ImportOutlined />}
+              {importing ? "Importing…" : "Import from device"}
+            </button>
             <button
               onClick={() => navigate("/edit")}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-400 text-white text-sm font-semibold transition-colors"

@@ -91,8 +91,9 @@ const CinemaRenderPage = lazyWithReload(() => import("./pages/CinemaRenderPage")
 const SplatViewer = lazyWithReload(() => import("./pages/SplatViewer"));
 const Showreel = lazyWithReload(() => import("./pages/Showreel"));
 const RoomDesign = lazyWithReload(() => import("./pages/RoomDesign"));
-const VideoEditor = lazyWithReload(() => import("./pages/VideoEditor"));
-const VideoLibrary = lazyWithReload(() => import("./pages/VideoLibrary"));
+const VideoEditor         = lazyWithReload(() => import("./pages/VideoEditor"));
+const VideoEditorAdvanced = lazyWithReload(() => import("./pages/VideoEditorAdvanced"));
+const VideoLibrary        = lazyWithReload(() => import("./pages/VideoLibrary"));
 
 /* ── Skeleton building blocks ──
  * The legacy hand-rolled pulse blocks (Light/Dark/Science/etc) are
@@ -265,6 +266,7 @@ const ROUTE_TITLES = {
   '/showreel'      : 'Showreel · Sid',
   '/room'          : 'Room Designer · Sid',
   '/edit'          : 'Video Editor · Sid',
+  '/edit/advanced' : 'Timeline Editor · Sid',
   '/edit/library'  : 'Edited Videos · Sid',
 };
 const DEFAULT_TITLE = 'Siddharth Fulia · AI Engineer';
@@ -381,8 +383,9 @@ const App = () => {
           <Route path='/room'     element={<Suspense fallback={<PageLoader />}><RoomDesign /></Suspense>} />
 
           {/* Video Editor — OpenReel embedded in an iframe. */}
-          <Route path='/edit'         element={<Suspense fallback={<PageLoader />}><VideoEditor  /></Suspense>} />
-          <Route path='/edit/library' element={<Suspense fallback={<PageLoader />}><VideoLibrary /></Suspense>} />
+          <Route path='/edit'           element={<Suspense fallback={<PageLoader />}><VideoEditor          /></Suspense>} />
+          <Route path='/edit/advanced'  element={<Suspense fallback={<PageLoader />}><VideoEditorAdvanced /></Suspense>} />
+          <Route path='/edit/library'   element={<Suspense fallback={<PageLoader />}><VideoLibrary        /></Suspense>} />
 
           {/* Catch-all — any unknown URL bounces to home instead of 404.
               Visitors fat-fingering /settngs or /chses end up somewhere
