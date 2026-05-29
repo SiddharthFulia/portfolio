@@ -1,8 +1,9 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useRef, useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { LockOutlined } from "@ant-design/icons";
+import { LockOutlined, UnlockOutlined } from "@ant-design/icons";
 import sakura from "../assets/sakura.mp3";
+import { useVault } from "../contexts/VaultContext";
 
 // New SF crimson logo lives under public/ — referenced by absolute
 // path so Vite serves it directly and we avoid bundling a 2 MB PNG.
@@ -68,6 +69,8 @@ const Navbar = () => {
         { to: '/showreel',       label: 'Showreel',        desc: 'Cinematic chapter reel of the AI stack' },
         { to: '/splat',          label: 'Splat Viewer',    desc: 'Walk through any Gaussian splat scene' },
         { to: '/room',           label: 'Room Designer',   desc: 'Video → analysis → furniture → MP4 · V1' },
+        { to: '/edit',           label: 'Video Editor',    desc: 'OpenReel · multi-track · crop · music · reels' },
+        { to: '/edit/library',   label: 'My Edits',        desc: 'Saved exported videos · library + bulk delete' },
         { to: '/hand',           label: 'Hand Tracking',   desc: '50 filters · 2-hand draw · cursor · laser' },
       ],
     },
@@ -172,10 +175,14 @@ const Navbar = () => {
             <>
               <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" onClick={() => setMoreOpen(false)} />
               <div className={`absolute top-full right-0 mt-2 rounded-2xl shadow-2xl border z-50 overflow-hidden
-                              w-[560px] max-w-[92vw] grid grid-cols-1 sm:grid-cols-2
+                              w-[560px] max-w-[92vw]
                               ${isDark
                                 ? 'bg-[#0a0a0e] border-gray-800'
                                 : 'bg-white border-gray-200'}`}>
+                {/* Vault control — top of the dropdown so it's one click
+                    away from anywhere on the site. Shows current state. */}
+                <VaultDropdownEntry isDark={isDark} onAction={() => setMoreOpen(false)} />
+                <div className="grid grid-cols-1 sm:grid-cols-2">
                 {moreGroups.map((g, gi) => (
                   <div key={g.title} className={`p-4 ${gi === 0 ? 'sm:border-r' : ''} ${isDark ? 'sm:border-gray-800' : 'sm:border-gray-200'}`}>
                     <p className={`text-[10px] uppercase tracking-[0.18em] font-bold mb-3 ${g.accent}`}>
@@ -216,6 +223,7 @@ const Navbar = () => {
                     </ul>
                   </div>
                 ))}
+                </div>
               </div>
             </>
           )}
@@ -273,8 +281,13 @@ const Navbar = () => {
             className={`absolute top-full left-0 right-0 z-50 py-4 px-6 flex flex-col gap-1 shadow-xl border-t
               ${isDark ? 'bg-gray-950/95 border-gray-800' : 'bg-white/95 border-gray-200'}`}>
 
+          {/* Vault control — same as the desktop dropdown entry */}
+          <div className="px-2 pt-2">
+            <VaultDropdownEntry isDark={isDark} onAction={() => setMenuOpen(false)} />
+          </div>
+
           {/* Main pages — the only "always visible" links now */}
-          <div className={`text-[10px] uppercase tracking-wider font-semibold px-2 pt-2 pb-1 ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>Pages</div>
+          <div className={`text-[10px] uppercase tracking-wider font-semibold px-2 pt-3 pb-1 ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>Pages</div>
           {primaryLinks.map(l => (
             <NavLink key={l.to} to={l.to} className={({ isActive }) =>
               `py-2.5 px-2 text-sm font-medium rounded-lg ${isActive ? 'text-blue-400 bg-blue-500/10' : isDark ? 'text-gray-300' : 'text-gray-700'}`}>
@@ -346,5 +359,50 @@ const MusicBtn = ({ playing, toggleMusic, isDark }) => (
     )}
   </button>
 );
+
+// Vault state entry rendered at the TOP of the Workshop dropdown.
+// Shows current lock state + a one-click login/logout button.
+// Reads from the global VaultContext so every other component reflects
+// the change without needing its own modal.
+const VaultDropdownEntry = ({ isDark, onAction }) => {
+  const { isUnlocked, openLoginModal, logout } = useVault();
+  return (
+    <div className={`px-4 py-3 ${isDark ? 'border-b border-gray-800 bg-gradient-to-r from-fuchsia-500/5 to-transparent' : 'border-b border-gray-200 bg-gradient-to-r from-fuchsia-50 to-transparent'}`}>
+      <div className="flex items-center gap-3">
+        <span className={`inline-flex w-9 h-9 rounded-xl items-center justify-center text-base ${
+          isUnlocked
+            ? 'bg-emerald-500/15 ring-1 ring-emerald-400/40 text-emerald-300'
+            : 'bg-fuchsia-500/15 ring-1 ring-fuchsia-400/40 text-fuchsia-300'
+        }`}>
+          {isUnlocked ? <UnlockOutlined /> : <LockOutlined />}
+        </span>
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            Vault {isUnlocked ? 'unlocked' : 'locked'}
+          </p>
+          <p className={`text-[11px] ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+            {isUnlocked
+              ? 'Editing, deletes & private items visible'
+              : 'Log in for editing, deletes & private items'}
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            if (isUnlocked) logout();
+            else openLoginModal();
+            onAction?.();
+          }}
+          className={`text-[11px] font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors ${
+            isUnlocked
+              ? 'bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25 ring-1 ring-emerald-400/40'
+              : 'bg-fuchsia-500 text-white hover:bg-fuchsia-400'
+          }`}
+        >
+          {isUnlocked ? 'Log out' : 'Unlock'}
+        </button>
+      </div>
+    </div>
+  );
+};
 
 export default Navbar;

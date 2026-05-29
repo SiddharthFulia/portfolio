@@ -6,6 +6,8 @@ import BackToTop from './components/BackToTop';
 import EasterEgg from './components/EasterEgg';
 import RouteErrorBoundary from './components/RouteErrorBoundary';
 import NoticeStack from './components/NoticeStack';
+import { VaultProvider } from './contexts/VaultContext';
+import VaultModal from './components/VaultModal';
 
 // Lazy import wrapper that auto-recovers from Vite/Vercel chunk-hash
 // mismatches. After a deploy, an open tab still has the OLD index.html
@@ -89,6 +91,8 @@ const CinemaRenderPage = lazyWithReload(() => import("./pages/CinemaRenderPage")
 const SplatViewer = lazyWithReload(() => import("./pages/SplatViewer"));
 const Showreel = lazyWithReload(() => import("./pages/Showreel"));
 const RoomDesign = lazyWithReload(() => import("./pages/RoomDesign"));
+const VideoEditor = lazyWithReload(() => import("./pages/VideoEditor"));
+const VideoLibrary = lazyWithReload(() => import("./pages/VideoLibrary"));
 
 /* ── Skeleton building blocks ──
  * The legacy hand-rolled pulse blocks (Light/Dark/Science/etc) are
@@ -260,6 +264,8 @@ const ROUTE_TITLES = {
   '/splat'         : 'Splat Viewer · Sid',
   '/showreel'      : 'Showreel · Sid',
   '/room'          : 'Room Designer · Sid',
+  '/edit'          : 'Video Editor · Sid',
+  '/edit/library'  : 'Edited Videos · Sid',
 };
 const DEFAULT_TITLE = 'Siddharth Fulia · AI Engineer';
 const TitleManager = () => {
@@ -296,6 +302,8 @@ const App = () => {
       algorithm: theme.darkAlgorithm,
       token: { colorPrimary: '#22d3ee', borderRadius: 10, colorBgContainer: '#111827', colorBgElevated: '#1f2937', colorBorder: '#374151' },
     }}>
+    <VaultProvider>
+    <VaultModal />
     <main className='bg-slate-300/20'>
       <Router>
         <TitleManager />
@@ -372,6 +380,10 @@ const App = () => {
               furniture suggestions, render the new room out as MP4. */}
           <Route path='/room'     element={<Suspense fallback={<PageLoader />}><RoomDesign /></Suspense>} />
 
+          {/* Video Editor — OpenReel embedded in an iframe. */}
+          <Route path='/edit'         element={<Suspense fallback={<PageLoader />}><VideoEditor  /></Suspense>} />
+          <Route path='/edit/library' element={<Suspense fallback={<PageLoader />}><VideoLibrary /></Suspense>} />
+
           {/* Catch-all — any unknown URL bounces to home instead of 404.
               Visitors fat-fingering /settngs or /chses end up somewhere
               real instead of staring at a blank page. */}
@@ -384,6 +396,7 @@ const App = () => {
       <EasterEgg />
       <NoticeStack />
     </main>
+    </VaultProvider>
     </ConfigProvider>
   );
 };
