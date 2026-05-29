@@ -48,12 +48,14 @@ import { useVault } from "../contexts/VaultContext";
 
 const BE_URL = import.meta.env.VITE_BE_URL || "http://localhost:4001";
 
-// Provider catalog — only the I2V-capable lanes show up here.
+// Provider catalog — model keys match what local-gpu-worker/worker.py
+// recognises (verified from MODEL_VRAM_GB + label table at L444+).
 // 'optimized' is the FE label that resolves to the 5090 worker on
 // the existing /api/ai-video/generate endpoint.
 const MODELS = [
-  { key: "wan-i2v",     label: "Wan 2.1 I2V",   note: "14B · best motion fidelity",     duration: 5, provider: "optimized" },
-  { key: "hunyuan-i2v", label: "Hunyuan I2V",   note: "13B DiT · most cinematic",       duration: 5, provider: "optimized" },
+  { key: "wan-2.1-i2v", label: "Wan 2.1 I2V",   note: "14B · best motion fidelity",     duration: 5, provider: "optimized" },
+  { key: "wan-2.2",     label: "Wan 2.2",       note: "5B · faster · text + image",     duration: 5, provider: "optimized" },
+  { key: "hunyuan",     label: "Hunyuan",       note: "Tencent DiT · most cinematic",   duration: 5, provider: "optimized" },
   { key: "ltx-video",   label: "LTX I2V",       note: "2B distilled · fastest preview", duration: 5, provider: "optimized" },
 ];
 
@@ -82,7 +84,9 @@ export default function Realism() {
   const [grain, setGrain]       = useState("kodak-vision3");
   const [tone, setTone]         = useState("warm-teal");
   const [motion, setMotion]     = useState("subtle");
-  const [model, setModel]       = useState("wan-i2v");
+  const [model, setModel]       = useState("wan-2.1-i2v");
+  const [resolution, setResolution] = useState("720p");
+  const [steps, setSteps]       = useState(14);
   const [enrichResult, setEnrichResult] = useState(null);
   const [enriching, setEnriching]       = useState(false);
   const [heroFile, setHeroFile]         = useState(null);
@@ -94,17 +98,61 @@ export default function Realism() {
   const [jobId, setJobId]       = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus]     = useState(null);   // {state, videoUrl, progressMessage}
+  const [logs, setLogs]         = useState([]);
   const pollRef = useRef(null);
+
+  // localStorage key for the realism job history. Reading job IDs
+  // from here is what powers the Realism library page.
+  const HISTORY_KEY = "sid-realism-jobs";
+  const pushHistory = (entry) => {
+    try {
+      const prev = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+      const next = [entry, ...prev.filter((p) => p.jobId !== entry.jobId)].slice(0, 100);
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+    } catch {}
+  };
 
   useEffect(() => {
     fetch(`${BE_URL}/api/realism/presets`)
       .then((r) => r.json())
       .then((b) => setPresets(b?.data || null))
       .catch(() => {});
+
+    // Resume in-flight job from the most recent history entry.
+    // If the user refreshed while the worker was still rendering,
+    // we re-attach the poll loop so they don't lose context.
+    try {
+      const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+      const top = history[0];
+      if (top?.jobId) {
+        // Probe status once. If the row says completed/failed we just
+        // hydrate the UI without polling. If still running, kick off
+        // the poll loop fresh.
+        fetch(`${BE_URL}/api/ai-video/status/${top.jobId}`, { headers: vaultHeaders() })
+          .then((r) => r.json())
+          .then((body) => {
+            const row = body?.data || body;
+            if (!row) return;
+            setJobId(top.jobId);
+            if (Array.isArray(row.logs)) setLogs(row.logs);
+            if (row.status === "completed" && (row.videoUrl || row.video)) {
+              setStatus({ state: "completed", videoUrl: row.videoUrl || row.video, progressMessage: "Done." });
+            } else if (row.status === "failed") {
+              setStatus({ state: "failed", progressMessage: row.error || "Worker reported failure" });
+            } else {
+              setStatus({ state: row.status || "processing", progressMessage: row.progressMessage || "Resumed — generating…" });
+              beginPoll(top.jobId);
+            }
+          })
+          .catch(() => {});
+      }
+    } catch {}
+
     return () => {
       if (heroUrlRef.current) URL.revokeObjectURL(heroUrlRef.current);
       if (pollRef.current) clearInterval(pollRef.current);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onPickHero = (e) => {
@@ -182,9 +230,9 @@ export default function Realism() {
         provider:       m.provider,
         model:          m.key,
         duration:       m.duration,
-        resolution:     "720p",
+        resolution:     resolution,
         aspectRatio:    "16:9",
-        steps:          14,
+        steps:          steps,
         imageUrl,
         generateCaption: false,
         silentWake:     true,
@@ -200,6 +248,15 @@ export default function Realism() {
       if (!newJobId) throw new Error("BE didn't return a jobId");
       setJobId(newJobId);
       setStatus({ state: "processing", progressMessage: "Worker accepted the job — generating…" });
+      setLogs([]);
+      pushHistory({
+        jobId:       newJobId,
+        title:       (base || enrichResult.enriched).slice(0, 80),
+        model:       m.key,
+        resolution,
+        steps,
+        createdAt:   new Date().toISOString(),
+      });
       beginPoll(newJobId);
     } catch (err) {
       setStatus({ state: "failed", progressMessage: err.message });
@@ -218,9 +275,33 @@ export default function Realism() {
         const res = await fetch(`${BE_URL}/api/ai-video/status/${id}`, { headers: vaultHeaders() });
         const body = await res.json();
         const row = body?.data || body;
+        // Surface live logs whenever the BE returns them. The
+        // /api/ai-video/status/:id endpoint already includes the
+        // shared job_logs tail.
+        if (Array.isArray(row?.logs)) setLogs(row.logs);
         if (row?.status === "completed" && (row.videoUrl || row.video)) {
           clearInterval(pollRef.current); pollRef.current = null;
-          setStatus({ state: "completed", videoUrl: row.videoUrl || row.video, progressMessage: "Done." });
+          const finalUrl = row.videoUrl || row.video;
+          setStatus({ state: "completed", videoUrl: finalUrl, progressMessage: "Done. Saving to local library…" });
+          // Mirror to BE local storage so the Realism library reads from
+          // disk, not Cloudinary. Tag with vault if user is unlocked.
+          const meta = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]").find((p) => p.jobId === id) || {};
+          fetch(`${BE_URL}/api/realism/save-from-url`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...vaultHeaders() },
+            body: JSON.stringify({
+              url:        finalUrl,
+              title:      meta.title || "Untitled realism render",
+              model:      meta.model || "",
+              resolution: meta.resolution || "",
+              steps:      meta.steps || null,
+              jobId:      id,
+            }),
+          }).then((r) => r.json()).then((body) => {
+            if (body?.status) {
+              setStatus({ state: "completed", videoUrl: finalUrl, progressMessage: "Saved to library." });
+            }
+          }).catch(() => {});
         } else if (row?.status === "failed") {
           clearInterval(pollRef.current); pollRef.current = null;
           setStatus({ state: "failed", progressMessage: row.error || "Worker reported failure" });
@@ -235,7 +316,7 @@ export default function Realism() {
           }));
         }
       } catch (_) {}
-    }, 4000);
+    }, 3000);
   };
 
   const reset = () => {
@@ -276,12 +357,21 @@ export default function Realism() {
               actually looks shot, not generated.
             </p>
           </div>
-          <button
-            onClick={() => navigate("/ai-video")}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] text-white text-sm font-semibold transition-colors"
-          >
-            <AppstoreOutlined /> AI Video library
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate("/realism/library")}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-400 text-white text-sm font-semibold transition-colors"
+            >
+              <AppstoreOutlined /> Realism library
+            </button>
+            <button
+              onClick={() => navigate("/ai-video")}
+              title="Production AI Video library"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] text-white text-xs transition-colors"
+            >
+              AI Video
+            </button>
+          </div>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
@@ -366,12 +456,54 @@ export default function Realism() {
                         {status.state === "failed" ? "failed" : "processing"}
                       </div>
                       <p className="text-sm text-gray-200">{status.progressMessage}</p>
-                      {status.state !== "failed" && (
-                        <p className="text-[10px] text-gray-500 mt-1">Polling every 4s · jobId {jobId?.slice(0, 8)}…</p>
+                      {status.state !== "failed" && jobId && (
+                        <button
+                          onClick={() => navigate(`/realism/job/${jobId}`)}
+                          className="mt-2 text-[10px] text-rose-300 hover:text-rose-200 underline"
+                        >
+                          Open full job page ·   {jobId.slice(0, 12)}…
+                        </button>
                       )}
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Live log strip */}
+            {jobId && logs.length > 0 && (
+              <div className="rounded-2xl ring-1 ring-white/10 bg-black/40 backdrop-blur p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
+                  <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-gray-400">
+                    Live · worker
+                  </p>
+                  {jobId && (
+                    <button
+                      onClick={() => navigate(`/realism/job/${jobId}`)}
+                      className="ml-auto text-[10px] font-mono uppercase tracking-[0.18em] text-gray-500 hover:text-gray-200"
+                    >
+                      open full →
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-1 max-h-[220px] overflow-y-auto pr-1 text-[11px] font-mono leading-snug">
+                  {logs.slice(-14).map((line, i) => {
+                    const msg = typeof line === "string" ? line : (line?.msg ?? line?.message ?? String(line));
+                    const ts  = typeof line === "object" && line?.ts ? new Date(line.ts) : null;
+                    const isErr = /error|failed|exception/i.test(msg);
+                    return (
+                      <div key={i} className={`flex gap-2 ${isErr ? "text-rose-300" : "text-gray-300"}`}>
+                        {ts && (
+                          <span className="text-gray-600 shrink-0">
+                            {ts.toLocaleTimeString([], { hour12: false }).slice(3)}
+                          </span>
+                        )}
+                        <span className="break-all">{msg}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
@@ -452,6 +584,53 @@ export default function Realism() {
                   );
                 })}
               </div>
+            </div>
+
+            {/* Resolution */}
+            <div className="rounded-2xl ring-1 ring-white/10 bg-white/[0.03] p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <ExperimentOutlined className="text-rose-300" />
+                <p className="text-sm font-semibold text-white">Resolution</p>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { key: "480p",  label: "480p",  note: "Fast" },
+                  { key: "720p",  label: "720p",  note: "Default" },
+                  { key: "1080p", label: "1080p", note: "Heavy" },
+                ].map((r) => {
+                  const active = resolution === r.key;
+                  return (
+                    <button key={r.key} onClick={() => setResolution(r.key)}
+                      className={`px-3 py-2 rounded-lg text-center transition-all ring-1 ${active ? "ring-rose-400 bg-rose-500/15" : "ring-white/10 bg-white/[0.02] hover:bg-white/[0.05]"}`}>
+                      <p className={`text-xs font-mono ${active ? "text-rose-200" : "text-white"}`}>{r.label}</p>
+                      <p className="text-[10px] text-gray-500">{r.note}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Iterations (steps) */}
+            <div className="rounded-2xl ring-1 ring-white/10 bg-white/[0.03] p-5">
+              <div className="flex items-center gap-2 mb-2">
+                <ThunderboltOutlined className="text-rose-300" />
+                <p className="text-sm font-semibold text-white">Iterations</p>
+                <span className="ml-auto text-[11px] text-gray-400 font-mono">{steps} steps</span>
+              </div>
+              <input
+                type="range" min={4} max={60} step={1} value={steps}
+                onChange={(e) => setSteps(parseInt(e.target.value, 10))}
+                className="w-full accent-rose-500"
+              />
+              <div className="flex items-center justify-between text-[10px] text-gray-500 font-mono mt-1">
+                <span>4 · preview</span>
+                <span>14 · default</span>
+                <span>60 · max</span>
+              </div>
+              <p className="text-[11px] text-gray-500 mt-2">
+                More steps = more sampling passes = cleaner motion + detail, longer
+                render time. {steps >= 30 ? "≈ slow (1-3 min)" : steps >= 18 ? "≈ medium" : "≈ fast"}.
+              </p>
             </div>
 
             {/* Submit */}
