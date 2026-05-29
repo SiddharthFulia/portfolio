@@ -295,13 +295,13 @@ export default function Realism() {
                 <span className="ml-auto text-[11px] text-gray-500">Plain English. We layer the cinematic stack for you.</span>
               </div>
               <textarea
-                rows={3}
+                rows={8}
                 value={base}
-                onChange={(e) => setBase(e.target.value.slice(0, 600))}
+                onChange={(e) => setBase(e.target.value.slice(0, 5000))}
                 placeholder="A young woman pauses on a wet city street at night, neon signs reflecting off the puddles. She glances at her phone, then over her shoulder."
-                className="w-full bg-white/[0.03] ring-1 ring-white/10 focus:ring-rose-400/40 outline-none rounded-lg px-3 py-2 text-sm text-white placeholder:text-gray-500 leading-relaxed"
+                className="w-full bg-white/[0.03] ring-1 ring-white/10 focus:ring-rose-400/40 outline-none rounded-lg px-3 py-2 text-sm text-white placeholder:text-gray-500 leading-relaxed resize-y min-h-[120px]"
               />
-              <div className="mt-3 flex items-center gap-2">
+              <div className="mt-3 flex items-center gap-2 flex-wrap">
                 <button
                   onClick={onEnrich}
                   disabled={enriching || !base.trim()}
@@ -311,7 +311,10 @@ export default function Realism() {
                   {enriching ? "Enriching…" : "Enrich for realism"}
                 </button>
                 <span className="text-[11px] text-gray-500">
-                  Groq llama-3.3-70b · 180-260 word cinematic rewrite
+                  Groq llama-3.3-70b · rewrite scales with input length
+                </span>
+                <span className={`ml-auto text-[10px] font-mono ${base.length >= 4800 ? 'text-amber-300' : 'text-gray-500'}`}>
+                  {base.length.toLocaleString()} / 5,000 chars
                 </span>
               </div>
             </div>
