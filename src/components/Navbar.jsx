@@ -196,8 +196,8 @@ const Navbar = () => {
               <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" onClick={() => setMoreOpen(false)} />
               <div
                 data-workshop-dropdown
-                className={`absolute top-full right-0 mt-2 rounded-2xl shadow-2xl border z-50 overflow-y-auto overscroll-contain
-                              w-[560px] max-w-[92vw] max-h-[min(78vh,720px)]
+                className={`absolute top-full right-0 mt-2 rounded-2xl shadow-2xl border z-50 overflow-hidden
+                              w-[560px] max-w-[92vw]
                               ${isDark
                                 ? 'bg-[#0a0a0e] border-gray-800'
                                 : 'bg-white border-gray-200'}`}>

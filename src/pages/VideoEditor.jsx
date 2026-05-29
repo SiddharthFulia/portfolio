@@ -143,9 +143,6 @@ export default function VideoEditor() {
                   Logged out — exports save publicly. Unlock vault for private saves.
                 </span>
               )}
-              <span className="ml-auto text-[11px] text-gray-500">
-                OpenReel is MIT-licensed · self-hosted at <code>/video-editor/</code>
-              </span>
             </div>
           </>
         )}
