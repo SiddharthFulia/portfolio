@@ -94,6 +94,7 @@ const RoomDesign = lazyWithReload(() => import("./pages/RoomDesign"));
 const VideoEditor         = lazyWithReload(() => import("./pages/VideoEditor"));
 const VideoEditorAdvanced = lazyWithReload(() => import("./pages/VideoEditorAdvanced"));
 const VideoLibrary        = lazyWithReload(() => import("./pages/VideoLibrary"));
+const Realism             = lazyWithReload(() => import("./pages/Realism"));
 
 /* ── Skeleton building blocks ──
  * The legacy hand-rolled pulse blocks (Light/Dark/Science/etc) are
@@ -268,6 +269,7 @@ const ROUTE_TITLES = {
   '/edit'          : 'Video Editor · Sid',
   '/edit/advanced' : 'Timeline Editor · Sid',
   '/edit/library'  : 'Edited Videos · Sid',
+  '/realism'       : 'Realism Lab · Sid',
 };
 const DEFAULT_TITLE = 'Siddharth Fulia · AI Engineer';
 const TitleManager = () => {
@@ -386,6 +388,11 @@ const App = () => {
           <Route path='/edit'           element={<Suspense fallback={<PageLoader />}><VideoEditor          /></Suspense>} />
           <Route path='/edit/advanced'  element={<Suspense fallback={<PageLoader />}><VideoEditorAdvanced /></Suspense>} />
           <Route path='/edit/library'   element={<Suspense fallback={<PageLoader />}><VideoLibrary        /></Suspense>} />
+
+          {/* Realism lab — sandbox for the Seedance-grade prompt
+              enrichment + I2V pipeline. Sits next to /ai-video,
+              doesn't replace it. */}
+          <Route path='/realism'        element={<Suspense fallback={<PageLoader />}><Realism             /></Suspense>} />
 
           {/* Catch-all — any unknown URL bounces to home instead of 404.
               Visitors fat-fingering /settngs or /chses end up somewhere
