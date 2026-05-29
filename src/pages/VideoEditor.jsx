@@ -12,7 +12,7 @@
 //   rm -rf E:/Siddharth/portfolio/public/video-editor/*
 //   cp -r apps/web/dist/* E:/Siddharth/portfolio/public/video-editor/
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FullscreenOutlined,
@@ -30,8 +30,38 @@ import { useVault } from "../contexts/VaultContext";
 export default function VideoEditor() {
   const navigate = useNavigate();
   const { isUnlocked } = useVault();
+  const frameWrapRef = useRef(null);
   const [isFullscreen, setIsFullscreen]   = useState(false);
   const [startHintOpen, setStartHintOpen] = useState(true);
+
+  // Native Fullscreen API on the iframe wrapper. Way more reliable
+  // than CSS-only fullscreen because OpenReel sees exactly ONE
+  // resize event instead of getting yanked between layouts. We sync
+  // local state on the native `fullscreenchange` event so pressing
+  // Esc to exit fullscreen also flips our UI back.
+  const toggleFullscreen = async () => {
+    const wrap = frameWrapRef.current;
+    if (!wrap) return;
+    try {
+      if (!document.fullscreenElement) {
+        if (wrap.requestFullscreen) await wrap.requestFullscreen();
+        else if (wrap.webkitRequestFullscreen) wrap.webkitRequestFullscreen();
+      } else {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      }
+    } catch (_) { /* user cancelled or unsupported */ }
+  };
+
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    document.addEventListener("webkitfullscreenchange", onChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      document.removeEventListener("webkitfullscreenchange", onChange);
+    };
+  }, []);
 
   // F11 / Ctrl+. fullscreen toggle — handy when the editor is
   // taking the whole viewport.
@@ -39,7 +69,7 @@ export default function VideoEditor() {
     const onKey = (e) => {
       if (e.key === "F11" || ((e.ctrlKey || e.metaKey) && e.key === ".")) {
         e.preventDefault();
-        setIsFullscreen((v) => !v);
+        toggleFullscreen();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -83,15 +113,15 @@ export default function VideoEditor() {
         )}
 
         {/* Editor frame — fills the viewport less the compact header.
-            Editor needs maximum vertical space for the timeline + tools
-            so we use h-[calc(100vh - chrome)] instead of aspect-ratio. */}
+            Native Fullscreen API makes the wrapper its own fullscreen
+            element so the iframe doesn't get re-laid-out during the
+            transition (which used to leave OpenReel showing nothing). */}
         <div
-          className={`relative overflow-hidden ring-1 ring-white/10 bg-black transition-all ${
-            isFullscreen
-              ? "fixed inset-0 z-50 rounded-none"
-              : "rounded-2xl"
+          ref={frameWrapRef}
+          className={`relative overflow-hidden ring-1 ring-white/10 bg-black ${
+            isFullscreen ? "rounded-none w-screen h-screen" : "rounded-2xl"
           }`}
-          style={isFullscreen ? {} : { height: "calc(100vh - 170px)", minHeight: "560px" }}
+          style={isFullscreen ? undefined : { height: "calc(100vh - 170px)", minHeight: "560px" }}
         >
           <iframe
             src="/video-editor/index.html"
@@ -105,46 +135,68 @@ export default function VideoEditor() {
               Dismissable so it doesn't stay in the way after the user
               has loaded their first clip. */}
           {startHintOpen && (
-            <div className="absolute top-3 left-3 z-10 max-w-[min(440px,calc(100%-100px))] pointer-events-none">
-              <div className="rounded-2xl px-4 py-3 backdrop-blur-xl bg-black/75 ring-1 ring-rose-400/40 shadow-2xl pointer-events-auto">
-                <div className="flex items-start gap-3">
-                  <div className="shrink-0 w-9 h-9 rounded-xl bg-rose-500/20 ring-1 ring-rose-400/40 grid place-items-center text-rose-200">
-                    <CloudUploadOutlined />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-white flex items-center gap-1.5">
-                      Start here
-                      <PlusCircleOutlined className="text-rose-300 text-[12px]" />
-                    </p>
-                    <p className="text-[11px] text-gray-300 leading-relaxed mt-0.5">
-                      <strong>Drag a video file</strong> anywhere on the editor below, or click
-                      the <strong>Import</strong> button in the media panel (top-left of the
-                      editor). Add audio, images, or text the same way.
-                    </p>
-                    <p className="text-[10px] text-rose-200/90 mt-1.5 flex items-center gap-2 font-mono uppercase tracking-[0.15em]">
-                      <span className="inline-flex items-center gap-1">
-                        <CloudUploadOutlined className="text-[10px]" />
+            <>
+              {/* Hint card — sits over the left panel area where the
+                  + Import button lives, so the user's eye is led
+                  straight to the actual control. */}
+              <div className="absolute top-16 left-3 z-10 max-w-[min(380px,calc(100%-40px))] pointer-events-none">
+                <div className="rounded-2xl px-4 py-3 backdrop-blur-xl bg-black/80 ring-1 ring-rose-400/50 shadow-2xl pointer-events-auto">
+                  <div className="flex items-start gap-3">
+                    <div className="shrink-0 w-9 h-9 rounded-xl bg-rose-500/20 ring-1 ring-rose-400/40 grid place-items-center text-rose-200">
+                      <CloudUploadOutlined />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-white flex items-center gap-1.5">
+                        Start here
+                        <PlusCircleOutlined className="text-rose-300 text-[12px]" />
+                      </p>
+                      <p className="text-[12px] text-gray-200 leading-relaxed mt-0.5">
+                        Look for the <strong className="text-rose-200">+ Import Media</strong>
+                        {" "}button in the <strong>Media panel on the left</strong> ↓ — or just
+                        drag a file anywhere onto the editor.
+                      </p>
+                      <p className="text-[10px] text-rose-200/90 mt-1.5 flex items-center gap-2 font-mono uppercase tracking-[0.15em]">
                         MP4 · MOV · WEBM · MKV
-                      </span>
-                      <span className="text-gray-500">·</span>
-                      <span>max 500 MB / file</span>
-                    </p>
+                        <span className="text-gray-500">·</span>
+                        <span>max 500 MB</span>
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setStartHintOpen(false)}
+                      className="shrink-0 -mt-1 -mr-1 w-6 h-6 rounded-md text-gray-400 hover:text-white hover:bg-white/10 grid place-items-center"
+                      aria-label="Dismiss"
+                    >
+                      ×
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setStartHintOpen(false)}
-                    className="shrink-0 -mt-1 -mr-1 w-6 h-6 rounded-md text-gray-400 hover:text-white hover:bg-white/10 grid place-items-center"
-                    aria-label="Dismiss"
-                  >
-                    ×
-                  </button>
                 </div>
               </div>
-            </div>
+              {/* Arrow nudge — animated chevron pointing down-left at
+                  the editor's media panel from just above where the
+                  Import button typically lives. */}
+              <div
+                aria-hidden
+                className="absolute left-4 top-44 z-10 text-rose-300 pointer-events-none"
+                style={{ animation: "videoHintArrow 1.4s ease-in-out infinite" }}
+              >
+                <svg width="36" height="42" viewBox="0 0 36 42" fill="none">
+                  <path d="M18 4 L18 32 M6 22 L18 34 L30 22"
+                    stroke="currentColor" strokeWidth="3.5"
+                    strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <style>{`
+                @keyframes videoHintArrow {
+                  0%, 100% { transform: translateY(0); opacity: 1; }
+                  50%      { transform: translateY(8px); opacity: 0.65; }
+                }
+              `}</style>
+            </>
           )}
 
           <button
-            onClick={() => setIsFullscreen((v) => !v)}
-            title={isFullscreen ? "Exit fullscreen (F11)" : "Fullscreen (F11)"}
+            onClick={toggleFullscreen}
+            title={isFullscreen ? "Exit fullscreen (Esc)" : "Fullscreen (F11)"}
             className="absolute top-3 right-3 z-10 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg
                        backdrop-blur-md bg-black/50 hover:bg-black/70 ring-1 ring-white/15
                        text-gray-100 hover:text-white text-xs font-semibold"
