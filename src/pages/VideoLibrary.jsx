@@ -21,6 +21,8 @@ import {
   PlayCircleOutlined,
   ImportOutlined,
   LoadingOutlined,
+  DownloadOutlined,
+  EyeOutlined,
 } from "@ant-design/icons";
 import { useVault } from "../contexts/VaultContext";
 
@@ -61,6 +63,7 @@ export default function VideoLibrary() {
   const [selected, setSelected] = useState(new Set());
   const [importing, setImporting] = useState(false);
   const importInputRef = useRef(null);
+  const [viewing, setViewing] = useState(null);   // {url, title} | null
 
   const fetchList = async () => {
     setLoading(true);
@@ -304,11 +307,52 @@ export default function VideoLibrary() {
                 selected={selected.has(it.id)}
                 onToggle={() => toggleOne(it.id)}
                 onDelete={() => deleteOne(it.id, it.title)}
+                onView={() => setViewing({ url: `${BE_URL}${it.url}`, title: it.title })}
               />
             ))}
           </div>
         )}
       </div>
+
+      {/* Full-screen play modal */}
+      {viewing && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-md grid place-items-center p-4"
+          onClick={() => setViewing(null)}
+        >
+          <div
+            className="relative w-full max-w-6xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="absolute -top-10 left-0 right-0 flex items-center justify-between text-sm">
+              <span className="text-white font-semibold truncate pr-4">{viewing.title}</span>
+              <div className="flex items-center gap-2 shrink-0">
+                <a
+                  href={viewing.url}
+                  download
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs"
+                >
+                  <DownloadOutlined /> Download
+                </a>
+                <button
+                  onClick={() => setViewing(null)}
+                  className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white text-lg"
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            <video
+              src={viewing.url}
+              controls
+              autoPlay
+              playsInline
+              className="w-full max-h-[80vh] rounded-2xl bg-black ring-1 ring-white/10"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Floating bulk-action bar */}
       {selected.size > 0 && (
@@ -334,7 +378,7 @@ export default function VideoLibrary() {
   );
 }
 
-function Tile({ item, selected, onToggle, onDelete }) {
+function Tile({ item, selected, onToggle, onDelete, onView }) {
   const videoRef = useRef(null);
   const fullUrl  = `${BE_URL}${item.url}`;
   const posterUrl = `${BE_URL}${item.poster}`;
@@ -407,17 +451,35 @@ function Tile({ item, selected, onToggle, onDelete }) {
       <div className="px-3 py-2.5 bg-black/40 backdrop-blur-sm">
         <p className="text-sm font-semibold text-white truncate">{item.title}</p>
         <div className="mt-0.5 flex items-center justify-between gap-2">
-          <p className="text-[11px] text-gray-500 truncate">
+          <p className="text-[11px] text-gray-500 truncate flex-1 min-w-0">
             {[item.aspectRatio, item.durationSec ? `${Math.round(item.durationSec)}s` : null, fmtDate(item.createdAt)]
               .filter(Boolean).join(" · ")}
           </p>
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            title="Delete"
-            className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-md text-rose-300 hover:text-white hover:bg-rose-500/20"
-          >
-            <DeleteOutlined className="text-[12px]" />
-          </button>
+          <div className="shrink-0 flex items-center gap-0.5">
+            <button
+              onClick={(e) => { e.stopPropagation(); onView?.(); }}
+              title="View"
+              className="inline-flex items-center justify-center w-7 h-7 rounded-md text-gray-300 hover:text-white hover:bg-white/10"
+            >
+              <EyeOutlined className="text-[12px]" />
+            </button>
+            <a
+              href={fullUrl}
+              download={`${item.title || item.id}.mp4`}
+              onClick={(e) => e.stopPropagation()}
+              title="Download"
+              className="inline-flex items-center justify-center w-7 h-7 rounded-md text-gray-300 hover:text-white hover:bg-white/10"
+            >
+              <DownloadOutlined className="text-[12px]" />
+            </a>
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              title="Delete"
+              className="inline-flex items-center justify-center w-7 h-7 rounded-md text-rose-300 hover:text-white hover:bg-rose-500/20"
+            >
+              <DeleteOutlined className="text-[12px]" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
