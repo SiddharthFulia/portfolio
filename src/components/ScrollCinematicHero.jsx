@@ -209,6 +209,10 @@ export default function ScrollCinematicHero({
     }
 
     const heroOwnsWheel = (deltaY) => {
+      // If the Workshop dropdown or mobile menu is open, the body
+      // gets a `.workshop-open` class — let those scroll their own
+      // contents instead of advancing the cinematic frames.
+      if (document.body.classList.contains('workshop-open')) return false
       if (window.scrollY > 0) return false                     // hero not at top
       if (deltaY > 0 && progressRef.current < 1) return true   // play forward
       if (deltaY < 0 && progressRef.current > 0) return true   // play reverse
@@ -333,11 +337,21 @@ export default function ScrollCinematicHero({
         </div>
       </div>
 
-      {/* Bottom strip — scrubber while playing, "Continue ↓" once done */}
+      {/* Bottom strip — scrubber + ALWAYS-VISIBLE "more below" cue.
+          During playback the cue is the secondary nudge ("there's a
+          page below, scroll all the way to see it"). After completion
+          it's the primary CTA (pulsing). Either way the user sees
+          there's content beyond the hero from the first paint. */}
       {renderMode !== 'fallback' && (
         <div className="absolute bottom-0 left-0 right-0 z-20 pointer-events-none">
+          {/* Soft gradient + chevron stripe at the very bottom edge —
+              peeks the next section's dark obsidian color through so
+              the cinematic appears to fade INTO more content. Pure
+              visual cue, no interactivity. */}
+          <div aria-hidden className="absolute -bottom-px left-0 right-0 h-24 bg-gradient-to-b from-transparent via-[#05050a]/40 to-[#05050a]/80 pointer-events-none" />
+
           {!videoComplete ? (
-            <div className="flex flex-col items-center gap-3 pb-6">
+            <div className="relative flex flex-col items-center gap-3 pb-6">
               <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-white/70">
                 Scroll to play · {progressPct}%
               </span>
@@ -347,19 +361,42 @@ export default function ScrollCinematicHero({
                   style={{ width: `${progressPct}%` }}
                 />
               </div>
+              {/* Always-visible "more below" cue. Bounces gently so
+                  it catches the eye without competing with the title. */}
+              <a
+                href="#below"
+                className="pointer-events-auto mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full
+                           bg-black/40 backdrop-blur-md ring-1 ring-white/15
+                           text-white/85 hover:text-white text-[10px] font-mono uppercase tracking-[0.28em]"
+                style={{ animation: 'splatBounce 2.2s ease-in-out infinite' }}
+              >
+                More below
+                <DownOutlined className="text-[10px]" />
+              </a>
             </div>
           ) : (
             <a
               href="#below"
               className="pointer-events-auto mx-auto mb-6 flex w-fit flex-col items-center gap-2
-                         text-white/80 hover:text-white transition-colors animate-pulse"
+                         text-white hover:text-rose-200 transition-colors"
+              style={{ animation: 'splatBounce 1.6s ease-in-out infinite' }}
             >
-              <span className="text-[10px] font-mono uppercase tracking-[0.3em]">
+              <span className="text-[11px] font-mono uppercase tracking-[0.3em]">
                 Continue
               </span>
-              <DownOutlined className="text-[12px]" />
+              <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-rose-500/20 ring-1 ring-rose-400/40">
+                <DownOutlined className="text-base" />
+              </span>
             </a>
           )}
+
+          {/* Inline keyframes so we don't need a tailwind config tweak. */}
+          <style>{`
+            @keyframes splatBounce {
+              0%, 100% { transform: translateY(0); }
+              50%      { transform: translateY(6px); }
+            }
+          `}</style>
         </div>
       )}
     </section>

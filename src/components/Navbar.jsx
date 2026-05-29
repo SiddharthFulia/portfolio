@@ -33,13 +33,33 @@ const Navbar = () => {
   // Close menu on route change
   useEffect(() => { setMenuOpen(false); }, [pathname]);
 
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  // While the Workshop dropdown OR the mobile menu is open, lock the
+  // body so the homepage cinematic-scroll-jack doesn't advance the
+  // video frames when the user is scrolling inside the dropdown.
+  // The `workshop-open` class is read by ScrollCinematicHero's wheel
+  // handler to bail out and let the dropdown scroll its own content.
+  useEffect(() => {
+    const anyOpen = moreOpen || menuOpen;
+    if (anyOpen) {
+      document.body.classList.add("workshop-open");
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.classList.remove("workshop-open");
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.classList.remove("workshop-open");
+      document.body.style.overflow = "";
+    };
+  }, [moreOpen, menuOpen]);
+
   const toggleMusic = () => {
     if (!audioRef.current) return;
     if (playing) { audioRef.current.pause(); } else { audioRef.current.play(); }
     setPlaying(p => !p);
   };
-
-  const [moreOpen, setMoreOpen] = useState(false);
 
   // Primary nav — always visible
   const primaryLinks = [
@@ -174,8 +194,10 @@ const Navbar = () => {
           {moreOpen && (
             <>
               <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" onClick={() => setMoreOpen(false)} />
-              <div className={`absolute top-full right-0 mt-2 rounded-2xl shadow-2xl border z-50 overflow-hidden
-                              w-[560px] max-w-[92vw]
+              <div
+                data-workshop-dropdown
+                className={`absolute top-full right-0 mt-2 rounded-2xl shadow-2xl border z-50 overflow-y-auto overscroll-contain
+                              w-[560px] max-w-[92vw] max-h-[min(78vh,720px)]
                               ${isDark
                                 ? 'bg-[#0a0a0e] border-gray-800'
                                 : 'bg-white border-gray-200'}`}>
