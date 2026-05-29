@@ -50,13 +50,18 @@ const BE_URL = import.meta.env.VITE_BE_URL || "http://localhost:4001";
 
 // Provider catalog — model keys match what local-gpu-worker/worker.py
 // recognises (verified from MODEL_VRAM_GB + label table at L444+).
-// 'optimized' is the FE label that resolves to the 5090 worker on
-// the existing /api/ai-video/generate endpoint.
+//
+// We use provider 'local' (NOT 'optimized') because /api/ai-video
+// /generate has a mode-based override that REPLACES the model field
+// when provider==='optimized' (default 'balanced' → wan-2.2). 'local'
+// lane passes opts.model straight through to the worker. So the
+// user's pick of Hunyuan / Wan-I2V / LTX actually lands on the model
+// they selected.
 const MODELS = [
-  { key: "wan-2.1-i2v", label: "Wan 2.1 I2V",   note: "14B · best motion fidelity",     duration: 5, provider: "optimized" },
-  { key: "wan-2.2",     label: "Wan 2.2",       note: "5B · faster · text + image",     duration: 5, provider: "optimized" },
-  { key: "hunyuan",     label: "Hunyuan",       note: "Tencent DiT · most cinematic",   duration: 5, provider: "optimized" },
-  { key: "ltx-video",   label: "LTX I2V",       note: "2B distilled · fastest preview", duration: 5, provider: "optimized" },
+  { key: "wan-2.1-i2v", label: "Wan 2.1 I2V",   note: "14B · best motion fidelity",     duration: 5, provider: "local" },
+  { key: "wan-2.2",     label: "Wan 2.2",       note: "5B · faster · text + image",     duration: 5, provider: "local" },
+  { key: "hunyuan",     label: "Hunyuan",       note: "Tencent DiT · most cinematic",   duration: 5, provider: "local" },
+  { key: "ltx-video",   label: "LTX I2V",       note: "2B distilled · fastest preview", duration: 5, provider: "local" },
 ];
 
 function vaultHeaders() {
