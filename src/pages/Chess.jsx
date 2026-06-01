@@ -30,6 +30,7 @@ import OpeningExplorer  from '../components/chess/OpeningExplorer'
 import {
   chessBestMove, chessAnalyze, chessPlay, chessEngineStatus,
   chessSaveGame, chessLoadGame, chessCreateMatch,
+  chessIdentifyOpening, chessGetOpening,
 } from '../api/ai'
 import useQueryState from '../hooks/useQueryState'
 
@@ -188,6 +189,77 @@ export default function ChessPage() {
   useEffect(() => {
     chessEngineStatus().then(({ data }) => setEngineHealth(data))
   }, [])
+
+  // ── Live opening detection ───────────────────────────────────────
+  // After each completed ply the FE asks the BE to name the line. We
+  // keep the LAST known opening in state and only swap to "(out of
+  // book)" when the BE returns null — so a 30-move game whose tail
+  // wandered off-book still shows the name we identified earlier.
+  // - Debounced 300ms so blitz-quick moves don't N+1 the BE.
+  // - Gated to matchedPly >= 3 for display (move 1 is noise: "King's
+  //   Pawn Game" etc.). Detection still runs from move 1 so the moment
+  //   we cross 3 plies the heading appears with the correct name.
+  // - Resets when the move list empties (board reset / new game).
+  const [openingInfo, setOpeningInfo] = useState(null)
+  // null = never identified ↔ { eco, name, slug, matchedPly, outOfBook? }
+  const [openingExpanded, setOpeningExpanded] = useState(false)
+  const [openingDetail, setOpeningDetail] = useState(null)
+  // Cache last-fetched detail keyed by slug so toggling open re-uses it.
+  const openingDetailCacheRef = useRef(new Map())
+
+  useEffect(() => {
+    if (history.length === 0) {
+      // Fresh board — wipe any prior identification + collapse the panel.
+      setOpeningInfo(null)
+      setOpeningExpanded(false)
+      setOpeningDetail(null)
+      return
+    }
+    let cancelled = false
+    const t = setTimeout(async () => {
+      const { data, error: err } = await chessIdentifyOpening(history)
+      if (cancelled) return
+      if (err) return
+      const eco  = data?.eco  || null
+      const name = data?.name || null
+      if (eco && name) {
+        setOpeningInfo({
+          eco,
+          name,
+          slug: data.slug,
+          matchedPly: data.matchedPly || 0,
+          outOfBook: false,
+        })
+      } else {
+        // No prefix match at any depth → stick on the last name we saw,
+        // tagged out-of-book. If we never had one in the first place,
+        // leave openingInfo as null so the panel stays hidden.
+        setOpeningInfo(prev => prev ? { ...prev, outOfBook: true } : null)
+      }
+    }, 300)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [history])
+
+  // When the user expands the collapsible, lazy-fetch the full opening
+  // record (PGN + computed FEN + the canonical move list) for the body.
+  // Cached per slug — switching openings within the same session is free
+  // after the first hit on each.
+  useEffect(() => {
+    if (!openingExpanded || !openingInfo?.slug) {
+      setOpeningDetail(null)
+      return
+    }
+    const slug = openingInfo.slug
+    const cached = openingDetailCacheRef.current.get(slug)
+    if (cached) { setOpeningDetail(cached); return }
+    let cancelled = false
+    chessGetOpening(slug).then(({ data }) => {
+      if (cancelled || !data) return
+      openingDetailCacheRef.current.set(slug, data)
+      setOpeningDetail(data)
+    })
+    return () => { cancelled = true }
+  }, [openingExpanded, openingInfo?.slug])
 
   const turnColor = useMemo(
     () => chessRef.current.turn() === 'w' ? 'white' : 'black',
@@ -610,6 +682,20 @@ export default function ChessPage() {
               </div>
             )}
             <div className="luxe-card p-3">
+              {/* Live opening name — collapsible, sits above the move
+                  list. Only renders once the BE has named the line AND
+                  the match goes ≥3 plies deep (move 1 alone yields
+                  noise like "King's Pawn Game"). Once shown, the panel
+                  keeps the LAST known name with an "(out of book)"
+                  tag when the game wanders off-book. */}
+              {openingInfo && openingInfo.matchedPly >= 3 && (
+                <OpeningHeading
+                  info={openingInfo}
+                  expanded={openingExpanded}
+                  onToggle={() => setOpeningExpanded(v => !v)}
+                  detail={openingDetail}
+                />
+              )}
               <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Moves</p>
               <MoveList history={history} evalHistory={evalHistory} />
             </div>
@@ -929,4 +1015,76 @@ function PgnImport({ value, setValue, onLoad }) {
       </button>
     </div>
   )
+}
+
+// ── Live opening heading ──
+// Collapsible chip that sits above the move list on the sidebar.
+// Collapsed view = a single tappable row with ECO + name. Expanded
+// view shows the canonical SAN sequence + PGN string + a copy button.
+// The "out of book" tag appears when the live game has wandered past
+// the line we recognise — the displayed name stays the LAST identified
+// one rather than regressing to a shorter / less specific match.
+function OpeningHeading({ info, expanded, onToggle, detail }) {
+  if (!info) return null
+  const pgnFromDetail = detail?.pgn || (Array.isArray(detail?.moves) ? renderPairs(detail.moves) : '')
+  const copyPgn = async () => {
+    const text = detail?.pgn || pgnFromDetail || ''
+    if (!text) return
+    try { await navigator.clipboard.writeText(text) } catch {}
+  }
+  return (
+    <div className="mb-3 -mt-1">
+      <button
+        type="button"
+        onClick={onToggle}
+        className={`w-full flex items-center justify-between gap-2 text-left rounded-lg border px-2.5 py-1.5 transition-colors
+          ${expanded
+            ? 'border-amber-500/50 bg-amber-500/10'
+            : 'border-amber-500/25 bg-amber-500/5 hover:bg-amber-500/10'}`}
+        title={info.name}
+      >
+        <span className="flex items-center gap-2 min-w-0">
+          <span className={`inline-block text-[10px] leading-none transition-transform ${expanded ? 'rotate-90' : ''} text-amber-300`}>▶</span>
+          <span className="text-[10px] uppercase tracking-wider text-amber-300/80">Opening</span>
+          <span className="text-amber-200 font-mono text-[11px] tabular-nums shrink-0">{info.eco}</span>
+          <span className="text-amber-100 text-xs font-semibold truncate">{info.name}</span>
+        </span>
+        {info.outOfBook && (
+          <span className="text-[9px] uppercase tracking-wider text-amber-400/70 font-mono shrink-0">out of book</span>
+        )}
+      </button>
+      {expanded && (
+        <div className="mt-2 rounded-lg border border-amber-500/20 bg-black/30 p-2.5 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] uppercase tracking-wider text-gray-500">Canonical line · {info.matchedPly} ply</p>
+            <button
+              type="button"
+              onClick={copyPgn}
+              disabled={!detail?.pgn}
+              className="text-[10px] font-mono px-2 py-0.5 rounded border border-gray-700 text-gray-400 hover:text-amber-200 hover:border-amber-500/50 disabled:opacity-30">
+              Copy PGN
+            </button>
+          </div>
+          {!detail ? (
+            <p className="text-[11px] text-gray-500 font-mono">Loading…</p>
+          ) : (
+            <p className="text-[11px] text-gray-200 font-mono break-words leading-relaxed">
+              {detail.pgn || (Array.isArray(detail.moves) ? renderPairs(detail.moves) : '—')}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Numbered SAN pairs as a plain string fallback for when detail.pgn is
+// empty (some openings have no PGN string indexed — only the moves[] array).
+function renderPairs(moves) {
+  const out = []
+  for (let i = 0; i < moves.length; i += 2) {
+    const n = Math.floor(i / 2) + 1
+    out.push(moves[i + 1] ? `${n}. ${moves[i]} ${moves[i + 1]}` : `${n}. ${moves[i]}`)
+  }
+  return out.join(' ')
 }
