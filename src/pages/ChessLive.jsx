@@ -26,6 +26,7 @@ import { Modal } from 'antd'
 import {
   ReloadOutlined, ArrowLeftOutlined, LinkOutlined, ThunderboltOutlined,
   FlagOutlined, CopyOutlined, CheckOutlined, CloseOutlined,
+  RollbackOutlined,
 } from '@ant-design/icons'
 import 'chessground/assets/chessground.base.css'
 import 'chessground/assets/chessground.brown.css'
@@ -35,6 +36,7 @@ import Clocks from '../components/chess/Clocks'
 import usePieceSet from '../components/chess/usePieceSet'
 import {
   chessGetMatch, chessJoinMatch, chessMatchMove, chessResignMatch,
+  chessMatchTakebackRequest, chessMatchTakebackAccept, chessMatchTakebackDecline,
 } from '../api/ai'
 
 const POLL_MS = 1500
@@ -345,6 +347,62 @@ export default function ChessLive() {
     })
   }, [session, doResign])
 
+  // ── Takeback flow ───────────────────────────────────────────────
+  // Mirrors the request → opponent-approval pattern from over-the-board
+  // play. The requester hits "Takeback", which posts to the BE; the
+  // polling FE on the opponent's tab sees match.takebackRequest with a
+  // requestedBy that's not their side, and shows the approval modal.
+  // Unlimited per match — no counter, no cap.
+  const [takebackBusy, setTakebackBusy] = useState(false)
+  // Tracks the requestedAt timestamp of the request WE just sent, so we
+  // can show "Takeback requested…" on our own button until the polling
+  // round-trip confirms the BE has stored it (or the opponent
+  // accepts/declines and it disappears).
+  const takebackReq = match?.takebackRequest || null
+  const iAmRequester = !!(takebackReq && mySide && takebackReq.requestedBy === mySide)
+  const opponentIsRequester = !!(takebackReq && mySide && takebackReq.requestedBy !== mySide)
+
+  const onRequestTakeback = useCallback(async () => {
+    if (!session || takebackBusy) return
+    setTakebackBusy(true)
+    const { data, error: err } = await chessMatchTakebackRequest(matchId, { session })
+    setTakebackBusy(false)
+    if (err) {
+      setError(err)
+      return
+    }
+    setMatch(data)
+  }, [session, matchId, takebackBusy])
+
+  const onAcceptTakeback = useCallback(async () => {
+    if (!session || takebackBusy) return
+    setTakebackBusy(true)
+    const { data, error: err } = await chessMatchTakebackAccept(matchId, { session })
+    setTakebackBusy(false)
+    if (err) {
+      setError(err)
+      return
+    }
+    setMatch(data)
+  }, [session, matchId, takebackBusy])
+
+  const onDeclineTakeback = useCallback(async () => {
+    if (!session || takebackBusy) return
+    setTakebackBusy(true)
+    const { data, error: err } = await chessMatchTakebackDecline(matchId, { session })
+    setTakebackBusy(false)
+    if (err) {
+      setError(err)
+      return
+    }
+    setMatch(data)
+  }, [session, matchId, takebackBusy])
+
+  // The requester can also cancel their own pending request by
+  // declining — keep the surface simple: one button toggles between
+  // "Takeback" and "Cancel request".
+  const onCancelOwnTakeback = onDeclineTakeback
+
   // ── Share-link copy ──
   const shareUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/chess/m/${matchId}`
@@ -548,6 +606,33 @@ export default function ChessLive() {
           </div>
         )}
 
+        {/* Takeback approval panel — only the opponent of the requester
+            sees this. The board stays interactive in case they'd rather
+            ignore it (declining is one click; moving also clears it on
+            the BE). Unlimited per match — no counter shown. */}
+        {opponentIsRequester && isActive && session && (
+          <div className="luxe-card p-4 border border-amber-400/40 bg-amber-500/5 flex items-center justify-between gap-3 flex-wrap">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-amber-200 inline-flex items-center gap-1.5">
+                <RollbackOutlined /> Opponent requests a takeback
+              </p>
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                Revert {Math.max(1, (takebackReq?.requestedAtPly ?? 0) - (takebackReq?.plyToRevertTo ?? 0))} move(s) — back to ply {takebackReq?.plyToRevertTo ?? 0}.
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button onClick={onAcceptTakeback} disabled={takebackBusy}
+                className="text-xs font-semibold px-3 py-2 rounded-lg border border-emerald-500/50 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25 disabled:opacity-50 inline-flex items-center gap-1.5">
+                <CheckOutlined /> Accept
+              </button>
+              <button onClick={onDeclineTakeback} disabled={takebackBusy}
+                className="text-xs font-semibold px-3 py-2 rounded-lg border border-gray-700 bg-gray-900/60 text-gray-300 hover:border-gray-500 disabled:opacity-50 inline-flex items-center gap-1.5">
+                <CloseOutlined /> Decline
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Clocks — only when a time control is configured on the match.
             Tickdown is interpolated locally; BE values are re-anchored on
             every poll / move response. */}
@@ -583,6 +668,23 @@ export default function ChessLive() {
             {match?.moveCount || 0} {match?.moveCount === 1 ? 'move' : 'moves'} played
           </span>
           <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Takeback — only meaningful once at least one move is on
+                the board and it's an active game we belong to. Hidden
+                while the opponent has an outstanding request (the
+                inline approval panel below replaces it). */}
+            {isActive && session && (match?.moveCount || 0) >= 1 && !opponentIsRequester && (
+              iAmRequester ? (
+                <button onClick={onCancelOwnTakeback} disabled={takebackBusy}
+                  className="text-xs font-semibold px-3 py-2 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 disabled:opacity-50 inline-flex items-center gap-1.5">
+                  <RollbackOutlined /> Takeback requested · cancel
+                </button>
+              ) : (
+                <button onClick={onRequestTakeback} disabled={takebackBusy}
+                  className="text-xs font-semibold px-3 py-2 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 disabled:opacity-50 inline-flex items-center gap-1.5">
+                  <RollbackOutlined /> {takebackBusy ? 'Requesting…' : 'Takeback'}
+                </button>
+              )
+            )}
             {isActive && session && (
               <button onClick={onResign}
                 className="text-xs font-semibold px-3 py-2 rounded-lg border border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 inline-flex items-center gap-1.5">
