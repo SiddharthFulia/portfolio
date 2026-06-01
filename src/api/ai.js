@@ -716,6 +716,19 @@ export async function chessIdentifyOpening(moves) {
     return { data: data?.data || data, error: null };
   } catch (err) { return { data: null, error: err.message }; }
 }
+// Variant engine — single endpoint for Chess960 / King of the Hill /
+// Three-Check. BE flips Stockfish's UCI_Chess960 for 960; for KoTH and
+// 3-Check the rules are FE-side (chess.js + a custom win check), so the
+// BE just runs standard Stockfish on the FEN it's given.
+//   payload: { variant: 'chess960'|'koth'|'threeCheck', fen, moveHistory?, options? }
+//   options.elo (default 1500), options.thinkMs (default 500), options.depth
+export async function chessVariantPlay(payload = {}) {
+  try {
+    const data = await post(ENDPOINTS.CHESS_VARIANT_PLAY, payload, { timeout: 12000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+
 // Lichess Opening Explorer — CC-BY masters DB. Proxied via the BE so we
 // (a) send a polite UA the upstream is happy to serve and (b) get 10-min
 // in-memory caching by FEN. Browser-direct calls were 401'ing globally.

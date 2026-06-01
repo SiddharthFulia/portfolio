@@ -1,5 +1,11 @@
 import { useState, useEffect } from 'react'
+import { get } from '../api/request'
+import { ENDPOINTS } from '../api/endpoints'
 
+// All three upstream calls (api.github.com + github-contributions-api.jogruber.de)
+// are routed through our BE proxy so the user agent never sees those hostnames
+// in DevTools. BE adds a User-Agent (GitHub rejects requests without one) and
+// caches responses for 10 min, which also dodges the 60-req/h unauth rate limit.
 const GitHubHeatmap = ({ username = 'Sid-passion' }) => {
   const [contributions, setContributions] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -8,9 +14,8 @@ const GitHubHeatmap = ({ username = 'Sid-passion' }) => {
   const [stats, setStats] = useState({ total: 0, streak: 0, best: 0 })
 
   useEffect(() => {
-    // Fetch contributions heatmap
-    fetch(`https://github-contributions-api.jogruber.de/v4/${username}?y=last`)
-      .then(r => r.json())
+    // Contributions heatmap (jogruber.de aggregator → our proxy)
+    get(ENDPOINTS.GITHUB_CONTRIBUTIONS, { user: username, year: 'last' })
       .then(d => {
         if (d?.contributions) {
           setContributions(d.contributions)
@@ -27,15 +32,13 @@ const GitHubHeatmap = ({ username = 'Sid-passion' }) => {
         }
       }).catch(() => {})
 
-    // Fetch profile + orgs
-    fetch(`https://api.github.com/users/${username}`)
-      .then(r => r.json())
+    // Profile (api.github.com/users/:user → our proxy)
+    get(ENDPOINTS.GITHUB_USER, { user: username })
       .then(d => setProfile(d))
       .catch(() => {})
 
-    // Fetch top repos
-    fetch(`https://api.github.com/users/${username}/repos?sort=updated&per_page=6`)
-      .then(r => r.json())
+    // Top repos (api.github.com/users/:user/repos → our proxy)
+    get(ENDPOINTS.GITHUB_REPOS, { user: username, sort: 'updated', per_page: 6 })
       .then(d => { if (Array.isArray(d)) setRepos(d) })
       .catch(() => {})
 
