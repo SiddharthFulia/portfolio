@@ -74,6 +74,11 @@ export const ENDPOINTS = {
   CHESS_OPENINGS_EXPLORER: '/api/chess/openings/explorer', // BE proxy to lichess masters DB
   CHESS_OPENINGS_IDENTIFY: '/api/chess/openings/identify', // POST { moves: [SAN,...] } — live opening name detection
   CHESS_VARIANT_PLAY:   '/api/chess/variant/play',     // POST { variant, fen, moveHistory?, options? } — Stockfish move for a variant position
+  // Puzzles lane (lichess-imported puzzle trainer)
+  CHESS_PUZZLES_USERS:    '/api/chess/puzzles/users',      // GET list, POST create; /:id appended for DELETE
+  CHESS_PUZZLES_NEXT:     '/api/chess/puzzles/next',       // ?userId=&difficulty=
+  CHESS_PUZZLES_ATTEMPT:  '/api/chess/puzzles/attempt',
+  CHESS_PUZZLES_STATS:    '/api/chess/puzzles/stats',      // ?userId=
   // Multi-video concatenation (ffmpeg-concat lane)
   COMBINE:              '/api/combine',
   COMBINE_UPLOAD:       '/api/combine/upload',

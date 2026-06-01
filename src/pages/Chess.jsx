@@ -28,6 +28,7 @@ import PgnDatabaseLoader from '../components/chess/PgnDatabase'
 import LiveGamesLobby   from '../components/chess/LiveGamesLobby'
 import OpeningExplorer  from '../components/chess/OpeningExplorer'
 import VariantsHub      from '../components/chess/VariantsHub'
+import PuzzleTrainer    from '../components/chess/PuzzleTrainer'
 import {
   chessBestMove, chessAnalyze, chessPlay, chessEngineStatus,
   chessSaveGame, chessLoadGame, chessCreateMatch,
@@ -727,10 +728,12 @@ export default function ChessPage() {
             paginated BE endpoints + on-click detail + Lichess masters. */}
         <OpeningExplorer defaultOpen={false} />
 
-        {/* Puzzles section is mounted in parallel by another agent — leave
-            this blank slot so when it lands it can sit between Openings and
-            Variants without overlap. */}
-        <div data-slot="chess-puzzles" />
+        {/* Puzzles section — lichess-imported tactics trainer with per-user
+            rating + difficulty-tuned random fetch + retry-with-penalty UX.
+            Library lives in BE SQLite; FE never hits lichess.org directly. */}
+        <div className="mt-5">
+          <PuzzleTrainer />
+        </div>
 
         {/* Chess variants — 7 cards (3 playable vs Stockfish, 4 rules-only).
             Click a playable card to open an inline panel with a fresh board

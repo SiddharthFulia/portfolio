@@ -744,6 +744,53 @@ export async function lichessMasters(fen, { moves = 5 } = {}) {
   }
 }
 
+// ─── Chess Puzzles (lichess-imported) ─────────────────────────────
+// Per-user rating + difficulty-tuned random fetch + retry-with-penalty UX.
+// Library is bulk-imported via `node scripts/import-lichess-puzzles.mjs` on
+// the BE — no per-request hits to lichess.org from the browser.
+export async function chessPuzzleListUsers() {
+  try {
+    const data = await get(ENDPOINTS.CHESS_PUZZLES_USERS, {}, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function chessPuzzleCreateUser(name) {
+  try {
+    const data = await post(ENDPOINTS.CHESS_PUZZLES_USERS, { name }, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message, status: err.status }; }
+}
+// Vault-gated on the BE. request.js's withVaultRetry pops the login modal
+// automatically when no token is in localStorage, then retries the DELETE once.
+export async function chessPuzzleDeleteUser(id) {
+  try {
+    const data = await del(`${ENDPOINTS.CHESS_PUZZLES_USERS}/${id}`, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message, status: err.status }; }
+}
+export async function chessPuzzleNext({ userId, difficulty }) {
+  try {
+    const data = await get(ENDPOINTS.CHESS_PUZZLES_NEXT, { userId, difficulty }, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message, status: err.status }; }
+}
+export async function chessPuzzleAttempt({ userId, puzzleId, success, attemptsUsed, viewedSolution, difficulty }) {
+  try {
+    const data = await post(
+      ENDPOINTS.CHESS_PUZZLES_ATTEMPT,
+      { userId, puzzleId, success, attemptsUsed, viewedSolution, difficulty },
+      { timeout: 8000 },
+    );
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function chessPuzzleStats(userId) {
+  try {
+    const data = await get(ENDPOINTS.CHESS_PUZZLES_STATS, { userId }, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+
 // ─── Unified live-log tail (added 2026-05) ────────────────────────
 // Cursor-based — pass the ts of the last log you've seen so the BE only
 // returns new lines. Cheap enough to poll every 1.5s during a job without
