@@ -116,6 +116,9 @@ export function FastImageGen() {
 }
 
 // ─── Vision AI (Gemini Vision) ───
+// Gemini image-out is the only model that performs vision-to-text here;
+// Groq has no equivalent. When BE returns 503 / disabled, the panel
+// surfaces a "feature offline" hint instead of a raw error string.
 export function VisionAI() {
   const [image, setImage] = useState(null)
   const [prompt, setPrompt] = useState('Describe this image in detail.')
@@ -140,6 +143,8 @@ export function VisionAI() {
     else if (data?.reply) setResult(data.reply)
     setLoading(false)
   }
+
+  const isOffline = !!error && /503|disabled|unavailable|GEMINI_DISABLED|not configured/i.test(error)
 
   return (
     <div className="space-y-5">
@@ -180,7 +185,18 @@ export function VisionAI() {
 
         <div>
           {loading && <div className={`${P} h-64`} />}
-          {error && <div className="p-4 bg-red-900/20 border border-red-800/40 rounded-xl text-red-400 text-sm">{error}</div>}
+          {isOffline && (
+            <div className="p-4 bg-amber-900/20 border border-amber-700/40 rounded-xl">
+              <p className="text-amber-300 text-sm font-semibold">Image vision is offline</p>
+              <p className="text-gray-400 text-xs mt-1 leading-relaxed">
+                The image-vision lane is currently disabled. Use the
+                <span className="text-cyan-300"> AI Chat</span> page and pick a Studio Pro
+                vision model (Qwen2.5-VL, Llama Vision) for image Q&amp;A — Groq alternatives
+                handle text-based image guidance.
+              </p>
+            </div>
+          )}
+          {error && !isOffline && <div className="p-4 bg-red-900/20 border border-red-800/40 rounded-xl text-red-400 text-sm">{error}</div>}
           {result && (
             <div className="p-4 bg-gray-900 border border-gray-700 rounded-xl max-h-80 overflow-y-auto">
               <div className="text-sm text-gray-200 leading-relaxed prose-invert">

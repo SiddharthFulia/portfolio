@@ -1456,9 +1456,9 @@ function ShotPromptRow({
         centered
         width={620}
       >
-        {/* Engine + model picker. Groq is the fast default; the three
-            Gemini sizes mirror what AI Chat exposes so the user picks
-            the same model they know from there. */}
+        {/* Engine + model picker. Groq is the only review engine right
+            now — Gemini was previously offered but is disabled on BE per
+            §76 (cost). See ENGINE_OPTIONS above for commented entries. */}
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           <span className="text-[10px] font-mono uppercase tracking-wider text-gray-500">Engine</span>
           {ENGINE_OPTIONS.map(opt => (

@@ -109,7 +109,9 @@ const FaceLab = () => {
     reader.readAsDataURL(file)
   }
 
-  // Describe face with Gemini (auto on image change)
+  // Describe face with Gemini-Vision (auto on image change). Groq has no
+  // image-out equivalent — when Gemini is disabled on BE the call returns
+  // 503 and we surface a clear offline hint instead of a raw error.
   const describeFace = async () => {
     if (!image) return
     setDescribing(true); setError(null)
@@ -119,15 +121,18 @@ const FaceLab = () => {
     setDescribing(false)
   }
 
-  // Generate styled portrait — uses (possibly user-edited) description
+  // Generate styled portrait — uses (possibly user-edited) description.
+  // If Gemini is offline, we still allow generation by falling back to a
+  // generic "a person" prompt so the page never feels broken — users can
+  // type their own description into the editor too.
   const generateStyled = async () => {
     if (!image) return
     setLoading(true); setError(null); setResult(null)
 
     let desc = description
     if (!desc) {
-      const { data } = await geminiVision(image, 'Describe this person in one sentence for an AI art generator: ethnicity, skin tone, gender, age, hair, face shape, expression, clothing. Be specific about skin color. Example: "South Asian male, 24yo, brown skin, short black hair, oval face, slight smile, blue shirt"')
-      desc = data?.reply || 'a person'
+      const { data, error: visionErr } = await geminiVision(image, 'Describe this person in one sentence for an AI art generator: ethnicity, skin tone, gender, age, hair, face shape, expression, clothing. Be specific about skin color. Example: "South Asian male, 24yo, brown skin, short black hair, oval face, slight smile, blue shirt"')
+      desc = data?.reply || (visionErr ? 'a person (vision description offline — type your own above for a closer match)' : 'a person')
       setDescription(desc)
     }
 
@@ -392,7 +397,19 @@ const FaceLab = () => {
 
       {error && (
         <div className="p-4 bg-gray-800/60 border border-gray-700 rounded-xl">
-          <p className="text-yellow-400 text-sm">{error}</p>
+          {/503|disabled|unavailable|GEMINI_DISABLED|not configured/i.test(error) ? (
+            <>
+              <p className="text-amber-300 text-sm font-semibold">Auto face description is offline</p>
+              <p className="text-gray-400 text-xs mt-1 leading-relaxed">
+                The vision-to-text lane is currently disabled. You can still
+                generate styled portraits — type a short description of yourself
+                in the editor above (skin tone, hair, expression, outfit) and the
+                style transfer will use that.
+              </p>
+            </>
+          ) : (
+            <p className="text-yellow-400 text-sm">{error}</p>
+          )}
         </div>
       )}
     </div>

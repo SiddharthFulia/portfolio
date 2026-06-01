@@ -131,6 +131,11 @@ const VisionAI = () => {
     setLoading(false)
   }
 
+  // Gemini-Vision is the only image-out vision model — Groq has no
+  // equivalent today. When BE returns 503 / disabled, surface a clear
+  // "feature offline" panel instead of a raw error string.
+  const isOffline = !!error && /503|disabled|unavailable|GEMINI_DISABLED|not configured/i.test(error)
+
   return (
     <div className="space-y-5">
       <div className="flex gap-2">
@@ -169,7 +174,18 @@ const VisionAI = () => {
 
         <div>
           {loading && <div className={`${P} h-64`} />}
-          {error && <div className="p-4 bg-red-900/20 border border-red-800/40 rounded-xl text-red-400 text-sm">{error}</div>}
+          {isOffline && (
+            <div className="p-4 bg-amber-900/20 border border-amber-700/40 rounded-xl">
+              <p className="text-amber-300 text-sm font-semibold">Image vision is offline</p>
+              <p className="text-gray-400 text-xs mt-1 leading-relaxed">
+                The image-vision lane is currently disabled. Try the
+                <span className="text-cyan-300"> Summarizer</span> tab or head to the
+                <span className="text-cyan-300"> AI Chat</span> page and pick a Studio Pro
+                vision model (Qwen2.5-VL, Llama Vision) for image Q&amp;A.
+              </p>
+            </div>
+          )}
+          {error && !isOffline && <div className="p-4 bg-red-900/20 border border-red-800/40 rounded-xl text-red-400 text-sm">{error}</div>}
           {result && (
             <div className="p-4 bg-gray-900 border border-gray-700 rounded-xl max-h-80 overflow-y-auto">
               <div className="text-sm text-gray-200 leading-relaxed prose-invert">
@@ -390,7 +406,7 @@ const AIStudio = () => {
             AI Studio
           </h1>
           <p className="text-gray-400 text-sm sm:text-base max-w-xl">
-            Generate images, analyze photos, convert text to speech, and summarize content — Stable Diffusion, Gemini, FLUX & more.
+            Generate images, analyze photos, convert text to speech, and summarize content — Stable Diffusion, FLUX, Groq & more.
           </p>
         </div>
       </div>

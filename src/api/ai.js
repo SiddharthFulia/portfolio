@@ -40,6 +40,7 @@ export async function sendGroq(message, options = {}) {
   }
 }
 
+// BE routes this through Groq when Gemini is disabled (GEMINI_ENABLED=0 on BE).
 export async function sendGemini(message, options = {}) {
   try {
     const data = await post(ENDPOINTS.GEMINI, {
@@ -56,6 +57,8 @@ export async function sendGemini(message, options = {}) {
   }
 }
 
+// Gemini image-out (vision-to-text) — no Groq equivalent. When BE has
+// Gemini disabled this returns 503; callers should show "feature offline".
 export async function geminiVision(image, prompt, options = {}) {
   try {
     const data = await post(ENDPOINTS.GEMINI_VISION, { image, prompt, model: options.model || 'gemini-flash' });

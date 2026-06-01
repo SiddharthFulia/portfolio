@@ -869,7 +869,7 @@ function WelcomeHero({ provider, localModels, localOnline, onPickProvider, onNew
       {/* Helper grid */}
       <div className="relative z-10 grid grid-cols-1 sm:grid-cols-3 gap-2 mt-8">
         <HelpCard icon={<AudioOutlined />} title="Speak it" body="Tap the mic in the input row — Whisper transcribes your voice straight into the prompt." />
-        <HelpCard icon={<CameraOutlined />} title="Attach an image" body="Vision models on 5090 (Qwen2.5-VL, Llama Vision) + Gemini accept images for OCR, charts, screenshots." />
+        <HelpCard icon={<CameraOutlined />} title="Attach an image" body="Vision models on 5090 (Qwen2.5-VL, Llama Vision) accept images for OCR, charts, screenshots." />
         <HelpCard icon={<FileTextOutlined />} title="Drop a document" body="Plain text, markdown, JSON, CSV, logs — gets embedded into your message for analysis." />
       </div>
     </div>
@@ -879,7 +879,8 @@ function WelcomeHero({ provider, localModels, localOnline, onPickProvider, onNew
 // Inline banner shown above the composer when the user attaches an
 // image but the current model can't process it. Suggests:
 //   • for 5090: switch model to the first vision-capable one we have
-//   • for cloud-groq / oracle-ollama: switch provider to Gemini or Studio Pro
+//   • for cloud-groq / oracle-ollama: switch provider to Studio Pro
+//     (Gemini chip is hidden — Gemini lane is disabled on BE per §76)
 function VisionSwitchHint({ provider, available5090Vision, onSwitchProvider, onSwitchModel }) {
   const has5090Vision = available5090Vision.length > 0
   return (

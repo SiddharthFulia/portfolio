@@ -30,11 +30,14 @@ import {
 //   onCloseMobile   — close mobile drawer.
 
 // Provider chip labels — kept tight so the filter dropdown stays narrow.
+// Gemini lane is disabled on BE per §76; we keep it hidden from the
+// visible filter list so users don't pick a dead chip. Older chats
+// stored under `cloud-gemini` still surface under "All chats".
 const PROVIDER_FILTERS = [
   { value: 'all',           label: 'All chats',     emoji: '💬' },
   { value: '5090',          label: 'Studio Pro',    emoji: '⚡' },
   { value: 'cloud-groq',    label: 'Groq',          emoji: '☁' },
-  { value: 'cloud-gemini',  label: 'Gemini',        emoji: '✨' },
+  // { value: 'cloud-gemini',  label: 'Gemini',        emoji: '✨' },  // §76 disabled
   { value: 'oracle-ollama', label: 'Standby',       emoji: '🛟' },
 ]
 
