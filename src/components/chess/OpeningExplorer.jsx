@@ -86,6 +86,7 @@ function OpeningRow({ row, expanded, onToggle }) {
   const [detailErr, setDetailErr] = useState(null)
   const [masters, setMasters] = useState(null)      // Lichess explorer payload
   const [mastersErr, setMastersErr] = useState(null)
+  const [mastersRateLimited, setMastersRateLimited] = useState(false)
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [loadingMasters, setLoadingMasters] = useState(false)
   // Detail fetch dedup — if the user toggles the row twice fast we want
@@ -107,11 +108,18 @@ function OpeningRow({ row, expanded, onToggle }) {
       setDetail(data)
       // Now kick off the masters fetch with the computed FEN.
       if (data?.fen) {
-        setLoadingMasters(true); setMastersErr(null)
-        const { data: m, error: merr } = await lichessMasters(data.fen, { moves: 5 })
+        setLoadingMasters(true); setMastersErr(null); setMastersRateLimited(false)
+        const { data: m, error: merr, status } = await lichessMasters(data.fen, { moves: 5 })
         if (cancelled) return
         setLoadingMasters(false)
-        if (merr) { setMastersErr(merr); return }
+        if (merr) {
+          // 429 is shown as a friendly inline pill — the BE has already
+          // proxied + cached, so a moment later the same FEN serves out
+          // of cache and the panel populates.
+          if (status === 429) setMastersRateLimited(true)
+          else setMastersErr(merr)
+          return
+        }
         setMasters(m)
       }
     })()
@@ -205,7 +213,12 @@ function OpeningRow({ row, expanded, onToggle }) {
                     Fetching from Lichess…
                   </div>
                 )}
-                {mastersErr && (
+                {mastersRateLimited && (
+                  <div className="text-[11px] text-amber-300 font-mono px-2 py-1.5 rounded border border-amber-500/30 bg-amber-500/10">
+                    Master games rate-limited, retry in a moment.
+                  </div>
+                )}
+                {mastersErr && !mastersRateLimited && (
                   <div className="text-[11px] text-rose-300 font-mono px-2 py-1.5 rounded border border-rose-500/30 bg-rose-500/10">
                     Lichess explorer unavailable: {mastersErr}
                   </div>

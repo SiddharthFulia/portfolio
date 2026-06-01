@@ -701,16 +701,34 @@ export async function chessGetOpening(slug) {
     return { data: data?.data || data, error: null };
   } catch (err) { return { data: null, error: err.message }; }
 }
-// Lichess Opening Explorer — CC-BY masters DB. Direct call, no BE proxy.
+// Live opening identifier — fires after each ply on /chess to update
+// the collapsible opening heading above the move list. POST body keeps
+// the SAN array off the URL (URLs cap around 2k chars; deep games would
+// hit that). BE responds { eco, name, slug, matchedPly } or null-tuple
+// when the move list has wandered out of book.
+export async function chessIdentifyOpening(moves) {
+  try {
+    const data = await post(
+      ENDPOINTS.CHESS_OPENINGS_IDENTIFY,
+      { moves: Array.isArray(moves) ? moves : [] },
+      { timeout: 5000 },
+    );
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+// Lichess Opening Explorer — CC-BY masters DB. Proxied via the BE so we
+// (a) send a polite UA the upstream is happy to serve and (b) get 10-min
+// in-memory caching by FEN. Browser-direct calls were 401'ing globally.
 // `moves` = limit of top continuations to return.
+// Returns { data, error, status } — status is bubbled so the UI can show
+// a rate-limit hint specifically on 429.
 export async function lichessMasters(fen, { moves = 5 } = {}) {
   try {
-    const url = `https://explorer.lichess.ovh/masters?fen=${encodeURIComponent(fen)}&moves=${moves}`;
-    const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    if (!r.ok) throw new Error(`lichess explorer: ${r.status}`);
-    const json = await r.json();
-    return { data: json, error: null };
-  } catch (err) { return { data: null, error: err.message }; }
+    const data = await get(ENDPOINTS.CHESS_OPENINGS_EXPLORER, { fen, moves }, { timeout: 12000 });
+    return { data: data?.data || data, error: null, status: 200 };
+  } catch (err) {
+    return { data: null, error: err.message, status: err.status || 0 };
+  }
 }
 
 // ─── Unified live-log tail (added 2026-05) ────────────────────────
@@ -873,6 +891,12 @@ export async function chessJoinMatch(id, body = {}) { try { const data = await p
 export async function chessGetMatch(id, session) { try { const params = session ? { session } : {}; const data = await get(`${ENDPOINTS.CHESS_MATCHES}/${id}`, params, { timeout: 6000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 export async function chessMatchMove(id, body) { try { const data = await post(`${ENDPOINTS.CHESS_MATCHES}/${id}/move`, body, { timeout: 6000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 export async function chessResignMatch(id, body) { try { const data = await post(`${ENDPOINTS.CHESS_MATCHES}/${id}/resign`, body, { timeout: 6000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+// Takeback flow — requester → opponent approval. Unlimited per match.
+// request body: { session, plyToRevertTo? }  (omit plyToRevertTo → revert one move)
+// accept/decline body: { session }
+export async function chessMatchTakebackRequest(id, body) { try { const data = await post(`${ENDPOINTS.CHESS_MATCHES}/${id}/takeback/request`, body, { timeout: 6000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+export async function chessMatchTakebackAccept(id, body)  { try { const data = await post(`${ENDPOINTS.CHESS_MATCHES}/${id}/takeback/accept`,  body, { timeout: 6000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+export async function chessMatchTakebackDecline(id, body) { try { const data = await post(`${ENDPOINTS.CHESS_MATCHES}/${id}/takeback/decline`, body, { timeout: 6000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 export async function chessListLiveMatches() { try { const data = await get(`${ENDPOINTS.CHESS_MATCHES}/lobby/live`, {}, { timeout: 6000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 
 // ─── YouTube downloader (yt-dlp wrapped on the BE) ─────────────────

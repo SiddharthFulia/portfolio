@@ -71,6 +71,8 @@ export const ENDPOINTS = {
   CHESS_COLLECTIONS:    '/api/chess/collections',
   CHESS_MATCHES:        '/api/chess/matches',     // /:id, /:id/join, /:id/move, /:id/resign appended at call site
   CHESS_OPENINGS:       '/api/chess/openings',    // /:slug appended at call site for detail
+  CHESS_OPENINGS_EXPLORER: '/api/chess/openings/explorer', // BE proxy to lichess masters DB
+  CHESS_OPENINGS_IDENTIFY: '/api/chess/openings/identify', // POST { moves: [SAN,...] } — live opening name detection
   // Multi-video concatenation (ffmpeg-concat lane)
   COMBINE:              '/api/combine',
   COMBINE_UPLOAD:       '/api/combine/upload',
