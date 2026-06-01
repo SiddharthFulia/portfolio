@@ -15,7 +15,12 @@ import { Chessground } from 'chessground'
 import { SQUARES } from 'chess.js'
 
 // chess.js .moves({square, verbose:true}) → chessground destination Map.
+// For variant games (chessops-backed adapter), .cgDests() already returns
+// a chessground-shaped Map directly — skip the per-square walk in that case.
 function buildDests(chess) {
+  if (chess && typeof chess.cgDests === 'function') {
+    return chess.cgDests()
+  }
   const dests = new Map()
   for (const sq of SQUARES) {
     const moves = chess.moves({ square: sq, verbose: true })

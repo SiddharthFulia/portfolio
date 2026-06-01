@@ -27,7 +27,7 @@ import SavedGames       from '../components/chess/SavedGames'
 import PgnDatabaseLoader from '../components/chess/PgnDatabase'
 import LiveGamesLobby   from '../components/chess/LiveGamesLobby'
 import OpeningExplorer  from '../components/chess/OpeningExplorer'
-import VariantsHub      from '../components/chess/VariantsHub'
+import VariantsRulesCard from '../components/chess/VariantsHub'
 import PuzzleTrainer    from '../components/chess/PuzzleTrainer'
 import {
   chessBestMove, chessAnalyze, chessPlay, chessEngineStatus,
@@ -35,6 +35,27 @@ import {
   chessIdentifyOpening, chessGetOpening,
 } from '../api/ai'
 import useQueryState from '../hooks/useQueryState'
+import { buildVariantGame, ENGINE_SUPPORTED_MODES } from '../lib/variantGame'
+import { generate960Fen } from '../lib/chess960'
+import { getBestMove as localBestMove, skillLevelFromElo } from '../lib/stockfishLocal'
+
+// Mode catalogue — drives the chip row near the page heading. `engine`
+// flags whether Stockfish can play this variant (KoTH / 3-Check play under
+// standard rules; atomic / antichess etc. need a variant-aware engine we
+// don't ship). Offline mode is a pure pass-and-play standard board.
+const MODES = [
+  { id: 'standard',    label: 'Standard',     icon: '♛', engine: true,  rules: 'chess.js' },
+  { id: 'chess960',    label: '960',          icon: '🎲', engine: true,  rules: 'chess.js' },
+  { id: 'koth',        label: 'KoTH',         icon: '⛰️', engine: true,  rules: 'chessops' },
+  { id: 'threeCheck',  label: '3-Check',      icon: '✓✓✓', engine: true,  rules: 'chessops' },
+  { id: 'atomic',      label: 'Atomic',       icon: '💥', engine: false, rules: 'chessops' },
+  { id: 'antichess',   label: 'Antichess',    icon: '🪞', engine: false, rules: 'chessops' },
+  { id: 'horde',       label: 'Horde',        icon: '🛡️', engine: false, rules: 'chessops' },
+  { id: 'crazyhouse',  label: 'Crazyhouse',   icon: '♛↺', engine: false, rules: 'chessops' },
+  { id: 'racingKings', label: 'Racing Kings', icon: '🏁', engine: false, rules: 'chessops' },
+  { id: 'offline',     label: 'Offline 2P',   icon: '🪑', engine: false, rules: 'chess.js' },
+]
+const USES_CHESSJS = new Set(['standard', 'chess960', 'offline'])
 
 // /chess — Stockfish-backed analysis board. chess.js owns the move state,
 // chessground (Lichess's board) renders, BE Stockfish provides engine
@@ -50,9 +71,28 @@ const fmtScore = (s) => {
 
 export default function ChessPage() {
   const navigate = useNavigate()
-  // Chess.js instance — single source of truth for moves. Lives in a ref
-  // so we don't recreate it on every React render.
+  // Chess.js instance — single source of truth for moves IN STANDARD MODES.
+  // Lives in a ref so we don't recreate it on every React render. For
+  // non-standard variants we swap to a chessops-backed adapter held in
+  // variantGameRef so the same ChessBoard component renders any rules.
   const chessRef = useRef(new Chess())
+  const variantGameRef = useRef(null)
+  // Top-level tab — drives the page sections. Variants are NOT a tab; they
+  // live inside Play as a mode chip row, so the user never leaves the board.
+  const [topTab, setTopTab] = useQueryState('tab', 'play', {
+    allowed: ['play', 'puzzles', 'online', 'saved'],
+  })
+  // Mode chip — variant rules + starting position. Default Standard.
+  const [mode, setMode] = useQueryState('variant', 'standard', {
+    allowed: MODES.map(m => m.id),
+  })
+  // Bump this to force ChessBoard to rebuild after a mode swap / new 960
+  // shuffle / reset — chessground caches piece positions, we want a fresh
+  // mount when the underlying rules engine flips.
+  const [boardKey, setBoardKey] = useState(0)
+  // Chosen game object for THIS render. For chess.js modes (standard / 960 /
+  // offline) it's chessRef.current. For chessops modes it's whatever we
+  // built into variantGameRef.current on the last mode-change effect.
   const [fen, setFen] = useState(STARTING_FEN)
   const [history, setHistory] = useState([])
   const [evalHistory, setEvalHistory] = useState([])
@@ -192,6 +232,57 @@ export default function ChessPage() {
     chessEngineStatus().then(({ data }) => setEngineHealth(data))
   }, [])
 
+  // ── Mode swap — rebuild the active game whenever the user picks a
+  // different variant. Uses chess.js for standard/960/offline, chessops
+  // for everything else. Resets history + clears engine telemetry so the
+  // sidebar doesn't show stale evals from the previous mode.
+  const modeMeta = useMemo(() => MODES.find(m => m.id === mode) || MODES[0], [mode])
+  const usesChessjs = USES_CHESSJS.has(mode)
+  // Variants that DON'T have engine support are forced to pass-and-play.
+  // Standard/960/KoTH/3-Check can run the engine for play/analyze.
+  const engineSupported = ENGINE_SUPPORTED_MODES.has(mode)
+  // Some modes are inherently pass-and-play only:
+  //   • offline (by design — user picked the 2-player lane)
+  //   • all variants where chessops rules differ from Stockfish's standard
+  //     rules (atomic / antichess / horde / crazyhouse / racingKings)
+  const forcedPassAndPlay = mode === 'offline' || !engineSupported
+
+  // Build the active game from scratch when mode changes. Standard mode
+  // hands the existing chess.js instance back; other modes spin up a fresh
+  // chessops-backed adapter (or a fresh chess.js for 960 / offline). We do
+  // NOT carry FEN across modes — switching variants means a brand new game.
+  useEffect(() => {
+    if (mode === 'standard') {
+      chessRef.current = new Chess()
+      variantGameRef.current = null
+      setFen(chessRef.current.fen())
+    } else if (mode === 'chess960') {
+      const f = generate960Fen()
+      try { chessRef.current = new Chess(f) } catch { chessRef.current = new Chess() }
+      variantGameRef.current = null
+      setFen(chessRef.current.fen())
+    } else if (mode === 'offline') {
+      chessRef.current = new Chess()
+      variantGameRef.current = null
+      setFen(chessRef.current.fen())
+    } else {
+      // chessops-backed variant.
+      const g = buildVariantGame(mode)
+      variantGameRef.current = g
+      setFen(g.fen())
+    }
+    setHistory([]); setEvalHistory([]); setVariations([])
+    setTelemetry(null)
+    setStatus({ kind: 'idle', text: 'Ready' })
+    setBoardKey(k => k + 1)
+    // When entering a forced pass-and-play mode, swap engineMode to HvH so
+    // the engine doesn't try to play a turn against rules it can't handle.
+    if (forcedPassAndPlay && engineMode === 'play') {
+      setEngineMode('human-vs-human')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode])
+
   // ── Live opening detection ───────────────────────────────────────
   // After each completed ply the FE asks the BE to name the line. We
   // keep the LAST known opening in state and only swap to "(out of
@@ -263,9 +354,13 @@ export default function ChessPage() {
     return () => { cancelled = true }
   }, [openingExpanded, openingInfo?.slug])
 
+  // Accessor — chess.js OR chessops adapter, whichever drives the current
+  // mode. ChessBoard treats both identically thanks to the adapter shim.
+  const activeGame = () => usesChessjs ? chessRef.current : variantGameRef.current
   const turnColor = useMemo(
-    () => chessRef.current.turn() === 'w' ? 'white' : 'black',
-    [fen],
+    () => (activeGame()?.turn() === 'w' ? 'white' : 'black'),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [fen, mode],
   )
   // In analyze + pass-and-play, the user drives BOTH sides — movableColor
   // follows whoever's turn it is. In play-vs-engine, lock to the player's
@@ -275,55 +370,67 @@ export default function ChessPage() {
   const movableColor = bothSidesMovable ? turnColor : (isPlayerTurn ? playerColor : null)
 
   // Called by ChessBoard when the user finishes a drag/drop legal move.
-  // Detect promotions BEFORE applying the move so we can show the piece
-  // picker — chess.js needs the promotion piece in the move args, so
-  // we hold the move pending the user's choice.
+  // Standard / 960 / offline use the full chess.js promotion picker; for
+  // chessops-backed variants we auto-queen (variants are a quicker lane
+  // and the parent picker is already there for the main standard board).
   const onUserMove = useCallback((from, to) => {
-    const chess = chessRef.current
-    const piece = chess.get(from)
-    // Promotion = pawn moving onto the last rank for its colour.
+    const game = usesChessjs ? chessRef.current : variantGameRef.current
+    if (!game) return
+    const piece = game.get(from)
     const toRank = to[1]
     const isPromotion = piece && piece.type === 'p' &&
       ((piece.color === 'w' && toRank === '8') || (piece.color === 'b' && toRank === '1'))
     if (isPromotion) {
-      setPendingPromotion({ from, to, color: piece.color })
+      if (usesChessjs) {
+        setPendingPromotion({ from, to, color: piece.color })
+        return
+      }
+      // Auto-queen for chessops variants.
+      try { game.move({ from, to, promotion: 'q' }) } catch { return }
+      setFen(game.fen())
+      setHistory(game.history())
+      setEvalHistory(prev => [...prev, { score: null, depth: 0 }])
       return
     }
     try {
-      const move = chess.move({ from, to })
+      const move = game.move({ from, to })
       if (!move) return
     } catch { return }
-    setFen(chess.fen())
-    setHistory(chess.history())
+    setFen(game.fen())
+    setHistory(game.history())
     setEvalHistory(prev => [...prev, { score: null, depth: 0 }])
-  }, [])
+  }, [usesChessjs])
 
   // User picked a promotion piece from the modal — apply the held move.
   const completePromotion = useCallback((pieceChar) => {
     const p = pendingPromotion
     if (!p) return
-    const chess = chessRef.current
+    const game = usesChessjs ? chessRef.current : variantGameRef.current
     try {
-      chess.move({ from: p.from, to: p.to, promotion: pieceChar })
+      game.move({ from: p.from, to: p.to, promotion: pieceChar })
     } catch {
       setPendingPromotion(null)
       return
     }
-    setFen(chess.fen())
-    setHistory(chess.history())
+    setFen(game.fen())
+    setHistory(game.history())
     setEvalHistory(prev => [...prev, { score: null, depth: 0 }])
     setPendingPromotion(null)
-  }, [pendingPromotion])
+  }, [pendingPromotion, usesChessjs])
 
   const cancelPromotion = () => {
-    // Restore the board view to current chess.js state — chessground may
+    // Restore the board view to current game state — chessground may
     // have already animated the pawn forward; re-set fen pushes it back.
     setPendingPromotion(null)
-    setFen(chessRef.current.fen())
+    const game = usesChessjs ? chessRef.current : variantGameRef.current
+    if (game) setFen(game.fen())
   }
 
-  // Engine plays its turn (mode = 'play' + engine's colour).
+  // ── BE Stockfish engine — only for STANDARD mode. Other engine-supported
+  // modes (960 / KoTH / 3-Check) use the local Web-Worker Stockfish below
+  // so we can pass UCI_Chess960 + skip the BE call entirely.
   useEffect(() => {
+    if (mode !== 'standard') return
     if (engineMode !== 'play' || isPlayerTurn) return
     if (chessRef.current.isGameOver()) return
     let cancelled = false
@@ -350,10 +457,61 @@ export default function ChessPage() {
       setStatus({ kind: 'idle', text: 'Your turn' })
     })
     return () => { cancelled = true }
-  }, [fen, isPlayerTurn, engineMode, engineElo])
+  }, [fen, isPlayerTurn, engineMode, engineElo, mode])
 
-  // Auto-analyze in 'analyze' mode (debounced 250ms).
+  // ── Local Stockfish (Web Worker) — handles 960 + chessops variants that
+  // chessops can score under standard rules (KoTH / 3-Check). The variant
+  // win conditions are enforced FE-side via the chessops adapter, so as
+  // far as Stockfish is concerned it's just "standard chess from this FEN".
+  // The variant rules layer terminates the game when KoTH / 3-Check trips.
   useEffect(() => {
+    if (mode === 'standard' || mode === 'offline') return
+    if (!engineSupported) return
+    if (engineMode !== 'play' || isPlayerTurn) return
+    const game = activeGame()
+    if (!game || game.isGameOver()) return
+    let cancelled = false
+    setThinking(true)
+    setStatus({ kind: 'thinking', text: `Stockfish (local) · ELO ${engineElo}` })
+    const options = { 'Skill Level': skillLevelFromElo(engineElo) }
+    if (mode === 'chess960') options.UCI_Chess960 = true
+    localBestMove(fen, { movetime: 1200, options })
+      .then(({ bestmove, info }) => {
+        if (cancelled) return
+        setThinking(false)
+        if (!bestmove) {
+          setStatus({ kind: 'error', text: 'Engine returned no move' })
+          return
+        }
+        const move = game.move({
+          from: bestmove.slice(0, 2),
+          to:   bestmove.slice(2, 4),
+          promotion: bestmove.length === 5 ? bestmove[4] : undefined,
+        })
+        if (!move) {
+          setStatus({ kind: 'error', text: `Engine move illegal in variant: ${bestmove}` })
+          return
+        }
+        setFen(game.fen())
+        setHistory(game.history())
+        setEvalHistory(prev => [...prev, { score: null, depth: 0 }])
+        setTelemetry(info ? { source: 'local', ...info } : null)
+        setStatus({ kind: 'idle', text: 'Your turn' })
+      })
+      .catch(err => {
+        if (cancelled) return
+        setThinking(false)
+        setStatus({ kind: 'error', text: err?.message || 'Local engine error' })
+      })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fen, isPlayerTurn, engineMode, engineElo, mode, engineSupported])
+
+  // Auto-analyze in 'analyze' mode (debounced 250ms) — STANDARD ONLY.
+  // The BE engine is plain Stockfish; analysing chessops variants would
+  // produce nonsense scores (SF doesn't know about atomic explosions etc.).
+  useEffect(() => {
+    if (mode !== 'standard') return
     if (engineMode !== 'analyze') return
     let cancelled = false
     const timer = setTimeout(() => {
@@ -375,16 +533,33 @@ export default function ChessPage() {
         })
     }, 250)
     return () => { cancelled = true; clearTimeout(timer) }
-  }, [fen, engineMode, analyzeDepth])
+  }, [fen, engineMode, analyzeDepth, mode])
 
   // ── Controls ──
+  // Reset replays the active mode's setup — re-shuffles 960, restarts a
+  // chessops variant from defaultPosition, or new() the chess.js game.
   const resetBoard = () => {
-    chessRef.current = new Chess()
-    setFen(chessRef.current.fen())
+    if (mode === 'standard' || mode === 'offline') {
+      chessRef.current = new Chess()
+      setFen(chessRef.current.fen())
+    } else if (mode === 'chess960') {
+      const f = generate960Fen()
+      try { chessRef.current = new Chess(f) } catch { chessRef.current = new Chess() }
+      setFen(chessRef.current.fen())
+    } else {
+      const g = buildVariantGame(mode)
+      variantGameRef.current = g
+      setFen(g.fen())
+    }
     setHistory([]); setEvalHistory([]); setVariations([])
+    setTelemetry(null)
     setStatus({ kind: 'idle', text: 'Ready' })
+    setBoardKey(k => k + 1)
   }
   const undoMove = () => {
+    // chessops Position has no .undo() — only chess.js does. Variants
+    // currently don't support undo; the user can hit Reset for a new game.
+    if (!usesChessjs) return
     const chess = chessRef.current
     if (!chess.undo()) return
     if (engineMode === 'play' && !chess.isGameOver()) chess.undo()
@@ -410,7 +585,13 @@ export default function ChessPage() {
   }
   const copyPgn = async () => {
     try {
-      await navigator.clipboard.writeText(chessRef.current.pgn())
+      const text = usesChessjs
+        ? chessRef.current.pgn()
+        // chessops adapter doesn't expose a real PGN engine; fall back to
+        // the UCI move list with a variant tag header so the user still
+        // has something useful to paste somewhere (e.g. Lichess analysis).
+        : `[Variant "${mode}"]\n[FEN "${variantGameRef.current?.fen?.() || ''}"]\n\n${(variantGameRef.current?.history?.() || []).join(' ')}`
+      await navigator.clipboard.writeText(text)
       setStatus({ kind: 'idle', text: 'PGN copied to clipboard' })
     } catch {
       setStatus({ kind: 'error', text: 'Clipboard unavailable' })
@@ -443,24 +624,31 @@ export default function ChessPage() {
     setSaveModalOpen(true)
   }
   const confirmSaveGame = async () => {
-    const chess = chessRef.current
     const name = saveName.trim()
     if (!name) return
-    const result = chess.isCheckmate()
-      ? (chess.turn() === 'w' ? '0-1' : '1-0')
-      : chess.isDraw() ? '1/2-1/2' : '*'
+    // Saved games rely on chess.js PGN export. For variant games (chessops)
+    // we don't have a real PGN engine wired up yet — save the FEN + UCI
+    // history string as a fallback so the user still has something to
+    // reload (the saved-games panel can render either gracefully).
+    const game = usesChessjs ? chessRef.current : variantGameRef.current
+    if (!game) { setSaveModalOpen(false); return }
+    const isMate = game.isCheckmate?.() || false
+    const result = isMate
+      ? (game.turn() === 'w' ? '0-1' : '1-0')
+      : (game.isDraw?.() ? '1/2-1/2' : '*')
+    const pgn = usesChessjs ? chessRef.current.pgn() : `[Variant "${mode}"]\n${(game.history() || []).join(' ')}`
     const { error: err } = await chessSaveGame({
       name,
-      pgn: chess.pgn(),
-      fen: chess.fen(),
+      pgn,
+      fen: game.fen(),
       side: engineMode === 'play' ? playerColor : null,
-      mode: engineMode,
-      engineName: engineMode === 'play' ? 'Stockfish' : null,
-      engineType: engineMode === 'play' ? 'stockfish' : null,
-      engineStrength: engineMode === 'play' ? engineElo : null,
+      mode: `${mode}/${engineMode}`,
+      engineName: engineMode === 'play' && engineSupported ? 'Stockfish' : null,
+      engineType: engineMode === 'play' && engineSupported ? 'stockfish' : null,
+      engineStrength: engineMode === 'play' && engineSupported ? engineElo : null,
       timeControl: timeControl?.id || 'none',
       result,
-      moveCount: chess.history().length,
+      moveCount: game.history().length,
     })
     setSaveModalOpen(false)
     if (err) setStatus({ kind: 'error', text: `Save failed: ${err}` })
@@ -481,6 +669,11 @@ export default function ChessPage() {
     setEvalHistory([]); setVariations([])
     setStatus({ kind: 'idle', text: `Loaded "${row.name}"` })
     setLibraryOpen(false)
+    // Snap the user back to the Play tab + Standard mode so they see the
+    // loaded position on the main board immediately. Saved games are
+    // chess.js PGNs — they only make sense in standard.
+    setMode('standard')
+    setTopTab('play')
   }
   // Apply a PGN string to the board. Used by both the textarea paste
   // ('Load PGN' button) and the file-upload picker. Decoupled from
@@ -505,15 +698,24 @@ export default function ChessPage() {
     setPgnInput('')
   }
 
-  const isGameOver = chessRef.current.isGameOver()
+  const activeGameInstance = usesChessjs ? chessRef.current : variantGameRef.current
+  const isGameOver = !!(activeGameInstance && activeGameInstance.isGameOver())
   const gameOverReason = (() => {
-    const c = chessRef.current
-    if (!c.isGameOver()) return null
+    const c = activeGameInstance
+    if (!c || !c.isGameOver()) return null
+    if (!usesChessjs && typeof c.variantOutcome === 'function') {
+      const outcome = c.variantOutcome()
+      if (outcome) {
+        if (outcome.winner === 'white') return `${modeMeta.label} · White wins`
+        if (outcome.winner === 'black') return `${modeMeta.label} · Black wins`
+        return `${modeMeta.label} · Draw`
+      }
+    }
     if (c.isCheckmate()) return `Checkmate · ${c.turn() === 'w' ? 'Black' : 'White'} wins`
     if (c.isStalemate()) return 'Stalemate'
     if (c.isInsufficientMaterial()) return 'Draw — insufficient material'
-    if (c.isThreefoldRepetition()) return 'Draw — threefold repetition'
-    if (c.isDraw()) return 'Draw — 50-move rule'
+    if (typeof c.isThreefoldRepetition === 'function' && c.isThreefoldRepetition()) return 'Draw — threefold repetition'
+    if (c.isDraw && c.isDraw()) return 'Draw — 50-move rule'
     return 'Game over'
   })()
 
@@ -564,22 +766,23 @@ export default function ChessPage() {
             <div className="w-24 sm:w-28">
               <Clocks
                 white={whiteMs} black={blackMs}
-                activeSide={chessRef.current.isGameOver() || flagged ? null
+                activeSide={isGameOver || flagged ? null
                             : history.length === 0 ? null
-                            : (chessRef.current.turn() === 'w' ? 'white' : 'black')}
+                            : turnColor}
                 orientation={playerColor}
               />
             </div>
           )}
           <div style={{ width: 'min(calc(100vh - 60px), 100%)', maxWidth: '100%' }}>
             <ChessBoard
-              chess={chessRef.current}
+              key={`fs-${mode}-${boardKey}`}
+              chess={activeGameInstance}
               fen={fen}
               orientation={playerColor}
               movableColor={movableColor}
               onMove={onUserMove}
               layoutKey={layoutKey}
-              candidateMoves={engineMode === 'analyze'
+              candidateMoves={engineMode === 'analyze' && mode === 'standard'
                 ? variations.slice(0, 3).map(v => v.pv?.[0]).filter(Boolean)
                 : []}
             />
@@ -589,156 +792,185 @@ export default function ChessPage() {
     )
   }
 
+  // Variant-specific status row (3-Check counters / KoTH hill / Atomic blast info).
+  const threeCheckCounts = (mode === 'threeCheck' && variantGameRef.current)
+    ? variantGameRef.current.threeCheckCounts() : null
+
   return (
     <div className="min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 sm:pt-32 pb-16 px-3 sm:px-6">
       {promotionPicker}
       <div className="max-w-6xl mx-auto">
         <Header engineHealth={engineHealth} onFullscreen={() => setFullscreen(true)} />
 
-        {/* Live lobby — collapsible. One-shot fetch on mount. */}
-        <div className="mb-5">
-          <LiveGamesLobby defaultOpen={false} />
-        </div>
+        {/* ── Top-level tabs ── peer sections of /chess. Puzzles & Online live
+            up here so the user doesn't have to scroll past the entire play
+            stack to find them. */}
+        <TopTabs value={topTab} onChange={setTopTab} />
 
-        <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[1fr_320px]">
-          {/* ── Board column ── */}
-          <div className="space-y-3">
-            <ModeBar
-              engineMode={engineMode} setEngineMode={setEngineMode}
-              playerColor={playerColor} setPlayerColor={setPlayerColor}
-              engineElo={engineElo} setEngineElo={setEngineElo}
-              analyzeDepth={analyzeDepth} setAnalyzeDepth={setAnalyzeDepth}
+        {topTab === 'play' && (
+          <>
+            {/* ── Mode chip row — variants live here. ONE shared board renders
+                whichever rules engine the active mode requires. Chessops drives
+                atomic / antichess / horde / crazyhouse / racingKings / koth /
+                threeCheck; chess.js drives standard / 960 / offline. */}
+            <ModeChips
+              value={mode} onChange={setMode}
+              modes={MODES}
             />
 
-            <div className="flex gap-2 sm:gap-3 touch-manipulation">
-              {/* EvalBar — hidden on mobile to save horizontal space.
-                  Also gated by the showEval toggle (off by default in
-                  play / human-vs-human so peeking at Stockfish's eval
-                  isn't a way to cheat against yourself or a friend). */}
-              {showEval && (
-                <div className="hidden sm:block">
-                  <EvalBar score={evalLatest?.score} orientation={playerColor} />
-                </div>
-              )}
-              {/* Clocks column — only when a time control is active.
-                  Active side ticks; flagged side flashes red. */}
-              {timeControl.baseMs != null && (
-                <div className="w-20 sm:w-24 shrink-0">
-                  <Clocks
-                    white={whiteMs} black={blackMs}
-                    activeSide={chessRef.current.isGameOver() || flagged ? null
-                                : history.length === 0 ? null
-                                : (chessRef.current.turn() === 'w' ? 'white' : 'black')}
-                    orientation={playerColor}
+            <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[1fr_320px] mt-4">
+              {/* ── Board column ── */}
+              <div className="space-y-3">
+                <ModeBar
+                  engineMode={engineMode} setEngineMode={setEngineMode}
+                  playerColor={playerColor} setPlayerColor={setPlayerColor}
+                  engineElo={engineElo} setEngineElo={setEngineElo}
+                  analyzeDepth={analyzeDepth} setAnalyzeDepth={setAnalyzeDepth}
+                  forcedPassAndPlay={forcedPassAndPlay}
+                  modeId={mode}
+                />
+
+                {/* Variant info row — for chessops modes, show the rule
+                    summary + any per-variant counters (3-Check, KoTH hill). */}
+                {mode !== 'standard' && (
+                  <VariantInfoStrip
+                    modeId={mode}
+                    threeCheckCounts={threeCheckCounts}
                   />
+                )}
+
+                <div className="flex gap-2 sm:gap-3 touch-manipulation">
+                  {/* EvalBar — disabled in variants where Stockfish would
+                      lie (atomic explosions / antichess captures-only /
+                      horde / crazyhouse / racing kings). Stockfish only
+                      understands standard chess. */}
+                  {showEval && mode === 'standard' && (
+                    <div className="hidden sm:block">
+                      <EvalBar score={evalLatest?.score} orientation={playerColor} />
+                    </div>
+                  )}
+                  {timeControl.baseMs != null && (
+                    <div className="w-20 sm:w-24 shrink-0">
+                      <Clocks
+                        white={whiteMs} black={blackMs}
+                        activeSide={isGameOver || flagged ? null
+                                    : history.length === 0 ? null
+                                    : turnColor}
+                        orientation={playerColor}
+                      />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0 max-w-[min(640px,calc(100vw-32px))] mx-auto">
+                    <ChessBoard
+                      key={`board-${mode}-${boardKey}`}
+                      chess={activeGameInstance}
+                      fen={fen}
+                      orientation={playerColor}
+                      movableColor={movableColor}
+                      onMove={onUserMove}
+                      layoutKey={layoutKey}
+                      candidateMoves={engineMode === 'analyze' && mode === 'standard'
+                        ? variations.slice(0, 3).map(v => v.pv?.[0]).filter(Boolean)
+                        : []}
+                    />
+                  </div>
                 </div>
-              )}
-              <div className="flex-1 min-w-0 max-w-[min(640px,calc(100vw-32px))] mx-auto">
-                <ChessBoard
-                  chess={chessRef.current}
-                  fen={fen}
-                  orientation={playerColor}
-                  movableColor={movableColor}
-                  onMove={onUserMove}
-                  layoutKey={layoutKey}
-                  // Top-3 candidate arrows — only in analyze mode so they
-                  // don't spoil play-vs-engine. Each variation's first
-                  // UCI move is the arrow's orig→dest.
-                  candidateMoves={engineMode === 'analyze'
-                    ? variations.slice(0, 3).map(v => v.pv?.[0]).filter(Boolean)
-                    : []}
+
+                <StatusBar
+                  status={status} thinking={thinking}
+                  isGameOver={isGameOver} gameOverReason={gameOverReason}
+                  onUndo={undoMove} onFlip={flipBoard}
+                  onReset={resetBoard} onCopyPgn={copyPgn}
+                  onSave={openSaveModal}
+                  onChallenge={mode === 'standard' ? onChallenge : null}
+                  showEval={showEval && mode === 'standard'}
+                  onToggleEval={() => setShowEval(v => !v)}
+                  undoSupported={usesChessjs}
                 />
+
+                {/* FEN / PGN import only for standard chess.js modes. */}
+                {usesChessjs && (
+                  <>
+                    <FenImport
+                      value={fenInput} setValue={setFenInput} onLoad={loadFen} currentFen={fen}
+                    />
+                    <PgnImport
+                      value={pgnInput} setValue={setPgnInput} onLoad={loadPgn}
+                    />
+                    <PgnDatabaseLoader onLoad={applyPgn} />
+                  </>
+                )}
+              </div>
+
+              {/* ── Sidebar ── */}
+              <div className="flex flex-col gap-3">
+                {mode === 'standard' && (
+                  <EnginePanel telemetry={telemetry} status={status} thinking={thinking} />
+                )}
+                {engineMode === 'analyze' && mode === 'standard' && variations.length > 0 && (
+                  <div className="hidden md:block">
+                    <Variations variations={variations} chess={chessRef.current} />
+                  </div>
+                )}
+                <div className="luxe-card p-3">
+                  {openingInfo && openingInfo.matchedPly >= 3 && mode === 'standard' && (
+                    <OpeningHeading
+                      info={openingInfo}
+                      expanded={openingExpanded}
+                      onToggle={() => setOpeningExpanded(v => !v)}
+                      detail={openingDetail}
+                    />
+                  )}
+                  <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Moves</p>
+                  <MoveList history={history} evalHistory={evalHistory} />
+                </div>
+                {showEval && mode === 'standard' && evalHistory.some(e => e?.score) && (
+                  <div className="luxe-card p-3 hidden md:block">
+                    <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Eval over time</p>
+                    <EvalGraph history={evalHistory} />
+                  </div>
+                )}
+                <TimeControlPicker value={timeControl} onChange={setTimeControl} />
+                <PieceSetPicker value={pieceSet} onChange={setPieceSet} />
               </div>
             </div>
 
-            <StatusBar
-              status={status} thinking={thinking}
-              isGameOver={isGameOver} gameOverReason={gameOverReason}
-              onUndo={undoMove} onFlip={flipBoard}
-              onReset={resetBoard} onCopyPgn={copyPgn}
-              onSave={openSaveModal}
-              onChallenge={onChallenge}
-              showEval={showEval}
-              onToggleEval={() => setShowEval(v => !v)}
-            />
+            {/* ECO opening database — only meaningful in standard chess.
+                Collapsed by default. */}
+            {mode === 'standard' && <OpeningExplorer defaultOpen={false} />}
 
-            <FenImport
-              value={fenInput} setValue={setFenInput} onLoad={loadFen} currentFen={fen}
-            />
-            <PgnImport
-              value={pgnInput} setValue={setPgnInput} onLoad={loadPgn}
-            />
-            {/* Multi-game files open a picker; single-game files load
-                straight away. Either way the chosen PGN is passed to
-                applyPgn (decoupled from the textarea's pgnInput state). */}
-            <PgnDatabaseLoader onLoad={applyPgn} />
-          </div>
-
-          {/* ── Sidebar ── On mobile this stacks below the board as a
-              single flex-column; on lg it becomes the 320px right rail. */}
-          <div className="flex flex-col gap-3">
-            <EnginePanel telemetry={telemetry} status={status} thinking={thinking} />
-            {engineMode === 'analyze' && variations.length > 0 && (
-              <div className="hidden md:block">
-                <Variations variations={variations} chess={chessRef.current} />
-              </div>
+            {/* Variants rules-only reference card — shown when the user is in
+                a chessops variant, gives the canonical rule summary. NO board:
+                the only board on this page is the one above. */}
+            {mode !== 'standard' && mode !== 'offline' && (
+              <VariantsRulesCard activeMode={mode} />
             )}
-            <div className="luxe-card p-3">
-              {/* Live opening name — collapsible, sits above the move
-                  list. Only renders once the BE has named the line AND
-                  the match goes ≥3 plies deep (move 1 alone yields
-                  noise like "King's Pawn Game"). Once shown, the panel
-                  keeps the LAST known name with an "(out of book)"
-                  tag when the game wanders off-book. */}
-              {openingInfo && openingInfo.matchedPly >= 3 && (
-                <OpeningHeading
-                  info={openingInfo}
-                  expanded={openingExpanded}
-                  onToggle={() => setOpeningExpanded(v => !v)}
-                  detail={openingDetail}
-                />
-              )}
-              <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Moves</p>
-              <MoveList history={history} evalHistory={evalHistory} />
+          </>
+        )}
+
+        {topTab === 'puzzles' && (
+          <div className="mt-2">
+            <PuzzleTrainer />
+          </div>
+        )}
+
+        {topTab === 'online' && (
+          <div className="mt-2 space-y-4">
+            <LiveGamesLobby defaultOpen={true} />
+            <div className="luxe-card p-4">
+              <p className="text-sm text-gray-300">
+                Challenge a friend from the Play tab's <span className="text-amber-300">Challenge</span> button —
+                or join an open match above.
+              </p>
             </div>
-            {showEval && evalHistory.some(e => e?.score) && (
-              <div className="luxe-card p-3 hidden md:block">
-                <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Eval over time</p>
-                <EvalGraph history={evalHistory} />
-              </div>
-            )}
-            <TimeControlPicker value={timeControl} onChange={setTimeControl} />
-            <PieceSetPicker value={pieceSet} onChange={setPieceSet} />
-            {/* Library button — opens the full saved-games library in a
-                modal. Was inline in the sidebar but that ate vertical
-                space and the user wanted it tucked behind a small button. */}
-            <button onClick={() => setLibraryOpen(true)}
-              className="w-full text-left luxe-card p-3 min-h-[40px] hover:border-amber-500/40 transition-colors flex items-center justify-between gap-2">
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-gray-500">Saved games</p>
-                <p className="text-xs text-gray-200 mt-0.5">Browse your library</p>
-              </div>
-              <BookOutlined className="text-base text-amber-300" />
-            </button>
           </div>
-        </div>
+        )}
 
-        {/* ECO opening database — collapsed by default. Browses the
-            full lichess-org/chess-openings dataset (~3.7k entries) via
-            paginated BE endpoints + on-click detail + Lichess masters. */}
-        <OpeningExplorer defaultOpen={false} />
-
-        {/* Puzzles section — lichess-imported tactics trainer with per-user
-            rating + difficulty-tuned random fetch + retry-with-penalty UX.
-            Library lives in BE SQLite; FE never hits lichess.org directly. */}
-        <div className="mt-5">
-          <PuzzleTrainer />
-        </div>
-
-        {/* Chess variants — 7 cards (3 playable vs Stockfish, 4 rules-only).
-            Click a playable card to open an inline panel with a fresh board
-            configured for that variant. Standard /chess flow above is untouched. */}
-        <VariantsHub />
+        {topTab === 'saved' && (
+          <div className="mt-2">
+            <SavedGames refreshKey={savedRefresh} onLoad={loadSavedGame} />
+          </div>
+        )}
       </div>
 
       {/* Save-game modal — replaces window.prompt with antd input */}
@@ -753,7 +985,7 @@ export default function ChessPage() {
       >
         <div className="space-y-3 py-2">
           <p className="text-xs text-gray-400">
-            Give this game a name. {history.length} ply, {chessRef.current.isGameOver() ? 'finished' : 'in progress'}.
+            Give this game a name. {history.length} ply, {isGameOver ? 'finished' : 'in progress'}.
           </p>
           <Input
             size="large"
@@ -821,26 +1053,135 @@ function Header({ engineHealth, onFullscreen }) {
   )
 }
 
+// ── Top-level tabs ── Play / Puzzles / Online / Saved.
+// Variants live INSIDE the Play tab (mode chip row) so the user never has
+// to scroll past the entire play stack to find puzzles or vice-versa.
+function TopTabs({ value, onChange }) {
+  const tabs = [
+    { id: 'play',    label: 'Play',    icon: <AimOutlined /> },
+    { id: 'puzzles', label: 'Puzzles', icon: <BookOutlined /> },
+    { id: 'online',  label: 'Online',  icon: <SendOutlined /> },
+    { id: 'saved',   label: 'Saved',   icon: <SaveOutlined /> },
+  ]
+  return (
+    <div className="luxe-card p-2 mb-4 flex items-center gap-1 flex-wrap">
+      {tabs.map(t => (
+        <button key={t.id} onClick={() => onChange(t.id)}
+          className={`text-xs font-semibold px-3 py-2 min-h-[40px] sm:min-h-0 sm:py-1.5 rounded-lg border transition-colors inline-flex items-center gap-1.5 ${
+            value === t.id
+              ? 'border-amber-400/60 bg-amber-500/15 text-amber-200'
+              : 'border-transparent text-gray-400 hover:text-gray-200 hover:bg-gray-900/40'
+          }`}>
+          {t.icon}
+          {t.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// ── Mode chip row — sits above the board inside the Play tab. Changing
+// the mode resets the board to that variant's starting position. The board
+// component below uses chess.js for standard/960/offline and the chessops
+// adapter for everything else; same chessground render in either case.
+function ModeChips({ value, onChange, modes }) {
+  return (
+    <div className="luxe-card p-3">
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="text-[10px] uppercase tracking-wider text-gray-500 mr-1">Mode</span>
+        {modes.map(m => (
+          <button key={m.id} onClick={() => onChange(m.id)}
+            title={m.engine ? `${m.label} · Stockfish supported` : `${m.label} · Pass-and-play only (chessops rules)`}
+            className={`text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border transition-colors inline-flex items-center gap-1.5 ${
+              value === m.id
+                ? 'border-amber-400/60 bg-amber-500/20 text-amber-100 ring-1 ring-amber-400/40'
+                : 'border-gray-800 bg-gray-900/40 text-gray-300 hover:border-amber-500/40 hover:text-amber-200'
+            }`}>
+            <span className="text-sm leading-none">{m.icon}</span>
+            {m.label}
+            {!m.engine && m.id !== 'offline' && (
+              <span className="text-[9px] uppercase tracking-wider text-fuchsia-300/80 ml-0.5">chessops</span>
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Variant info strip — surfaced just under the mode chips, gives the
+// rule summary + per-variant live counters (3-Check counts, KoTH hint).
+const VARIANT_BLURB = {
+  chess960:    'Back rank shuffled. Bishops on opposite colours, king between rooks. Castling adapts to starting files.',
+  koth:        'First king to reach d4, e4, d5 or e5 wins. Checkmate ends the game as normal.',
+  threeCheck:  'First side to deliver three checks wins. Mate also ends the game.',
+  atomic:      "Captures detonate a 3×3 square (pawns excepted). Explode the opponent's king to win. Rules by chessops.",
+  antichess:   'Captures are mandatory. No check, no mate. First to lose all pieces wins. Rules by chessops.',
+  horde:       'White has 36 pawns and no other pieces. Black mates White; White wins by clearing the board. Rules by chessops.',
+  crazyhouse:  'Captured pieces switch sides and join your reserve. Drops are a move. Rules by chessops.',
+  racingKings: 'No checks allowed. First king to reach the 8th rank wins. Rules by chessops.',
+  offline:     'Pass-and-play — two humans on one device. No engine, no network. Standard rules.',
+}
+function VariantInfoStrip({ modeId, threeCheckCounts }) {
+  const blurb = VARIANT_BLURB[modeId]
+  if (!blurb) return null
+  return (
+    <div className="luxe-card p-3 flex items-start gap-3 flex-wrap">
+      <p className="text-xs text-gray-300 leading-relaxed flex-1 min-w-[200px]">
+        {blurb}
+      </p>
+      {modeId === 'threeCheck' && threeCheckCounts && (
+        <div className="flex items-center gap-2 text-[11px] font-mono shrink-0">
+          <span className="text-gray-400">Checks:</span>
+          <span className="text-amber-200">W {threeCheckCounts.white}/3</span>
+          <span className="text-gray-600">·</span>
+          <span className="text-amber-200">B {threeCheckCounts.black}/3</span>
+        </div>
+      )}
+      {modeId === 'koth' && (
+        <div className="text-[11px] font-mono shrink-0 text-amber-200">
+          <span className="text-gray-500">Hill:</span> d4 · e4 · d5 · e5
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Mode + colour + slider bar ──
-function ModeBar({ engineMode, setEngineMode, playerColor, setPlayerColor, engineElo, setEngineElo, analyzeDepth, setAnalyzeDepth }) {
+// forcedPassAndPlay = true when the active variant has rules Stockfish can't
+// play (atomic, antichess, etc.). We grey-out Play / Analyze in that case and
+// surface a helpful pill explaining why.
+function ModeBar({ engineMode, setEngineMode, playerColor, setPlayerColor, engineElo, setEngineElo, analyzeDepth, setAnalyzeDepth, forcedPassAndPlay, modeId }) {
+  const ENGINE_MODES = [
+    { id: 'play',            label: 'Play vs engine', icon: <AimOutlined />,    engine: true },
+    { id: 'analyze',         label: 'Analyze',        icon: <SearchOutlined />, engine: true },
+    { id: 'human-vs-human',  label: 'Pass and play',  icon: <TeamOutlined />,   engine: false },
+  ]
   return (
     <div className="luxe-card p-3 flex items-center gap-2 flex-wrap">
-      {[
-        { id: 'play',            label: 'Play vs engine', icon: <AimOutlined /> },
-        { id: 'analyze',         label: 'Analyze',        icon: <SearchOutlined /> },
-        { id: 'human-vs-human',  label: 'Pass and play',  icon: <TeamOutlined /> },
-      ].map(m => (
-        <button key={m.id} onClick={() => setEngineMode(m.id)}
+      {ENGINE_MODES.map(m => {
+        const disabled = m.engine && forcedPassAndPlay
+        return (
+        <button key={m.id} onClick={() => !disabled && setEngineMode(m.id)}
+          disabled={disabled}
+          title={disabled ? `Stockfish can't play ${modeId} — Pass-and-play only.` : ''}
           className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors inline-flex items-center gap-1.5 ${
-            engineMode === m.id
-              ? 'border-amber-400/60 bg-amber-500/15 text-amber-200'
-              : 'border-gray-800 bg-gray-900/40 text-gray-400 hover:text-gray-200'
+            disabled
+              ? 'border-gray-900 bg-gray-900/30 text-gray-600 cursor-not-allowed'
+              : engineMode === m.id
+                ? 'border-amber-400/60 bg-amber-500/15 text-amber-200'
+                : 'border-gray-800 bg-gray-900/40 text-gray-400 hover:text-gray-200'
           }`}>
           {m.icon}
           {m.label}
         </button>
-      ))}
-      {engineMode === 'play' && (
+      )})}
+      {forcedPassAndPlay && (
+        <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-gray-700 bg-gray-900/60 text-gray-400 ml-1">
+          Engine: variant unsupported
+        </span>
+      )}
+      {engineMode === 'play' && !forcedPassAndPlay && (
         <>
           <span className="text-[10px] text-gray-600 mx-1">·</span>
           <span className="text-[10px] text-gray-400">You:</span>
@@ -881,7 +1222,7 @@ function ModeBar({ engineMode, setEngineMode, playerColor, setPlayerColor, engin
 }
 
 // ── Status + action buttons row ──
-function StatusBar({ status, thinking, isGameOver, gameOverReason, onUndo, onFlip, onReset, onCopyPgn, onSave, onChallenge, showEval, onToggleEval }) {
+function StatusBar({ status, thinking, isGameOver, gameOverReason, onUndo, onFlip, onReset, onCopyPgn, onSave, onChallenge, showEval, onToggleEval, undoSupported = true }) {
   return (
     <div className="luxe-card p-3 flex items-center justify-between gap-2 flex-wrap">
       <span className={`text-xs font-mono ${
@@ -898,7 +1239,9 @@ function StatusBar({ status, thinking, isGameOver, gameOverReason, onUndo, onFli
           40×40 minimum tap target on mobile per Apple HIG / Material. */}
       <div className="flex flex-wrap items-center gap-1.5">
         <button onClick={onUndo}
-          className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 min-h-[40px] sm:min-h-0 rounded-lg border border-gray-800 hover:border-gray-600 text-gray-300 inline-flex items-center gap-1.5">
+          disabled={!undoSupported}
+          title={undoSupported ? '' : 'Undo not supported in this variant'}
+          className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 min-h-[40px] sm:min-h-0 rounded-lg border border-gray-800 hover:border-gray-600 text-gray-300 inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
           <UndoOutlined /> Undo
         </button>
         <button onClick={onFlip}
