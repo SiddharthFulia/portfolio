@@ -81,7 +81,10 @@ function WinBar({ move }) {
 }
 
 // Single row + accordion content for one opening.
-function OpeningRow({ row, expanded, onToggle }) {
+// `offline` skips the Lichess masters fetch entirely (the openings
+// list + detail are FE cached on the BE anyway, but the masters panel
+// is the only thing that hits an external network upstream).
+function OpeningRow({ row, expanded, onToggle, offline = false }) {
   const [detail, setDetail] = useState(null)        // BE detail record
   const [detailErr, setDetailErr] = useState(null)
   const [masters, setMasters] = useState(null)      // Lichess explorer payload
@@ -95,6 +98,8 @@ function OpeningRow({ row, expanded, onToggle }) {
   const fetched = useRef(false)
 
   // Lazy-fetch detail on first expand. Detail → FEN → masters chain.
+  // In offline mode we still load the opening detail (it's served by
+  // the BE proxy with cache) but skip the upstream Lichess masters call.
   useEffect(() => {
     if (!expanded || fetched.current) return
     fetched.current = true
@@ -106,8 +111,9 @@ function OpeningRow({ row, expanded, onToggle }) {
       setLoadingDetail(false)
       if (error) { setDetailErr(error); return }
       setDetail(data)
-      // Now kick off the masters fetch with the computed FEN.
-      if (data?.fen) {
+      // Now kick off the masters fetch with the computed FEN — unless
+      // the user toggled Offline mode, in which case we skip entirely.
+      if (data?.fen && !offline) {
         setLoadingMasters(true); setMastersErr(null); setMastersRateLimited(false)
         const { data: m, error: merr, status } = await lichessMasters(data.fen, { moves: 5 })
         if (cancelled) return
@@ -124,7 +130,7 @@ function OpeningRow({ row, expanded, onToggle }) {
       }
     })()
     return () => { cancelled = true }
-  }, [expanded, row.slug])
+  }, [expanded, row.slug, offline])
 
   const copyPgn = async () => {
     try {
@@ -202,7 +208,10 @@ function OpeningRow({ row, expanded, onToggle }) {
                 </div>
               </div>
 
-              {/* Master games (Lichess Opening Explorer) */}
+              {/* Master games (Lichess Opening Explorer) — hidden when
+                  Offline mode is on since the masters DB is fetched
+                  upstream via Lichess explorer (BE proxy → network). */}
+              {!offline && (
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5">
                   Master games · top continuations
@@ -250,6 +259,7 @@ function OpeningRow({ row, expanded, onToggle }) {
                   </div>
                 )}
               </div>
+              )}
             </div>
           )}
         </div>
@@ -269,6 +279,11 @@ export default function OpeningExplorer({ defaultOpen = false }) {
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState(null)
   const [expandedSlug, setExpandedSlug] = useState(null)
+  // Offline toggle — when on, the row accordion skips the Lichess
+  // masters fetch (the only upstream network call in this panel).
+  // The opening list + detail still load (they're proxied + cached by
+  // our own BE) but the "Master games" subsection is suppressed.
+  const [offline, setOffline] = useState(false)
 
   // Fetch list when (a) panel is opened, (b) page changes, (c) query changes.
   const load = useCallback(async (signal) => {
@@ -330,7 +345,7 @@ export default function OpeningExplorer({ defaultOpen = false }) {
 
       {open && (
         <div className="border-t border-gray-800/60">
-          {/* Search bar */}
+          {/* Search bar + offline toggle */}
           <div className="px-3 sm:px-4 py-3 border-b border-gray-800/60 flex items-center gap-2 flex-wrap">
             <Input
               prefix={<SearchOutlined className="text-gray-500" />}
@@ -341,6 +356,24 @@ export default function OpeningExplorer({ defaultOpen = false }) {
               size="middle"
               className="!bg-gray-950 max-w-md"
             />
+            {/* Offline mode — hides the Lichess masters subsection so the
+                row accordion never hits the upstream network call. The
+                opening list + detail are served by our own BE proxy. */}
+            <button
+              type="button"
+              onClick={() => setOffline(o => !o)}
+              title={offline ? 'Show master games panel' : 'Hide master games panel (no upstream network)'}
+              className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded-lg border inline-flex items-center gap-1.5 ${
+                offline
+                  ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
+                  : 'border-gray-800 bg-gray-900/60 text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              Offline{' '}
+              <span className={`font-mono ${offline ? 'text-emerald-300' : 'text-gray-500'}`}>
+                {offline ? 'ON' : 'OFF'}
+              </span>
+            </button>
             <span className="sm:hidden text-[11px] text-gray-500 ml-auto">{headerSummary}</span>
           </div>
 
@@ -370,6 +403,7 @@ export default function OpeningExplorer({ defaultOpen = false }) {
                 row={row}
                 expanded={expandedSlug === row.slug}
                 onToggle={() => setExpandedSlug(s => s === row.slug ? null : row.slug)}
+                offline={offline}
               />
             ))}
           </div>

@@ -1,13 +1,23 @@
 // VariantsHub — grid of chess-variant cards on /chess.
 //
-// Three variants are fully playable against Stockfish:
+// 100 % client-side. Stockfish runs in a Web Worker inside the page
+// (see src/lib/stockfishLocal.js). Zero BE calls for any variant here —
+// the analysis page above the hub still uses BE Stockfish for the main
+// board, but this hub is fully self-contained.
+//
+// Three engine variants:
 //   • Chess960 (Fischer Random) — shuffled back rank, X-FEN castling.
-//     Stockfish handles the rules natively once UCI_Chess960=true.
-//   • King of the Hill — first king on d4/e4/d5/e5 wins. Pure FE win
-//     check after each move; Stockfish runs vanilla on the FEN.
-//   • Three-Check — first side to give 3 checks wins. FE counts checks;
-//     Stockfish runs vanilla.
-// Four variants are rules-cards only (no engine yet):
+//     UCI_Chess960=true is forwarded to the worker.
+//   • King of the Hill — first king on d4/e4/d5/e5 wins. We post the
+//     position to a vanilla Stockfish; our own JS layer checks the
+//     hill-win after each move.
+//   • Three-Check — first side to 3 checks wins. Same approach: vanilla
+//     SF for the move search, FE win-check after each ply.
+// One pure-FE variant:
+//   • Offline 2-Player Board — hot-seat pass-and-play. No engine, no
+//     network. Two humans alternate on one device. Flip board + PGN
+//     export at game end.
+// Four rules-card-only variants:
 //   Atomic · Crazyhouse · Antichess · Horde.
 //
 // Clicking a playable card opens an inline panel below the grid with a
@@ -17,13 +27,14 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { Chess } from 'chess.js'
-import { CloseOutlined, ReloadOutlined, SwapOutlined } from '@ant-design/icons'
+import { CloseOutlined, ReloadOutlined, SwapOutlined, CopyOutlined } from '@ant-design/icons'
 import ChessBoard from './ChessBoard'
-import { chessVariantPlay } from '../../api/ai'
 import { generate960Fen } from '../../lib/chess960'
+import { getBestMove, skillLevelFromElo } from '../../lib/stockfishLocal'
 
 // ── Variant catalogue ───────────────────────────────────────────────
-// `playable: true` cards open the inline engine panel; others are
+// Cards with `playable: true` open the inline engine panel; cards with
+// `offline: true` open the human-only hot-seat panel; the rest are
 // rules-only and show a "Coming soon" pill.
 const VARIANTS = [
   {
@@ -52,6 +63,15 @@ const VARIANTS = [
     eco: '3C',
     playable: true,
     summary: 'Standard rules, but the first side to deliver three checks wins immediately. Mate ends the game as usual.',
+  },
+  {
+    id: 'offline',
+    name: 'Offline Board',
+    aka: 'Hot-Seat',
+    icon: '🪑',
+    eco: 'PvP',
+    offline: true,
+    summary: 'Pass-and-play, no engine, no internet. Just two humans on one screen.',
   },
   {
     id: 'atomic',
@@ -111,6 +131,7 @@ function kingSquare(chess, color) {
 
 export default function VariantsHub() {
   const [openVariant, setOpenVariant] = useState(null)
+  const variant = openVariant ? VARIANTS.find(v => v.id === openVariant) : null
 
   return (
     <section className="mt-10">
@@ -120,8 +141,8 @@ export default function VariantsHub() {
           ♟ Variants
         </h2>
         <p className="text-sm text-gray-400 max-w-2xl">
-          Seven rule-sets beyond standard chess. Three are playable vs Stockfish right here;
-          the rest are documented for now.
+          Eight rule-sets beyond standard chess. Three play vs Stockfish in the browser (no server),
+          one is a pure 2-player hot-seat board, the rest are documented for now.
         </p>
       </header>
 
@@ -131,15 +152,23 @@ export default function VariantsHub() {
             key={v.id}
             variant={v}
             active={openVariant === v.id}
-            onPlay={() => v.playable && setOpenVariant(v.id)}
+            onPlay={() => (v.playable || v.offline) && setOpenVariant(v.id)}
           />
         ))}
       </div>
 
-      {openVariant && (
+      {variant && variant.offline && (
+        <div className="mt-5">
+          <OfflinePanel
+            variant={variant}
+            onClose={() => setOpenVariant(null)}
+          />
+        </div>
+      )}
+      {variant && variant.playable && (
         <div className="mt-5">
           <VariantPanel
-            variant={VARIANTS.find(v => v.id === openVariant)}
+            variant={variant}
             onClose={() => setOpenVariant(null)}
           />
         </div>
@@ -150,15 +179,20 @@ export default function VariantsHub() {
 
 // ── Variant card ────────────────────────────────────────────────────
 function VariantCard({ variant, active, onPlay }) {
-  const playable = variant.playable
+  const interactive = variant.playable || variant.offline
+  // Pill text + accent — engine cards say "Play vs Stockfish", the
+  // hot-seat card says "2-Player Hot-Seat" so the user knows the lane.
+  const pillText = variant.offline
+    ? (active ? 'Playing ↓' : '2-Player Hot-Seat ↗')
+    : (active ? 'Playing ↓' : 'Play vs Stockfish ↗')
   return (
     <button
       type="button"
       onClick={onPlay}
-      disabled={!playable}
+      disabled={!interactive}
       className={`group text-left luxe-card p-4 transition-colors flex flex-col gap-3 min-h-[180px]
         ${active ? 'border-amber-400/60 ring-1 ring-amber-400/30' : ''}
-        ${playable ? 'hover:border-amber-500/40 cursor-pointer' : 'opacity-80 cursor-default'}`}
+        ${interactive ? 'hover:border-amber-500/40 cursor-pointer' : 'opacity-80 cursor-default'}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
@@ -176,12 +210,12 @@ function VariantCard({ variant, active, onPlay }) {
         {variant.summary}
       </p>
       <div className="flex items-center justify-between gap-2 pt-1">
-        {playable ? (
+        {interactive ? (
           <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded-lg border
             ${active
               ? 'border-amber-400/60 bg-amber-500/20 text-amber-200'
               : 'border-amber-500/40 bg-amber-500/10 text-amber-300 group-hover:bg-amber-500/20'}`}>
-            {active ? 'Playing ↓' : 'Play vs Stockfish ↗'}
+            {pillText}
           </span>
         ) : (
           <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded-lg border border-gray-700 bg-gray-900/60 text-gray-400">
@@ -193,11 +227,12 @@ function VariantCard({ variant, active, onPlay }) {
   )
 }
 
-// ── Inline play panel ───────────────────────────────────────────────
+// ── Inline play panel (engine variants) ─────────────────────────────
 // Fresh chess.js instance scoped to the variant — does NOT touch the
 // parent /chess page's main board. Win conditions overlay chess.js's
 // built-in isGameOver() check so KoTH / 3-Check terminate even when no
-// checkmate has occurred.
+// checkmate has occurred. Engine moves come from the local stockfish
+// worker (src/lib/stockfishLocal.js) — no network.
 function VariantPanel({ variant, onClose }) {
   // Initial FEN depends on variant — 960 uses a generated shuffled FEN;
   // KoTH / 3-Check use the standard starting position.
@@ -331,34 +366,39 @@ function VariantPanel({ variant, onClose }) {
 
   // Engine reply — runs when it becomes the engine's turn and the game
   // isn't over (including via variant win conditions, not just chess.js).
+  // Uses the local Web Worker; no network involved.
   useEffect(() => {
     if (isGameOver) return
     if (turnColor === playerColor) return
     if (!chessRef.current) return
     let cancelled = false
     setThinking(true)
-    setStatus({ kind: 'thinking', text: 'Stockfish thinking…' })
-    chessVariantPlay({
-      variant: variant.id,
-      fen,
-      options: { elo: 1500, thinkMs: 500 },
-    }).then(({ data, error: err }) => {
-      if (cancelled) return
-      setThinking(false)
-      if (err || !data?.bestmove) {
-        setStatus({ kind: 'error', text: err || 'Engine returned no move' })
-        return
-      }
-      const uci = data.bestmove
-      applyMove({
-        from: uci.slice(0, 2),
-        to:   uci.slice(2, 4),
-        promotion: uci.length === 5 ? uci[4] : undefined,
+    setStatus({ kind: 'thinking', text: 'Engine thinking…' })
+    // 960 needs the UCI_Chess960 flag so SF interprets castling correctly.
+    // Skill Level approximates ELO 1500 → roughly Skill 10/20 — strong
+    // enough to challenge but not crushing.
+    const options = { 'Skill Level': skillLevelFromElo(1500) }
+    if (variant.id === 'chess960') options.UCI_Chess960 = true
+    getBestMove(fen, { movetime: 1500, options })
+      .then(({ bestmove }) => {
+        if (cancelled) return
+        setThinking(false)
+        if (!bestmove) {
+          setStatus({ kind: 'error', text: 'Engine returned no move' })
+          return
+        }
+        applyMove({
+          from: bestmove.slice(0, 2),
+          to:   bestmove.slice(2, 4),
+          promotion: bestmove.length === 5 ? bestmove[4] : undefined,
+        })
+        setStatus({ kind: 'idle', text: 'Your move' })
       })
-      setStatus({ kind: 'idle', text: 'Your move' })
-    }).catch(() => {
-      if (!cancelled) setThinking(false)
-    })
+      .catch((err) => {
+        if (cancelled) return
+        setThinking(false)
+        setStatus({ kind: 'error', text: err?.message || 'Engine error' })
+      })
     return () => { cancelled = true }
   // fen drives the effect — every time the position changes, re-evaluate.
   }, [fen, playerColor, isGameOver, turnColor, variant.id, applyMove])
@@ -376,7 +416,9 @@ function VariantPanel({ variant, onClose }) {
           <span className="text-2xl">{variant.icon}</span>
           <div>
             <h3 className="text-base font-bold text-amber-200">{variant.name}</h3>
-            <p className="text-[10px] uppercase tracking-wider text-gray-500">vs Stockfish · ELO 1500</p>
+            <p className="text-[10px] uppercase tracking-wider text-gray-500">
+              vs Stockfish (local) · ELO ~1500
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
@@ -439,6 +481,206 @@ function VariantPanel({ variant, onClose }) {
           <div className="luxe-card p-3 bg-black/30">
             <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5">Rules</p>
             <p className="text-[11px] text-gray-300 leading-relaxed">{variant.summary}</p>
+          </div>
+          {history.length > 0 && (
+            <div className="luxe-card p-3 bg-black/30">
+              <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5">Moves · {history.length}</p>
+              <p className="text-[11px] font-mono text-gray-200 break-words leading-relaxed max-h-32 overflow-y-auto">
+                {history.join(' ')}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Offline 2-Player hot-seat panel ─────────────────────────────────
+// Pure local pass-and-play. No engine, no network, ever. chess.js owns
+// move validation + game-over detection. The board orientation flips
+// after each ply so the side to move always faces the player on the
+// other side of the screen — unless the user has explicitly locked
+// orientation via the Flip button (autoFlip = false).
+function OfflinePanel({ variant, onClose }) {
+  const chessRef = useRef(null)
+  const [fen, setFen] = useState('')
+  // orientation = the colour currently rendered at the bottom of the
+  // board. Starts on 'white'; auto-rotates on each move when autoFlip
+  // is on. Manual Flip button toggles + sets autoFlip = false so the
+  // user keeps a fixed perspective once they explicitly pick one.
+  const [orientation, setOrientation] = useState('white')
+  const [autoFlip, setAutoFlip] = useState(true)
+  const [history, setHistory] = useState([])
+  const [boardKey, setBoardKey] = useState(0)
+  const [copyStatus, setCopyStatus] = useState(null)
+
+  const reset = useCallback(() => {
+    chessRef.current = new Chess()
+    setFen(chessRef.current.fen())
+    setHistory([])
+    setOrientation('white')
+    setAutoFlip(true)
+    setBoardKey(k => k + 1)
+    setCopyStatus(null)
+  }, [])
+
+  useEffect(() => { reset() }, [reset])
+
+  const turnColor = useMemo(
+    () => (chessRef.current?.turn() === 'w' ? 'white' : 'black'),
+    [fen],
+  )
+
+  const isGameOver = chessRef.current?.isGameOver() ?? false
+  const gameOverReason = useMemo(() => {
+    const c = chessRef.current
+    if (!c || !c.isGameOver()) return null
+    if (c.isCheckmate()) return `Checkmate · ${c.turn() === 'w' ? 'Black' : 'White'} wins`
+    if (c.isStalemate()) return 'Stalemate · Draw'
+    if (c.isInsufficientMaterial()) return 'Insufficient material · Draw'
+    if (c.isThreefoldRepetition()) return 'Threefold repetition · Draw'
+    if (c.isDraw()) return '50-move rule · Draw'
+    return 'Game over'
+  }, [fen])
+
+  // Movable colour follows whose turn it is — pass-and-play means BOTH
+  // players use this same device, so we never lock to a fixed side.
+  const movableColor = isGameOver ? null : turnColor
+
+  const onUserMove = useCallback((from, to) => {
+    if (isGameOver) return
+    const c = chessRef.current
+    const piece = c.get(from)
+    // Auto-queen — the offline lane is meant to be a quick hot-seat game
+    // and the parent /chess page already exposes the full promo picker.
+    const promotion = piece && piece.type === 'p' && (to[1] === '8' || to[1] === '1') ? 'q' : undefined
+    let move
+    try { move = c.move({ from, to, promotion }) } catch { return }
+    if (!move) return
+    setFen(c.fen())
+    setHistory(c.history())
+    // Auto-rotate the board so the next player always sees their own
+    // pieces facing them. User can disable this by hitting Flip manually.
+    if (autoFlip) setOrientation(o => (o === 'white' ? 'black' : 'white'))
+  }, [autoFlip, isGameOver])
+
+  // Manual flip — also disables auto-flip so the user's chosen perspective
+  // sticks for the rest of the game (until they reset).
+  const manualFlip = () => {
+    setOrientation(o => (o === 'white' ? 'black' : 'white'))
+    setAutoFlip(false)
+  }
+
+  const copyPgn = async () => {
+    const pgn = chessRef.current?.pgn() || ''
+    if (!pgn) {
+      setCopyStatus({ kind: 'error', text: 'No moves yet' })
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(pgn)
+      setCopyStatus({ kind: 'ok', text: 'PGN copied' })
+    } catch {
+      setCopyStatus({ kind: 'error', text: 'Clipboard unavailable' })
+    }
+  }
+
+  return (
+    <div className="luxe-card p-4 sm:p-5 border-amber-500/30">
+      <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
+        <div className="flex items-center gap-2.5">
+          <span className="text-2xl">{variant.icon}</span>
+          <div>
+            <h3 className="text-base font-bold text-amber-200">{variant.name}</h3>
+            <p className="text-[10px] uppercase tracking-wider text-gray-500">
+              2-Player hot-seat · No engine · Fully offline
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button onClick={manualFlip}
+            title={autoFlip ? 'Lock orientation (disables auto-flip)' : 'Flip board'}
+            className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-gray-800 hover:border-gray-600 text-gray-300 inline-flex items-center gap-1.5">
+            <SwapOutlined /> Flip
+          </button>
+          <button onClick={copyPgn}
+            disabled={history.length === 0}
+            className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5">
+            <CopyOutlined /> Export PGN
+          </button>
+          <button onClick={reset}
+            className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 inline-flex items-center gap-1.5">
+            <ReloadOutlined /> New game
+          </button>
+          <button onClick={onClose}
+            className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-gray-800 hover:border-gray-600 text-gray-300 inline-flex items-center gap-1.5">
+            <CloseOutlined /> Close
+          </button>
+        </div>
+      </div>
+
+      <div className="mb-3 flex items-center gap-3 text-[11px] flex-wrap">
+        <span className={`px-2 py-0.5 rounded font-mono ${
+          turnColor === 'white' ? 'bg-gray-100 text-gray-900' : 'bg-gray-900 text-gray-100 border border-gray-700'
+        }`}>
+          {turnColor === 'white' ? 'White' : 'Black'} to move
+        </span>
+        <span className="text-gray-500">·</span>
+        <span className="text-gray-400">
+          Auto-flip{' '}
+          <button
+            type="button"
+            onClick={() => setAutoFlip(a => !a)}
+            className={`font-mono text-[11px] px-1.5 py-0.5 rounded border ${
+              autoFlip
+                ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
+                : 'border-gray-700 bg-gray-900/60 text-gray-400'
+            }`}>
+            {autoFlip ? 'ON' : 'OFF'}
+          </button>
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-3 items-start">
+        <div className="max-w-[520px] mx-auto w-full">
+          {chessRef.current && (
+            <ChessBoard
+              key={boardKey}
+              chess={chessRef.current}
+              fen={fen}
+              orientation={orientation}
+              movableColor={movableColor}
+              onMove={onUserMove}
+              layoutKey={`offline-${boardKey}-${orientation}`}
+            />
+          )}
+        </div>
+
+        <div className="space-y-2 text-xs">
+          <div className={`px-3 py-2 rounded-lg border font-mono ${
+            isGameOver
+              ? 'border-amber-400/40 bg-amber-500/10 text-amber-200'
+              : 'border-gray-800 bg-gray-900/60 text-gray-300'
+          }`}>
+            {isGameOver ? gameOverReason : `${turnColor === 'white' ? 'White' : 'Black'}'s turn`}
+          </div>
+          {copyStatus && (
+            <div className={`px-3 py-1.5 rounded-lg border font-mono text-[11px] ${
+              copyStatus.kind === 'error'
+                ? 'border-rose-400/40 bg-rose-500/10 text-rose-300'
+                : 'border-emerald-400/40 bg-emerald-500/10 text-emerald-300'
+            }`}>
+              {copyStatus.text}
+            </div>
+          )}
+          <div className="luxe-card p-3 bg-black/30">
+            <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5">Hot-seat tips</p>
+            <p className="text-[11px] text-gray-300 leading-relaxed">
+              Pass the device between moves. Auto-flip rotates the board so
+              the next player always sees their pieces facing them. Hit
+              Export PGN at any time to save the game.
+            </p>
           </div>
           {history.length > 0 && (
             <div className="luxe-card p-3 bg-black/30">
