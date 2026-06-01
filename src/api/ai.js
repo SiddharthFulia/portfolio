@@ -790,6 +790,12 @@ export async function chessPuzzleStats(userId) {
     return { data: data?.data || data, error: null };
   } catch (err) { return { data: null, error: err.message }; }
 }
+export async function chessPuzzleGlobalStats() {
+  try {
+    const data = await get(ENDPOINTS.CHESS_PUZZLES_STATS_GLOBAL, {}, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
 
 // ─── Unified live-log tail (added 2026-05) ────────────────────────
 // Cursor-based — pass the ts of the last log you've seen so the BE only

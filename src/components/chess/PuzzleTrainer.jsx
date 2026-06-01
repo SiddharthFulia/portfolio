@@ -30,7 +30,7 @@ import { Button } from '../ui'
 import ChessBoard from './ChessBoard'
 import {
   chessPuzzleListUsers, chessPuzzleCreateUser, chessPuzzleDeleteUser,
-  chessPuzzleNext, chessPuzzleAttempt, chessPuzzleStats,
+  chessPuzzleNext, chessPuzzleAttempt, chessPuzzleStats, chessPuzzleGlobalStats,
 } from '../../api/ai'
 
 // ── Difficulty tiers — keep in lock-step with services/chess/puzzleStore.js
@@ -98,7 +98,14 @@ export default function PuzzleTrainer() {
   const [ratingDelta, setRatingDelta] = useState(null)
 
   // ── Live counters ───────────────────────────────────────────────
-  const [stats, setStats] = useState(null)   // { rating, solvedCount, totalAvailable }
+  const [stats, setStats] = useState(null)   // per-user { rating, solvedCount, totalAvailable }
+  const [globalStats, setGlobalStats] = useState(null)   // { totalPuzzles, totalUsers, totalAttempts, totalSolved, ratingBuckets, topThemes }
+
+  useEffect(() => {
+    chessPuzzleGlobalStats().then(({ data, error }) => {
+      if (!error && data) setGlobalStats(data)
+    })
+  }, [])
 
   // ── Bootstrap: load users on mount ──────────────────────────────
   const refreshUsers = useCallback(async () => {
@@ -376,8 +383,24 @@ export default function PuzzleTrainer() {
             <FireOutlined /> Chess Puzzles
           </h2>
           <p className="text-xs text-gray-400 mt-1">
-            ~{stats?.totalAvailable?.toLocaleString() || '—'} lichess puzzles · pick your difficulty · ratings update live.
+            ~{stats?.totalAvailable?.toLocaleString() || globalStats?.totalPuzzles?.toLocaleString() || '—'} lichess puzzles · pick your difficulty · ratings update live.
           </p>
+          {globalStats && (
+            <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-mono tabular-nums">
+              <span className="px-2 py-0.5 rounded border border-amber-500/25 bg-amber-500/5 text-amber-200">
+                {globalStats.totalPuzzles.toLocaleString()} puzzles
+              </span>
+              <span className="px-2 py-0.5 rounded border border-rose-500/25 bg-rose-500/5 text-rose-200">
+                {globalStats.totalUsers.toLocaleString()} players
+              </span>
+              <span className="px-2 py-0.5 rounded border border-emerald-500/25 bg-emerald-500/5 text-emerald-200">
+                {globalStats.totalSolved.toLocaleString()} solved
+              </span>
+              <span className="px-2 py-0.5 rounded border border-fuchsia-500/25 bg-fuchsia-500/5 text-fuchsia-200">
+                {globalStats.totalAttempts.toLocaleString()} attempts
+              </span>
+            </div>
+          )}
         </div>
         {/* Live counters in the corner */}
         {stats && (

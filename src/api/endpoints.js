@@ -79,6 +79,7 @@ export const ENDPOINTS = {
   CHESS_PUZZLES_NEXT:     '/api/chess/puzzles/next',       // ?userId=&difficulty=
   CHESS_PUZZLES_ATTEMPT:  '/api/chess/puzzles/attempt',
   CHESS_PUZZLES_STATS:    '/api/chess/puzzles/stats',      // ?userId=
+  CHESS_PUZZLES_STATS_GLOBAL: '/api/chess/puzzles/stats/global',
   // Multi-video concatenation (ffmpeg-concat lane)
   COMBINE:              '/api/combine',
   COMBINE_UPLOAD:       '/api/combine/upload',
