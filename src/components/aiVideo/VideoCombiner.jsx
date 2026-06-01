@@ -36,6 +36,27 @@ const TRACKED_KEY = 'sid-combine-tracked'
 const PAGE_SIZE_OPTIONS = ['10', '20', '30', '40', '50', '100']
 const DEFAULT_PAGE_SIZE = 20
 
+// Resolve a stored video URL to an absolute one. listVideos() can return
+// either fully-qualified Cloudinary URLs (`https://res.cloudinary.com/…`)
+// or BE-relative paths (`/api/files/…`) for self-hosted clips. Without
+// this prefix, relative URLs resolve against the FE origin and 404 — the
+// <video> element silently renders an empty box (the bug the user saw:
+// "I can't see the videos"). Mirrors the helper in pages/AIVideo.jsx.
+const BE_URL = import.meta.env.VITE_BE_URL || ''
+const resolveVideoUrl = (url) => {
+  if (!url) return ''
+  return url.startsWith('http') ? url : `${BE_URL}${url}`
+}
+// Build a Cloudinary poster (single-frame JPG) so the picker tile shows
+// a thumbnail instead of a black box before hover. No-op for non-
+// Cloudinary URLs — `poster={null}` is harmless on <video>.
+const thumbFromVideo = (videoUrl) => {
+  if (!videoUrl || !/cloudinary\.com\/.+\/video\/upload\//.test(videoUrl)) return null
+  return videoUrl
+    .replace('/video/upload/', '/video/upload/so_1,w_400,c_fill,q_auto,f_jpg/')
+    .replace(/\.(mp4|webm|mov)$/i, '.jpg')
+}
+
 const loadTracked = () => {
   try {
     const v = JSON.parse(localStorage.getItem(TRACKED_KEY) || '[]')
@@ -199,8 +220,11 @@ function BuildTab({
 
   // ── selection ops ──
   const toggleSelect = (item) => {
-    const url = item.videoUrl || item.outputUrl
-    if (!url) return
+    // When the row has a videoId the BE resolves the source from the DB
+    // (so a relative URL is fine to keep around for UI), but for the
+    // pasted/external case we want an absolute URL.
+    const url = resolveVideoUrl(item.videoUrl || item.outputUrl)
+    if (!url && !item.videoId) return
     const exists = picked.find(p => p.videoId === item.videoId)
     if (exists) {
       setPicked(picked.filter(p => p.videoId !== item.videoId))
@@ -356,21 +380,46 @@ function BuildTab({
           <div className='grid grid-cols-2 sm:grid-cols-3 gap-3'>
             {libItems.map((item) => {
               const isPicked = !!picked.find(p => p.videoId === item.videoId)
+              // listVideos() returns either an absolute Cloudinary URL or a
+              // BE-relative path — both need resolving. The poster gives the
+              // tile a real thumbnail in its idle state (instead of a black
+              // box); hover triggers .play() and mouse-leave pauses + rewinds
+              // so the next hover always starts from frame 0. preload stays
+              // at 'metadata' so a 30-tile page doesn't drag every clip
+              // across the wire on mount.
+              const src    = resolveVideoUrl(item.videoUrl)
+              const poster = item.thumbnailUrl || thumbFromVideo(src)
               return (
                 <button
                   key={item.videoId}
                   type='button'
                   onClick={() => toggleSelect(item)}
-                  className={`relative aspect-video rounded-lg overflow-hidden border transition-colors
+                  className={`group relative aspect-video rounded-lg overflow-hidden border transition-colors bg-black/40
                     ${isPicked ? 'border-amber-400 ring-2 ring-amber-400/40' : 'border-line hover:border-line-strong'}`}
                 >
-                  <video src={item.videoUrl} className='w-full h-full object-cover' muted playsInline preload='metadata' />
+                  {src ? (
+                    <video
+                      src={src}
+                      poster={poster || undefined}
+                      className='w-full h-full object-cover pointer-events-none'
+                      muted
+                      loop
+                      playsInline
+                      preload='metadata'
+                      onMouseEnter={(e) => { e.currentTarget.play?.().catch(() => {}) }}
+                      onMouseLeave={(e) => { e.currentTarget.pause?.(); try { e.currentTarget.currentTime = 0 } catch {} }}
+                    />
+                  ) : (
+                    <div className='w-full h-full flex items-center justify-center text-[10px] uppercase tracking-wider text-fg-muted'>
+                      no preview
+                    </div>
+                  )}
                   {isPicked && (
-                    <span className='absolute top-1 right-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500 text-black inline-flex items-center gap-0.5'>
+                    <span className='absolute top-1 right-1 z-10 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500 text-black inline-flex items-center gap-0.5'>
                       <CheckOutlined /> {picked.findIndex(p => p.videoId === item.videoId) + 1}
                     </span>
                   )}
-                  <span className='absolute inset-x-0 bottom-0 px-2 py-1 text-[10px] bg-gradient-to-t from-black/90 to-transparent text-fg-secondary truncate'>
+                  <span className='absolute inset-x-0 bottom-0 z-10 px-2 py-1 text-[10px] bg-gradient-to-t from-black/90 to-transparent text-fg-secondary truncate'>
                     {(item.prompt || item.videoId).slice(0, 40)}
                   </span>
                 </button>
