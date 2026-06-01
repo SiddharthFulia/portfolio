@@ -104,6 +104,11 @@ export const ENDPOINTS = {
   ADMIN_WORKERS:        '/api/admin/workers',
   ADMIN_PURGE_QUEUE:    '/api/admin/queues/purge',
   ADMIN_ACTIVITY:       '/api/admin/activity',
+  // Database Explorer — Settings → Database tab
+  ADMIN_DB_TABLES:      '/api/admin/db/tables',
+  ADMIN_DB_TABLE:       '/api/admin/db/tables',   // /:name appended at call site
+  ADMIN_DB_QUERY:       '/api/admin/db/query',
+  ADMIN_DB_ASK:         '/api/admin/db/ask',
   JOB_LOGS:             '/api/job-logs',   // /:lane/:jobId?since=<ms>&limit=80
   EXPORT:               '/api/export',     // POST { format, rows|content, title, filename }
 

@@ -1096,3 +1096,57 @@ export async function adminQueueStats() { try { const data = await get(ENDPOINTS
 export async function adminWorkers() { try { const data = await get(ENDPOINTS.ADMIN_WORKERS, {}, { timeout: 10000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 export async function adminPurgeQueue(queue) { try { const data = await post(ENDPOINTS.ADMIN_PURGE_QUEUE, { queue }, { timeout: 15000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 export async function adminActivity(days = 14) { try { const data = await get(ENDPOINTS.ADMIN_ACTIVITY, { days }, { timeout: 20000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+
+// ─── Database Explorer (Settings → Database) ────────────────────
+// Schema introspection + paginated browse + read-only SQL + Groq Q&A.
+// Every call is vault-gated; the request helper attaches the token from
+// localStorage automatically. Timeouts are generous because Groq + a
+// cold SQLite schema rebuild can together take 8-10s on first call.
+export async function adminDbTables({ refresh = false } = {}) {
+  try {
+    const data = await get(ENDPOINTS.ADMIN_DB_TABLES, refresh ? { refresh: 1 } : {}, { timeout: 15000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function adminDbTable(name, { limit = 50, offset = 0, orderBy, order = 'desc' } = {}) {
+  try {
+    const params = { limit, offset, order };
+    if (orderBy) params.orderBy = orderBy;
+    const data = await get(`${ENDPOINTS.ADMIN_DB_TABLE}/${encodeURIComponent(name)}`, params, { timeout: 20000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+// Both /query and /ask intentionally avoid the wrapped `post()` helper:
+// on a 400 (rejected SQL) we need the BE's `data` payload (generatedSql,
+// reason) — the wrapped helper throws on non-2xx and discards `data`. We
+// hit fetch directly here so the UI can show the rejected SQL inline.
+const BE_URL = import.meta.env.VITE_BE_URL || 'http://localhost:4001';
+function _vaultHeaders() {
+  try {
+    const t = localStorage.getItem('sid-vault-token');
+    return t ? { Authorization: `Bearer ${t}` } : {};
+  } catch { return {}; }
+}
+async function _adminDbPost(endpoint, body, { timeout = 20000 } = {}) {
+  try {
+    const res = await fetch(`${BE_URL}${endpoint}`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', ..._vaultHeaders() },
+      body:    JSON.stringify(body),
+      signal:  AbortSignal.timeout(timeout),
+    });
+    let payload = null;
+    try { payload = await res.json(); } catch {}
+    if (res.ok) return { data: payload?.data || payload, error: null };
+    // Non-OK: surface message + the BE data block (generatedSql, etc).
+    return {
+      data:  payload?.data || null,
+      error: payload?.message || `Request failed: ${res.status}`,
+      status: res.status,
+    };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+}
+export async function adminDbQuery(sql)        { return _adminDbPost(ENDPOINTS.ADMIN_DB_QUERY, { sql },      { timeout: 20000 }); }
+export async function adminDbAsk(question)     { return _adminDbPost(ENDPOINTS.ADMIN_DB_ASK,   { question }, { timeout: 45000 }); }

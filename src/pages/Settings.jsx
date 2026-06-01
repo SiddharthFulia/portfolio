@@ -7,6 +7,7 @@ import {
   XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from 'recharts'
 import VaultGate from '../components/VaultGate'
+import DbExplorer from '../components/settings/DbExplorer'
 import {
   adminServerStats, adminDbStats, adminDiskStats, adminQueueStats, adminWorkers, adminPurgeQueue,
   adminActivity, adminMeshStats,
@@ -50,7 +51,7 @@ function SettingsInner() {
   // ?tab= mirrors the active Tabs key so refreshing or sharing the URL
   // preserves which pane the user was viewing. Defaults to 'overview',
   // which is omitted from the URL so /settings stays clean.
-  const [tab, setTab] = useQueryState('tab', 'overview', { allowed: ['overview', 'storage', 'visualize', 'cloudinary'] })
+  const [tab, setTab] = useQueryState('tab', 'overview', { allowed: ['overview', 'storage', 'visualize', 'database', 'cloudinary'] })
   const [server, setServer] = useState(null)
   const [dbStats, setDbStats] = useState(null)
   const [diskStats, setDiskStats] = useState(null)
@@ -341,6 +342,11 @@ function SettingsInner() {
               key: 'visualize',
               label: <span className="text-sm inline-flex items-center gap-1.5"><BarChartOutlined /> Visualize</span>,
               children: <VisualizeTab pollMs={pollMs} />,
+            },
+            {
+              key: 'database',
+              label: <span className="text-sm inline-flex items-center gap-1.5"><DatabaseOutlined /> Database</span>,
+              children: <DbExplorer />,
             },
             {
               key: 'cloudinary',
