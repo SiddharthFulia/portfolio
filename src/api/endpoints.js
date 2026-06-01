@@ -70,6 +70,7 @@ export const ENDPOINTS = {
   CHESS_GAMES:          '/api/chess/games',       // /:id appended at call site for one-game ops
   CHESS_COLLECTIONS:    '/api/chess/collections',
   CHESS_MATCHES:        '/api/chess/matches',     // /:id, /:id/join, /:id/move, /:id/resign appended at call site
+  CHESS_OPENINGS:       '/api/chess/openings',    // /:slug appended at call site for detail
   // Multi-video concatenation (ffmpeg-concat lane)
   COMBINE:              '/api/combine',
   COMBINE_UPLOAD:       '/api/combine/upload',

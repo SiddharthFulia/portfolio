@@ -685,6 +685,34 @@ export async function chessDeleteGame(id) {
 export async function chessBulkSaveGames(games, collection) { try { const data = await post(`${ENDPOINTS.CHESS_GAMES}/bulk`, { games, collection }, { timeout: 30000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 export async function chessListCollections() { try { const data = await get(ENDPOINTS.CHESS_COLLECTIONS, {}, { timeout: 6000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 
+// ─── Opening database (paginated, lazy detail) ─────────────────────
+// List is cheap (eco + name + slug, ~50 per page). Detail returns full
+// record including FEN — the FE then pipes that FEN to Lichess's free
+// Opening Explorer for the "master games" panel.
+export async function chessListOpenings({ page = 1, limit = 50, q = '' } = {}) {
+  try {
+    const data = await get(ENDPOINTS.CHESS_OPENINGS, { page, limit, q }, { timeout: 8000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+export async function chessGetOpening(slug) {
+  try {
+    const data = await get(`${ENDPOINTS.CHESS_OPENINGS}/${encodeURIComponent(slug)}`, {}, { timeout: 6000 });
+    return { data: data?.data || data, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+// Lichess Opening Explorer — CC-BY masters DB. Direct call, no BE proxy.
+// `moves` = limit of top continuations to return.
+export async function lichessMasters(fen, { moves = 5 } = {}) {
+  try {
+    const url = `https://explorer.lichess.ovh/masters?fen=${encodeURIComponent(fen)}&moves=${moves}`;
+    const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!r.ok) throw new Error(`lichess explorer: ${r.status}`);
+    const json = await r.json();
+    return { data: json, error: null };
+  } catch (err) { return { data: null, error: err.message }; }
+}
+
 // ─── Unified live-log tail (added 2026-05) ────────────────────────
 // Cursor-based — pass the ts of the last log you've seen so the BE only
 // returns new lines. Cheap enough to poll every 1.5s during a job without

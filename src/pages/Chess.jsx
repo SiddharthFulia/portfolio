@@ -26,6 +26,7 @@ import TimeControlPicker, { TIME_CONTROLS } from '../components/chess/TimeContro
 import SavedGames       from '../components/chess/SavedGames'
 import PgnDatabaseLoader from '../components/chess/PgnDatabase'
 import LiveGamesLobby   from '../components/chess/LiveGamesLobby'
+import OpeningExplorer  from '../components/chess/OpeningExplorer'
 import {
   chessBestMove, chessAnalyze, chessPlay, chessEngineStatus,
   chessSaveGame, chessLoadGame, chessCreateMatch,
@@ -633,6 +634,11 @@ export default function ChessPage() {
             </button>
           </div>
         </div>
+
+        {/* ECO opening database — collapsed by default. Browses the
+            full lichess-org/chess-openings dataset (~3.7k entries) via
+            paginated BE endpoints + on-click detail + Lichess masters. */}
+        <OpeningExplorer defaultOpen={false} />
       </div>
 
       {/* Save-game modal — replaces window.prompt with antd input */}
