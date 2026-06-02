@@ -246,7 +246,7 @@ export const projects = [
         iconUrl: car,
         theme: 'btn-back-orange',
         name: 'Chess Platform',
-        description: 'Full chess workspace · Stockfish 17 WASM in-browser · 10 modes: Standard / Chess960 / King-of-the-Hill / Three-Check / Atomic / Antichess / Horde / Crazyhouse / Racing Kings / Offline 2-Player · 3,700+ named openings with Lichess master-game explorer · 100,000+ Lichess puzzles with per-user ELO + retry scoring · Online multiplayer with takeback-request approval + clocks · MultiPV analysis · Save+replay across every variant · Per-side auto-queen · Refresh-resilient.',
+        description: 'Stockfish 17 WASM in-browser · 10 variants · 3,700+ openings with master-game lookups · 100k tactical puzzles with per-user ELO · online multiplayer with takeback approval + clocks · MultiPV analysis · save-replay every variant.',
         link: 'https://github.com/SiddharthFulia/Chess-engine',
         linkLabel: 'GitHub',
         tag: 'Full Suite · Engine · Variants · Multiplayer',
