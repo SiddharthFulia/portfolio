@@ -268,6 +268,13 @@ export default function ChessPage() {
     }
   }
 
+  // ── Engine-play refresh resilience ──────────────────────────────
+  // Single key: stores the current in-flight engine game (variant +
+  // startFen + UCI list + engine settings). Snapshot per move; restore
+  // once on mount. Saved/online/puzzles tabs each have their own storage,
+  // so this is play-tab-only.
+  const ENGINE_STATE_KEY = 'sid-chess-engine-state'
+
   // Build the active game from scratch when mode changes. Standard mode
   // hands the existing chess.js instance back; other modes spin up a fresh
   // chessops-backed adapter (or a fresh chess.js for 960 / offline). We do
@@ -309,12 +316,14 @@ export default function ChessPage() {
     }
     // History snapshot — if we just hydrated from a saved row, surface the
     // game's OWN history() (now SAN for chessops adapter too) so MoveList
-    // renders glyphs instead of UCI.
+    // renders glyphs instead of UCI. Otherwise reset to empty for a fresh game.
     if (hydrate?.movesUci?.length) {
       const g = variantGameRef.current || chessRef.current
       setHistory(g ? g.history() : hydrate.movesUci.slice())
+    } else {
+      setHistory([])
     }
-    setHistory([]); setEvalHistory([]); setVariations([])
+    setEvalHistory([]); setVariations([])
     setTelemetry(null)
     setStatus({ kind: 'idle', text: 'Ready' })
     setBoardKey(k => k + 1)
@@ -325,6 +334,96 @@ export default function ChessPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode])
+
+  // Persist engine-play state to localStorage on every move so refresh
+  // restores the in-flight game (variant + startFen + UCI list + engine
+  // settings). Snapshot is per-variant — switching variants overwrites.
+  useEffect(() => {
+    if (topTab !== 'play') return
+    try {
+      const uciList = usesChessjs
+        ? (chessRef.current?.history({ verbose: true }) || []).map(m => m.from + m.to + (m.promotion || ''))
+        : (variantGameRef.current?.historyUci?.() || [])
+      if (uciList.length === 0) {
+        // Empty position → drop the saved state so the next refresh shows
+        // the URL-driven default, not a stale game.
+        localStorage.removeItem(ENGINE_STATE_KEY)
+        return
+      }
+      const payload = {
+        v: 1,
+        variant: mode,
+        startFen: startFenRef.current,
+        movesUci: uciList,
+        engineMode,
+        engineElo,
+        playerColor,
+        savedAt: Date.now(),
+      }
+      localStorage.setItem(ENGINE_STATE_KEY, JSON.stringify(payload))
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [history.length, mode, engineMode, engineElo, playerColor, topTab])
+
+  // On mount, restore an in-flight engine game from localStorage. Falls
+  // through silently if nothing saved or the payload is malformed.
+  useEffect(() => {
+    let raw
+    try { raw = localStorage.getItem(ENGINE_STATE_KEY) } catch { return }
+    if (!raw) return
+    let s
+    try { s = JSON.parse(raw) } catch { return }
+    if (!s || s.v !== 1 || !s.variant || !Array.isArray(s.movesUci) || s.movesUci.length === 0) return
+    // Stash the hydrate then either swap mode (triggers mode-change effect
+    // which consumes the stash) or rebuild in place if mode is already right.
+    pendingLoadRef.current = {
+      variant: s.variant,
+      startFen: s.startFen || null,
+      movesUci: s.movesUci,
+    }
+    if (s.engineMode) setEngineMode(s.engineMode)
+    if (typeof s.engineElo === 'number') setEngineElo(s.engineElo)
+    if (s.playerColor) setPlayerColor(s.playerColor)
+    if (s.variant !== mode) {
+      setMode(s.variant)
+    } else {
+      // Same mode — mode-change effect won't re-fire on setMode(same). Do
+      // the build+replay inline. (Mirrors the mode-change effect logic.)
+      if (s.variant === 'standard' || s.variant === 'offline') {
+        const c = new Chess()
+        replayUci(c, s.movesUci)
+        chessRef.current = c
+        variantGameRef.current = null
+        startFenRef.current = null
+        setFen(c.fen())
+        setHistory(c.history())
+      } else if (s.variant === 'chess960') {
+        const f = s.startFen || generate960Fen()
+        const g = buildVariantGame('chess960', f)
+        if (g) {
+          replayUci(g, s.movesUci)
+          variantGameRef.current = g
+          chessRef.current = null
+          startFenRef.current = f
+          setFen(g.fen())
+          setHistory(g.history())
+        }
+      } else {
+        const g = buildVariantGame(s.variant, s.startFen || undefined)
+        if (g) {
+          replayUci(g, s.movesUci)
+          variantGameRef.current = g
+          chessRef.current = null
+          startFenRef.current = g.fen()
+          setFen(g.fen())
+          setHistory(g.history())
+        }
+      }
+      pendingLoadRef.current = null
+    }
+    setStatus({ kind: 'idle', text: 'Restored from last session' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Saved games and puzzles are standard-chess-only. If the user lands
   // on those tabs with a non-standard variant in the URL (e.g. clicking
@@ -614,6 +713,9 @@ export default function ChessPage() {
     setTelemetry(null)
     setStatus({ kind: 'idle', text: 'Ready' })
     setBoardKey(k => k + 1)
+    // Clear refresh-restore snapshot — the empty-history save effect would
+    // do it too, but this is more deterministic during the same tick.
+    try { localStorage.removeItem(ENGINE_STATE_KEY) } catch {}
   }
   const undoMove = () => {
     // chess.js modes (standard / offline) and chessops modes (960 + every
