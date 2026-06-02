@@ -33,9 +33,38 @@ The Database tab is a read-only window into `data/sid.db`. Three modes share one
 
 - The rules (only SELECT, no comments, no multi-statement, prefer LIMIT 200, use JSON helpers for JSON columns).
 - The full schema dump, one line per table, with the sample rows JSON-stringified.
-- An instruction to return `{"sql": "...", "explanation": "..."}` as raw JSON.
+- A chart-selection rubric (see "Chart rendering" below).
+- An instruction to return `{"sql": "...", "explanation": "...", "chart": null OR {...}}` as raw JSON.
 
 The model picked is `llama-3.3-70b-versatile` (Groq) at temperature 0.1, 4000 max tokens. The schema dump for the current sid.db is ~2-3k tokens; the full payload sits well under the model's 128k window.
+
+**Chart rendering.** Groq is also asked to suggest a Recharts spec when the answer is naturally chartable. The response shape from the model is:
+
+```json
+{
+  "sql": "SELECT variant, COUNT(*) AS n FROM chess_games GROUP BY variant ORDER BY n DESC",
+  "explanation": "Counts saved games per chess variant.",
+  "chart": {
+    "type": "bar",
+    "xKey": "variant",
+    "yKeys": ["n"],
+    "title": "Games per variant"
+  }
+}
+```
+
+The model picks the chart type by question + result shape:
+- `"how many <X> per <category>"` → `bar`, xKey = category, yKeys = [count]
+- `<X> over time` → `line` (or `area` for cumulative/stacked) with xKey = date/time-bucket
+- `share of total <X>` with ≤10 slices → `pie`
+- two numeric columns with no natural ordering → `scatter`
+- single-scalar / wide non-numeric result → `chart: null`
+
+The BE sanitises the spec (`sanitizeChartSpec` in `services/admin/dbExplorer.js`): it only accepts `bar | line | pie | area | scatter`, requires non-empty `xKey` and `yKeys[]`, and after executing the SELECT it drops the chart if any referenced column isn't actually in the result set (hallucinated alias guard). The vet'd chart spec lands in the `/ask` response as `{ ..., chart: { type, xKey, yKeys, title } | null }`.
+
+The FE (`src/components/settings/DbExplorer.jsx`) renders it with Recharts via a `ResultViewer` that shows a `Chart | Table` segmented toggle above the data. Defaults to chart when one is supplied, table when not. Each chart family (`BarChart`, `LineChart`, `AreaChart`, `PieChart`, `ScatterChart`) cycles the portfolio palette — amber → rose → fuchsia → emerald → cyan → violet — for multi-series rendering, sits inside a luxe-card with the chart title across the top, and uses `ResponsiveContainer` at ~320px height with tabular-nums axis labels. If the user toggles back to Table, the same dataset renders as the row-by-row HTML table that already existed.
+
+The Write-SQL tab supports an optional `-- chart:<type> xKey=<col> yKeys=<col[,col...]> title="…"` directive on the first line of the SQL; the FE strips that comment before sending to the BE (which rejects all SQL comments) and uses the directive locally to render the same chart family. Useful for power users who want a chart without going through Groq.
 
 **How rejections work.** Both `/api/admin/db/query` and `/api/admin/db/ask` return `400` with a JSON body containing `{ message, data: { generatedSql, reason } }` when the safety wrapper says no. The Database tab displays the rejection inline (red banner), shows the offending SQL, and offers a one-click "Edit in SQL tab" button so the user can refine the question or hand-edit the query. Nothing is ever executed past the safety wrapper.
 

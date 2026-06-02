@@ -14,16 +14,70 @@
 // visible to the user.
 
 import { useEffect, useMemo, useState, useRef } from 'react'
-import { Tabs, Pagination, Select, Empty, Tag, Tooltip, Input } from 'antd'
+import { Tabs, Pagination, Select, Empty, Tag, Tooltip, Input, Segmented } from 'antd'
 import {
   DatabaseOutlined, ReloadOutlined, SearchOutlined, ThunderboltOutlined,
   CodeOutlined, BulbOutlined, SafetyOutlined, RightOutlined,
+  BarChartOutlined, TableOutlined,
 } from '@ant-design/icons'
+import {
+  ResponsiveContainer,
+  BarChart, Bar,
+  LineChart, Line,
+  AreaChart, Area,
+  PieChart, Pie,
+  ScatterChart, Scatter,
+  XAxis, YAxis, CartesianGrid, Legend, Cell,
+  Tooltip as RTooltip,
+} from 'recharts'
 import { Button } from '../ui'
 import { notice } from '../../lib/notice'
 import {
   adminDbTables, adminDbTable, adminDbQuery, adminDbAsk,
 } from '../../api/ai'
+
+// Portfolio palette — cycled for multi-series charts. Order chosen so the
+// first 3 read as the brand gradient (amber → rose → fuchsia).
+const CHART_COLORS = ['#f59e0b', '#f43f5e', '#d946ef', '#10b981', '#06b6d4', '#8b5cf6']
+const VALID_CHART_TYPES = new Set(['bar', 'line', 'pie', 'area', 'scatter'])
+
+// Parse a leading "-- chart:<type> xKey=<col> yKeys=<col[,col...]>" directive
+// from the Write-SQL textarea so power users can preview charts without going
+// through Groq. Anything malformed → null and we fall back to table-only.
+function parseChartDirective(rawSql) {
+  if (!rawSql) return null
+  const first = String(rawSql).split('\n')[0].trim()
+  if (!first.startsWith('--')) return null
+  const m = first.match(/--\s*chart\s*:\s*(\w+)([^\n]*)/i)
+  if (!m) return null
+  const type = m[1].toLowerCase()
+  if (!VALID_CHART_TYPES.has(type)) return null
+  const rest = m[2] || ''
+  const xKeyM  = rest.match(/xKey\s*=\s*([\w".`]+)/i)
+  const yKeysM = rest.match(/yKeys\s*=\s*([\w",.`]+)/i)
+  const titleM = rest.match(/title\s*=\s*"([^"]+)"/i)
+  if (!xKeyM || !yKeysM) return null
+  const xKey = xKeyM[1].replace(/["`]/g, '')
+  const yKeys = yKeysM[1].replace(/["`]/g, '').split(',').map(s => s.trim()).filter(Boolean)
+  if (!xKey || yKeys.length === 0) return null
+  return { type, xKey, yKeys, title: titleM ? titleM[1] : '' }
+}
+
+// Validate that a chart spec's keys exist in the rendered columns and that
+// at least the first yKey is numeric across the rows. Returns true/false —
+// chart container short-circuits to a friendly "chart not renderable"
+// message when this fails.
+function chartIsRenderable(spec, rows) {
+  if (!spec || !rows || rows.length === 0) return false
+  if (!VALID_CHART_TYPES.has(spec.type)) return false
+  if (!spec.xKey || !Array.isArray(spec.yKeys) || spec.yKeys.length === 0) return false
+  const cols = new Set(Object.keys(rows[0] || {}))
+  if (!cols.has(spec.xKey)) return false
+  for (const y of spec.yKeys) if (!cols.has(y)) return false
+  // First yKey should be numeric somewhere — pie/scatter/bar all need a number.
+  const firstY = spec.yKeys[0]
+  return rows.some(r => Number.isFinite(Number(r?.[firstY])))
+}
 
 const PAGE_SIZES = [25, 50, 100, 200, 500]
 
@@ -157,8 +211,16 @@ export default function DbExplorer() {
   const runSql = async () => {
     const s = sql.trim()
     if (!s) return
+    // Strip the optional leading `-- chart:` directive before sending —
+    // the BE rejects any SQL containing comments, but we still want to
+    // honour the directive client-side to render a chart.
+    const cleaned = s
+      .split('\n')
+      .filter((ln, i) => !(i === 0 && /^\s*--\s*chart\s*:/i.test(ln)))
+      .join('\n')
+      .trim()
     setSqlLoading(true); setSqlError(null); setSqlResult(null)
-    const r = await adminDbQuery(s)
+    const r = await adminDbQuery(cleaned)
     setSqlLoading(false)
     if (r.error) {
       setSqlError({ message: r.error, data: r.data, status: r.status })
@@ -418,7 +480,7 @@ export default function DbExplorer() {
                                 {askResult.explanation}
                               </div>
                             )}
-                            <QueryResultTable result={askResult} />
+                            <ResultViewer result={askResult} chart={askResult.chart} />
                           </div>
                         )}
                       </div>
@@ -446,7 +508,7 @@ export default function DbExplorer() {
                             <ThunderboltOutlined /> {sqlLoading ? 'Running…' : 'Run SQL'}
                           </Button>
                           <span className="text-[10px] text-gray-500 font-mono">
-                            SELECT only · auto-LIMIT 200 · no comments / multi-statements
+                            SELECT only · auto-LIMIT 200 · prefix `-- chart:bar xKey=… yKeys=…` to render
                           </span>
                         </div>
 
@@ -458,7 +520,10 @@ export default function DbExplorer() {
 
                         {sqlResult && (
                           <div ref={sqlResultRef}>
-                            <QueryResultTable result={sqlResult} />
+                            <ResultViewer
+                              result={sqlResult}
+                              chart={parseChartDirective(sql)}
+                            />
                           </div>
                         )}
                       </div>
@@ -474,43 +539,249 @@ export default function DbExplorer() {
   )
 }
 
-// Reusable result table for both the "Ask" and "Write SQL" tabs.
-function QueryResultTable({ result }) {
+// Two-view result panel: switches between the data table and a Recharts
+// rendering when the BE (or a `-- chart:` directive in the SQL tab) supplied
+// a chart spec. Defaults to the chart view if one is available, table view
+// otherwise. Toggle only renders when both views make sense.
+function ResultViewer({ result, chart }) {
+  const cols = useMemo(
+    () => result?.columns || (result?.rows?.[0] ? Object.keys(result.rows[0]) : []),
+    [result],
+  )
+  const rows = result?.rows || []
+  const chartOk = chartIsRenderable(chart, rows)
+  const [view, setView] = useState(chartOk ? 'chart' : 'table')
+
+  // If the chart suggestion arrived after the panel rendered (e.g. user
+  // re-ran the same panel with a chartable question), bump the default
+  // view back to chart. Don't override an explicit user choice within the
+  // same chart spec.
+  const lastSpecKey = useRef('')
+  useEffect(() => {
+    const key = chart ? `${chart.type}|${chart.xKey}|${(chart.yKeys || []).join(',')}` : ''
+    if (key && key !== lastSpecKey.current) {
+      lastSpecKey.current = key
+      setView(chartOk ? 'chart' : 'table')
+    } else if (!chartOk && view === 'chart') {
+      setView('table')
+    }
+  }, [chart, chartOk]) // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!result) return null
-  const cols = result.columns || (result.rows?.[0] ? Object.keys(result.rows[0]) : [])
+
   return (
     <div className="rounded-lg border border-white/10 bg-black/30">
       <div className="px-2 py-1.5 border-b border-white/5 flex items-center gap-2 text-[10px] uppercase tracking-wider text-gray-400 font-mono">
         <span>{result.rowCount} rows</span>
         {typeof result.durationMs === 'number' && <span>· {result.durationMs} ms</span>}
         {cols.length > 0 && <span>· {cols.length} cols</span>}
+        {chartOk && (
+          <div className="ml-auto">
+            <Segmented
+              size="small"
+              value={view}
+              onChange={(v) => setView(v)}
+              options={[
+                { value: 'chart', label: <span className="inline-flex items-center gap-1"><BarChartOutlined /> Chart</span> },
+                { value: 'table', label: <span className="inline-flex items-center gap-1"><TableOutlined /> Table</span> },
+              ]}
+            />
+          </div>
+        )}
       </div>
-      {result.rows?.length ? (
-        <div className="overflow-x-auto">
-          <table className="w-full text-[11px]">
-            <thead className="bg-white/[0.03] border-b border-white/10">
-              <tr>
-                {cols.map(c => (
-                  <th key={c} className="text-left px-2 py-1 font-mono text-[10px] text-gray-400 uppercase tracking-wider">{c}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {result.rows.map((row, i) => (
-                <tr key={i} className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02]">
-                  {cols.map(c => (
-                    <td key={c} className="px-2 py-1 align-top max-w-[260px] truncate">
-                      {renderCell(row[c])}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+
+      {view === 'chart' && chartOk ? (
+        <QueryChart chart={chart} rows={rows} />
       ) : (
-        <div className="px-2 py-3 text-xs text-gray-500">Empty result.</div>
+        <ResultTable rows={rows} cols={cols} />
       )}
+    </div>
+  )
+}
+
+function ResultTable({ rows, cols }) {
+  if (!rows?.length) {
+    return <div className="px-2 py-3 text-xs text-gray-500">Empty result.</div>
+  }
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-[11px]">
+        <thead className="bg-white/[0.03] border-b border-white/10">
+          <tr>
+            {cols.map(c => (
+              <th key={c} className="text-left px-2 py-1 font-mono text-[10px] text-gray-400 uppercase tracking-wider">{c}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={i} className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02]">
+              {cols.map(c => (
+                <td key={c} className="px-2 py-1 align-top max-w-[260px] truncate">
+                  {renderCell(row[c])}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// Recharts wrapper. Reads the {type, xKey, yKeys, title} spec from the BE,
+// picks the matching chart family, cycles the portfolio palette for any
+// multi-series rendering. Wrapped in a luxe-card container so the chart
+// matches the rest of the Settings dashboard chrome.
+function QueryChart({ chart, rows }) {
+  const { type, xKey, yKeys, title } = chart
+  const data = useMemo(() => rows.map(r => {
+    // Coerce numeric strings → numbers so Recharts axes auto-scale
+    // properly. Leave xKey as-is (often a category label).
+    const out = { ...r }
+    for (const y of yKeys) {
+      const n = Number(out[y])
+      if (!Number.isNaN(n) && out[y] !== null && out[y] !== '') out[y] = n
+    }
+    return out
+  }), [rows, yKeys])
+
+  // Common Recharts theming — dark axes, subtle grid, gradient legend.
+  const axisProps = {
+    stroke: '#475569',
+    tick: { fill: '#94a3b8', fontSize: 10, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' },
+    style: { fontVariantNumeric: 'tabular-nums' },
+  }
+  const tooltipProps = {
+    contentStyle: {
+      background: 'rgba(10, 10, 14, 0.95)',
+      border: '1px solid rgba(255,255,255,0.1)',
+      borderRadius: 8,
+      fontSize: 11,
+      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+    },
+    labelStyle: { color: '#f59e0b' },
+    itemStyle: { color: '#e5e7eb' },
+    cursor: { fill: 'rgba(245,158,11,0.06)', stroke: 'rgba(245,158,11,0.2)' },
+  }
+  const gridProps = { stroke: 'rgba(255,255,255,0.06)', strokeDasharray: '3 3', vertical: false }
+
+  let chartEl = null
+  if (type === 'bar') {
+    chartEl = (
+      <BarChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
+        <CartesianGrid {...gridProps} />
+        <XAxis dataKey={xKey} {...axisProps} />
+        <YAxis {...axisProps} />
+        <RTooltip {...tooltipProps} />
+        {yKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 11, fontFamily: 'ui-monospace, monospace' }} />}
+        {yKeys.map((y, i) => (
+          <Bar key={y} dataKey={y} fill={CHART_COLORS[i % CHART_COLORS.length]} radius={[4, 4, 0, 0]} />
+        ))}
+      </BarChart>
+    )
+  } else if (type === 'line') {
+    chartEl = (
+      <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
+        <CartesianGrid {...gridProps} />
+        <XAxis dataKey={xKey} {...axisProps} />
+        <YAxis {...axisProps} />
+        <RTooltip {...tooltipProps} />
+        {yKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 11, fontFamily: 'ui-monospace, monospace' }} />}
+        {yKeys.map((y, i) => (
+          <Line
+            key={y}
+            type="monotone"
+            dataKey={y}
+            stroke={CHART_COLORS[i % CHART_COLORS.length]}
+            strokeWidth={2}
+            dot={{ r: 2, fill: CHART_COLORS[i % CHART_COLORS.length] }}
+            activeDot={{ r: 4 }}
+          />
+        ))}
+      </LineChart>
+    )
+  } else if (type === 'area') {
+    chartEl = (
+      <AreaChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
+        <defs>
+          {yKeys.map((y, i) => {
+            const c = CHART_COLORS[i % CHART_COLORS.length]
+            return (
+              <linearGradient key={y} id={`db-area-${i}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%"  stopColor={c} stopOpacity={0.6} />
+                <stop offset="100%" stopColor={c} stopOpacity={0.05} />
+              </linearGradient>
+            )
+          })}
+        </defs>
+        <CartesianGrid {...gridProps} />
+        <XAxis dataKey={xKey} {...axisProps} />
+        <YAxis {...axisProps} />
+        <RTooltip {...tooltipProps} />
+        {yKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 11, fontFamily: 'ui-monospace, monospace' }} />}
+        {yKeys.map((y, i) => (
+          <Area
+            key={y}
+            type="monotone"
+            dataKey={y}
+            stroke={CHART_COLORS[i % CHART_COLORS.length]}
+            strokeWidth={2}
+            fill={`url(#db-area-${i})`}
+          />
+        ))}
+      </AreaChart>
+    )
+  } else if (type === 'pie') {
+    chartEl = (
+      <PieChart>
+        <RTooltip {...tooltipProps} />
+        <Legend wrapperStyle={{ fontSize: 11, fontFamily: 'ui-monospace, monospace' }} />
+        <Pie
+          data={data}
+          dataKey={yKeys[0]}
+          nameKey={xKey}
+          innerRadius={50}
+          outerRadius={100}
+          paddingAngle={2}
+          stroke="rgba(0,0,0,0.4)"
+        >
+          {data.map((_, i) => (
+            <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+          ))}
+        </Pie>
+      </PieChart>
+    )
+  } else if (type === 'scatter') {
+    chartEl = (
+      <ScatterChart margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
+        <CartesianGrid {...gridProps} />
+        <XAxis dataKey={xKey} type="number" {...axisProps} />
+        <YAxis dataKey={yKeys[0]} type="number" {...axisProps} />
+        <RTooltip {...tooltipProps} cursor={{ strokeDasharray: '3 3', stroke: 'rgba(245,158,11,0.3)' }} />
+        <Scatter data={data} fill={CHART_COLORS[0]} />
+      </ScatterChart>
+    )
+  } else {
+    return (
+      <div className="px-3 py-6 text-xs text-amber-300/80 text-center font-mono">
+        Chart type "{String(type)}" not recognised. Showing table instead.
+      </div>
+    )
+  }
+
+  return (
+    <div className="px-2 py-2">
+      {title && (
+        <div className="text-[11px] font-mono text-amber-300/90 mb-1 px-1 tracking-wide">
+          {title}
+        </div>
+      )}
+      <div className="w-full" style={{ height: 320 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          {chartEl}
+        </ResponsiveContainer>
+      </div>
     </div>
   )
 }
