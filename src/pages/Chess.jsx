@@ -55,7 +55,8 @@ const MODES = [
   { id: 'racingKings', label: 'Racing Kings', icon: '🏁', engine: false, rules: 'chessops' },
   { id: 'offline',     label: 'Offline 2P',   icon: '🪑', engine: false, rules: 'chess.js' },
 ]
-const USES_CHESSJS = new Set(['standard', 'chess960', 'offline'])
+// 960 uses chessops (chess.js v1 can't parse X-FEN castling like "AHah").
+const USES_CHESSJS = new Set(['standard', 'offline'])
 
 // /chess — Stockfish-backed analysis board. chess.js owns the move state,
 // chessground (Lichess's board) renders, BE Stockfish provides engine
@@ -258,9 +259,10 @@ export default function ChessPage() {
       setFen(chessRef.current.fen())
     } else if (mode === 'chess960') {
       const f = generate960Fen()
-      try { chessRef.current = new Chess(f) } catch { chessRef.current = new Chess() }
-      variantGameRef.current = null
-      setFen(chessRef.current.fen())
+      const g = buildVariantGame('chess960', f)
+      chessRef.current = null
+      variantGameRef.current = g
+      setFen(g ? g.fen() : f)
     } else if (mode === 'offline') {
       chessRef.current = new Chess()
       variantGameRef.current = null
@@ -282,6 +284,17 @@ export default function ChessPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode])
+
+  // Saved games and puzzles are standard-chess-only. If the user lands
+  // on those tabs with a non-standard variant in the URL (e.g. clicking
+  // a saved game while ?variant=chess960 was stuck), snap mode back so
+  // the board renders and replays work.
+  useEffect(() => {
+    if ((topTab === 'saved' || topTab === 'puzzles') && mode !== 'standard') {
+      setMode('standard')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topTab])
 
   // ── Live opening detection ───────────────────────────────────────
   // After each completed ply the FE asks the BE to name the line. We
@@ -544,8 +557,10 @@ export default function ChessPage() {
       setFen(chessRef.current.fen())
     } else if (mode === 'chess960') {
       const f = generate960Fen()
-      try { chessRef.current = new Chess(f) } catch { chessRef.current = new Chess() }
-      setFen(chessRef.current.fen())
+      const g = buildVariantGame('chess960', f)
+      chessRef.current = null
+      variantGameRef.current = g
+      setFen(g ? g.fen() : f)
     } else {
       const g = buildVariantGame(mode)
       variantGameRef.current = g
