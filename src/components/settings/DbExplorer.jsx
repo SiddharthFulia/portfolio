@@ -353,9 +353,12 @@ export default function DbExplorer() {
             ) : rowsLoading && !rowsData ? (
               <div className="text-xs text-gray-500 py-6 text-center">Loading rows…</div>
             ) : rowsData?.rows?.length ? (
-              <div className="overflow-x-auto rounded-lg border border-white/5">
+              // max-h cap + sticky header — keeps the Groq query panel
+              // always visible below the fold instead of pushed off-screen
+              // when the user picks 200 rows/page on a wide table.
+              <div className="overflow-auto max-h-[55vh] rounded-lg border border-white/5">
                 <table className="w-full text-[11px]">
-                  <thead className="bg-white/[0.03] border-b border-white/10">
+                  <thead className="bg-white/[0.03] border-b border-white/10 sticky top-0 z-10 backdrop-blur">
                     <tr>
                       {(rowsData.columns || []).map(c => {
                         const colName = c.name || c

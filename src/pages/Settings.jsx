@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Modal, InputNumber, Select, Tabs, Segmented } from 'antd'
 import { notice } from '../lib/notice'
-import { LockOutlined, ReloadOutlined, DatabaseOutlined, CloudServerOutlined, ApiOutlined, ClusterOutlined, DashboardOutlined, BarChartOutlined, DeleteOutlined, CheckOutlined } from '@ant-design/icons'
+import { LockOutlined, ReloadOutlined, DatabaseOutlined, HddOutlined, CloudServerOutlined, ApiOutlined, ClusterOutlined, DashboardOutlined, BarChartOutlined, DeleteOutlined, CheckOutlined } from '@ant-design/icons'
 import {
   ResponsiveContainer, LineChart, Line, AreaChart, Area, BarChart, Bar, Cell,
   XAxis, YAxis, Tooltip, CartesianGrid, Legend,
@@ -191,11 +191,11 @@ function SettingsInner() {
   const fetchWorkersRef = useRef(fetchWorkers); fetchWorkersRef.current = fetchWorkers
 
   // Per-endpoint poll loops. Each loop awaits its own fetch, sleeps
-  // pollMs, fires again. A 5-second Queues call holds up only the
-  // Queues card's next refresh — Server / DB / Disk / Workers keep
-  // ticking at 2s (or whatever pollMs is) independently. The user's
-  // stated contract: "call all others every 2s and wait for this to
-  // get called and then wait 2sec for this to get called again."
+  // pollMs, fires again. Loops are GATED on the active tab so we don't
+  // hammer Overview endpoints while the user is reading the Database
+  // tab or browsing Cloudinary assets. Overview owns Server / DB /
+  // Queues / Workers; Storage owns Disk; other tabs poll nothing here
+  // (Visualize + DbExplorer + Cloudinary each manage their own fetches).
   useEffect(() => {
     const sleep = (ms) => new Promise(r => setTimeout(r, ms))
     let cancelled = false
@@ -206,13 +206,16 @@ function SettingsInner() {
         await sleep(pollMs)
       }
     }
-    runLoop(() => fetchServerRef.current)
-    runLoop(() => fetchDbRef.current)
-    runLoop(() => fetchDiskRef.current)
-    runLoop(() => fetchQueuesRef.current)
-    runLoop(() => fetchWorkersRef.current)
+    if (tab === 'overview') {
+      runLoop(() => fetchServerRef.current)
+      runLoop(() => fetchDbRef.current)
+      runLoop(() => fetchQueuesRef.current)
+      runLoop(() => fetchWorkersRef.current)
+    } else if (tab === 'storage') {
+      runLoop(() => fetchDiskRef.current)
+    }
     return () => { cancelled = true }
-  }, [pollMs])
+  }, [pollMs, tab])
 
   // Persist whichever ms value the user lands on.
   useEffect(() => {
@@ -335,7 +338,7 @@ function SettingsInner() {
             },
             {
               key: 'storage',
-              label: <span className="text-sm inline-flex items-center gap-1.5"><DatabaseOutlined /> Storage</span>,
+              label: <span className="text-sm inline-flex items-center gap-1.5"><HddOutlined /> Storage</span>,
               children: <StorageCard data={diskStats} loading={diskLoading} />,
             },
             {
