@@ -245,11 +245,11 @@ export const projects = [
     {
         iconUrl: car,
         theme: 'btn-back-orange',
-        name: 'Chess Engine',
-        description: 'Chess engine in C with alpha-beta pruning, iterative deepening, quiescence search, MVV-LVA move ordering, delta pruning, and piece-square tables. 10×12 mailbox board with full move generation (castling, en passant, promotion).',
+        name: 'Chess Platform',
+        description: 'Full chess workspace · Stockfish 17 WASM in-browser · 10 modes: Standard / Chess960 / King-of-the-Hill / Three-Check / Atomic / Antichess / Horde / Crazyhouse / Racing Kings / Offline 2-Player · 3,700+ named openings with Lichess master-game explorer · 100,000+ Lichess puzzles with per-user ELO + retry scoring · Online multiplayer with takeback-request approval + clocks · MultiPV analysis · Save+replay across every variant · Per-side auto-queen · Refresh-resilient.',
         link: 'https://github.com/SiddharthFulia/Chess-engine',
         linkLabel: 'GitHub',
-        tag: 'Systems · C',
+        tag: 'Full Suite · Engine · Variants · Multiplayer',
     },
     {
         iconUrl: car,

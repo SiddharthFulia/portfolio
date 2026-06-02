@@ -55,11 +55,11 @@ const stagger = {
 // ── Live/featured project list (Chess engine has an interactive route) ──
 const LIVE_PROJECTS = [
   {
-    title: 'Chess Engine',
-    tag: 'Systems · C',
+    title: 'Chess Platform',
+    tag: 'Stockfish · 10 Variants · Multiplayer · Puzzles · Openings',
     gradient: 'from-amber-500 via-orange-500 to-red-600',
-    desc: 'Full chess engine with alpha-beta pruning, iterative deepening, piece-square tables, and 10×12 board representation. Play against the AI live in your browser.',
-    techs: ['C', 'Alpha-Beta', 'Iterative Deepening', 'Quiescence Search', 'MVV-LVA', 'Delta Pruning', 'Piece-Square Tables'],
+    desc: 'A complete chess workspace built from scratch. Stockfish 17 in a WebAssembly worker plays standard, Chess960, King of the Hill, and Three-Check. Atomic, Antichess, Horde, Crazyhouse, and Racing Kings run on chessops rules in pass-and-play. Live opening name detection while you play, a searchable library of 3,700+ named openings with Lichess master-game continuations, 100,000+ Lichess puzzles with per-user ELO progression and retry-with-penalty scoring, online multiplayer with takeback-request approval flow + clocks, MultiPV analysis, save-and-replay across every variant (including 960\'s random starting positions), per-side auto-queen toggle, refresh-resilient engine play via localStorage. SAN move list with Unicode piece glyphs. Mobile-friendly chessground board.',
+    techs: ['Stockfish.js (WASM)', 'chess.js', 'chessops', 'chessground', 'Lichess Explorer + Puzzles API', 'React + Vite', 'Web Workers', 'SQLite', 'Express + Node', 'Recharts'],
     route: '/chess',
     github: 'https://github.com/SiddharthFulia/Chess-engine',
   },

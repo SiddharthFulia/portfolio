@@ -39,7 +39,7 @@ Below the board (Play tab only): live opening detection + Opening Explorer.
 | Section            | Component                                 | Endpoints |
 |--------------------|-------------------------------------------|-----------|
 | Opening name chip  | inline `OpeningHeading` in `Chess.jsx`    | `POST /api/chess/openings/identify` (debounced 300ms per move) · `GET /api/chess/openings/:slug` (lazy on expand) |
-| Opening Explorer   | `components/chess/OpeningExplorer.jsx`    | `GET /api/chess/openings` (paginated) · `GET /api/chess/openings/:slug` · `GET /api/chess/openings/explorer` (BE proxies to Lichess masters DB) |
+| Opening Explorer   | `components/chess/OpeningExplorer.jsx`    | `GET /api/chess/openings` (paginated) · `GET /api/chess/openings/:slug` · `GET /api/chess/openings/explorer` (BE proxies to Lichess masters DB, sends `Authorization: Bearer ${LICHESS_API_TOKEN}` — env-only, scope-less token) |
 
 ### Modes (one chip row, one board)
 

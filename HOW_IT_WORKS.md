@@ -123,6 +123,18 @@ The mode bar exposes:
 
 The promotion picker now works **for every mode** — standard, 960, and all chessops variants. (Previously, variants auto-queened with no override; now the per-side toggle controls both standard and variant promotions identically.)
 
+### Lichess Opening Explorer authentication
+
+The `/chess` Opening Explorer panel pulls master-game continuations from `https://explorer.lichess.ovh/masters` (3,700+ openings dataset is bundled locally; the masters explorer is fetched live for "what do strong players actually play here"). **Lichess started returning 401 on anonymous traffic in early 2026** — to restore access, set a scope-less personal API token in the BE env:
+
+```
+LICHESS_API_TOKEN=lip_xxxxxxxxxxxx
+```
+
+Get one at https://lichess.org/account/oauth/token/create — **leave every scope unchecked**. The token only proves "I'm an authenticated Lichess user", which is what their nginx is gating on. No personal data is granted — minimum blast radius if the token ever leaks.
+
+The BE proxy at `controllers/chess/index.js → getOpeningExplorer` attaches it as `Authorization: Bearer <token>` on every `/api/chess/openings/explorer` call (the FE never sees the token; only the BE knows it). 10-min in-memory cache on the BE deduplicates hot positions. If the env var is missing, requests go out without auth and Lichess responds 401; the FE shows an amber "Master games rate-limited, retry in a moment" pill inline.
+
 ### Take back (formerly "Undo")
 
 Standard `chess.js` had `.undo()` from day one; the chessops adapter wasn't capable until we added a snapshot stack. Every `.move(...)` on the adapter clones the position **before** play. Undo pops the latest clone, swaps it in as the active position, and pops the move from `historyUci`. Works for every variant, including 960. In engine-play mode the button rolls back **two** plies so you land back on your own turn instead of facing the engine again with the same board.
