@@ -99,6 +99,10 @@ export function buildVariantGame(mode, fen) {
 
 // Wrap a chessops Position with the chess.js subset our board uses.
 function wrap(pos, mode, historyUci) {
+  // Snapshot stack — each entry is the cloned Position from BEFORE a move.
+  // Lets us roll back N times by popping. chessops Positions have .clone()
+  // which deep-copies board + state, so each snapshot is independent.
+  const posSnapshots = []
   const game = {
     // ── chess.js-shaped getters ─────────────────────────────────────
     turn: () => pos.turn === 'white' ? 'w' : 'b',
@@ -161,6 +165,8 @@ function wrap(pos, mode, historyUci) {
       if (!pos.isLegal(parsed)) return null
       const movingPiece = pos.board.get(parsed.from)
       const color = movingPiece ? movingPiece.color : pos.turn
+      // Snapshot BEFORE the play() so undo can roll back deterministically.
+      posSnapshots.push(pos.clone())
       pos.play(parsed)
       historyUci.push(uci)
       return {
@@ -169,6 +175,19 @@ function wrap(pos, mode, historyUci) {
         promotion: m.promotion,
         color: color === 'white' ? 'w' : 'b',
         san: uci, // not real SAN — keeps the shape but the actual SAN engine for variants is overkill
+      }
+    },
+    // chess.js parity: roll one ply back. Returns the popped move shape
+    // or null if there's nothing to undo. Works for ALL variants because
+    // we snapshot the Position before each play.
+    undo: () => {
+      if (posSnapshots.length === 0) return null
+      pos = posSnapshots.pop()
+      const uci = historyUci.pop() || ''
+      return {
+        from: uci.slice(0, 2),
+        to: uci.slice(2, 4),
+        promotion: uci.length === 5 ? uci[4] : undefined,
       }
     },
     // ── variant-specific telemetry ──────────────────────────────────

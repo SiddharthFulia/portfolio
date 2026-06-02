@@ -572,15 +572,17 @@ export default function ChessPage() {
     setBoardKey(k => k + 1)
   }
   const undoMove = () => {
-    // chessops Position has no .undo() — only chess.js does. Variants
-    // currently don't support undo; the user can hit Reset for a new game.
-    if (!usesChessjs) return
-    const chess = chessRef.current
-    if (!chess.undo()) return
-    if (engineMode === 'play' && !chess.isGameOver()) chess.undo()
-    setFen(chess.fen())
-    setHistory(chess.history())
-    setEvalHistory(prev => prev.slice(0, chess.history().length))
+    // chess.js modes (standard / offline) and chessops modes (960 + every
+    // variant) both expose .undo(). For engine play, undo TWICE so the user
+    // lands back on their own turn instead of facing the engine again with
+    // the same position.
+    const game = activeGame()
+    if (!game) return
+    if (!game.undo()) return
+    if (engineMode === 'play' && !game.isGameOver()) game.undo()
+    setFen(game.fen())
+    setHistory(game.history())
+    setEvalHistory(prev => prev.slice(0, game.history().length))
   }
   const flipBoard = () => {
     setPlayerColor(playerColor === 'white' ? 'black' : 'white')
@@ -900,7 +902,7 @@ export default function ChessPage() {
                   onChallenge={mode === 'standard' ? onChallenge : null}
                   showEval={showEval && mode === 'standard'}
                   onToggleEval={() => setShowEval(v => !v)}
-                  undoSupported={usesChessjs}
+                  undoSupported={true}
                 />
 
                 {/* FEN / PGN import only for standard chess.js modes. */}
@@ -1255,9 +1257,9 @@ function StatusBar({ status, thinking, isGameOver, gameOverReason, onUndo, onFli
       <div className="flex flex-wrap items-center gap-1.5">
         <button onClick={onUndo}
           disabled={!undoSupported}
-          title={undoSupported ? '' : 'Undo not supported in this variant'}
+          title={undoSupported ? 'Roll one move back (two in engine play)' : 'Take back not supported in this variant'}
           className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 min-h-[40px] sm:min-h-0 rounded-lg border border-gray-800 hover:border-gray-600 text-gray-300 inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
-          <UndoOutlined /> Undo
+          <UndoOutlined /> Take back
         </button>
         <button onClick={onFlip}
           className="text-[11px] font-semibold px-3 py-2 sm:px-2.5 sm:py-1 min-h-[40px] sm:min-h-0 rounded-lg border border-gray-800 hover:border-gray-600 text-gray-300 inline-flex items-center gap-1.5">
