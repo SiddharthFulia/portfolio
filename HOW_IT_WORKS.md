@@ -113,6 +113,16 @@ Stockfish runs in the browser via `stockfish.js` (the WASM build, lite single-th
 
 The eval bar is gated to standard only — Stockfish's score for "this is good in standard chess" doesn't mean anything in Atomic.
 
+### Engine controls (Play / Analyse)
+
+The mode bar exposes:
+- **Engine ELO** (1320–3190, step 50) — slider sets Stockfish's `Skill Level` for play mode.
+- **Depth** (6–22) — analyse-mode search depth.
+- **MultiPV** (1–5) — number of parallel best-lines the engine returns in analyse. 1 = best move only (fastest); 3-5 = see runners-up at the cost of speed.
+- **Auto-Q ♕W / ♛B** — per-side auto-queen toggles. Always visible, toggleable mid-game. When OFF for a side, promotions for that side pop the picker (Q / R / B / N); when ON, the move auto-promotes to queen silently. Useful for fast formats or one-sided "always queen" play. Persists in `localStorage` (`sid-chess-autoq-w` / `sid-chess-autoq-b`).
+
+The promotion picker now works **for every mode** — standard, 960, and all chessops variants. (Previously, variants auto-queened with no override; now the per-side toggle controls both standard and variant promotions identically.)
+
 ### Take back (formerly "Undo")
 
 Standard `chess.js` had `.undo()` from day one; the chessops adapter wasn't capable until we added a snapshot stack. Every `.move(...)` on the adapter clones the position **before** play. Undo pops the latest clone, swaps it in as the active position, and pops the move from `historyUci`. Works for every variant, including 960. In engine-play mode the button rolls back **two** plies so you land back on your own turn instead of facing the engine again with the same board.

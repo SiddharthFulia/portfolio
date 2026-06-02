@@ -56,6 +56,14 @@ Below the board (Play tab only): live opening detection + Opening Explorer.
 | Racing Kings | chessops    | no        | Race kings to rank 8 |
 | Offline 2P   | chess.js    | no        | Pass-and-play |
 
+### Engine controls
+
+Mode bar (above the board):
+- **ELO** (1320–3190) → Stockfish `Skill Level` in play mode.
+- **Depth** (6–22) → analyse search depth.
+- **MultiPV** (1–5) → number of parallel best lines returned. Wired into `chessAnalyze({ multiPv, depth, … })`.
+- **Auto-Q ♕W / ♛B** → per-side auto-queen toggles, always visible, toggleable mid-game, persisted in `localStorage` (`sid-chess-autoq-w` / `sid-chess-autoq-b`). When a side's toggle is OFF, promotion for that side pops the picker (Q/R/B/N) — works identically for chess.js modes and chessops variants.
+
 ### Take back
 
 Local roll-back button. Calls `.undo()` on the active rules engine — both `chess.js` and the chessops adapter (`src/lib/variantGame.js`) expose it. The chessops adapter implements it via a `posSnapshots` stack (clones position before each `.play()`). In engine-play mode, take back rolls TWO plies so the user lands on their own turn.

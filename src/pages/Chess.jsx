@@ -115,6 +115,21 @@ export default function ChessPage() {
     parse: (s) => parseInt(s, 10),
   })
   const [analyzeDepth, setAnalyzeDepth] = useState(14)
+  // MultiPV — how many parallel best-lines the engine returns in analyze
+  // mode. 1 = best move only (fastest). 3-5 = see runners-up (slower).
+  const [multiPv, setMultiPv] = useState(3)
+  // Per-side auto-queen toggle. When ON for a side, promotions for that
+  // side skip the picker and auto-promote to queen. Toggleable mid-game
+  // — useful for fast formats or "I always queen" players. Persists in
+  // localStorage so the preference survives refresh.
+  const [autoQueenWhite, setAutoQueenWhite] = useState(() => {
+    try { return localStorage.getItem('sid-chess-autoq-w') === '1' } catch { return false }
+  })
+  const [autoQueenBlack, setAutoQueenBlack] = useState(() => {
+    try { return localStorage.getItem('sid-chess-autoq-b') === '1' } catch { return false }
+  })
+  useEffect(() => { try { localStorage.setItem('sid-chess-autoq-w', autoQueenWhite ? '1' : '0') } catch {} }, [autoQueenWhite])
+  useEffect(() => { try { localStorage.setItem('sid-chess-autoq-b', autoQueenBlack ? '1' : '0') } catch {} }, [autoQueenBlack])
   const [variations, setVariations] = useState([])
   const [thinking, setThinking] = useState(false)
   const [status, setStatus] = useState({ kind: 'idle', text: 'Ready' })
@@ -523,9 +538,9 @@ export default function ChessPage() {
   const movableColor = bothSidesMovable ? turnColor : (isPlayerTurn ? playerColor : null)
 
   // Called by ChessBoard when the user finishes a drag/drop legal move.
-  // Standard / 960 / offline use the full chess.js promotion picker; for
-  // chessops-backed variants we auto-queen (variants are a quicker lane
-  // and the parent picker is already there for the main standard board).
+  // Promotion handling: if the moving side has auto-queen ON, promote to
+  // queen silently. Otherwise show the modal picker (Q / R / B / N). Works
+  // identically for chess.js modes AND chessops variants.
   const onUserMove = useCallback((from, to) => {
     const game = usesChessjs ? chessRef.current : variantGameRef.current
     if (!game) return
@@ -534,11 +549,11 @@ export default function ChessPage() {
     const isPromotion = piece && piece.type === 'p' &&
       ((piece.color === 'w' && toRank === '8') || (piece.color === 'b' && toRank === '1'))
     if (isPromotion) {
-      if (usesChessjs) {
+      const autoQ = piece.color === 'w' ? autoQueenWhite : autoQueenBlack
+      if (!autoQ) {
         setPendingPromotion({ from, to, color: piece.color })
         return
       }
-      // Auto-queen for chessops variants.
       try { game.move({ from, to, promotion: 'q' }) } catch { return }
       setFen(game.fen())
       setHistory(game.history())
@@ -552,7 +567,7 @@ export default function ChessPage() {
     setFen(game.fen())
     setHistory(game.history())
     setEvalHistory(prev => [...prev, { score: null, depth: 0 }])
-  }, [usesChessjs])
+  }, [usesChessjs, autoQueenWhite, autoQueenBlack])
 
   // User picked a promotion piece from the modal — apply the held move.
   const completePromotion = useCallback((pieceChar) => {
@@ -669,7 +684,7 @@ export default function ChessPage() {
     let cancelled = false
     const timer = setTimeout(() => {
       setStatus({ kind: 'analyzing', text: `Analyzing · depth ${analyzeDepth}` })
-      chessAnalyze({ fen, multiPv: 3, depth: analyzeDepth, thinkMs: 700 })
+      chessAnalyze({ fen, multiPv, depth: analyzeDepth, thinkMs: 700 })
         .then(({ data, error: err }) => {
           if (cancelled) return
           if (err) { setStatus({ kind: 'error', text: err }); return }
@@ -686,7 +701,7 @@ export default function ChessPage() {
         })
     }, 250)
     return () => { cancelled = true; clearTimeout(timer) }
-  }, [fen, engineMode, analyzeDepth, mode])
+  }, [fen, engineMode, analyzeDepth, multiPv, mode])
 
   // ── Controls ──
   // Reset replays the active mode's setup — re-shuffles 960, restarts a
@@ -1016,6 +1031,9 @@ export default function ChessPage() {
                   playerColor={playerColor} setPlayerColor={setPlayerColor}
                   engineElo={engineElo} setEngineElo={setEngineElo}
                   analyzeDepth={analyzeDepth} setAnalyzeDepth={setAnalyzeDepth}
+                  multiPv={multiPv} setMultiPv={setMultiPv}
+                  autoQueenWhite={autoQueenWhite} setAutoQueenWhite={setAutoQueenWhite}
+                  autoQueenBlack={autoQueenBlack} setAutoQueenBlack={setAutoQueenBlack}
                   forcedPassAndPlay={forcedPassAndPlay}
                   modeId={mode}
                 />
@@ -1341,7 +1359,7 @@ function VariantInfoStrip({ modeId, threeCheckCounts }) {
 // forcedPassAndPlay = true when the active variant has rules Stockfish can't
 // play (atomic, antichess, etc.). We grey-out Play / Analyze in that case and
 // surface a helpful pill explaining why.
-function ModeBar({ engineMode, setEngineMode, playerColor, setPlayerColor, engineElo, setEngineElo, analyzeDepth, setAnalyzeDepth, forcedPassAndPlay, modeId }) {
+function ModeBar({ engineMode, setEngineMode, playerColor, setPlayerColor, engineElo, setEngineElo, analyzeDepth, setAnalyzeDepth, multiPv, setMultiPv, autoQueenWhite, setAutoQueenWhite, autoQueenBlack, setAutoQueenBlack, forcedPassAndPlay, modeId }) {
   const ENGINE_MODES = [
     { id: 'play',            label: 'Play vs engine', icon: <AimOutlined />,    engine: true },
     { id: 'analyze',         label: 'Analyze',        icon: <SearchOutlined />, engine: true },
@@ -1405,8 +1423,37 @@ function ModeBar({ engineMode, setEngineMode, playerColor, setPlayerColor, engin
               className="w-24 accent-cyan-400" />
             <span className="text-cyan-300 font-mono text-[11px] w-6 text-right">{analyzeDepth}</span>
           </label>
+          <span className="text-[10px] text-gray-600 mx-1">·</span>
+          <label className="text-[10px] text-gray-400 flex items-center gap-1.5"
+                 title="How many parallel best lines Stockfish returns. 1 = best move only (fast). 3-5 = see runners-up.">
+            MultiPV
+            <input type="range" min="1" max="5" step="1" value={multiPv}
+              onChange={e => setMultiPv(parseInt(e.target.value, 10))}
+              className="w-16 accent-fuchsia-400" />
+            <span className="text-fuchsia-300 font-mono text-[11px] w-4 text-right">{multiPv}</span>
+          </label>
         </>
       )}
+      {/* Per-side auto-queen toggles — always visible, toggleable mid-game.
+          OFF = pop the promotion picker; ON = silently queen for that side. */}
+      <span className="text-[10px] text-gray-600 mx-1">·</span>
+      <div className="flex items-center gap-1">
+        <span className="text-[10px] text-gray-500">Auto-Q</span>
+        <button onClick={() => setAutoQueenWhite(v => !v)}
+          title="Auto-queen for white promotions"
+          className={`text-[10px] font-semibold px-2 py-1 rounded-lg border ${
+            autoQueenWhite
+              ? 'border-amber-400/60 bg-amber-500/20 text-amber-200'
+              : 'border-gray-800 bg-gray-900/40 text-gray-500'
+          }`}>♕ W</button>
+        <button onClick={() => setAutoQueenBlack(v => !v)}
+          title="Auto-queen for black promotions"
+          className={`text-[10px] font-semibold px-2 py-1 rounded-lg border ${
+            autoQueenBlack
+              ? 'border-amber-400/60 bg-amber-500/20 text-amber-200'
+              : 'border-gray-800 bg-gray-900/40 text-gray-500'
+          }`}>♛ B</button>
+      </div>
     </div>
   )
 }

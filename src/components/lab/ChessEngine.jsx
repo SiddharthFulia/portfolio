@@ -1662,7 +1662,7 @@ export default function ChessEngine() {
                 onMouseEnter={e => { if (!aiThinking && gameState.history.length > 0) e.target.style.background = '#4b5563' }}
                 onMouseLeave={e => { if (!aiThinking && gameState.history.length > 0) e.target.style.background = '#374151' }}
               >
-                Undo
+                Take back
               </button>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
