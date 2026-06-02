@@ -1149,4 +1149,4 @@ async function _adminDbPost(endpoint, body, { timeout = 20000 } = {}) {
   }
 }
 export async function adminDbQuery(sql)        { return _adminDbPost(ENDPOINTS.ADMIN_DB_QUERY, { sql },      { timeout: 20000 }); }
-export async function adminDbAsk(question)     { return _adminDbPost(ENDPOINTS.ADMIN_DB_ASK,   { question }, { timeout: 45000 }); }
+export async function adminDbAsk(question, { table } = {}) { return _adminDbPost(ENDPOINTS.ADMIN_DB_ASK, { question, table }, { timeout: 45000 }); }

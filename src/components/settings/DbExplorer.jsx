@@ -196,7 +196,9 @@ export default function DbExplorer() {
     const q = question.trim()
     if (!q) return
     setAskLoading(true); setAskError(null); setAskResult(null)
-    const r = await adminDbAsk(q)
+    // Pass the currently-selected table so the BE shrinks the prompt
+    // to that table's schema + curated context — much cheaper on tokens.
+    const r = await adminDbAsk(q, { table: selected || undefined })
     setAskLoading(false)
     if (r.error) {
       // BE returns the generated SQL even on rejection — display both.
