@@ -30,6 +30,7 @@ import {
 import { parseFen, makeFen, INITIAL_FEN } from 'chessops/fen'
 import { parseUci, makeUci, parseSquare, makeSquare, opposite } from 'chessops/util'
 import { chessgroundDests } from 'chessops/compat'
+import { makeSan } from 'chessops/san'
 
 // ── Mode → chessops rules string ────────────────────────────────────
 // `chess960` maps to standard rules (chessops doesn't separate them;
@@ -103,13 +104,21 @@ function wrap(pos, mode, historyUci) {
   // Lets us roll back N times by popping. chessops Positions have .clone()
   // which deep-copies board + state, so each snapshot is independent.
   const posSnapshots = []
+  // Parallel array of SAN strings ("Nf3", "O-O", "exd5", etc.) so the move
+  // list can render piece glyphs instead of UCI ("g1f3"). chess.js's
+  // .history() returns SAN by default; we match that contract so MoveList
+  // works without branching by rules engine.
+  const historySan = []
   const game = {
     // ── chess.js-shaped getters ─────────────────────────────────────
     turn: () => pos.turn === 'white' ? 'w' : 'b',
     fen: () => makeFen(pos.toSetup()),
     inCheck: () => pos.isCheck(),
     isGameOver: () => pos.isEnd(),
-    history: () => historyUci.slice(),
+    // SAN history (chess.js parity — MoveList expects SAN to swap in glyphs).
+    history: () => historySan.slice(),
+    // UCI history (for save/replay — drops in Crazyhouse like 'P@e4' too).
+    historyUci: () => historyUci.slice(),
     // chessgroundDests gives us the legal-move map directly; we expose it
     // both via a custom getter AND via .moves({square}) for chess.js parity.
     cgDests: () => chessgroundDests(pos),
@@ -165,16 +174,22 @@ function wrap(pos, mode, historyUci) {
       if (!pos.isLegal(parsed)) return null
       const movingPiece = pos.board.get(parsed.from)
       const color = movingPiece ? movingPiece.color : pos.turn
+      // Compute SAN BEFORE play() — chessops makeSan needs the pre-move
+      // position to disambiguate ("Nbd2" vs "Nfd2"), detect check (+) and
+      // mate (#). Fall back to UCI if anything goes wrong.
+      let san = uci
+      try { san = makeSan(pos, parsed) || uci } catch { san = uci }
       // Snapshot BEFORE the play() so undo can roll back deterministically.
       posSnapshots.push(pos.clone())
       pos.play(parsed)
       historyUci.push(uci)
+      historySan.push(san)
       return {
         from: m.from,
         to: m.to,
         promotion: m.promotion,
         color: color === 'white' ? 'w' : 'b',
-        san: uci, // not real SAN — keeps the shape but the actual SAN engine for variants is overkill
+        san,
       }
     },
     // chess.js parity: roll one ply back. Returns the popped move shape
@@ -184,6 +199,7 @@ function wrap(pos, mode, historyUci) {
       if (posSnapshots.length === 0) return null
       pos = posSnapshots.pop()
       const uci = historyUci.pop() || ''
+      historySan.pop()
       return {
         from: uci.slice(0, 2),
         to: uci.slice(2, 4),

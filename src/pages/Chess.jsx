@@ -307,9 +307,12 @@ export default function ChessPage() {
       if (hydrate && hydrate.movesUci?.length && g) replayUci(g, hydrate.movesUci)
       setFen(g ? g.fen() : startFenRef.current)
     }
-    // History snapshot — if we just hydrated from a saved row, surface its move list.
+    // History snapshot — if we just hydrated from a saved row, surface the
+    // game's OWN history() (now SAN for chessops adapter too) so MoveList
+    // renders glyphs instead of UCI.
     if (hydrate?.movesUci?.length) {
-      setHistory(hydrate.movesUci.slice())
+      const g = variantGameRef.current || chessRef.current
+      setHistory(g ? g.history() : hydrate.movesUci.slice())
     }
     setHistory([]); setEvalHistory([]); setVariations([])
     setTelemetry(null)
@@ -694,23 +697,14 @@ export default function ChessPage() {
     const result = isMate
       ? (game.turn() === 'w' ? '0-1' : '1-0')
       : (game.isDraw?.() ? '1/2-1/2' : '*')
-    const historyUci = game.history() || []
-    const pgn = usesChessjs ? chessRef.current.pgn() : `[Variant "${mode}"]\n${historyUci.join(' ')}`
-    // For variant games (chessops) the SAN engine isn't wired, so PGN is a
-    // thin wrapper; the real replay surface is movesUci + startFen.
-    // For 960 the starting position is random, so we always persist startFen.
-    const startFen = (mode === 'chess960' || !usesChessjs)
-      ? (variantGameRef.current?.fen ? null : null) // placeholder so logic stays clear
-      : null
-    // Capture the true initial position. chess.js / chessops both expose
-    // .fen() on the current position; for variants we recorded the initial
-    // setup at mode-change time, but to keep this commit small we re-derive
-    // it: if history is empty, current fen IS the start; otherwise we leave
-    // null for standard (default starting), and for 960 we use the FEN at
-    // history length 0 — which we don't have on hand here, so we save the
-    // first FEN we know about. (For 960 specifically, see mode-change effect
-    // — startFen is captured into a ref at game creation; consume that ref
-    // here.)
+    // UCI list for save (replay-friendly across rules engines). chess.js
+    // gives us SAN by default; we ask for verbose so we can stringify each
+    // move into UCI. Chessops adapter exposes historyUci() directly.
+    const historyUciList = usesChessjs
+      ? (chessRef.current.history({ verbose: true }) || []).map(m => m.from + m.to + (m.promotion || ''))
+      : (variantGameRef.current?.historyUci?.() || [])
+    const moveCount = historyUciList.length
+    const pgn = usesChessjs ? chessRef.current.pgn() : `[Variant "${mode}"]\n${historyUciList.join(' ')}`
     const { error: err } = await chessSaveGame({
       name,
       pgn,
@@ -722,10 +716,10 @@ export default function ChessPage() {
       engineStrength: engineMode === 'play' && engineSupported ? engineElo : null,
       timeControl: timeControl?.id || 'none',
       result,
-      moveCount: historyUci.length,
+      moveCount,
       variant: mode,
       startFen: startFenRef.current,
-      movesUci: historyUci.join(' '),
+      movesUci: historyUciList.join(' '),
     })
     setSaveModalOpen(false)
     if (err) setStatus({ kind: 'error', text: `Save failed: ${err}` })
