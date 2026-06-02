@@ -39,6 +39,7 @@ function useDebounced(value, delay = 250) {
 
 // Render a SAN move list as numbered pairs (1. e4 c5 2. Nf3 d6 …).
 function renderPgnPairs(moves) {
+  if (!Array.isArray(moves) || moves.length === 0) return null
   const pairs = []
   for (let i = 0; i < moves.length; i += 2) {
     const num = Math.floor(i / 2) + 1

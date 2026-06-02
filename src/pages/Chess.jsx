@@ -1438,6 +1438,7 @@ function OpeningHeading({ info, expanded, onToggle, detail }) {
 // Numbered SAN pairs as a plain string fallback for when detail.pgn is
 // empty (some openings have no PGN string indexed — only the moves[] array).
 function renderPairs(moves) {
+  if (!Array.isArray(moves) || moves.length === 0) return ''
   const out = []
   for (let i = 0; i < moves.length; i += 2) {
     const n = Math.floor(i / 2) + 1

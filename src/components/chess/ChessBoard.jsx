@@ -18,10 +18,11 @@ import { SQUARES } from 'chess.js'
 // For variant games (chessops-backed adapter), .cgDests() already returns
 // a chessground-shaped Map directly — skip the per-square walk in that case.
 function buildDests(chess) {
-  if (chess && typeof chess.cgDests === 'function') {
+  const dests = new Map()
+  if (!chess) return dests
+  if (typeof chess.cgDests === 'function') {
     return chess.cgDests()
   }
-  const dests = new Map()
   for (const sq of SQUARES) {
     const moves = chess.moves({ square: sq, verbose: true })
     if (moves.length) dests.set(sq, moves.map(m => m.to))
@@ -103,7 +104,7 @@ export default function ChessBoard({
   // Sync state from React → chessground on every change.
   useEffect(() => {
     const cg = cgRef.current
-    if (!cg) return
+    if (!cg || !chess) return
     const autoShapes = (candidateMoves || []).slice(0, 3).map(uciToShape)
     cg.set({
       fen,
