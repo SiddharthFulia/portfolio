@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Modal, InputNumber, Select, Tabs, Segmented } from 'antd'
 import { notice } from '../lib/notice'
-import { LockOutlined, ReloadOutlined, DatabaseOutlined, HddOutlined, CloudServerOutlined, ApiOutlined, ClusterOutlined, DashboardOutlined, BarChartOutlined, DeleteOutlined, CheckOutlined } from '@ant-design/icons'
+import { LockOutlined, ReloadOutlined, DatabaseOutlined, FolderOpenOutlined, CloudServerOutlined, ApiOutlined, ClusterOutlined, DashboardOutlined, BarChartOutlined, DeleteOutlined, CheckOutlined } from '@ant-design/icons'
 import {
   ResponsiveContainer, LineChart, Line, AreaChart, Area, BarChart, Bar, Cell,
   XAxis, YAxis, Tooltip, CartesianGrid, Legend,
@@ -338,7 +338,7 @@ function SettingsInner() {
             },
             {
               key: 'storage',
-              label: <span className="text-sm inline-flex items-center gap-1.5"><HddOutlined /> Storage</span>,
+              label: <span className="text-sm inline-flex items-center gap-1.5"><FolderOpenOutlined /> Storage</span>,
               children: <StorageCard data={diskStats} loading={diskLoading} />,
             },
             {
