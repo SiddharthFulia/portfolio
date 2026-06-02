@@ -78,6 +78,14 @@ export default function ChessPage() {
   // variantGameRef so the same ChessBoard component renders any rules.
   const chessRef = useRef(new Chess())
   const variantGameRef = useRef(null)
+  // Starting FEN for the CURRENT game — captured at mode-change time. We
+  // only persist it on save when it's not the standard initial (960's
+  // random back rank, or any custom-FEN load).
+  const startFenRef = useRef(null)
+  // Set by loadSavedGame BEFORE setMode() so the mode-change effect can
+  // hydrate from a saved row's startFen + UCI moves instead of generating
+  // a fresh starting position. Consumed once then cleared.
+  const pendingLoadRef = useRef(null)
   // Top-level tab — drives the page sections. Variants are NOT a tab; they
   // live inside Play as a mode chip row, so the user never leaves the board.
   const [topTab, setTopTab] = useQueryState('tab', 'play', {
@@ -248,30 +256,60 @@ export default function ChessPage() {
   //     rules (atomic / antichess / horde / crazyhouse / racingKings)
   const forcedPassAndPlay = mode === 'offline' || !engineSupported
 
+  // Replay a UCI move list onto a chessops-backed game. Used when loading
+  // a saved variant row — startFen sets the position, then we re-apply
+  // every move in order so the game's history + position match the saved
+  // state. Stops at the first illegal move (defensive — saved rows could
+  // come from older chessops versions with subtly different rules).
+  const replayUci = (game, moves) => {
+    for (const uci of moves) {
+      const m = { from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] }
+      if (!game.move(m)) break
+    }
+  }
+
   // Build the active game from scratch when mode changes. Standard mode
   // hands the existing chess.js instance back; other modes spin up a fresh
   // chessops-backed adapter (or a fresh chess.js for 960 / offline). We do
   // NOT carry FEN across modes — switching variants means a brand new game.
   useEffect(() => {
+    // If loadSavedGame queued a hydrate for THIS mode, consume it.
+    const pending = pendingLoadRef.current
+    pendingLoadRef.current = null
+    const hydrate = pending && pending.variant === mode ? pending : null
+
     if (mode === 'standard') {
       chessRef.current = new Chess()
       variantGameRef.current = null
+      startFenRef.current = null  // standard default — no need to persist
       setFen(chessRef.current.fen())
     } else if (mode === 'chess960') {
-      const f = generate960Fen()
+      const f = (hydrate && hydrate.startFen) || generate960Fen()
       const g = buildVariantGame('chess960', f)
       chessRef.current = null
       variantGameRef.current = g
+      startFenRef.current = f      // random — MUST persist for replay
+      if (hydrate && hydrate.movesUci?.length && g) replayUci(g, hydrate.movesUci)
       setFen(g ? g.fen() : f)
     } else if (mode === 'offline') {
       chessRef.current = new Chess()
       variantGameRef.current = null
+      startFenRef.current = null
       setFen(chessRef.current.fen())
     } else {
       // chessops-backed variant.
-      const g = buildVariantGame(mode)
+      const g = buildVariantGame(mode, hydrate?.startFen || undefined)
       variantGameRef.current = g
-      setFen(g.fen())
+      // Each variant has a deterministic starting position from chessops'
+      // defaultPosition(rules), so we capture it explicitly — replays don't
+      // need to know which chessops version they came from.
+      startFenRef.current = g?.fen() || null
+      if (hydrate && hydrate.movesUci?.length && g) replayUci(g, hydrate.movesUci)
+      setFen(g ? g.fen() : startFenRef.current)
+    }
+    // History snapshot — if we just hydrated from a saved row, surface its move list.
+    if (hydrate?.movesUci?.length) {
+      setHistory(hydrate.movesUci.slice())
     }
     setHistory([]); setEvalHistory([]); setVariations([])
     setTelemetry(null)
@@ -554,16 +592,19 @@ export default function ChessPage() {
   const resetBoard = () => {
     if (mode === 'standard' || mode === 'offline') {
       chessRef.current = new Chess()
+      startFenRef.current = null
       setFen(chessRef.current.fen())
     } else if (mode === 'chess960') {
       const f = generate960Fen()
       const g = buildVariantGame('chess960', f)
       chessRef.current = null
       variantGameRef.current = g
+      startFenRef.current = f
       setFen(g ? g.fen() : f)
     } else {
       const g = buildVariantGame(mode)
       variantGameRef.current = g
+      startFenRef.current = g?.fen() || null
       setFen(g.fen())
     }
     setHistory([]); setEvalHistory([]); setVariations([])
@@ -653,7 +694,23 @@ export default function ChessPage() {
     const result = isMate
       ? (game.turn() === 'w' ? '0-1' : '1-0')
       : (game.isDraw?.() ? '1/2-1/2' : '*')
-    const pgn = usesChessjs ? chessRef.current.pgn() : `[Variant "${mode}"]\n${(game.history() || []).join(' ')}`
+    const historyUci = game.history() || []
+    const pgn = usesChessjs ? chessRef.current.pgn() : `[Variant "${mode}"]\n${historyUci.join(' ')}`
+    // For variant games (chessops) the SAN engine isn't wired, so PGN is a
+    // thin wrapper; the real replay surface is movesUci + startFen.
+    // For 960 the starting position is random, so we always persist startFen.
+    const startFen = (mode === 'chess960' || !usesChessjs)
+      ? (variantGameRef.current?.fen ? null : null) // placeholder so logic stays clear
+      : null
+    // Capture the true initial position. chess.js / chessops both expose
+    // .fen() on the current position; for variants we recorded the initial
+    // setup at mode-change time, but to keep this commit small we re-derive
+    // it: if history is empty, current fen IS the start; otherwise we leave
+    // null for standard (default starting), and for 960 we use the FEN at
+    // history length 0 — which we don't have on hand here, so we save the
+    // first FEN we know about. (For 960 specifically, see mode-change effect
+    // — startFen is captured into a ref at game creation; consume that ref
+    // here.)
     const { error: err } = await chessSaveGame({
       name,
       pgn,
@@ -665,7 +722,10 @@ export default function ChessPage() {
       engineStrength: engineMode === 'play' && engineSupported ? engineElo : null,
       timeControl: timeControl?.id || 'none',
       result,
-      moveCount: game.history().length,
+      moveCount: historyUci.length,
+      variant: mode,
+      startFen: startFenRef.current,
+      movesUci: historyUci.join(' '),
     })
     setSaveModalOpen(false)
     if (err) setStatus({ kind: 'error', text: `Save failed: ${err}` })
@@ -673,24 +733,41 @@ export default function ChessPage() {
   }
 
   const loadSavedGame = async (row) => {
-    const chess = new Chess()
-    try {
-      chess.loadPgn(row.pgn || '')
-    } catch (err) {
-      setStatus({ kind: 'error', text: `Couldn't load: ${err.message}` })
+    const savedVariant = row.variant && row.variant !== 'standard' ? row.variant : null
+    // Standard / offline / legacy rows → chess.js PGN replay (the existing path).
+    if (!savedVariant) {
+      const chess = new Chess()
+      try {
+        chess.loadPgn(row.pgn || '')
+      } catch (err) {
+        setStatus({ kind: 'error', text: `Couldn't load: ${err.message}` })
+        return
+      }
+      chessRef.current = chess
+      variantGameRef.current = null
+      startFenRef.current = null
+      setFen(chess.fen())
+      setHistory(chess.history())
+      setEvalHistory([]); setVariations([])
+      setStatus({ kind: 'idle', text: `Loaded "${row.name}"` })
+      setLibraryOpen(false)
+      setMode('standard')
+      setTopTab('play')
       return
     }
-    chessRef.current = chess
-    setFen(chess.fen())
-    setHistory(chess.history())
-    setEvalHistory([]); setVariations([])
-    setStatus({ kind: 'idle', text: `Loaded "${row.name}"` })
+    // Variant row → build chessops game from startFen + replay UCI sequence.
+    // We bypass the mode-change auto-init effect by setting the refs FIRST,
+    // then setMode — the effect will overwrite the refs with defaults, so
+    // we stash the load into pendingLoadRef which the effect honours.
+    pendingLoadRef.current = {
+      variant: savedVariant,
+      startFen: row.startFen || null,
+      movesUci: (row.movesUci || '').split(/\s+/).filter(Boolean),
+    }
     setLibraryOpen(false)
-    // Snap the user back to the Play tab + Standard mode so they see the
-    // loaded position on the main board immediately. Saved games are
-    // chess.js PGNs — they only make sense in standard.
-    setMode('standard')
+    setMode(savedVariant)
     setTopTab('play')
+    setStatus({ kind: 'idle', text: `Loaded "${row.name}" (${savedVariant})` })
   }
   // Apply a PGN string to the board. Used by both the textarea paste
   // ('Load PGN' button) and the file-upload picker. Decoupled from
