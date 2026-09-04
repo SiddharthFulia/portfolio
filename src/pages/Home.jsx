@@ -60,8 +60,9 @@ const GROUPS = [
     title: "Engineered",
     accent: "text-cyan-300",
     items: [
-      { to: "/chess",  label: "Chess Engine", desc: "Stockfish · clocks · saved games · piece themes" },
-      { to: "/runner", label: "Hand Runner",  desc: "Three.js · MediaPipe · ramps · oncoming trains" },
+      { to: "/chess",       label: "Chess Engine",  desc: "Stockfish · clocks · saved games · piece themes" },
+      { to: "/runner",      label: "Hand Runner",   desc: "Three.js · MediaPipe · ramps · oncoming trains" },
+      { to: "/simple-game", label: "Simple Games",  desc: "Snake · code + live game · step through algorithms" },
     ],
   },
   {
@@ -188,7 +189,7 @@ const Home = () => {
                     <button
                       key={it.to}
                       onClick={() => navigate(it.to)}
-                      className="group text-left rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/20 px-5 py-4 transition-all hover:-translate-y-0.5"
+                      className="luxe-glass group text-left px-5 py-4 transition-all hover:-translate-y-0.5"
                     >
                       <div className="flex items-center gap-2 mb-1">
                         <h4 className="text-[15px] font-semibold text-white group-hover:text-amber-200 transition-colors">

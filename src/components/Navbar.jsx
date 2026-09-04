@@ -1,9 +1,10 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useRef, useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { LockOutlined, UnlockOutlined } from "@ant-design/icons";
+import { LockOutlined, UnlockOutlined, BulbOutlined, BulbFilled } from "@ant-design/icons";
 import sakura from "../assets/sakura.mp3";
 import { useVault } from "../contexts/VaultContext";
+import { useTheme } from "../hooks/useTheme";
 
 // New SF crimson logo lives under public/ — referenced by absolute
 // path so Vite serves it directly and we avoid bundling a 2 MB PNG.
@@ -21,6 +22,7 @@ const Navbar = () => {
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const { theme, toggle: toggleTheme } = useTheme();
 
   useEffect(() => {
     const a = new Audio(sakura);
@@ -185,6 +187,18 @@ const Navbar = () => {
 
         <div className={`w-px h-4 mx-0.5 xl:mx-1 ${isDark ? 'bg-gray-700' : 'bg-gray-300'}`} />
 
+        <button
+          onClick={toggleTheme}
+          aria-label='Toggle theme'
+          title={theme === 'light' ? 'Switch to dark' : 'Switch to light'}
+          className={`text-[13px] w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+            isDark
+              ? 'text-gray-300 hover:text-amber-200 hover:bg-white/[0.06]'
+              : 'text-gray-600 hover:text-black hover:bg-gray-100'
+          }`}>
+          {theme === 'light' ? <BulbFilled /> : <BulbOutlined />}
+        </button>
+
         {/* Mega-menu — every tool lives here now (no inline pills) */}
         <div className="relative">
           <button
@@ -208,7 +222,7 @@ const Navbar = () => {
               <div
                 data-workshop-dropdown
                 className={`absolute top-full right-0 mt-2 rounded-2xl shadow-2xl border z-50 overflow-hidden
-                              w-[560px] max-w-[92vw]
+                              w-[720px] max-w-[94vw]
                               ${isDark
                                 ? 'bg-[#0a0a0e] border-gray-800'
                                 : 'bg-white border-gray-200'}`}>

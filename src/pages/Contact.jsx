@@ -215,12 +215,9 @@ const Contact = () => {
 
               {/* Direct contacts — labeled rows so the actual handles +
                   email are visible at a glance, not buried behind icons. */}
-              <div className='luxe-card p-5 sm:p-6'>
+              <div className='luxe-glass p-5 sm:p-6'>
                 <p className='eyebrow-mono mb-4'>— Find me here</p>
-                {/* auto-rows-[64px] forces every row to the same height so
-                    icons line up across both columns even when the text
-                    length differs between left + right cards. */}
-                <div className='grid grid-cols-1 sm:grid-cols-2 gap-2 auto-rows-[64px]'>
+                <div className='grid grid-cols-1 sm:grid-cols-2 gap-2 [&>a]:min-h-[64px]'>
                   <a href='mailto:siddharthfulia7@gmail.com'
                     className='tap-44 h-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/[0.04] transition-colors group'>
                     <span className='w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-fg-secondary group-hover:text-accent-amber transition-colors'>

@@ -480,4 +480,30 @@
 .border-line-strong  { border-color: var(--luxe-border-hi); }
 .hover\:border-line-strong:hover { border-color: var(--luxe-border-hi); }
 
+/* Light theme — activated by `<body class="theme-light">` (set by
+   useThemeStore in localStorage). Only remaps the tokens; every page
+   that uses --luxe-* automatically inverts without per-component edits. */
+body.theme-light {
+  --luxe-bg-deep:     #f6f7f9;
+  --luxe-bg-base:     #ffffff;
+  --luxe-bg-elevated: #f8fafc;
+  --luxe-surface:     #ffffff;
+  --luxe-surface-hi:  #f1f5f9;
+  --luxe-fg:          #0f172a;
+  --luxe-fg-muted:    #475569;
+  --luxe-fg-dim:      #94a3b8;
+  --luxe-border:      #e2e8f0;
+  --luxe-border-hi:   #cbd5e1;
+}
+body.theme-light .luxe-glass {
+  background: rgba(255, 255, 255, 0.55);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 12px 40px rgba(15, 23, 42, 0.08);
+}
+body.theme-light .luxe-glass:hover {
+  border-color: rgba(0, 0, 0, 0.14);
+}
+
 /* End of luxe.css */

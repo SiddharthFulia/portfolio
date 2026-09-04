@@ -1,9 +1,19 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import { Segmented } from "antd";
 
 import { CTA } from "../components";
 import { projects } from "../constants";
+
+const projectCategory = (tag = '') => {
+  const first = String(tag).split(/\s*·\s*/)[0].trim();
+  if (/research|ieee|paper/i.test(first)) return 'Research';
+  if (/production|live/i.test(first))     return 'Production';
+  if (/ai|ml|rag|llm/i.test(first))        return 'AI · ML';
+  if (/full|engine/i.test(first))          return 'Full-Stack';
+  return 'Utilities';
+};
 
 const ShareButtons = ({ url }) => {
   const [copied, setCopied] = useState(false)
@@ -133,6 +143,12 @@ const PreviewPlaceholder = ({ label, gradient }) => {
 
 const Projects = () => {
   const totalCount = LIVE_PROJECTS.length + projects.length;
+  const [cat, setCat] = useState('All');
+  const categories = useMemo(() => {
+    const set = new Set(projects.map(p => projectCategory(p.tag)));
+    return ['All', ...Array.from(set)];
+  }, []);
+  const shown = cat === 'All' ? projects : projects.filter(p => projectCategory(p.tag) === cat);
 
   return (
     <section className="relative min-h-screen bg-surface-base text-fg-primary pt-28 sm:pt-32 pb-24 px-4 sm:px-6 overflow-hidden">
@@ -171,7 +187,7 @@ const Projects = () => {
 
           {LIVE_PROJECTS.map(proj => (
             <motion.div key={proj.title} variants={fadeUp}>
-              <div className="luxe-card luxe-card-hover overflow-hidden flex flex-col sm:flex-row">
+              <div className="luxe-glass luxe-card-hover overflow-hidden flex flex-col sm:flex-row h-full">
                 {/* Left content */}
                 <div className="flex-1 p-5 sm:p-6">
                   <div className="flex items-center gap-2 flex-wrap mb-2">
@@ -258,16 +274,27 @@ const Projects = () => {
           variants={stagger}
           viewport={{ once: true, amount: 0.05 }}
         >
-          <motion.div variants={fadeUp} className="flex items-center gap-3 mb-3 mt-4">
+          <motion.div variants={fadeUp} className="flex items-center gap-3 mb-3 mt-4 flex-wrap">
             <SectionPill dotColor={null} tone="gray">All projects</SectionPill>
             <span className="h-px flex-1 bg-gray-800" />
-            <span className="text-[10px] font-mono tracking-wider text-gray-600 tabular-nums">{projects.length} total</span>
+            <span className="text-[10px] font-mono tracking-wider text-gray-600 tabular-nums">{shown.length} / {projects.length}</span>
           </motion.div>
 
-          {projects.map((project) => {
+          <motion.div variants={fadeUp} className="mb-4">
+            <Segmented
+              value={cat}
+              onChange={setCat}
+              options={categories}
+              size="small"
+              className="!bg-transparent"
+            />
+          </motion.div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {shown.map((project) => {
             const isChess = project.name === 'Chess Engine';
             const cardInner = (
-              <div className="luxe-card luxe-card-hover overflow-hidden flex flex-col sm:flex-row">
+              <div className="luxe-glass luxe-card-hover overflow-hidden flex flex-col sm:flex-row h-full">
                 {/* Left content */}
                 <div className="flex-1 p-5 sm:p-6">
                   <div className="flex items-center gap-2 flex-wrap mb-2">
@@ -353,6 +380,7 @@ const Projects = () => {
               </motion.div>
             );
           })}
+          </div>
         </motion.div>
 
         <div className="luxe-divider my-16" />
