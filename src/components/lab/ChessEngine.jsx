@@ -1345,7 +1345,7 @@ export default function ChessEngine() {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center',
-      gap: '12px', padding: '12px 4px', color: '#e2e8f0',
+      gap: '12px', padding: '12px 4px', color: 'var(--luxe-fg)',
       fontFamily: "'Inter', system-ui, sans-serif",
       maxWidth: '960px', margin: '0 auto', width: '100%', boxSizing: 'border-box',
     }}>
@@ -1358,7 +1358,7 @@ export default function ChessEngine() {
         }}>
           Chess Engine
         </h2>
-        <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 0' }}>
+        <p style={{ fontSize: '0.75rem', color: 'var(--luxe-fg-dim)', margin: '4px 0 0' }}>
           Alpha-Beta Pruning with Iterative Deepening
         </p>
       </div>
@@ -1382,7 +1382,7 @@ export default function ChessEngine() {
             alignSelf: 'stretch',
           }}>
             <div style={{
-              flex: `${100 - evalPct} 0 0`, background: '#1a1a2e',
+              flex: `${100 - evalPct} 0 0`, background: 'var(--luxe-surface)',
               transition: 'flex 0.5s ease',
               display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
               paddingBottom: 2,
@@ -1414,12 +1414,12 @@ export default function ChessEngine() {
               display: 'flex', gap: '2px', minHeight: '22px',
               marginBottom: '4px', alignItems: 'center', paddingLeft: 2,
             }}>
-              <span style={{ fontSize: '0.7rem', color: '#94a3b8', marginRight: 4 }}>
+              <span style={{ fontSize: '0.7rem', color: 'var(--luxe-fg-muted)', marginRight: 4 }}>
                 {PIECE_CHARS_B[KING]}
               </span>
               {renderCaptured(WHITE)}
               {matDiff < 0 && (
-                <span style={{ fontSize: '0.65rem', color: '#94a3b8', marginLeft: 4 }}>
+                <span style={{ fontSize: '0.65rem', color: 'var(--luxe-fg-muted)', marginLeft: 4 }}>
                   +{Math.abs(matDiff / 100).toFixed(0)}
                 </span>
               )}
@@ -1519,12 +1519,12 @@ export default function ChessEngine() {
               display: 'flex', gap: '2px', minHeight: '22px',
               marginTop: '4px', alignItems: 'center', paddingLeft: 2,
             }}>
-              <span style={{ fontSize: '0.7rem', color: '#94a3b8', marginRight: 4 }}>
+              <span style={{ fontSize: '0.7rem', color: 'var(--luxe-fg-muted)', marginRight: 4 }}>
                 {PIECE_CHARS_W[KING]}
               </span>
               {renderCaptured(BLACK)}
               {matDiff > 0 && (
-                <span style={{ fontSize: '0.65rem', color: '#94a3b8', marginLeft: 4 }}>
+                <span style={{ fontSize: '0.65rem', color: 'var(--luxe-fg-muted)', marginLeft: 4 }}>
                   +{(matDiff / 100).toFixed(0)}
                 </span>
               )}
@@ -1539,12 +1539,12 @@ export default function ChessEngine() {
                 borderRadius: '4px', zIndex: 10,
               }}>
                 <div style={{
-                  background: '#1e293b', borderRadius: '12px', padding: '20px',
+                  background: 'var(--luxe-surface)', borderRadius: '12px', padding: '20px',
                   display: 'flex', gap: '12px',
                   border: '1px solid rgba(255,255,255,0.15)',
                   boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
                 }}>
-                  <span style={{ fontSize: '0.8rem', color: '#94a3b8', alignSelf: 'center', marginRight: 4 }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--luxe-fg-muted)', alignSelf: 'center', marginRight: 4 }}>
                     Promote to:
                   </span>
                   {[QUEEN, ROOK, BISHOP, KNIGHT].map(p => (
@@ -1553,7 +1553,7 @@ export default function ChessEngine() {
                       onClick={() => handlePromoChoice(p)}
                       style={{
                         width: 56, height: 56, fontSize: '2.2rem',
-                        background: '#334155', border: '1px solid rgba(255,255,255,0.15)',
+                        background: 'var(--luxe-surface-hi)', border: '1px solid rgba(255,255,255,0.15)',
                         borderRadius: '8px', cursor: 'pointer',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         transition: 'all 0.15s',
@@ -1586,7 +1586,7 @@ export default function ChessEngine() {
                   {gameOver === 'stalemate' && 'Stalemate'}
                   {gameOver === 'draw' && 'Draw'}
                 </div>
-                <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--luxe-fg-muted)' }}>
                   {gameOver === 'checkmate' ? 'Checkmate'
                     : gameOver === 'stalemate' ? 'Stalemate · no legal moves'
                     : `Draw · ${drawReason || 'insufficient material / 50-move rule'}`}
@@ -1617,7 +1617,7 @@ export default function ChessEngine() {
                   borderTopColor: 'transparent', borderRadius: '50%',
                   animation: 'chess-spin 0.8s linear infinite',
                 }} />
-                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Thinking...</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--luxe-fg-muted)' }}>Thinking...</span>
               </div>
             )}
           </div>
@@ -1639,7 +1639,7 @@ export default function ChessEngine() {
                 onClick={newGame}
                 style={{
                   flex: 1, padding: '7px 0', background: '#1e40af',
-                  border: 'none', borderRadius: '6px', color: '#e2e8f0',
+                  border: 'none', borderRadius: '6px', color: 'var(--luxe-fg)',
                   fontWeight: 600, cursor: 'pointer', fontSize: '0.78rem',
                   transition: 'background 0.15s',
                 }}
@@ -1653,8 +1653,8 @@ export default function ChessEngine() {
                 disabled={aiThinking || gameState.history.length === 0}
                 style={{
                   flex: 1, padding: '7px 0',
-                  background: aiThinking || gameState.history.length === 0 ? '#1e293b' : '#374151',
-                  border: 'none', borderRadius: '6px', color: '#e2e8f0',
+                  background: aiThinking || gameState.history.length === 0 ? 'var(--luxe-surface)' : '#374151',
+                  border: 'none', borderRadius: '6px', color: 'var(--luxe-fg)',
                   fontWeight: 600, cursor: aiThinking ? 'not-allowed' : 'pointer',
                   fontSize: '0.78rem', transition: 'background 0.15s',
                   opacity: aiThinking || gameState.history.length === 0 ? 0.4 : 1,
@@ -1666,7 +1666,7 @@ export default function ChessEngine() {
               </button>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '0.75rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>AI Depth:</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--luxe-fg-muted)', whiteSpace: 'nowrap' }}>AI Depth:</span>
               <div style={{ display: 'flex', gap: '4px', flex: 1 }}>
                 {[1, 2, 3, 4].map(d => (
                   <button
@@ -1674,9 +1674,9 @@ export default function ChessEngine() {
                     onClick={() => setAiDepth(d)}
                     style={{
                       flex: 1, padding: '4px 0',
-                      background: d === aiDepth ? '#3b82f6' : '#1e293b',
+                      background: d === aiDepth ? '#3b82f6' : 'var(--luxe-surface)',
                       border: d === aiDepth ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.08)',
-                      borderRadius: '4px', color: d === aiDepth ? '#fff' : '#94a3b8',
+                      borderRadius: '4px', color: d === aiDepth ? '#fff' : 'var(--luxe-fg-muted)',
                       fontWeight: 600, cursor: 'pointer', fontSize: '0.75rem',
                       transition: 'all 0.15s',
                     }}
@@ -1688,7 +1688,7 @@ export default function ChessEngine() {
             </div>
             {/* Piece theme picker — purely cosmetic. Persisted to localStorage. */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '0.75rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>Pieces:</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--luxe-fg-muted)', whiteSpace: 'nowrap' }}>Pieces:</span>
               <div style={{ display: 'flex', gap: '4px', flex: 1 }}>
                 {Object.entries(PIECE_THEMES).map(([id, t]) => (
                   <button
@@ -1697,9 +1697,9 @@ export default function ChessEngine() {
                     title={t.desc}
                     style={{
                       flex: 1, padding: '4px 0',
-                      background: id === pieceTheme ? '#7c3aed' : '#1e293b',
+                      background: id === pieceTheme ? '#7c3aed' : 'var(--luxe-surface)',
                       border: id === pieceTheme ? '1px solid #a78bfa' : '1px solid rgba(255,255,255,0.08)',
-                      borderRadius: '4px', color: id === pieceTheme ? '#fff' : '#94a3b8',
+                      borderRadius: '4px', color: id === pieceTheme ? '#fff' : 'var(--luxe-fg-muted)',
                       fontWeight: 600, cursor: 'pointer', fontSize: '0.7rem',
                       transition: 'all 0.15s',
                     }}
@@ -1717,7 +1717,7 @@ export default function ChessEngine() {
             padding: '12px', border: '1px solid rgba(255,255,255,0.06)',
           }}>
             <h3 style={{
-              fontSize: '0.7rem', fontWeight: 700, color: '#64748b',
+              fontSize: '0.7rem', fontWeight: 700, color: 'var(--luxe-fg-dim)',
               textTransform: 'uppercase', letterSpacing: '0.08em',
               margin: '0 0 8px',
             }}>
@@ -1734,14 +1734,14 @@ export default function ChessEngine() {
                   background: 'rgba(0,0,0,0.2)', borderRadius: '6px',
                   padding: '6px 8px',
                 }}>
-                  <div style={{ fontSize: '0.6rem', color: '#64748b', textTransform: 'uppercase' }}>{label}</div>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#e2e8f0', fontFamily: 'monospace' }}>{value}</div>
+                  <div style={{ fontSize: '0.6rem', color: 'var(--luxe-fg-dim)', textTransform: 'uppercase' }}>{label}</div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--luxe-fg)', fontFamily: 'monospace' }}>{value}</div>
                 </div>
               ))}
             </div>
             {aiInfo.nodes > 0 && (
               <div style={{
-                marginTop: 8, fontSize: '0.65rem', color: '#64748b',
+                marginTop: 8, fontSize: '0.65rem', color: 'var(--luxe-fg-dim)',
               }}>
                 NPS: {aiInfo.time > 0 ? Math.round(aiInfo.nodes / (aiInfo.time / 1000)).toLocaleString() : '-'}
               </div>
@@ -1755,7 +1755,7 @@ export default function ChessEngine() {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: showBestMoves ? 8 : 0 }}>
               <h3 style={{
-                fontSize: '0.7rem', fontWeight: 700, color: '#64748b',
+                fontSize: '0.7rem', fontWeight: 700, color: 'var(--luxe-fg-dim)',
                 textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0,
               }}>
                 Recommended Moves
@@ -1766,10 +1766,10 @@ export default function ChessEngine() {
                   if (!showBestMoves) computeBestMoves(stateRef.current)
                 }}
                 style={{
-                  background: showBestMoves ? '#1e40af' : '#1e293b',
+                  background: showBestMoves ? '#1e40af' : 'var(--luxe-surface)',
                   border: '1px solid rgba(255,255,255,0.08)',
                   borderRadius: '4px', padding: '2px 8px',
-                  color: showBestMoves ? '#fff' : '#94a3b8',
+                  color: showBestMoves ? '#fff' : 'var(--luxe-fg-muted)',
                   fontSize: '0.65rem', fontWeight: 600, cursor: 'pointer',
                 }}
               >
@@ -1785,10 +1785,10 @@ export default function ChessEngine() {
                     borderRadius: 4, padding: '4px 8px',
                     border: i === 0 ? '1px solid rgba(59,130,246,0.3)' : '1px solid transparent',
                   }}>
-                    <span style={{ fontSize: '0.65rem', color: '#64748b', width: 14 }}>#{i + 1}</span>
+                    <span style={{ fontSize: '0.65rem', color: 'var(--luxe-fg-dim)', width: 14 }}>#{i + 1}</span>
                     <span style={{
                       fontSize: '0.78rem', fontWeight: 700, fontFamily: 'monospace',
-                      color: i === 0 ? '#60a5fa' : '#cbd5e1',
+                      color: i === 0 ? '#60a5fa' : 'var(--luxe-fg-muted)',
                     }}>
                       {fancyMove(bm.alg, true)}
                     </span>
@@ -1803,7 +1803,7 @@ export default function ChessEngine() {
               </div>
             )}
             {showBestMoves && bestMoves.length === 0 && (
-              <div style={{ fontSize: '0.7rem', color: '#475569', fontStyle: 'italic' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--luxe-fg-dim)', fontStyle: 'italic' }}>
                 {gameState.side === WHITE ? 'Click Show to analyze' : 'Wait for your turn'}
               </div>
             )}
@@ -1827,7 +1827,7 @@ export default function ChessEngine() {
             ) : isInCheck(gameState) ? (
               <span style={{ color: '#f87171' }}>Check!</span>
             ) : (
-              <span style={{ color: '#94a3b8' }}>
+              <span style={{ color: 'var(--luxe-fg-muted)' }}>
                 {gameState.side === WHITE ? 'Your turn (White)' : 'Black to move'}
               </span>
             )}
@@ -1841,7 +1841,7 @@ export default function ChessEngine() {
             maxHeight: '200px',
           }}>
             <h3 style={{
-              fontSize: '0.7rem', fontWeight: 700, color: '#64748b',
+              fontSize: '0.7rem', fontWeight: 700, color: 'var(--luxe-fg-dim)',
               textTransform: 'uppercase', letterSpacing: '0.08em',
               margin: '0 0 8px',
             }}>
@@ -1849,21 +1849,21 @@ export default function ChessEngine() {
             </h3>
             <div style={{
               maxHeight: '150px', overflowY: 'auto', fontSize: '0.75rem',
-              fontFamily: 'monospace', color: '#cbd5e1',
+              fontFamily: 'monospace', color: 'var(--luxe-fg-muted)',
               display: 'grid', gridTemplateColumns: 'auto 1fr 1fr', gap: '2px 6px',
               lineHeight: 1.7,
             }}>
               {Array.from({ length: Math.ceil(gameState.moveList.length / 2) }).map((_, i) => (
                 <React.Fragment key={i}>
-                  <span style={{ color: '#64748b' }}>{i + 1}.</span>
+                  <span style={{ color: 'var(--luxe-fg-dim)' }}>{i + 1}.</span>
                   <span style={{
-                    color: i * 2 === gameState.moveList.length - 1 ? '#60a5fa' : '#cbd5e1',
+                    color: i * 2 === gameState.moveList.length - 1 ? '#60a5fa' : 'var(--luxe-fg-muted)',
                     fontWeight: i * 2 === gameState.moveList.length - 1 ? 700 : 400,
                   }}>
                     {fancyMove(gameState.moveList[i * 2], true)}
                   </span>
                   <span style={{
-                    color: i * 2 + 1 === gameState.moveList.length - 1 ? '#60a5fa' : '#94a3b8',
+                    color: i * 2 + 1 === gameState.moveList.length - 1 ? '#60a5fa' : 'var(--luxe-fg-muted)',
                     fontWeight: i * 2 + 1 === gameState.moveList.length - 1 ? 700 : 400,
                   }}>
                     {fancyMove(gameState.moveList[i * 2 + 1], false)}
@@ -1872,7 +1872,7 @@ export default function ChessEngine() {
               ))}
             </div>
             {gameState.moveList.length === 0 && (
-              <div style={{ fontSize: '0.7rem', color: '#475569', fontStyle: 'italic' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--luxe-fg-dim)', fontStyle: 'italic' }}>
                 No moves yet
               </div>
             )}
@@ -1882,7 +1882,7 @@ export default function ChessEngine() {
 
       {/* Footer info */}
       <div style={{
-        fontSize: '0.65rem', color: '#475569', textAlign: 'center',
+        fontSize: '0.65rem', color: 'var(--luxe-fg-dim)', textAlign: 'center',
         lineHeight: 1.6,
       }}>
         <span>Inspired by </span>

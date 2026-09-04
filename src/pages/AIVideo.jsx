@@ -215,7 +215,7 @@ const thumbFromVideo = (videoUrl, opts = {}) => {
 
 const Tag = ({ children, tone = 'gray' }) => {
   const tones = {
-    gray: 'bg-gray-800 text-gray-400 border-gray-700',
+    gray: 'bg-[color:var(--luxe-surface-hi)] text-gray-400 border-gray-700',
     sky: 'bg-sky-900/40 text-sky-300 border-sky-700/60',
     emerald: 'bg-emerald-900/40 text-emerald-300 border-emerald-700/60',
   }
@@ -349,7 +349,7 @@ const Skeleton = ({ jobId, status, job, paused = false, onTogglePause }) => {
 
           {pct != null && (
             <>
-              <div className="w-full h-1.5 rounded-full bg-gray-800 overflow-hidden">
+              <div className="w-full h-1.5 rounded-full bg-[color:var(--luxe-surface-hi)] overflow-hidden">
                 <div className={`h-full ${barColor} transition-all duration-1000 ease-linear`}
                   style={{ width: `${pct}%` }} />
               </div>
@@ -1626,7 +1626,7 @@ const JobsTab = ({ refreshKey }) => {
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors ${
                 active
                   ? meta ? meta.chip : 'bg-cyan-600/20 text-cyan-300 border-cyan-500/40'
-                  : 'bg-gray-800/60 hover:bg-gray-800 text-gray-400 border-transparent hover:border-gray-700'
+                  : 'bg-[color:var(--luxe-surface-hi)]/60 hover:bg-[color:var(--luxe-surface-hi)] text-gray-400 border-transparent hover:border-gray-700'
               }`}>
               {meta && <span>{meta.icon}</span>}
               <span>{f.label}</span>
@@ -1685,12 +1685,12 @@ const JobsTab = ({ refreshKey }) => {
       {data.pages > 1 && (
         <div className="flex items-center justify-center gap-2 pt-2">
           <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-            className="px-3 py-1.5 text-xs rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed">
+            className="px-3 py-1.5 text-xs rounded-lg bg-[color:var(--luxe-surface-hi)] hover:bg-gray-700 text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed">
             <LeftOutlined />
           </button>
           <span className="text-xs text-gray-500 font-mono">{page} / {data.pages}</span>
           <button onClick={() => setPage(p => Math.min(data.pages, p + 1))} disabled={page === data.pages}
-            className="px-3 py-1.5 text-xs rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed">
+            className="px-3 py-1.5 text-xs rounded-lg bg-[color:var(--luxe-surface-hi)] hover:bg-gray-700 text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed">
             <RightOutlined />
           </button>
         </div>
@@ -1831,7 +1831,7 @@ const LibraryTab = ({ refreshKey }) => {
             <button key={f.v} onClick={() => setFilter(f.v)}
               className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${
                 filter === f.v ? 'bg-cyan-600/20 text-cyan-300 border border-cyan-500/40'
-                                : 'bg-gray-800 hover:bg-gray-700 text-gray-400 border border-transparent'
+                                : 'bg-[color:var(--luxe-surface-hi)] hover:bg-gray-700 text-gray-400 border border-transparent'
               }`}>
               {f.label}
             </button>
@@ -1876,8 +1876,8 @@ const LibraryTab = ({ refreshKey }) => {
             <div key={i} className="rounded-xl overflow-hidden border border-gray-800">
               <div className="aspect-[9/16] bg-gray-800/60 animate-pulse" />
               <div className="p-2.5 space-y-1.5 bg-gray-900/40">
-                <div className="h-3 w-full rounded bg-gray-800 animate-pulse" />
-                <div className="h-3 w-2/3 rounded bg-gray-800 animate-pulse" />
+                <div className="h-3 w-full rounded bg-[color:var(--luxe-surface-hi)] animate-pulse" />
+                <div className="h-3 w-2/3 rounded bg-[color:var(--luxe-surface-hi)] animate-pulse" />
               </div>
             </div>
           ))}

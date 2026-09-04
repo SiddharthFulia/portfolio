@@ -19,17 +19,17 @@ message.config({ top: 80, duration: 2.2, maxCount: 3 })
 
 const card = {
   borderRadius: 14,
-  background: 'rgba(13, 13, 20, 0.96)',
+  background: 'var(--luxe-surface)',
   backdropFilter: 'blur(14px)',
   WebkitBackdropFilter: 'blur(14px)',
-  border: '1px solid rgba(75, 85, 99, 0.45)',
-  color: '#e5e7eb',
+  border: '1px solid var(--luxe-border)',
+  color: 'var(--luxe-fg)',
   boxShadow: '0 18px 50px rgba(0, 0, 0, 0.6)',
   padding: 14,
 }
 
-const titleStyle = { color: '#fff', fontWeight: 800, fontSize: 13, letterSpacing: 0.1 }
-const descStyle  = { color: '#d1d5db', fontSize: 12, lineHeight: 1.5 }
+const titleStyle = { color: 'var(--luxe-fg)', fontWeight: 800, fontSize: 13, letterSpacing: 0.1 }
+const descStyle  = { color: 'var(--luxe-fg-muted)', fontSize: 12, lineHeight: 1.5 }
 const descErr    = { color: '#fecaca', fontSize: 12, lineHeight: 1.5 }
 
 const make = ({ title, desc, icon, accent, key, duration }) => ({
