@@ -506,4 +506,63 @@ body.theme-light .luxe-glass:hover {
   border-color: rgba(0, 0, 0, 0.14);
 }
 
+/* Bulk light-mode overrides for the hardcoded dark colors that pages
+   inline instead of going through --luxe-* tokens. Written as
+   attribute-safe selectors so Tailwind arbitrary values like
+   `bg-[#0a0a0e]` flip too. */
+body.theme-light .bg-\[\#0a0a0e\],
+body.theme-light .bg-\[\#07070b\],
+body.theme-light .bg-\[\#0f0f14\],
+body.theme-light .bg-\[#050507\],
+body.theme-light .bg-\[#11111a\],
+body.theme-light .bg-\[#141420\] {
+  background-color: #ffffff !important;
+}
+body.theme-light .bg-slate-950,
+body.theme-light .bg-gray-950,
+body.theme-light .bg-neutral-950,
+body.theme-light .bg-zinc-950 {
+  background-color: #ffffff !important;
+}
+body.theme-light .bg-slate-900,
+body.theme-light .bg-gray-900,
+body.theme-light .bg-neutral-900,
+body.theme-light .bg-zinc-900 {
+  background-color: #f8fafc !important;
+}
+body.theme-light .text-gray-100,
+body.theme-light .text-gray-200,
+body.theme-light .text-gray-300,
+body.theme-light .text-white {
+  color: #0f172a !important;
+}
+body.theme-light .text-gray-400,
+body.theme-light .text-gray-500 {
+  color: #475569 !important;
+}
+body.theme-light .text-fg-primary,
+body.theme-light .text-fg-secondary {
+  color: #0f172a !important;
+}
+body.theme-light .text-fg-muted {
+  color: #475569 !important;
+}
+body.theme-light .border-gray-800,
+body.theme-light .border-gray-900,
+body.theme-light .border-white\/10,
+body.theme-light .border-white\/20 {
+  border-color: #e2e8f0 !important;
+}
+/* Amber gradient text — needs a light-mode partner so it stays legible */
+body.theme-light .gradient-text-amber {
+  color: #b45309 !important;
+}
+body.theme-light .gradient-text-cyan {
+  color: #0e7490 !important;
+}
+/* SectionPill on Projects + friends */
+body.theme-light .eyebrow-mono {
+  color: #b45309 !important;
+}
+
 /* End of luxe.css */

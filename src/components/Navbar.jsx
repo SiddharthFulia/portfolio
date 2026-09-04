@@ -225,35 +225,40 @@ const Navbar = () => {
           {moreOpen && (
             <>
               <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" onClick={() => setMoreOpen(false)} />
+              {/* Full-width horizontal mega-menu — categories side-by-side
+                  so the whole surface is visible on one glance. */}
               <div
                 data-workshop-dropdown
-                className={`absolute top-full right-0 mt-2 rounded-2xl shadow-2xl border z-50 overflow-hidden
-                              w-[720px] max-w-[94vw]
+                className={`fixed top-[76px] left-1/2 -translate-x-1/2 mt-0 rounded-2xl shadow-2xl border z-50 overflow-hidden
+                              w-[min(1280px,96vw)]
                               ${isDark
-                                ? 'bg-[#0a0a0e] border-gray-800'
-                                : 'bg-white border-gray-200'}`}>
-                {/* Vault control — top of the dropdown so it's one click
-                    away from anywhere on the site. Shows current state. */}
+                                ? 'bg-[#0a0a0e]/95 backdrop-blur border-gray-800'
+                                : 'bg-white/95 backdrop-blur border-gray-200'}`}>
                 <VaultDropdownEntry isDark={isDark} onAction={() => setMoreOpen(false)} />
-                <div className="grid grid-cols-1 sm:grid-cols-2">
-                {moreGroups.map((g, gi) => (
-                  <div key={g.title} className={`p-4 ${gi === 0 ? 'sm:border-r' : ''} ${isDark ? 'sm:border-gray-800' : 'sm:border-gray-200'}`}>
-                    <p className={`text-[10px] uppercase tracking-[0.18em] font-bold mb-3 ${g.accent}`}>
-                      {g.title}
-                    </p>
-                    <ul className="space-y-1">
+                <div className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 divide-x ${isDark ? 'divide-gray-800' : 'divide-gray-200'}`}>
+                {moreGroups.map((g) => (
+                  <div key={g.title} className="p-4 min-w-0">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className={`text-[10px] uppercase tracking-[0.2em] font-bold ${g.accent}`}>
+                        {g.title}
+                      </p>
+                      <span className={`text-[9px] font-mono ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>
+                        {g.items.length}
+                      </span>
+                    </div>
+                    <ul className="space-y-0.5">
                       {g.items.map(it => (
                         <li key={it.to}>
                           <NavLink to={it.to} onClick={() => setMoreOpen(false)}
                             className={({ isActive }) =>
-                              `group flex flex-col px-3 py-2 rounded-lg transition-all ${
+                              `group flex flex-col px-2.5 py-1.5 rounded-md transition-all ${
                                 isActive
                                   ? (isDark ? 'bg-white/[0.06] ring-1 ring-amber-400/40' : 'bg-amber-50 ring-1 ring-amber-200')
                                   : (isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-gray-50')
                               }`}>
                             {({ isActive }) => (
                               <>
-                                <span className={`text-sm font-semibold transition-colors inline-flex items-center gap-1.5 ${
+                                <span className={`text-[13px] font-semibold transition-colors inline-flex items-center gap-1.5 truncate ${
                                   isActive
                                     ? (isDark ? 'text-white' : 'text-black')
                                     : (isDark ? 'text-gray-100 group-hover:text-white' : 'text-gray-900')
@@ -261,11 +266,11 @@ const Navbar = () => {
                                   {it.label}
                                   {it.vault && (
                                     <LockOutlined
-                                      className="text-[10px] text-fuchsia-400"
+                                      className="text-[9px] text-fuchsia-400 shrink-0"
                                       title="Vault password required" />
                                   )}
                                 </span>
-                                <span className={`text-[11px] mt-0.5 ${isDark ? 'text-gray-500 group-hover:text-gray-400' : 'text-gray-500'}`}>
+                                <span className={`text-[10px] leading-snug line-clamp-1 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
                                   {it.desc}
                                 </span>
                               </>
