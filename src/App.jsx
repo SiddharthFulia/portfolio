@@ -97,6 +97,9 @@ const VideoLibrary        = lazyWithReload(() => import("./pages/VideoLibrary"))
 const Realism             = lazyWithReload(() => import("./pages/Realism"));
 const RealismLibrary      = lazyWithReload(() => import("./pages/RealismLibrary"));
 const RealismJob          = lazyWithReload(() => import("./pages/RealismJob"));
+const SimpleGame          = lazyWithReload(() => import("./pages/SimpleGame"));
+
+import GlassFilter from './components/GlassFilter';
 
 /* ── Skeleton building blocks ──
  * The legacy hand-rolled pulse blocks (Light/Dark/Science/etc) are
@@ -256,6 +259,7 @@ const ROUTE_TITLES = {
   '/hand'          : 'Hand Tracking · Sid',
   '/runner'        : 'Hand Runner · Sid',
   '/game'          : 'Hand Runner · Sid',
+  '/simple-game'   : 'Simple Games · Sid',
   '/summarizer'    : 'Summarizer · Sid',
   '/yt-dl'         : 'YouTube DL · Sid',
   '/science'       : 'Explore Space · Sid',
@@ -311,6 +315,7 @@ const App = () => {
     }}>
     <VaultProvider>
     <VaultModal />
+    <GlassFilter />
     <main className='bg-slate-300/20'>
       <Router>
         <TitleManager />
@@ -357,6 +362,8 @@ const App = () => {
           {/* Hand-gesture endless runner — MediaPipe + Three.js */}
           <Route path='/runner'          element={<Suspense fallback={<PageLoader />}><Runner /></Suspense>} />
           <Route path='/game'            element={<Suspense fallback={<PageLoader />}><Runner /></Suspense>} />
+          <Route path='/simple-game'     element={<Suspense fallback={<PageLoader />}><SimpleGame /></Suspense>} />
+          <Route path='/simple-game/:id' element={<Suspense fallback={<PageLoader />}><SimpleGame /></Suspense>} />
           <Route path='/summarizer'      element={<Suspense fallback={<PageLoader />}><SummarizerPage /></Suspense>} />
           <Route path='/yt-dl'           element={<Suspense fallback={<PageLoader />}><YoutubeDl /></Suspense>} />
           <Route path='/youtube'         element={<Suspense fallback={<PageLoader />}><YoutubeDl /></Suspense>} />

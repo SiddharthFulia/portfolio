@@ -99,6 +99,42 @@
   border-radius: var(--luxe-radius);
 }
 
+/* ── Luxe-glass — refractive Apple/iOS-style surface ────────────── */
+/* Uses the <GlassFilter/> SVG mounted at the app root (id=luxe-glass-filter).
+   Combined with backdrop-blur + saturate this reads as actual glass, not
+   flat frosted plastic. `-webkit-` prefix keeps Safari happy. */
+.luxe-glass {
+  position: relative;
+  background: rgba(17, 17, 26, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--luxe-radius-lg);
+  backdrop-filter: url(#luxe-glass-filter) blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 12px 40px rgba(0, 0, 0, 0.32);
+  transition:
+    border-color var(--luxe-dur-base) var(--luxe-easing),
+    box-shadow   var(--luxe-dur-base) var(--luxe-easing);
+}
+.luxe-glass:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 16px 48px rgba(0, 0, 0, 0.4);
+}
+
+/* Softer variant — for chrome that sits on top of hero video / imagery
+   where full glass would over-distort. Same class, no displacement. */
+.luxe-glass-soft {
+  background: rgba(17, 17, 26, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--luxe-radius-lg);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
 /* Glow-on-hover border — no-op'd. */
 .glass-card-glow { position: relative; }
 .glass-card-glow::before { content: none; }
