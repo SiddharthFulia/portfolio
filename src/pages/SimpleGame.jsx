@@ -190,7 +190,7 @@ function Board({ state }) {
   const size = GRID * CELL
   return (
     <div className='luxe-glass p-4 flex items-center justify-center'>
-      <svg width={size} height={size} className='rounded-xl' style={{ background: '#050507' }}>
+      <svg width={size} height={size} className='rounded-xl' style={{ background: 'var(--luxe-bg-deep)' }}>
         {Array.from({ length: GRID }).map((_, x) =>
           Array.from({ length: GRID }).map((_, y) => (
             <circle key={`${x}-${y}`} cx={x * CELL + CELL / 2} cy={y * CELL + CELL / 2} r={0.9} fill='#1e293b' />
