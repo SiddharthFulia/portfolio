@@ -1,18 +1,53 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Segmented } from "antd";
 
 import { CTA } from "../components";
 import { projects } from "../constants";
 
-const projectCategory = (tag = '') => {
-  const first = String(tag).split(/\s*·\s*/)[0].trim();
-  if (/research|ieee|paper/i.test(first)) return 'Research';
-  if (/production|live/i.test(first))     return 'Production';
-  if (/ai|ml|rag|llm/i.test(first))        return 'AI · ML';
-  if (/full|engine/i.test(first))          return 'Full-Stack';
+const projectCategory = (tag = '', name = '') => {
+  const t = String(tag || '');
+  const n = String(name || '').toLowerCase();
+  if (/research|ieee|paper|accepted|published|top 3|techgium/i.test(t)) return 'Research';
+  if (/production|live/i.test(t))                                       return 'Production';
+  if (/ai · oss|\bai\b|\bml\b|\brag\b|\bllm\b|groq|realism/i.test(t) || /ai|ml|llm|groq|realism|prompt|whisper/i.test(n)) return 'AI · ML';
+  if (/full|engine|multiplayer|suite/i.test(t) || /chess|platform/.test(n)) return 'Full-Stack';
   return 'Utilities';
+};
+
+// One curated icon glyph per project — picked by name so no two share
+// the same face. Falls back to initials for anything unseen.
+const PROJECT_GLYPH = {
+  'CrickSpeakAI':                    '🏏',
+  'GrabPhisher':                     '🕵️',
+  'Quantum-Resistant Cryptography':  '🔐',
+  'IoT Soil Testing & Crop Recommender': '🌱',
+  'Passionfruit Platform':           '🍑',
+  'Chess Platform':                  '♞',
+  'LTTS Knowledge Graph':            '🕸️',
+  'realism-prompt-engine':           '📸',
+  'groq-llm-router':                 '⚡',
+  'comfyui-job-queue':               '🎨',
+  'whisper-diarize-transcribe':      '🎙️',
+  'rag-pdf-chat':                    '📄',
+  'sd-lora-toolkit':                 '🎛️',
+  'flux-inpaint-batch':              '✂️',
+  'video-frame-explainer':           '🎞️',
+  'youtube-shorts-repurposer':       '📹',
+  'og-image-forge':                  '🖼️',
+  'link-in-bio-min':                 '🔗',
+  'markdown-slideshow':              '📽️',
+  'notion-to-static-site':           '📓',
+  'timezone-mate':                   '🕒',
+  'invoice-pdf-min':                 '🧾',
+  'meta-tag-audit':                  '🏷️',
+  'a11y-color-picker':               '🎨',
+  'sitemap-diff':                    '🗺️',
+  'json-schema-cheatsheet':          '📚',
+  'csv-explorer-mini':               '📊',
+  'sql-formatter-lite':              '🧮',
+  'regex-explainer':                 '#️⃣',
+  'shortcut-cheatsheet':             '⌨️',
 };
 
 const ShareButtons = ({ url }) => {
@@ -141,13 +176,8 @@ const hashName = (s = '') => {
 };
 
 const PreviewPlaceholder = ({ label }) => {
-  const short = (label || '')
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map(w => w[0])
-    .join('')
-    .toUpperCase();
+  const glyph = PROJECT_GLYPH[label];
+  const short = (label || '').split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
   const gradient = GRADIENT_POOL[hashName(label) % GRADIENT_POOL.length];
 
   return (
@@ -155,9 +185,16 @@ const PreviewPlaceholder = ({ label }) => {
                      bg-gradient-to-br ${gradient}
                      border-b border-[var(--luxe-border)] relative overflow-hidden`}>
       <div aria-hidden className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/10 blur-3xl" />
-      <span className="relative font-poppins text-3xl sm:text-4xl font-bold text-white/90 tracking-wider select-none [text-shadow:0_2px_18px_rgba(0,0,0,0.4)]">
-        {short || '◆'}
-      </span>
+      <div aria-hidden className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full bg-black/20 blur-3xl" />
+      {glyph ? (
+        <span className="relative text-6xl sm:text-7xl select-none [filter:drop-shadow(0_4px_18px_rgba(0,0,0,0.4))]">
+          {glyph}
+        </span>
+      ) : (
+        <span className="relative font-poppins text-4xl sm:text-5xl font-black text-white/95 tracking-wider select-none [text-shadow:0_2px_18px_rgba(0,0,0,0.5)]">
+          {short || '◆'}
+        </span>
+      )}
     </div>
   );
 };
@@ -165,11 +202,18 @@ const PreviewPlaceholder = ({ label }) => {
 const Projects = () => {
   const totalCount = LIVE_PROJECTS.length + projects.length;
   const [cat, setCat] = useState('All');
+  // Precompute (category, project) pairs once so both the filter list and
+  // the visible grid derive from the same source. Prevents "reads correct
+  // count but shows wrong cards" style drift.
+  const catalog = useMemo(
+    () => projects.map(p => ({ ...p, __cat: projectCategory(p.tag, p.name) })),
+    [],
+  );
   const categories = useMemo(() => {
-    const set = new Set(projects.map(p => projectCategory(p.tag)));
+    const set = new Set(catalog.map(p => p.__cat));
     return ['All', ...Array.from(set)];
-  }, []);
-  const shown = cat === 'All' ? projects : projects.filter(p => projectCategory(p.tag) === cat);
+  }, [catalog]);
+  const shown = cat === 'All' ? catalog : catalog.filter(p => p.__cat === cat);
 
   return (
     <section className="relative min-h-screen bg-surface-base text-fg-primary pt-24 sm:pt-28 pb-24 px-4 sm:px-8 lg:px-12 overflow-hidden">
@@ -300,20 +344,31 @@ const Projects = () => {
             <span className="text-[10px] font-mono tracking-wider text-gray-600 tabular-nums">{shown.length} / {projects.length}</span>
           </motion.div>
 
-          <motion.div variants={fadeUp} className="sticky top-20 sm:top-24 z-20 -mx-4 sm:-mx-8 lg:-mx-12 px-4 sm:px-8 lg:px-12 py-3 bg-[var(--luxe-bg-base)]/85 backdrop-blur border-b border-[var(--luxe-border)]/60 mb-4 flex flex-wrap items-center gap-3">
-            <Segmented
-              value={cat}
-              onChange={setCat}
-              options={categories.map(c => ({ label: c, value: c }))}
-              size="middle"
-              className="!bg-transparent"
-            />
-            <span className="text-[11px] font-mono text-fg-muted tabular-nums">
-              {shown.length} of {projects.length}
+          <div className="sticky top-20 sm:top-24 z-20 -mx-4 sm:-mx-8 lg:-mx-12 px-4 sm:px-8 lg:px-12 py-3 bg-[var(--luxe-bg-base)]/85 backdrop-blur border-b border-[var(--luxe-border)]/60 mb-4 flex flex-wrap items-center gap-2">
+            {categories.map(c => {
+              const active = c === cat;
+              const count = c === 'All' ? catalog.length : catalog.filter(p => p.__cat === c).length;
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setCat(c)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                    active
+                      ? 'bg-amber-500 text-black'
+                      : 'bg-[color:var(--luxe-surface-hi)] text-fg-secondary hover:text-fg-primary border border-[color:var(--luxe-border)]'
+                  }`}>
+                  <span>{c}</span>
+                  <span className={`text-[10px] font-mono tabular-nums ${active ? 'text-black/70' : 'text-fg-muted'}`}>{count}</span>
+                </button>
+              );
+            })}
+            <span className="ml-auto text-[11px] font-mono text-fg-muted tabular-nums">
+              {shown.length} of {catalog.length}
             </span>
-          </motion.div>
+          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div key={cat} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {shown.map((project) => {
             const isChess = project.name === 'Chess Engine';
             const cardInner = (
