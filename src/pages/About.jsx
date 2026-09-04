@@ -174,7 +174,7 @@ const SKILL_GROUPS = [
 
 function SkillGroupCard({ group }) {
   return (
-    <motion.div variants={fadeUp} className="luxe-card luxe-card-hover p-5">
+    <motion.div variants={fadeUp} className="luxe-glass luxe-card-hover p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="luxe-eyebrow text-amber-300/80">{group.key}</p>
@@ -359,7 +359,7 @@ const About = () => {
                       className="absolute -left-5 top-5 w-3 h-3 rounded-full bg-[#0a0a0e] border-2"
                       style={{ borderColor: '#fbbf24' }}
                     />
-                    <div className="luxe-card luxe-card-hover p-5 sm:p-6">
+                    <div className="luxe-glass luxe-card-hover p-5 sm:p-6">
                       <div className="flex items-start justify-between gap-3 flex-wrap">
                         <a
                           href={exp.company_link}
@@ -428,7 +428,7 @@ const About = () => {
               return (
                 <motion.div key={pub.title} variants={fadeUp}>
                   <CardWrapper>
-                    <div className="luxe-card luxe-card-hover p-6">
+                    <div className="luxe-glass luxe-card-hover p-6">
                       <div className="flex items-start justify-between gap-4 flex-wrap">
                         <div>
                           <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md
@@ -477,7 +477,7 @@ const About = () => {
             initial="hidden" whileInView="show" variants={stagger} viewport={{ once: true }}>
             {achievements.map((ach) => (
               <motion.div key={ach.title} variants={fadeUp}>
-                <div className="luxe-card luxe-card-hover p-6 h-full flex flex-col gap-3">
+                <div className="luxe-glass luxe-card-hover p-6 h-full flex flex-col gap-3">
                   <div>
                     <h4 className="font-poppins font-semibold text-base text-white leading-snug">{ach.title}</h4>
                     <p className="mt-1 text-2xl font-poppins font-extrabold text-amber-300">{ach.rank}</p>
@@ -514,7 +514,7 @@ const About = () => {
             initial="hidden" whileInView="show" variants={stagger} viewport={{ once: true }}>
             {competitiveProgramming.map((cp) => (
               <motion.div key={cp.platform} variants={fadeUp}>
-                <div className="luxe-card luxe-card-hover overflow-hidden">
+                <div className="luxe-glass luxe-card-hover overflow-hidden">
                   {/* Header */}
                   <div className="p-5 flex items-center justify-between border-b border-white/[0.06]">
                     <div>

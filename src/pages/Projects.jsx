@@ -117,9 +117,30 @@ const SectionPill = ({ children, dotColor, tone = 'gray' }) => {
   );
 };
 
-// ── Small UI atom: preview placeholder (used when project has no image) ──
-const PreviewPlaceholder = ({ label, gradient }) => {
-  // Make a short label (initials or emoji) to render in the placeholder
+// Unique gradient per project — hash the name into one of 12 curated pairs
+// so no two projects share a look and re-orderings stay stable.
+const GRADIENT_POOL = [
+  'from-amber-500/40 via-orange-500/25 to-rose-500/30',
+  'from-cyan-500/40 via-sky-500/25 to-violet-500/30',
+  'from-fuchsia-500/40 via-pink-500/25 to-rose-500/30',
+  'from-emerald-500/40 via-teal-500/25 to-cyan-500/30',
+  'from-violet-500/40 via-fuchsia-500/25 to-pink-500/30',
+  'from-indigo-500/40 via-blue-500/25 to-sky-500/30',
+  'from-rose-500/40 via-red-500/25 to-orange-500/30',
+  'from-lime-500/40 via-green-500/25 to-emerald-500/30',
+  'from-yellow-500/40 via-amber-500/25 to-orange-500/30',
+  'from-teal-500/40 via-cyan-500/25 to-blue-500/30',
+  'from-purple-500/40 via-violet-500/25 to-indigo-500/30',
+  'from-pink-500/40 via-fuchsia-500/25 to-purple-500/30',
+];
+
+const hashName = (s = '') => {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+};
+
+const PreviewPlaceholder = ({ label }) => {
   const short = (label || '')
     .split(' ')
     .filter(Boolean)
@@ -127,14 +148,14 @@ const PreviewPlaceholder = ({ label, gradient }) => {
     .map(w => w[0])
     .join('')
     .toUpperCase();
+  const gradient = GRADIENT_POOL[hashName(label) % GRADIENT_POOL.length];
 
   return (
-    <div
-      className="w-full h-40 sm:h-full sm:min-h-[180px] flex items-center justify-center
-                  bg-amber-500/10
-                  border-l border-gray-800/60 relative overflow-hidden"
-    >
-      <span className="relative font-poppins text-3xl sm:text-4xl font-bold text-white/80 tracking-wider select-none">
+    <div className={`w-full h-40 sm:h-full sm:min-h-[180px] flex items-center justify-center
+                     bg-gradient-to-br ${gradient}
+                     border-l border-gray-800/60 relative overflow-hidden`}>
+      <div aria-hidden className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/10 blur-3xl" />
+      <span className="relative font-poppins text-3xl sm:text-4xl font-bold text-white/90 tracking-wider select-none [text-shadow:0_2px_18px_rgba(0,0,0,0.4)]">
         {short || '◆'}
       </span>
     </div>
@@ -355,20 +376,18 @@ const Projects = () => {
                   <ShareButtons url={project.link || window.location.href} />
                 </div>
 
-                {/* Right preview */}
-                <div className="w-full sm:w-72 shrink-0 order-first sm:order-last">
-                  {project.iconUrl ? (
-                    <div className="w-full h-40 sm:h-full sm:min-h-[180px] relative overflow-hidden
-                                    bg-amber-500/10
-                                    border-b sm:border-b-0 sm:border-l border-gray-800/60 flex items-center justify-center">
-                      <img
-                        src={project.iconUrl}
-                        alt={project.name}
-                        className="relative w-16 h-16 object-contain opacity-90"
-                      />
-                    </div>
-                  ) : (
-                    <PreviewPlaceholder label={project.name} />
+                {/* Right preview — always a unique gradient by name hash so
+                    no two projects visually collide even with the shared
+                    icon assets. Icon renders on top when present. */}
+                <div className="w-full sm:w-72 shrink-0 order-first sm:order-last relative">
+                  <PreviewPlaceholder label={project.name} />
+                  {project.iconUrl && (
+                    <img
+                      src={project.iconUrl}
+                      alt=""
+                      aria-hidden
+                      className="absolute inset-0 m-auto w-14 h-14 object-contain opacity-90 pointer-events-none [filter:drop-shadow(0_4px_16px_rgba(0,0,0,0.4))]"
+                    />
                   )}
                 </div>
               </div>
