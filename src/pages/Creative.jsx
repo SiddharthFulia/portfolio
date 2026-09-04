@@ -154,7 +154,7 @@ const Creative = () => {
               ['7', 'Visual Effects', 'text-pink-400'],
               ['100%', 'Browser-Native', 'text-yellow-400'],
             ].map(([n, l, c]) => (
-              <div key={l} className='luxe-card luxe-card-hover text-center px-5 py-3'>
+              <div key={l} className='luxe-glass luxe-card-hover text-center px-5 py-3'>
                 <div className={`text-3xl font-black tabular-nums ${c}`}>{n}</div>
                 <div className='text-xs text-gray-500 mt-0.5'>{l}</div>
               </div>
@@ -235,7 +235,7 @@ const Creative = () => {
         </div>
 
         {filteredDemos.length === 0 && (
-          <div className="text-center py-16 luxe-card mt-6 p-8">
+          <div className="text-center py-16 luxe-glass mt-6 p-8">
             <p className="text-gray-300 font-semibold mb-1">Nothing matches that filter yet</p>
             <p className="text-gray-500 text-sm mb-4">Try a different category.</p>
             <button

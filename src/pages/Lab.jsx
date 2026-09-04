@@ -303,7 +303,7 @@ const Lab = () => {
             return (
               <AnimatedCard key={s.id} effect={effectMap[s.id] || 'default'} onClick={() => handleClick(s.id)} className="h-full">
                 <div
-                  className="luxe-card luxe-card-hover relative group text-left p-4 transition-all duration-300"
+                  className="luxe-glass luxe-card-hover relative group text-left p-4 transition-all duration-300"
                   style={{ animationDelay: `${i * 60}ms` }}
                 >
                 {/* Active indicator bar */}
