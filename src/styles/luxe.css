@@ -517,4 +517,40 @@ body.theme-light main.bg-slate-300\/20 {
   background-color: var(--luxe-bg-deep);
 }
 
+/* Page-level dark backdrops (bg-gray-950 / bg-slate-950 / bg-[#0a0a0e]
+   / bg-black on min-h-screen containers) that pages inline — flip to
+   the cream base so light mode is coherent site-wide.
+   Scoped to min-h-screen so media letterboxes stay dark. */
+body.theme-light .min-h-screen.bg-gray-950,
+body.theme-light .min-h-screen.bg-slate-950,
+body.theme-light .min-h-screen.bg-neutral-950,
+body.theme-light .min-h-screen.bg-zinc-950,
+body.theme-light .min-h-screen.bg-black,
+body.theme-light .min-h-screen[class*="bg-[#0a0a0e]"],
+body.theme-light .min-h-screen[class*="bg-[#07070b]"],
+body.theme-light .min-h-screen[class*="bg-[#05050a]"] {
+  background-color: var(--luxe-bg-base);
+  color: var(--luxe-fg);
+}
+/* Section wrappers that use those same colors — same treatment. */
+body.theme-light section.bg-gray-950,
+body.theme-light section[class*="bg-[#07070b]"],
+body.theme-light section[class*="bg-[#0a0a0e]"] {
+  background-color: var(--luxe-bg-base);
+  color: var(--luxe-fg);
+}
+/* text-white on a light bg is invisible — flip to charcoal ON any
+   page-level container. */
+body.theme-light .min-h-screen.text-white,
+body.theme-light .min-h-screen.text-gray-100,
+body.theme-light .min-h-screen.text-gray-200 {
+  color: var(--luxe-fg);
+}
+/* Ant Design tab bar / modal text under light mode */
+body.theme-light .ant-tabs-tab,
+body.theme-light .ant-modal-content,
+body.theme-light .ant-modal-title {
+  color: var(--luxe-fg) !important;
+}
+
 /* End of luxe.css */

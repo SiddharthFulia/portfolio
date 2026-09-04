@@ -33,7 +33,7 @@ function FadeIn({ children, delay = 0, className = '' }) {
 }
 
 const Explore = () => (
-  <div className="min-h-screen bg-gray-950 text-white">
+  <div className="min-h-screen bg-gray-950 text-white text-fg-primary">
     <div className="relative max-w-6xl mx-auto px-6 pt-32 pb-8 overflow-hidden">
       {/* Ambient orbs behind hero */}
       <div aria-hidden className="ambient-orb -top-40 -left-32 opacity-70" />

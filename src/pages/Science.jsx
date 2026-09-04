@@ -203,7 +203,7 @@ const Science = () => {
   const filtered = filter === 'all' ? SECTIONS : SECTIONS.filter(s => s.cat === filter)
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="min-h-screen bg-gray-950 text-white text-fg-primary">
       {/* Hero */}
       <div className="relative max-w-6xl mx-auto px-6 pt-32 pb-6 overflow-hidden">
         {/* Ambient orbs — behind hero text, cool variant matches the science palette */}
