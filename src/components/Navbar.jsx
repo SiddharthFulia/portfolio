@@ -367,11 +367,21 @@ const Navbar = () => {
             </div>
           ))}
 
-          <a href="/resume.pdf" target="_blank" rel="noreferrer"
-            className="text-sm px-4 py-2.5 rounded-lg text-black font-semibold text-center
-                       bg-amber-400 hover:bg-amber-300 mt-3">
-            Resume
-          </a>
+          <div className="flex items-center gap-2 mt-3">
+            <a href="/resume.pdf" target="_blank" rel="noreferrer"
+              className="flex-1 text-sm px-4 py-2.5 rounded-lg text-black font-semibold text-center
+                         bg-amber-400 hover:bg-amber-300">
+              Resume
+            </a>
+            <button
+              onClick={toggleTheme}
+              aria-label='Toggle theme'
+              className={`w-11 h-11 rounded-lg flex items-center justify-center border ${
+                isDark ? 'border-gray-700 text-gray-300' : 'border-gray-200 text-gray-700'
+              }`}>
+              {theme === 'light' ? <BulbFilled /> : <BulbOutlined />}
+            </button>
+          </div>
           </motion.div>
         )}
       </AnimatePresence>

@@ -136,15 +136,15 @@ const Home = () => {
           {/* Primary trio — About / Projects / Contact. Promoted to
               full-bleed glow cards so they pull the eye on first
               paint. Bigger type, brighter rings, color-matched glow. */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 sm:gap-6 mt-14">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mt-10 sm:mt-14">
             {PRIMARY.map((card) => (
               <button
                 key={card.to}
                 onClick={() => navigate(card.to)}
-                className={`group relative overflow-hidden rounded-3xl p-7 sm:p-8 text-left ring-2 transition-all duration-300
+                className={`group relative overflow-hidden rounded-3xl p-5 sm:p-8 text-left ring-2 transition-all duration-300
                             bg-gradient-to-br ${card.gradient}
                             ${card.ring} ${card.glow}
-                            hover:-translate-y-1.5 min-h-[220px]`}
+                            hover:-translate-y-1.5 min-h-[160px] sm:min-h-[220px]`}
               >
                 {/* Soft white wash + sheen */}
                 <div className="absolute inset-0 bg-white/[0.04] group-hover:bg-white/[0.07] transition-colors" />
@@ -178,31 +178,31 @@ const Home = () => {
           </div>
 
           {/* Tools grid — every AI lane + engineered build + tool, grouped. */}
-          <div className="mt-16 space-y-12">
+          <div className="mt-14 sm:mt-16 space-y-8 sm:space-y-10">
             {GROUPS.map((g) => (
               <div key={g.title}>
-                <p className={`text-[11px] uppercase tracking-[0.22em] font-bold mb-4 ${g.accent}`}>
+                <p className={`text-[11px] uppercase tracking-[0.22em] font-bold mb-3 sm:mb-4 ${g.accent}`}>
                   {g.title}
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3">
                   {g.items.map((it) => (
                     <button
                       key={it.to}
                       onClick={() => navigate(it.to)}
-                      className="luxe-glass group text-left px-5 py-4 transition-all hover:-translate-y-0.5"
+                      className="luxe-glass group text-left px-3.5 py-3 sm:px-4 sm:py-3.5 transition-all hover:-translate-y-0.5"
                     >
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="text-[15px] font-semibold text-white group-hover:text-amber-200 transition-colors">
+                      <div className="flex items-center gap-1.5 mb-0.5 sm:mb-1">
+                        <h4 className="text-[13px] sm:text-[14px] font-semibold text-white group-hover:text-amber-200 transition-colors line-clamp-1">
                           {it.label}
                         </h4>
                         {it.vault && (
                           <LockOutlined
-                            className="text-[10px] text-fuchsia-400"
+                            className="text-[10px] text-fuchsia-400 shrink-0"
                             title="Vault password required"
                           />
                         )}
                       </div>
-                      <p className="text-[12px] text-gray-400 leading-relaxed">
+                      <p className="text-[11px] text-gray-400 leading-snug line-clamp-2">
                         {it.desc}
                       </p>
                     </button>
