@@ -197,7 +197,7 @@ export default function Cinema({ embedded = false, view = 'all', refreshKey = 0 
             <p className="eyebrow-mono">— AI Studio · Cinema</p>
             <div className="flex items-center gap-3 mt-2">
               <VideoCameraOutlined className="text-amber-400 text-2xl" />
-              <h1 className="text-4xl sm:text-5xl font-bold leading-tight text-white">
+              <h1 className="text-3xl sm:text-5xl font-bold leading-tight text-white">
                 Cinema
               </h1>
             </div>

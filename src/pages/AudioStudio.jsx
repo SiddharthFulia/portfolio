@@ -370,7 +370,7 @@ export default function AudioStudio() {
           <p className="eyebrow-mono">— AI Studio · Audio</p>
           <div className="flex items-center gap-3 mt-2">
             <CustomerServiceOutlined className="text-amber-400 text-2xl" />
-            <h1 className="text-4xl sm:text-5xl font-bold leading-tight text-white">
+            <h1 className="text-3xl sm:text-5xl font-bold leading-tight text-white">
               Audio Studio
             </h1>
           </div>

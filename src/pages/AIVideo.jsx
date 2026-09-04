@@ -1975,7 +1975,7 @@ const AIVideo = () => {
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       <div className="relative overflow-hidden">
-        <div className="relative max-w-6xl mx-auto px-5 sm:px-6 pt-28 sm:pt-32 pb-8">
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-24 sm:pt-32 pb-8">
           <div className="eyebrow-mono mb-3 inline-flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
             {activeKey === 'cinema' ? 'MULTI-SHOT ORCHESTRATOR · 5090 POWERED' : 'MULTI-PROVIDER · 5090 POWERED'}
@@ -1992,7 +1992,7 @@ const AIVideo = () => {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-5 sm:px-6 pb-24">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-24">
         <Tabs
           activeKey={activeKey}
           onChange={onTabChange}
