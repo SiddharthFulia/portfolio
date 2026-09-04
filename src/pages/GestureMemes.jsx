@@ -1,9 +1,9 @@
-// Ported from meowmeowcatcam/app.js (browser build). MediaPipe tasks-vision
-// on webcam frames → 11 hand + face gestures → cat meme swaps. Meme assets
-// live under /public/gesture-memes/.
+// Ported from meowmeowcatcam/app.js. MediaPipe tasks-vision from npm
+// (Vite bundles it); WASM/models pulled from Google CDN at runtime.
 import { useEffect, useRef, useState } from 'react'
+import { HandLandmarker, FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision'
 
-const CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14'
+const MEDIAPIPE_WASM = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm'
 const HAND_MODEL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task'
 const FACE_MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task'
 
@@ -79,8 +79,7 @@ export default function GestureMemes() {
   const start = async () => {
     setError(null)
     try {
-      const { HandLandmarker, FaceLandmarker, FilesetResolver } = await import(/* @vite-ignore */ `${CDN}/vision_bundle.mjs`)
-      const fileset = await FilesetResolver.forVisionTasks(`${CDN}/wasm`)
+      const fileset = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM)
       stateRef.current.handLM = await HandLandmarker.createFromOptions(fileset, {
         baseOptions: { modelAssetPath: HAND_MODEL, delegate: 'GPU' },
         runningMode: 'VIDEO', numHands: 2,
@@ -89,7 +88,10 @@ export default function GestureMemes() {
         baseOptions: { modelAssetPath: FACE_MODEL, delegate: 'GPU' },
         runningMode: 'VIDEO', numFaces: 1, outputFacialTransformationMatrixes: true,
       })
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false })
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false,
+      })
       videoRef.current.srcObject = stream
       await videoRef.current.play()
       setRunning(true)

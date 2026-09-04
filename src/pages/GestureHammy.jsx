@@ -2,8 +2,9 @@
 // + pose) on webcam frames -> 15 gestures -> hamster meme swaps. Assets
 // live under /public/gesture-hammy/.
 import { useEffect, useRef, useState } from 'react'
+import { HandLandmarker, FaceLandmarker, PoseLandmarker, FilesetResolver } from '@mediapipe/tasks-vision'
 
-const CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14'
+const MEDIAPIPE_WASM = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm'
 const HAND_MODEL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task'
 const FACE_MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task'
 const POSE_MODEL = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task'
@@ -286,9 +287,7 @@ export default function GestureHammy() {
     setError(null)
     setLoading(true)
     try {
-      const { HandLandmarker, FaceLandmarker, PoseLandmarker, FilesetResolver } =
-        await import(/* @vite-ignore */ `${CDN}/vision_bundle.mjs`)
-      const fileset = await FilesetResolver.forVisionTasks(`${CDN}/wasm`)
+      const fileset = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM)
       stateRef.current.handLM = await HandLandmarker.createFromOptions(fileset, {
         baseOptions: { modelAssetPath: HAND_MODEL, delegate: 'GPU' },
         runningMode: 'VIDEO', numHands: 2,
@@ -305,7 +304,10 @@ export default function GestureHammy() {
         runningMode: 'VIDEO', numPoses: 1,
         minPoseDetectionConfidence: 0.5, minTrackingConfidence: 0.5,
       })
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false })
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false,
+      })
       videoRef.current.srcObject = stream
       await videoRef.current.play()
       setLoading(false)
