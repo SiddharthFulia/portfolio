@@ -1096,6 +1096,9 @@ export async function adminQueueStats() { try { const data = await get(ENDPOINTS
 export async function adminWorkers() { try { const data = await get(ENDPOINTS.ADMIN_WORKERS, {}, { timeout: 10000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 export async function adminPurgeQueue(queue) { try { const data = await post(ENDPOINTS.ADMIN_PURGE_QUEUE, { queue }, { timeout: 15000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 export async function adminActivity(days = 14) { try { const data = await get(ENDPOINTS.ADMIN_ACTIVITY, { days }, { timeout: 20000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+// Keep-alive queue — fire one message manually + read consumer history.
+export async function adminKeepAliveTrigger() { try { const data = await post(ENDPOINTS.ADMIN_KEEP_ALIVE_TRIGGER, {}, { timeout: 10000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+export async function adminKeepAliveStatus()  { try { const data = await get(ENDPOINTS.ADMIN_KEEP_ALIVE_STATUS,  {}, { timeout: 10000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 
 // ─── Database Explorer (Settings → Database) ────────────────────
 // Schema introspection + paginated browse + read-only SQL + Groq Q&A.

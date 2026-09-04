@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Modal, InputNumber, Select, Tabs, Segmented } from 'antd'
 import { notice } from '../lib/notice'
-import { LockOutlined, ReloadOutlined, DatabaseOutlined, FolderOpenOutlined, CloudServerOutlined, ApiOutlined, ClusterOutlined, DashboardOutlined, BarChartOutlined, DeleteOutlined, CheckOutlined } from '@ant-design/icons'
+import { LockOutlined, ReloadOutlined, DatabaseOutlined, FolderOpenOutlined, CloudServerOutlined, ApiOutlined, ClusterOutlined, DashboardOutlined, BarChartOutlined, DeleteOutlined, CheckOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import {
   ResponsiveContainer, LineChart, Line, AreaChart, Area, BarChart, Bar, Cell,
   XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from 'recharts'
 import VaultGate from '../components/VaultGate'
 import DbExplorer from '../components/settings/DbExplorer'
+import KeepAliveTab from '../components/settings/KeepAliveTab'
 import {
   adminServerStats, adminDbStats, adminDiskStats, adminQueueStats, adminWorkers, adminPurgeQueue,
   adminActivity, adminMeshStats,
@@ -51,7 +52,7 @@ function SettingsInner() {
   // ?tab= mirrors the active Tabs key so refreshing or sharing the URL
   // preserves which pane the user was viewing. Defaults to 'overview',
   // which is omitted from the URL so /settings stays clean.
-  const [tab, setTab] = useQueryState('tab', 'overview', { allowed: ['overview', 'storage', 'visualize', 'database', 'cloudinary'] })
+  const [tab, setTab] = useQueryState('tab', 'overview', { allowed: ['overview', 'storage', 'visualize', 'database', 'cloudinary', 'keepalive'] })
   const [server, setServer] = useState(null)
   const [dbStats, setDbStats] = useState(null)
   const [diskStats, setDiskStats] = useState(null)
@@ -355,6 +356,11 @@ function SettingsInner() {
               key: 'cloudinary',
               label: <span className="text-sm inline-flex items-center gap-1.5"><CloudServerOutlined /> Cloudinary</span>,
               children: <CloudinaryTab />,
+            },
+            {
+              key: 'keepalive',
+              label: <span className="text-sm inline-flex items-center gap-1.5"><ThunderboltOutlined /> Keep-alive</span>,
+              children: <KeepAliveTab />,
             },
           ]}
         />

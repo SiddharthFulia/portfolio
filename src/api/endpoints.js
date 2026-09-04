@@ -109,6 +109,9 @@ export const ENDPOINTS = {
   ADMIN_DB_TABLE:       '/api/admin/db/tables',   // /:name appended at call site
   ADMIN_DB_QUERY:       '/api/admin/db/query',
   ADMIN_DB_ASK:         '/api/admin/db/ask',
+  // Keep-alive queue — Settings → Keep-alive tab
+  ADMIN_KEEP_ALIVE_TRIGGER: '/api/admin/keep-alive/trigger',
+  ADMIN_KEEP_ALIVE_STATUS:  '/api/admin/keep-alive/status',
   JOB_LOGS:             '/api/job-logs',   // /:lane/:jobId?since=<ms>&limit=80
   EXPORT:               '/api/export',     // POST { format, rows|content, title, filename }
 
