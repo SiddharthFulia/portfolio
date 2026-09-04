@@ -98,6 +98,8 @@ const Realism             = lazyWithReload(() => import("./pages/Realism"));
 const RealismLibrary      = lazyWithReload(() => import("./pages/RealismLibrary"));
 const RealismJob          = lazyWithReload(() => import("./pages/RealismJob"));
 const SimpleGame          = lazyWithReload(() => import("./pages/SimpleGame"));
+const GestureMemes        = lazyWithReload(() => import("./pages/GestureMemes"));
+const GestureHammy        = lazyWithReload(() => import("./pages/GestureHammy"));
 
 import GlassFilter from './components/GlassFilter';
 
@@ -260,6 +262,8 @@ const ROUTE_TITLES = {
   '/runner'        : 'Hand Runner · Sid',
   '/game'          : 'Hand Runner · Sid',
   '/simple-game'   : 'Simple Games · Sid',
+  '/gesture-memes' : 'Gesture Memes · Sid',
+  '/gesture-hammy' : 'Hammy Hamster · Sid',
   '/summarizer'    : 'Summarizer · Sid',
   '/yt-dl'         : 'YouTube DL · Sid',
   '/science'       : 'Explore Space · Sid',
@@ -364,6 +368,8 @@ const App = () => {
           <Route path='/game'            element={<Suspense fallback={<PageLoader />}><Runner /></Suspense>} />
           <Route path='/simple-game'     element={<Suspense fallback={<PageLoader />}><SimpleGame /></Suspense>} />
           <Route path='/simple-game/:id' element={<Suspense fallback={<PageLoader />}><SimpleGame /></Suspense>} />
+          <Route path='/gesture-memes'   element={<Suspense fallback={<PageLoader />}><GestureMemes /></Suspense>} />
+          <Route path='/gesture-hammy'   element={<Suspense fallback={<PageLoader />}><GestureHammy /></Suspense>} />
           <Route path='/summarizer'      element={<Suspense fallback={<PageLoader />}><SummarizerPage /></Suspense>} />
           <Route path='/yt-dl'           element={<Suspense fallback={<PageLoader />}><YoutubeDl /></Suspense>} />
           <Route path='/youtube'         element={<Suspense fallback={<PageLoader />}><YoutubeDl /></Suspense>} />

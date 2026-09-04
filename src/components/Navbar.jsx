@@ -107,15 +107,21 @@ const Navbar = () => {
       ],
     },
     {
-      // 'Engineered' replaces 'Play' — both items here are full ground-up
-      // builds (chess engine + 3D runner), not casual demos. Chess goes
-      // first because it's the deeper engineering build.
       title: 'Engineered',
       accent: 'text-cyan-300',
       items: [
         { to: '/chess',       label: 'Chess Engine',  desc: 'Stockfish · clocks · saved games · piece themes' },
-        { to: '/runner',      label: 'Hand Runner',   desc: 'Three.js · MediaPipe · ramps · oncoming trains' },
         { to: '/simple-game', label: 'Simple Games',  desc: 'Snake · code + live game · pause · step through' },
+      ],
+    },
+    {
+      title: 'Hand Gesture',
+      accent: 'text-fuchsia-300',
+      items: [
+        { to: '/runner',         label: 'Hand Runner',   desc: 'Three.js runner · lane by hand, jump by palm' },
+        { to: '/hand',           label: 'Hand Tracking', desc: '50 filters · 2-hand draw · cursor · laser' },
+        { to: '/gesture-memes',  label: 'Gesture Memes', desc: '11 gestures → cat memes · MediaPipe in-browser' },
+        { to: '/gesture-hammy',  label: 'Hammy Hamster', desc: '15 face + hand + pose gestures → hamster memes' },
       ],
     },
     {
@@ -128,7 +134,7 @@ const Navbar = () => {
         { to: '/science',    label: 'Explore Space',    desc: '11 NASA modules · APOD · Mars · Asteroids' },
         { to: '/explore',    label: 'Web Playground',   desc: '9 APIs · Pokémon · Memes · Countries · Quotes' },
         { to: '/summarizer', label: 'Summarizer',       desc: 'Paste long text · get a tight summary' },
-        { to: '/yt-dl',      label: 'YouTube DL',       desc: 'Paste a YouTube link · get MP3 or MP4 · 1hr+ works fine' },
+        { to: '/yt-dl',      label: 'YouTube DL',       desc: 'Paste a YouTube link · get MP3 or MP4' },
       ],
     },
     {

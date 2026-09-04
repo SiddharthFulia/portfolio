@@ -61,8 +61,17 @@ const GROUPS = [
     accent: "text-cyan-300",
     items: [
       { to: "/chess",       label: "Chess Engine",  desc: "Stockfish · clocks · saved games · piece themes" },
-      { to: "/runner",      label: "Hand Runner",   desc: "Three.js · MediaPipe · ramps · oncoming trains" },
       { to: "/simple-game", label: "Simple Games",  desc: "Snake · code + live game · step through algorithms" },
+    ],
+  },
+  {
+    title: "Hand Gesture",
+    accent: "text-fuchsia-300",
+    items: [
+      { to: "/runner",         label: "Hand Runner",   desc: "Three.js runner · lane by hand, jump by palm" },
+      { to: "/hand",           label: "Hand Tracking", desc: "50 filters · 2-hand draw · cursor · laser" },
+      { to: "/gesture-memes",  label: "Gesture Memes", desc: "11 gestures → cat memes · MediaPipe in-browser" },
+      { to: "/gesture-hammy",  label: "Hammy Hamster", desc: "15 face + hand + pose gestures → hamster memes" },
     ],
   },
   {
