@@ -1,6 +1,10 @@
 /* ── Science Hub – Shared Utilities ── */
-
-export const NASA_API_KEY = import.meta.env.VITE_NASA_API_KEY || 'DEMO_KEY';
+//
+// NOTE: Every NASA call goes through the BE proxy at /api/nasa/* — the
+// NASA API key lives in sid-be/.env, never in the browser bundle. Use the
+// helpers in src/api/nasa.js (fetchAPOD, fetchNeoWs, fetchEPIC, …) for
+// anything that needs the key. This file only exposes formatting +
+// styling helpers now.
 
 /* ── In-memory response cache (survives section close/reopen) ── */
 const _cache = new Map();
@@ -34,69 +38,6 @@ export function getRateLimitWaitSec() {
 
 export function getRateLimitRemaining() {
   return _rateLimitRemaining;
-}
-
-/**
- * Fetch with caching, rate-limit awareness, and abort support.
- */
-export async function fetchNASA(url, { signal, skipCache = false } = {}) {
-  if (!skipCache) {
-    const cached = getCached(url);
-    if (cached) return { data: cached, error: null, fromCache: true };
-  }
-
-  if (isRateLimited()) {
-    const wait = getRateLimitWaitSec();
-    return { data: null, error: `Rate limited — please wait ${wait}s before retrying.` };
-  }
-
-  try {
-    const res = await fetch(url, { signal });
-
-    // Track remaining requests from response headers
-    const rlRemaining = res.headers.get('X-RateLimit-Remaining');
-    if (rlRemaining !== null) _rateLimitRemaining = parseInt(rlRemaining, 10);
-
-    if (!res.ok) {
-      if (res.status === 429) {
-        _rateLimitHit = Date.now();
-        _rateLimitRemaining = 0;
-        return { data: null, error: 'Rate limit reached — waiting 10s before retrying.' };
-      }
-      if (res.status === 404) {
-        return { data: null, error: 'This API endpoint is currently unavailable (404). It may be temporarily down.' };
-      }
-      throw new Error(`API Error ${res.status}: ${res.statusText}`);
-    }
-
-    // Guard against HTML responses (some APIs return HTML on errors/redirects)
-    const contentType = res.headers.get('content-type') || '';
-    if (contentType.includes('text/html')) {
-      return { data: null, error: 'API returned an HTML page instead of data. The service may be temporarily down.' };
-    }
-
-    const text = await res.text();
-    try {
-      const data = JSON.parse(text);
-      setCache(url, data);
-      return { data, error: null };
-    } catch {
-      return { data: null, error: 'Invalid response from API. The service may be temporarily down.' };
-    }
-  } catch (err) {
-    if (err.name === 'AbortError') return { data: null, error: null };
-    return { data: null, error: err.message };
-  }
-}
-
-/** Build an API url with the key injected */
-export function nasaUrl(path, params = {}) {
-  const url = new URL(path);
-  url.searchParams.set('api_key', NASA_API_KEY);
-  Object.entries(params).forEach(([k, v]) => {
-    if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v);
-  });
-  return url.toString();
 }
 
 /** Format large numbers with commas */

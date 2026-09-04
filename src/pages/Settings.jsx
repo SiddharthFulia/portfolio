@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Modal, InputNumber, Select, Tabs, Segmented } from 'antd'
+import { Modal, InputNumber, Select, Tabs, Segmented, Input, Pagination } from 'antd'
 import { notice } from '../lib/notice'
 import { LockOutlined, ReloadOutlined, DatabaseOutlined, FolderOpenOutlined, CloudServerOutlined, ApiOutlined, ClusterOutlined, DashboardOutlined, BarChartOutlined, DeleteOutlined, CheckOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import {
@@ -57,6 +57,9 @@ function SettingsInner() {
   const [dbStats, setDbStats] = useState(null)
   const [diskStats, setDiskStats] = useState(null)
   const [queues, setQueues] = useState(null)
+  const [queuesPage, setQueuesPage] = useState(1)
+  const [queuesPageSize, setQueuesPageSize] = useState(20)
+  const [queuesQuery, setQueuesQuery] = useState('')
   const [workers, setWorkers] = useState(null)
   // Per-card loading flags so each card renders its own data the
   // moment its endpoint returns — no more waiting for the slowest call
@@ -159,7 +162,11 @@ function SettingsInner() {
     if (inFlightQueues.current) return
     inFlightQueues.current = true
     try {
-      const { data, error } = await adminQueueStats()
+      const { data, error } = await adminQueueStats({
+        page: queuesPage,
+        pageSize: queuesPageSize,
+        q: queuesQuery,
+      })
       if (data) setQueues(data)
       reconcile(data, error)
       setQueuesLoading(false)
@@ -332,7 +339,16 @@ function SettingsInner() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <ServerCard   data={server}  loading={serverLoading} />
                   <DatabaseCard data={dbStats} loading={dbLoading} />
-                  <QueuesCard   data={queues}  loading={queuesLoading} onPurge={confirmPurge} />
+                  <QueuesCard
+                    data={queues}
+                    loading={queuesLoading}
+                    onPurge={confirmPurge}
+                    page={queuesPage}
+                    pageSize={queuesPageSize}
+                    query={queuesQuery}
+                    onPageChange={(p, s) => { setQueuesPage(p); if (s !== queuesPageSize) setQueuesPageSize(s) }}
+                    onQueryChange={(v) => { setQueuesQuery(v); setQueuesPage(1) }}
+                  />
                   <WorkersCard  rows={workers} loading={workersLoading} />
                 </div>
               ),
@@ -993,7 +1009,11 @@ function DatabaseCard({ data, loading }) {
 }
 
 // ─── Queues card ──────────────────────────────────────────────
-function QueuesCard({ data, onPurge, loading }) {
+// Reads from GET /api/admin/queues which discovers every queue on the
+// broker via the CloudAMQP management API (no more hardcoded whitelist)
+// and paginates server-side. Supports a substring search too.
+function QueuesCard({ data, onPurge, loading, page, pageSize, query, onPageChange, onQueryChange }) {
+  const total = data?.total ?? (data?.queues?.length ?? 0)
   return (
     <Card icon={<ApiOutlined />} title="Queues (RabbitMQ)" accent="amber">
       {!data ? (loading ? <CardSkeleton rows={8} /> : <Empty />) : data.configured === false ? (
@@ -1001,7 +1021,24 @@ function QueuesCard({ data, onPurge, loading }) {
           RABBITMQ_URL not configured on this BE.
         </p>
       ) : (
-        <div>
+        <div className="space-y-3">
+          {/* Search + count row */}
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <Input.Search
+              size="small"
+              allowClear
+              placeholder="Filter queues…"
+              defaultValue={query}
+              onSearch={onQueryChange}
+              onChange={(e) => { if (!e.target.value) onQueryChange('') }}
+              className="!max-w-[200px]"
+            />
+            <span className="text-[10px] text-gray-500 font-mono tabular-nums">
+              {total.toLocaleString()} queue{total === 1 ? '' : 's'}
+              {data.error && <span className="ml-1 text-amber-400">· {data.error}</span>}
+            </span>
+          </div>
+
           <table className="w-full text-xs">
             <thead>
               <tr className="text-[10px] uppercase tracking-wider text-gray-500">
@@ -1042,6 +1079,19 @@ function QueuesCard({ data, onPurge, loading }) {
               )}
             </tbody>
           </table>
+
+          {total > pageSize && (
+            <Pagination
+              size="small"
+              current={page}
+              pageSize={pageSize}
+              total={total}
+              showSizeChanger
+              pageSizeOptions={['10', '20', '30', '50']}
+              onChange={onPageChange}
+              className="text-right"
+            />
+          )}
         </div>
       )}
     </Card>

@@ -1092,7 +1092,7 @@ export async function adminCloudinaryDelete({ publicIds, resourceType = 'video' 
     return { data: data?.data || data, error: null };
   } catch (err) { return { data: null, error: err.message }; }
 }
-export async function adminQueueStats() { try { const data = await get(ENDPOINTS.ADMIN_QUEUES, {}, { timeout: 20000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+export async function adminQueueStats({ page = 1, pageSize = 20, q = '', sort = 'messages' } = {}) { try { const data = await get(ENDPOINTS.ADMIN_QUEUES, { page, pageSize, q, sort }, { timeout: 20000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 export async function adminWorkers() { try { const data = await get(ENDPOINTS.ADMIN_WORKERS, {}, { timeout: 10000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 export async function adminPurgeQueue(queue) { try { const data = await post(ENDPOINTS.ADMIN_PURGE_QUEUE, { queue }, { timeout: 15000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 export async function adminActivity(days = 14) { try { const data = await get(ENDPOINTS.ADMIN_ACTIVITY, { days }, { timeout: 20000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
