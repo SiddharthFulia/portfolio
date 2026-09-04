@@ -103,7 +103,6 @@ const Navbar = () => {
         { to: '/edit/advanced',  label: 'Timeline Editor', desc: 'Multi-track · keyframes · color · effects' },
         { to: '/edit/library',   label: 'My Edits',        desc: 'Saved exported videos · library + bulk delete' },
         { to: '/realism',        label: 'Realism Lab',     desc: 'Sandbox · cinematic prompt + I2V pipeline' },
-        { to: '/hand',           label: 'Hand Tracking',   desc: '50 filters · 2-hand draw · cursor · laser' },
       ],
     },
     {

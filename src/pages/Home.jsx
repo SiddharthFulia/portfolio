@@ -53,7 +53,6 @@ const GROUPS = [
       { to: "/showreel",       label: "Showreel",           desc: "Cinematic chapter reel of the live AI stack" },
       { to: "/splat",          label: "Splat Viewer",       desc: "Walk through any Gaussian splat in the browser" },
       { to: "/room",           label: "Room Designer",      desc: "Video → analysis → furniture → MP4 · V1 UI" },
-      { to: "/hand",           label: "Hand Tracking",      desc: "50 filters · 2-hand draw · cursor · laser" },
     ],
   },
   {
