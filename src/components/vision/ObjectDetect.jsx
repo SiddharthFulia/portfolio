@@ -191,7 +191,7 @@ const ObjectDetect = () => {
               className="w-20 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-pink-500" />
             <span className="text-xs text-pink-400 font-mono">{Math.round(threshold * 100)}%</span>
           </div>
-          <div style={{ fontSize: 12, color: '#888', padding: '6px 10px', background: '#0d0d2b', borderRadius: 8, border: '1px solid #ffffff10' }}>
+          <div style={{ fontSize: 12, color: '#888', padding: '6px 10px', background: 'var(--luxe-surface)', borderRadius: 8, border: '1px solid #ffffff10' }}>
             <span style={{ color: '#e91e8c', fontWeight: 600 }}>{fps}</span> FPS
             <span style={{ color: '#555', marginLeft: 8 }}>{processMs}ms</span>
           </div>
@@ -205,7 +205,7 @@ const ObjectDetect = () => {
           ) : (
             <div className="space-y-2 max-h-80 overflow-y-auto">
               {predictions.map((p, i) => (
-                <div key={i} className="flex items-center gap-2 p-2 rounded-lg" style={{ background: '#0d0d2b' }}>
+                <div key={i} className="flex items-center gap-2 p-2 rounded-lg" style={{ background: 'var(--luxe-surface)' }}>
                   <span className="text-lg">{CLASS_EMOJIS[p.class] || '📦'}</span>
                   <span className="text-white text-sm capitalize flex-1">{p.class}</span>
                   <span className="text-xs font-mono" style={{ color: getColor(p.class) }}>{Math.round(p.score * 100)}%</span>

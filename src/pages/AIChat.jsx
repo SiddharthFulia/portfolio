@@ -351,7 +351,7 @@ const AIChat = () => {
       // Force the modal itself dark so all the light-on-dark text below
       // is readable. AntD's default white background eats white text.
       styles: {
-        content: { background: '#0a0a0e', border: '1px solid rgba(75, 85, 99, 0.5)', boxShadow: '0 20px 60px rgba(0, 0, 0, 0.6)' },
+        content: { background: 'var(--luxe-bg-base)', border: '1px solid var(--luxe-border)', boxShadow: '0 20px 60px rgba(0, 0, 0, 0.6)' },
         header:  { background: 'transparent', borderBottom: '1px solid rgba(55, 65, 81, 0.6)', paddingBottom: 12 },
         body:    { background: 'transparent', color: '#e5e7eb', paddingTop: 16 },
         footer:  { background: 'transparent', borderTop: '1px solid rgba(55, 65, 81, 0.6)', paddingTop: 12 },

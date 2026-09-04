@@ -47,7 +47,7 @@ function FeatureBar({ label, value, color }) {
         <span style={{ color: '#ccc' }}>{label}</span>
         <span style={{ color, fontWeight: 600 }}>{pct}%</span>
       </div>
-      <div style={{ height: 5, borderRadius: 3, background: '#1a1a3e', overflow: 'hidden' }}>
+      <div style={{ height: 5, borderRadius: 3, background: 'var(--luxe-surface-hi)', overflow: 'hidden' }}>
         <div style={{ height: '100%', width: `${pct}%`, background: `linear-gradient(90deg, ${color}66, ${color})`, borderRadius: 3, transition: 'width 0.3s ease' }} />
       </div>
     </div>
@@ -237,13 +237,13 @@ const FaceAI = () => {
     <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 24, maxWidth: 900, margin: '0 auto' }}>
       {/* Camera */}
       <div style={{ flex: '0 0 auto', width: '100%', maxWidth: 400 }}>
-        <div style={{ position: 'relative', width: '100%', paddingBottom: '133.33%', borderRadius: 16, overflow: 'hidden', background: '#0d0d2b', border: '1px solid #e91e8c33', boxShadow: '0 0 40px #e91e8c15' }}>
+        <div style={{ position: 'relative', width: '100%', paddingBottom: '133.33%', borderRadius: 16, overflow: 'hidden', background: 'var(--luxe-surface)', border: '1px solid #e91e8c33', boxShadow: '0 0 40px #e91e8c15' }}>
           <video ref={videoRef} autoPlay playsInline muted onLoadedMetadata={handleVideoReady}
             style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
           <canvas ref={canvasRef} style={{ display: 'none' }} />
           <canvas ref={overlayRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }} />
           {noFace && serviceOnline && (
-            <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', background: '#07071acc', padding: '8px 16px', borderRadius: 20, fontSize: 13, color: '#ffc107', whiteSpace: 'nowrap' }}>
+            <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', background: 'var(--luxe-bg-elevated)', padding: '8px 16px', borderRadius: 20, fontSize: 13, color: '#ffc107', whiteSpace: 'nowrap' }}>
               No face detected — look at the camera!
             </div>
           )}
@@ -266,7 +266,7 @@ const FaceAI = () => {
           <ToggleBtn active={showLandmarks} onClick={() => setShowLandmarks(l => !l)} label="Landmarks" />
           <ToggleBtn active={showBox} onClick={() => setShowBox(b => !b)} label="Box" />
           <ToggleBtn active={showAge} onClick={() => setShowAge(a => !a)} label="Age" />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#888', padding: '6px 10px', background: '#0d0d2b', borderRadius: 8, border: '1px solid #ffffff10' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#888', padding: '6px 10px', background: 'var(--luxe-surface)', borderRadius: 8, border: '1px solid #ffffff10' }}>
             <span style={{ color: '#b388ff', fontWeight: 600 }}>{fps}</span> FPS
           </div>
         </div>
@@ -279,7 +279,7 @@ const FaceAI = () => {
             <span style={{ fontSize: 36, fontWeight: 700, color: confColor, lineHeight: 1 }}>{confidence}%</span>
             <span style={{ fontSize: 12, color: '#888' }}>detection</span>
           </div>
-          <div style={{ height: 6, borderRadius: 3, background: '#1a1a3e', overflow: 'hidden' }}>
+          <div style={{ height: 6, borderRadius: 3, background: 'var(--luxe-surface-hi)', overflow: 'hidden' }}>
             <div style={{ height: '100%', width: `${confidence}%`, background: `linear-gradient(90deg, ${confColor}88, ${confColor})`, borderRadius: 3, transition: 'width 0.3s ease' }} />
           </div>
         </GlassCard>

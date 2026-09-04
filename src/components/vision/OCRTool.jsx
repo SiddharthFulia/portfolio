@@ -83,16 +83,16 @@ const OCRTool = () => {
             Capture & Scan
           </button>
           <button onClick={() => fileRef.current?.click()} disabled={loading}
-            style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #ffffff15', background: '#0d0d2b', color: '#888', fontSize: 12, cursor: 'pointer', opacity: loading ? 0.5 : 1 }}>
+            style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #ffffff15', background: 'var(--luxe-surface)', color: '#888', fontSize: 12, cursor: 'pointer', opacity: loading ? 0.5 : 1 }}>
             Upload Image
           </button>
           <input ref={fileRef} type="file" accept="image/*" onChange={handleUpload} style={{ display: 'none' }} />
           {image && <button onClick={() => { setImage(null); setText('') }}
-            style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #ffffff15', background: '#0d0d2b', color: '#666', fontSize: 12, cursor: 'pointer' }}>
+            style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #ffffff15', background: 'var(--luxe-surface)', color: '#666', fontSize: 12, cursor: 'pointer' }}>
             Clear
           </button>}
           <select value={lang} onChange={e => { setLang(e.target.value); workerRef.current?.terminate(); workerRef.current = null }}
-            style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #ffffff15', background: '#0d0d2b', color: '#888', fontSize: 12 }}>
+            style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #ffffff15', background: 'var(--luxe-surface)', color: '#888', fontSize: 12 }}>
             <option value="eng">English</option>
             <option value="hin">Hindi</option>
             <option value="jpn">Japanese</option>
@@ -112,7 +112,7 @@ const OCRTool = () => {
               <span style={{ color: '#888' }}>Processing...</span>
               <span style={{ color: '#ff9800', fontWeight: 600 }}>{progress}%</span>
             </div>
-            <div style={{ height: 6, borderRadius: 3, background: '#1a1a3e', overflow: 'hidden' }}>
+            <div style={{ height: 6, borderRadius: 3, background: 'var(--luxe-surface-hi)', overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${progress}%`, background: 'linear-gradient(90deg, #ff980066, #ff9800)', borderRadius: 3, transition: 'width 0.3s ease' }} />
             </div>
           </div>
@@ -127,7 +127,7 @@ const OCRTool = () => {
                 {copied ? 'Copied!' : 'Copy'}
               </button>
             </div>
-            <pre style={{ color: '#ddd', fontSize: 12, lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: 300, overflowY: 'auto', background: '#07071a', padding: 12, borderRadius: 8, fontFamily: 'monospace' }}>{text}</pre>
+            <pre style={{ color: '#ddd', fontSize: 12, lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: 300, overflowY: 'auto', background: 'var(--luxe-bg-elevated)', padding: 12, borderRadius: 8, fontFamily: 'monospace' }}>{text}</pre>
           </div>
         )}
 
