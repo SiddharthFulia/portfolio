@@ -236,7 +236,7 @@ const Contact = () => {
                     </span>
                   </a>
 
-                  <a href='https://wa.me/918877663311?text=Hi%20Siddharth!%20I%20found%20your%20portfolio%20and%20would%20love%20to%20connect.'
+                  <a href='https://wa.me/918104031595?text=Hi%20Siddharth!%20I%20found%20your%20portfolio%20and%20would%20love%20to%20connect.'
                     target='_blank' rel='noreferrer'
                     className='tap-44 h-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/[0.04] transition-colors group'>
                     <span className='w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-fg-secondary group-hover:text-accent-emerald transition-colors'>
@@ -247,12 +247,12 @@ const Contact = () => {
                     <span className='flex flex-col min-w-0'>
                       <span className='text-[10px] uppercase tracking-wider text-fg-muted'>WhatsApp</span>
                       <span className='text-sm text-fg-secondary group-hover:text-fg-primary transition-colors truncate'>
-                        +91 88776 63311
+                        +91 81040 31595
                       </span>
                     </span>
                   </a>
 
-                  <a href='tel:+918877663311'
+                  <a href='tel:+918104031595'
                     className='tap-44 h-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/[0.04] transition-colors group'>
                     <span className='w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-fg-secondary group-hover:text-accent-amber transition-colors'>
                       <svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'>
@@ -262,7 +262,7 @@ const Contact = () => {
                     <span className='flex flex-col min-w-0'>
                       <span className='text-[10px] uppercase tracking-wider text-fg-muted'>Phone</span>
                       <span className='text-sm text-fg-secondary group-hover:text-fg-primary transition-colors truncate'>
-                        +91 88776 63311
+                        +91 81040 31595
                       </span>
                     </span>
                   </a>
