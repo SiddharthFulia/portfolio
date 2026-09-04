@@ -151,9 +151,9 @@ const PreviewPlaceholder = ({ label }) => {
   const gradient = GRADIENT_POOL[hashName(label) % GRADIENT_POOL.length];
 
   return (
-    <div className={`w-full h-40 sm:h-full sm:min-h-[180px] flex items-center justify-center
+    <div className={`w-full h-full flex items-center justify-center
                      bg-gradient-to-br ${gradient}
-                     border-l border-gray-800/60 relative overflow-hidden`}>
+                     border-b border-[var(--luxe-border)] relative overflow-hidden`}>
       <div aria-hidden className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/10 blur-3xl" />
       <span className="relative font-poppins text-3xl sm:text-4xl font-bold text-white/90 tracking-wider select-none [text-shadow:0_2px_18px_rgba(0,0,0,0.4)]">
         {short || '◆'}
@@ -172,12 +172,11 @@ const Projects = () => {
   const shown = cat === 'All' ? projects : projects.filter(p => projectCategory(p.tag) === cat);
 
   return (
-    <section className="relative min-h-screen bg-surface-base text-fg-primary pt-28 sm:pt-32 pb-24 px-4 sm:px-6 overflow-hidden">
-      {/* ── Ambient hero glow — now uses the canonical `ambient-orb` helper. ── */}
+    <section className="relative min-h-screen bg-surface-base text-fg-primary pt-24 sm:pt-28 pb-24 px-4 sm:px-8 lg:px-12 overflow-hidden">
       <div aria-hidden className="ambient-orb absolute -top-24 left-1/2 -translate-x-1/2" />
       <div aria-hidden className="ambient-orb ambient-orb-cool absolute top-1/3 -right-20 w-[420px] h-[420px] opacity-80" />
 
-      <div className="relative max-w-5xl mx-auto">
+      <div className="relative max-w-[1600px] mx-auto">
 
         {/* ── Page header ── */}
         <motion.div initial="hidden" animate="show" variants={fadeUp}>
@@ -208,7 +207,7 @@ const Projects = () => {
 
           {LIVE_PROJECTS.map(proj => (
             <motion.div key={proj.title} variants={fadeUp}>
-              <div className="luxe-glass luxe-card-hover overflow-hidden flex flex-col sm:flex-row h-full">
+              <div className="luxe-glass luxe-card-hover overflow-hidden flex flex-col h-full">
                 {/* Left content */}
                 <div className="flex-1 p-5 sm:p-6">
                   <div className="flex items-center gap-2 flex-wrap mb-2">
@@ -301,21 +300,24 @@ const Projects = () => {
             <span className="text-[10px] font-mono tracking-wider text-gray-600 tabular-nums">{shown.length} / {projects.length}</span>
           </motion.div>
 
-          <motion.div variants={fadeUp} className="mb-4">
+          <motion.div variants={fadeUp} className="sticky top-20 sm:top-24 z-20 -mx-4 sm:-mx-8 lg:-mx-12 px-4 sm:px-8 lg:px-12 py-3 bg-[var(--luxe-bg-base)]/85 backdrop-blur border-b border-[var(--luxe-border)]/60 mb-4 flex flex-wrap items-center gap-3">
             <Segmented
               value={cat}
               onChange={setCat}
-              options={categories}
-              size="small"
+              options={categories.map(c => ({ label: c, value: c }))}
+              size="middle"
               className="!bg-transparent"
             />
+            <span className="text-[11px] font-mono text-fg-muted tabular-nums">
+              {shown.length} of {projects.length}
+            </span>
           </motion.div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {shown.map((project) => {
             const isChess = project.name === 'Chess Engine';
             const cardInner = (
-              <div className="luxe-glass luxe-card-hover overflow-hidden flex flex-col sm:flex-row h-full">
+              <div className="luxe-glass luxe-card-hover overflow-hidden flex flex-col h-full">
                 {/* Left content */}
                 <div className="flex-1 p-5 sm:p-6">
                   <div className="flex items-center gap-2 flex-wrap mb-2">
@@ -376,10 +378,9 @@ const Projects = () => {
                   <ShareButtons url={project.link || window.location.href} />
                 </div>
 
-                {/* Right preview — always a unique gradient by name hash so
-                    no two projects visually collide even with the shared
-                    icon assets. Icon renders on top when present. */}
-                <div className="w-full sm:w-72 shrink-0 order-first sm:order-last relative">
+                {/* Preview banner on top of card in bento layout — bigger,
+                    more visual, unique gradient per project. */}
+                <div className="w-full order-first relative h-32">
                   <PreviewPlaceholder label={project.name} />
                   {project.iconUrl && (
                     <img

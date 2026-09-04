@@ -480,89 +480,41 @@
 .border-line-strong  { border-color: var(--luxe-border-hi); }
 .hover\:border-line-strong:hover { border-color: var(--luxe-border-hi); }
 
-/* Light theme — activated by `<body class="theme-light">` (set by
-   useThemeStore in localStorage). Only remaps the tokens; every page
-   that uses --luxe-* automatically inverts without per-component edits. */
+/* Light theme — warm cream / charcoal, not stark white/black. Activated
+   by `<body class="theme-light">` via useTheme. Only remaps the luxe
+   tokens; individual pages that inline hardcoded hex colors need per-
+   page fixes and adopt --luxe-* over time. */
 body.theme-light {
-  --luxe-bg-deep:     #f6f7f9;
-  --luxe-bg-base:     #ffffff;
-  --luxe-bg-elevated: #f8fafc;
+  --luxe-bg-deep:     #f5f2ec;   /* warm cream */
+  --luxe-bg-base:     #faf7f2;
+  --luxe-bg-elevated: #ffffff;
   --luxe-surface:     #ffffff;
-  --luxe-surface-hi:  #f1f5f9;
-  --luxe-fg:          #0f172a;
-  --luxe-fg-muted:    #475569;
-  --luxe-fg-dim:      #94a3b8;
-  --luxe-border:      #e2e8f0;
-  --luxe-border-hi:   #cbd5e1;
+  --luxe-surface-hi:  #f8f4ec;
+  --luxe-fg:          #1c1917;   /* warm charcoal, not stark black */
+  --luxe-fg-muted:    #57534e;
+  --luxe-fg-dim:      #a8a29e;
+  --luxe-border:      #e7e2d9;
+  --luxe-border-hi:   #d6d3d1;
+  /* Amber stays the accent — same hue, higher contrast for light bg. */
+  --luxe-accent:      #d97706;
+  --luxe-accent-hi:   #b45309;
+  --luxe-accent-soft: #92400e;
+  --luxe-accent-on:   #ffffff;
 }
 body.theme-light .luxe-glass {
-  background: rgba(255, 255, 255, 0.55);
-  border-color: rgba(0, 0, 0, 0.08);
+  background: rgba(255, 253, 249, 0.6);
+  border-color: rgba(28, 25, 23, 0.08);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 12px 40px rgba(15, 23, 42, 0.08);
+    0 12px 40px rgba(28, 25, 23, 0.06);
 }
 body.theme-light .luxe-glass:hover {
-  border-color: rgba(0, 0, 0, 0.14);
+  border-color: rgba(28, 25, 23, 0.16);
 }
-
-/* Bulk light-mode overrides for the hardcoded dark colors that pages
-   inline instead of going through --luxe-* tokens. Written as
-   attribute-safe selectors so Tailwind arbitrary values like
-   `bg-[#0a0a0e]` flip too. */
-body.theme-light .bg-\[\#0a0a0e\],
-body.theme-light .bg-\[\#07070b\],
-body.theme-light .bg-\[\#0f0f14\],
-body.theme-light .bg-\[#050507\],
-body.theme-light .bg-\[#11111a\],
-body.theme-light .bg-\[#141420\] {
-  background-color: #ffffff !important;
-}
-body.theme-light .bg-slate-950,
-body.theme-light .bg-gray-950,
-body.theme-light .bg-neutral-950,
-body.theme-light .bg-zinc-950 {
-  background-color: #ffffff !important;
-}
-body.theme-light .bg-slate-900,
-body.theme-light .bg-gray-900,
-body.theme-light .bg-neutral-900,
-body.theme-light .bg-zinc-900 {
-  background-color: #f8fafc !important;
-}
-body.theme-light .text-gray-100,
-body.theme-light .text-gray-200,
-body.theme-light .text-gray-300,
-body.theme-light .text-white {
-  color: #0f172a !important;
-}
-body.theme-light .text-gray-400,
-body.theme-light .text-gray-500 {
-  color: #475569 !important;
-}
-body.theme-light .text-fg-primary,
-body.theme-light .text-fg-secondary {
-  color: #0f172a !important;
-}
-body.theme-light .text-fg-muted {
-  color: #475569 !important;
-}
-body.theme-light .border-gray-800,
-body.theme-light .border-gray-900,
-body.theme-light .border-white\/10,
-body.theme-light .border-white\/20 {
-  border-color: #e2e8f0 !important;
-}
-/* Amber gradient text — needs a light-mode partner so it stays legible */
-body.theme-light .gradient-text-amber {
-  color: #b45309 !important;
-}
-body.theme-light .gradient-text-cyan {
-  color: #0e7490 !important;
-}
-/* SectionPill on Projects + friends */
-body.theme-light .eyebrow-mono {
-  color: #b45309 !important;
+/* Root <main> uses bg-slate-300/20 which is subtly grey — replace with
+   the cream base so light mode has a coherent surface tone. */
+body.theme-light main.bg-slate-300\/20 {
+  background-color: var(--luxe-bg-deep);
 }
 
 /* End of luxe.css */
