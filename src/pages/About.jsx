@@ -219,7 +219,7 @@ const About = () => {
 
         {/* ── Flagship hero — recruiter dwell-time peaks here, so this is the keep-them-scrolling moment. ── */}
         <motion.div initial="hidden" animate="show" variants={fadeUp}>
-          <p className="eyebrow-mono">— About</p>
+          <p className="eyebrow-mono">About</p>
           <h1 className="gradient-text-amber luxe-section-title text-4xl sm:text-5xl md:text-6xl mt-3 leading-[1.05]">
             Engineer · creator · builder
           </h1>
@@ -314,7 +314,7 @@ const About = () => {
           <motion.div
             initial="hidden" whileInView="show" variants={stagger} viewport={{ once: true }}
           >
-            <p className="eyebrow-mono">— Skills</p>
+            <p className="eyebrow-mono">Skills</p>
             <h2 className="luxe-section-title text-2xl text-fg-primary mt-2">Tech stack</h2>
             <p className="text-fg-secondary leading-relaxed mt-2 max-w-2xl">
               Languages, frameworks, and tools I reach for to ship production systems.
@@ -331,7 +331,7 @@ const About = () => {
           <motion.div
             initial="hidden" whileInView="show" variants={stagger} viewport={{ once: true }}
           >
-            <p className="eyebrow-mono">— Experience</p>
+            <p className="eyebrow-mono">Experience</p>
             <h2 className="luxe-section-title text-2xl text-fg-primary mt-2">Where I've shipped</h2>
             <p className="text-fg-secondary leading-relaxed mt-2 max-w-2xl">
               Cutting-edge companies and research labs where I've shipped real impact.
@@ -391,7 +391,7 @@ const About = () => {
         {/* ── Tech Expertise ── */}
         <div className="mt-20">
           <motion.p className="eyebrow-mono" initial="hidden" whileInView="show"
-            variants={fadeUp} viewport={{ once: true }}>— What I build</motion.p>
+            variants={fadeUp} viewport={{ once: true }}>What I build</motion.p>
           <motion.h2 className="luxe-section-title text-3xl text-fg-primary mt-2" initial="hidden" whileInView="show"
             variants={fadeUp} viewport={{ once: true }}>Systems I've designed and shipped</motion.h2>
           <motion.p className="mt-3 max-w-2xl leading-relaxed text-fg-secondary" initial="hidden" whileInView="show"
@@ -409,7 +409,7 @@ const About = () => {
         {/* ── Research & Publications ── */}
         <div className="mt-20">
           <motion.p className="eyebrow-mono" initial="hidden" whileInView="show"
-            variants={fadeUp} viewport={{ once: true }}>— Research</motion.p>
+            variants={fadeUp} viewport={{ once: true }}>Research</motion.p>
           <motion.h2 className="luxe-section-title text-3xl text-fg-primary mt-2" initial="hidden" whileInView="show"
             variants={fadeUp} viewport={{ once: true }}>Publications</motion.h2>
           <motion.p className="mt-3 max-w-2xl leading-relaxed text-fg-secondary" initial="hidden" whileInView="show"
@@ -466,7 +466,7 @@ const About = () => {
         {/* ── Achievements ── */}
         <div className="mt-20">
           <motion.p className="eyebrow-mono" initial="hidden" whileInView="show"
-            variants={fadeUp} viewport={{ once: true }}>— Achievements</motion.p>
+            variants={fadeUp} viewport={{ once: true }}>Achievements</motion.p>
           <motion.h2 className="luxe-section-title text-3xl text-fg-primary mt-2" initial="hidden" whileInView="show"
             variants={fadeUp} viewport={{ once: true }}>Competitive wins</motion.h2>
           <motion.p className="mt-3 max-w-2xl leading-relaxed text-fg-secondary" initial="hidden" whileInView="show"
@@ -502,7 +502,7 @@ const About = () => {
         {/* ── Competitive Programming ── */}
         <div className="mt-20">
           <motion.p className="eyebrow-mono" initial="hidden" whileInView="show"
-            variants={fadeUp} viewport={{ once: true }}>— Competitive programming</motion.p>
+            variants={fadeUp} viewport={{ once: true }}>Competitive programming</motion.p>
           <motion.h2 className="luxe-section-title text-3xl text-fg-primary mt-2" initial="hidden" whileInView="show"
             variants={fadeUp} viewport={{ once: true }}>CodeChef · Codeforces</motion.h2>
           <motion.p className="mt-3 max-w-2xl leading-relaxed text-fg-secondary" initial="hidden" whileInView="show"

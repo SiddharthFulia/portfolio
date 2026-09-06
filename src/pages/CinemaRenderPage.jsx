@@ -158,7 +158,7 @@ export default function CinemaRenderPage() {
         </div>
 
         <header className="pb-2 border-b border-gray-800">
-          <p className="eyebrow-mono mb-2">— Cinema · live render</p>
+          <p className="eyebrow-mono mb-2">Cinema · live render</p>
           {(() => {
             const fullTitle = project?.masterPrompt || 'Untitled render'
             const isTruncated = fullTitle.length > 120
@@ -227,7 +227,7 @@ export default function CinemaRenderPage() {
             aria-expanded={unifiedLogsOpen}
             className="w-full flex items-center justify-between text-left">
             <div>
-              <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80">— Unified logs</p>
+              <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80">Unified logs</p>
               <p className="text-xs text-fg-muted mt-1">
                 Every log line across all {render.shotCount} shots + the combine step, ordered by time.
               </p>
@@ -323,7 +323,7 @@ function RenderSpecsModal({ open, onClose, project, render }) {
                      :                         'border-amber-500/30'
     return (
       <section className={`luxe-card p-3 border ${toneBorder}`}>
-        <p className={`text-[10px] font-mono uppercase tracking-[0.3em] ${toneText} mb-2`}>— {title}</p>
+        <p className={`text-[10px] font-mono uppercase tracking-[0.3em] ${toneText} mb-2`}>{title}</p>
         {children}
       </section>
     )

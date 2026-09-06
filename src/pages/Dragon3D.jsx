@@ -50,7 +50,7 @@ export default function Dragon3D() {
     <div className="min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 sm:pt-32 pb-20 px-4 sm:px-6">
       <div className="max-w-6xl mx-auto">
         <header className="text-center mb-6 sm:mb-10">
-          <p className="luxe-eyebrow text-cyan-300/80">— Interactive 3D</p>
+          <p className="luxe-eyebrow text-cyan-300/80">Interactive 3D</p>
           <h1 className="luxe-section-title text-4xl sm:text-5xl text-white mt-3">
             Generate a 3D scene
           </h1>

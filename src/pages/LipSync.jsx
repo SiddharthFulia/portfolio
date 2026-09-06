@@ -110,7 +110,7 @@ export default function LipSync() {
       <div aria-hidden className="ambient-orb -bottom-40 -right-32" />
       <div className="relative max-w-5xl mx-auto">
         <header className="mb-8">
-          <p className="eyebrow-mono">— AI Studio · Lip Sync</p>
+          <p className="eyebrow-mono">AI Studio · Lip Sync</p>
           <div className="flex items-center gap-3 mt-2">
             <SoundOutlined className="text-emerald-400 text-2xl" />
             <h1 className="text-4xl sm:text-5xl font-bold leading-tight text-white">

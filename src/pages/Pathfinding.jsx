@@ -26,11 +26,12 @@ import {
   PlayCircleFilled, PauseCircleFilled, ReloadOutlined,
   NodeIndexOutlined, ThunderboltFilled, EnvironmentFilled,
   AimOutlined, SwapOutlined, ExpandOutlined,
-  SearchOutlined, EyeOutlined, EyeInvisibleOutlined,
-  ExperimentOutlined,
+  EyeOutlined, EyeInvisibleOutlined,
+  ExperimentOutlined, ClearOutlined, HistoryOutlined,
 } from '@ant-design/icons'
 import { get as apiGet } from '../api/request'
 import { ENDPOINTS } from '../api/endpoints'
+import { notify } from '../utils/notify'
 
 // ─── Haversine — meters between two lat/lng ────────────────────
 function haversine(a, b) {
@@ -917,13 +918,23 @@ export default function Pathfinding() {
   const [sortKey, setSortKey] = useState('ms')
   const [sortDir, setSortDir] = useState('asc')
 
-  // Area search
-  const [placeQuery, setPlaceQuery] = useState('')
-  const [placeSuggestions, setPlaceSuggestions] = useState([])
-  const [placeTarget, setPlaceTarget] = useState('src')    // 'src' | 'dst'
-  const [showLabels, setShowLabels] = useState(false)
-  const [labels, setLabels] = useState([])                  // top-50 labels for overlay
-  const suggestDebounceRef = useRef(null)
+  // Google-Maps-style dual composer — one autocomplete per pin. Each has
+  // its own debounce timer, suggestion list, highlight cursor, and open
+  // state. Recent-selection lists are persisted per key in localStorage.
+  const [fromQuery, setFromQuery]           = useState('')
+  const [toQuery,   setToQuery]             = useState('')
+  const [fromSuggestions, setFromSuggestions] = useState([])
+  const [toSuggestions,   setToSuggestions]   = useState([])
+  const [fromOpen,  setFromOpen]            = useState(false)
+  const [toOpen,    setToOpen]              = useState(false)
+  const [fromHighlight, setFromHighlight]   = useState(0)
+  const [toHighlight,   setToHighlight]     = useState(0)
+  const [fromRecents, setFromRecents]       = useState([])
+  const [toRecents,   setToRecents]         = useState([])
+  const [showLabels, setShowLabels]         = useState(false)
+  const [labels, setLabels]                 = useState([])          // top-50 labels for overlay
+  const fromDebounceRef = useRef(null)
+  const toDebounceRef   = useRef(null)
 
   const graphRef        = useRef(null)
   const revAdjRef       = useRef(null)
@@ -1538,36 +1549,197 @@ export default function Pathfinding() {
     else { setSortKey(k); setSortDir('asc') }
   }
 
-  // ── Area search ──
-  const runPlaceQuery = useCallback((q) => {
-    if (suggestDebounceRef.current) clearTimeout(suggestDebounceRef.current)
-    suggestDebounceRef.current = setTimeout(async () => {
+  // ── Google-Maps-style dual autocomplete ──
+  // Per-input debounced query. When a city is picked we hit the per-city
+  // endpoint (Trie + trigram + substring, already ranked BE-side). When no
+  // city is picked we fall back to the cross-city endpoint that returns
+  // {city_slug, city_name} alongside the place so we can auto-switch.
+  const runPlaceQuery = useCallback((which, q) => {
+    const ref = which === 'from' ? fromDebounceRef : toDebounceRef
+    const setSug = which === 'from' ? setFromSuggestions : setToSuggestions
+    const setHi  = which === 'from' ? setFromHighlight  : setToHighlight
+    if (ref.current) clearTimeout(ref.current)
+    ref.current = setTimeout(async () => {
       try {
-        const res = await apiGet(`${ENDPOINTS.CITY_GRAPHS_PLACES}/${citySlug}/places`, { q, limit: 8 })
-        setPlaceSuggestions(res?.data?.items || [])
+        // Cross-city fallback vs per-city — driven by citySlug alone. The
+        // FE always has a city selected today (default = bangalore), but
+        // we keep the branch open so the "search all cities" mode can be
+        // toggled in without a rewrite.
+        const url = citySlug
+          ? `${ENDPOINTS.CITY_GRAPHS_PLACES}/${citySlug}/places`
+          : ENDPOINTS.CITY_GRAPHS_PLACES_ALL
+        const res = await apiGet(url, { q, limit: 8 })
+        setSug(res?.data?.items || [])
+        setHi(0)
       } catch (e) {
         console.warn('places lookup failed', e.message)
-        setPlaceSuggestions([])
+        setSug([])
       }
-    }, 300)
+    }, 200)
   }, [citySlug])
 
-  function onPlaceInput(v) {
-    setPlaceQuery(v)
-    if (!v || v.trim().length < 2) { setPlaceSuggestions([]); return }
-    runPlaceQuery(v.trim())
+  function onPlaceInput(which, v) {
+    if (which === 'from') { setFromQuery(v); setFromOpen(true) }
+    else                  { setToQuery(v);   setToOpen(true) }
+    if (!v || v.trim().length < 2) {
+      if (which === 'from') setFromSuggestions([])
+      else                  setToSuggestions([])
+      return
+    }
+    runPlaceQuery(which, v.trim())
   }
 
-  function onPickSuggestion(p) {
+  // Persist last 5 selections per input in localStorage. Keyed per city
+  // so switching to Mumbai doesn't surface Bangalore locality suggestions.
+  const recentsKey = (which) => `pathfinding.recents.${citySlug || 'all'}.${which}`
+
+  const loadRecents = useCallback((which) => {
+    try {
+      const raw = localStorage.getItem(recentsKey(which))
+      return raw ? JSON.parse(raw).slice(0, 5) : []
+    } catch { return [] }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [citySlug])
+
+  const persistRecent = (which, p) => {
+    try {
+      const key = recentsKey(which)
+      const prev = loadRecents(which).filter(r => r.name !== p.name || r.lat !== p.lat)
+      const next = [p, ...prev].slice(0, 5)
+      localStorage.setItem(key, JSON.stringify(next))
+      if (which === 'from') setFromRecents(next)
+      else                  setToRecents(next)
+    } catch { /* private mode etc. — silent */ }
+  }
+
+  // Hydrate the recents lists whenever the city changes.
+  useEffect(() => {
+    setFromRecents(loadRecents('from'))
+    setToRecents(loadRecents('to'))
+  }, [loadRecents])
+
+  // Assign a suggestion → nearest graph node → source or destination pin.
+  // If the suggestion carries a different `city_slug` (cross-city mode),
+  // auto-switch cities first and defer the pin assignment until the new
+  // graph is loaded.
+  function onPickSuggestion(which, p) {
+    // Auto-switch city if the suggestion belongs to a different metro.
+    if (p.city_slug && p.city_slug !== citySlug) {
+      const cityName = p.city_name || p.city_slug
+      pendingPickRef.current = { which, p }
+      notify.success(`Switched to ${cityName}`, { title: 'City auto-switch', key: 'city-auto-switch' })
+      onPickCity(p.city_slug)
+      // The pending pick fires from the effect below once the new graph
+      // is installed. Keep the input filled so the user sees what they
+      // picked; close the dropdown.
+      if (which === 'from') { setFromQuery(p.name); setFromOpen(false) }
+      else                  { setToQuery(p.name);   setToOpen(false) }
+      persistRecent(which, p)
+      return
+    }
     const g = graphRef.current
     if (!g) return
     const id = nearestNode(g.nodes, p.lat, p.lng)
     if (id == null) return
-    if (placeTarget === 'src') setSrc(id)
-    else setDst(id)
-    setPlaceQuery(p.name)
-    setPlaceSuggestions([])
+    if (which === 'from') { setSrc(id); setFromQuery(p.name); setFromOpen(false); setFromSuggestions([]) }
+    else                  { setDst(id); setToQuery(p.name);   setToOpen(false);   setToSuggestions([]) }
+    persistRecent(which, p)
   }
+
+  // Deferred pick — waits for the target city's graph to install, then
+  // resolves the nearest node in the new graph and drops the pin.
+  const pendingPickRef = useRef(null)
+  useEffect(() => {
+    if (status !== 'ready' || !pendingPickRef.current) return
+    const { which, p } = pendingPickRef.current
+    pendingPickRef.current = null
+    const g = graphRef.current
+    if (!g) return
+    const id = nearestNode(g.nodes, p.lat, p.lng)
+    if (id == null) return
+    if (which === 'from') setSrc(id)
+    else                  setDst(id)
+  }, [status, citySlug])
+
+  function swapFromTo() {
+    setFromQuery(toQuery); setToQuery(fromQuery)
+    const s = src, d = dst
+    setSrc(d); setDst(s)
+  }
+
+  // Keyboard: ↑/↓ on the highlighted composer.
+  function onComposerKeyDown(which, e) {
+    const sug = which === 'from' ? fromSuggestions : toSuggestions
+    const rec = which === 'from' ? fromRecents    : toRecents
+    const list = sug.length ? sug : rec
+    const hi   = which === 'from' ? fromHighlight  : toHighlight
+    const setHi = which === 'from' ? setFromHighlight : setToHighlight
+    const setOpen = which === 'from' ? setFromOpen : setToOpen
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setOpen(true)
+      if (list.length) setHi((hi + 1) % list.length)
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setOpen(true)
+      if (list.length) setHi((hi - 1 + list.length) % list.length)
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      if (list.length) onPickSuggestion(which, list[hi] || list[0])
+      else if (which === 'to' && src != null && dst != null) {
+        // Enter on To with both pins set → kick off Run.
+        setRunning(true)
+      }
+    } else if (e.key === 'Escape') {
+      setOpen(false)
+    } else if (e.key === 'Tab') {
+      // Tab cycles From ↔ To without jumping to browser chrome.
+      e.preventDefault()
+      const nextInput = which === 'from' ? 'to' : 'from'
+      const el = document.getElementById(`pf-composer-${nextInput}`)
+      if (el) el.focus()
+    }
+  }
+
+  // ── Clear paths ──
+  // Wipes every algorithm overlay from the canvas + clears the results
+  // table + resets the per-algo eye toggles. Keeps src/dst pins intact —
+  // clearing paths only. Also fires on the `C` keyboard shortcut.
+  const clearPaths = useCallback(() => {
+    pathRef.current = null
+    visitedSetRef.current = new Set()
+    visitedListRef.current = []
+    bidiSideRef.current = new Map()
+    setComparisonRows([])
+    setHidden({})
+    setTele({ visited: 0, ms: 0, pathKm: 0, pathN: 0, done: false, found: false })
+    setRunning(false)
+    // Rebuild the generator so the next Play starts clean without erasing
+    // the current start/end pins.
+    const g = graphRef.current
+    if (g && src != null && dst != null) {
+      genRef.current = makeGenerator(algo, g, revAdjRef.current, src, dst)
+    }
+    requestFrame()
+    notify.success('Paths cleared', { title: 'Cleared', key: 'pf-clear-paths' })
+  }, [algo, src, dst])
+
+  // Global keyboard shortcut: `C` fires clearPaths. Ignored while the
+  // user is typing in an input / textarea / contenteditable.
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = e.target?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      if (e.key === 'c' || e.key === 'C') {
+        e.preventDefault()
+        clearPaths()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [clearPaths])
 
   // Toggle labels on → fetch a top-50 label bundle (no query = "popular").
   useEffect(() => {
@@ -1617,7 +1789,7 @@ export default function Pathfinding() {
 
         {/* City picker */}
         <div className='luxe-glass p-3 mb-3'>
-          <p className='eyebrow-mono mb-2 text-amber-300/80 font-bold'>— City</p>
+          <p className='eyebrow-mono mb-2 text-amber-300/80 font-bold'>City</p>
           <div className='overflow-x-auto -mx-1 px-1'>
             <Segmented
               size='small'
@@ -1632,44 +1804,10 @@ export default function Pathfinding() {
           </p>
         </div>
 
-        {/* Area search */}
+        {/* Area search — Google-Maps-style dual composer */}
         <div className='luxe-glass p-3 mb-3'>
-          <p className='eyebrow-mono mb-2 text-fuchsia-300/80 font-bold'>— Area search</p>
-          <div className='flex flex-wrap items-center gap-2'>
-            <div className='flex-1 min-w-[220px] relative'>
-              <Input
-                allowClear
-                size='small'
-                placeholder='Search neighbourhood / area / landmark…'
-                prefix={<SearchOutlined />}
-                value={placeQuery}
-                onChange={(e) => onPlaceInput(e.target.value)}
-                disabled={status !== 'ready'}
-              />
-              {placeSuggestions.length > 0 && (
-                <div className='absolute z-20 left-0 right-0 top-full mt-1 max-h-72 overflow-y-auto rounded-md border border-line bg-[#0a0a0e]/95 backdrop-blur shadow-lg'>
-                  {placeSuggestions.map((p, i) => (
-                    <button
-                      key={`${p.name}-${i}`}
-                      type='button'
-                      onClick={() => onPickSuggestion(p)}
-                      className='w-full text-left px-3 py-1.5 text-xs hover:bg-white/5 flex items-center justify-between gap-2'>
-                      <span className='text-fg-primary truncate'>{p.name}</span>
-                      <span className='text-[10px] font-mono text-fg-muted uppercase'>{p.kind}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <Segmented
-              size='small'
-              value={placeTarget}
-              onChange={setPlaceTarget}
-              options={[
-                { label: <><EnvironmentFilled /> Start</>, value: 'src' },
-                { label: <><AimOutlined /> End</>, value: 'dst' },
-              ]}
-            />
+          <div className='flex items-center justify-between mb-2 gap-2 flex-wrap'>
+            <p className='eyebrow-mono text-fuchsia-300/80 font-bold'>Area search</p>
             <Button
               variant='subtle'
               size='small'
@@ -1679,8 +1817,77 @@ export default function Pathfinding() {
               {showLabels ? 'Hide labels' : 'Show labels'}
             </Button>
           </div>
+          {/* Stacked composer — From on top, To below, Swap on the right */}
+          <div className='flex flex-col sm:flex-row gap-2 items-stretch sm:items-start'>
+            <div className='flex-1 space-y-2 min-w-0'>
+              {/* From */}
+              <ComposerRow
+                id='pf-composer-from'
+                which='from'
+                iconDot='bg-emerald-400'
+                iconRing='ring-emerald-400/30'
+                placeholder='From: type a landmark, area or suburb'
+                value={fromQuery}
+                onChange={(v) => onPlaceInput('from', v)}
+                onFocus={() => setFromOpen(true)}
+                onBlur={() => setTimeout(() => setFromOpen(false), 120)}
+                onKeyDown={(e) => onComposerKeyDown('from', e)}
+                open={fromOpen}
+                suggestions={fromSuggestions}
+                recents={fromRecents}
+                highlight={fromHighlight}
+                setHighlight={setFromHighlight}
+                onPick={(p) => onPickSuggestion('from', p)}
+                query={fromQuery}
+                srcNodeLatLng={null}
+                disabled={status !== 'ready'}
+                helper='Type any landmark, area or suburb across our 10 metros.'
+              />
+              {/* To */}
+              <ComposerRow
+                id='pf-composer-to'
+                which='to'
+                iconDot='bg-rose-500'
+                iconRing='ring-rose-400/30'
+                placeholder='To: type a landmark, area or suburb'
+                value={toQuery}
+                onChange={(v) => onPlaceInput('to', v)}
+                onFocus={() => setToOpen(true)}
+                onBlur={() => setTimeout(() => setToOpen(false), 120)}
+                onKeyDown={(e) => onComposerKeyDown('to', e)}
+                open={toOpen}
+                suggestions={toSuggestions}
+                recents={toRecents}
+                highlight={toHighlight}
+                setHighlight={setToHighlight}
+                onPick={(p) => onPickSuggestion('to', p)}
+                query={toQuery}
+                srcNodeLatLng={
+                  src != null && graphRef.current?.nodes.get(src)
+                    ? graphRef.current.nodes.get(src)
+                    : null
+                }
+                disabled={status !== 'ready'}
+                helper='Type any landmark, area or suburb across our 10 metros.'
+              />
+            </div>
+            <Button
+              variant='secondary'
+              size='small'
+              icon={<SwapOutlined />}
+              onClick={swapFromTo}
+              disabled={status !== 'ready' || (src == null && dst == null)}
+              className='self-end sm:self-center shrink-0'
+              title='Swap From ↔ To'
+            >
+              Swap
+            </Button>
+          </div>
           <p className='text-[11px] text-fg-muted leading-snug mt-2'>
-            Type a suburb, park, or landmark. Suggestions snap to the nearest graph node when picked.
+            Enter on <span className='text-amber-300'>To</span> runs the search ·
+            <span className='text-amber-300'> ↑ / ↓</span> browse suggestions ·
+            <span className='text-amber-300'> Tab</span> jumps From ↔ To ·
+            <span className='text-amber-300'> C</span> clears paths.
           </p>
         </div>
 
@@ -1750,7 +1957,7 @@ export default function Pathfinding() {
           <div className='space-y-3'>
             {/* Run All */}
             <div className='luxe-glass p-3'>
-              <p className='eyebrow-mono mb-2 text-fuchsia-300/80 font-bold'>— Race the field</p>
+              <p className='eyebrow-mono mb-2 text-fuchsia-300/80 font-bold'>Race the field</p>
               <Button
                 variant='primary'
                 block
@@ -1768,7 +1975,7 @@ export default function Pathfinding() {
 
             {/* Algorithm picker */}
             <div className='luxe-glass p-3'>
-              <p className='eyebrow-mono mb-2 text-cyan-300/80 font-bold'>— Algorithm</p>
+              <p className='eyebrow-mono mb-2 text-cyan-300/80 font-bold'>Algorithm</p>
               <div className='flex flex-wrap gap-1'>
                 {ALGOS.map((a) => (
                   <button
@@ -1798,7 +2005,7 @@ export default function Pathfinding() {
 
             {/* Controls */}
             <div className='luxe-glass p-3 space-y-3'>
-              <p className='eyebrow-mono text-amber-300/80 font-bold'>— Controls</p>
+              <p className='eyebrow-mono text-amber-300/80 font-bold'>Controls</p>
               <div>
                 <div className='flex flex-wrap items-center gap-2'>
                   <Button
@@ -1820,6 +2027,16 @@ export default function Pathfinding() {
                     Reset
                   </Button>
                   <Button
+                    variant='ghost'
+                    size='small'
+                    icon={<ClearOutlined />}
+                    onClick={clearPaths}
+                    disabled={status !== 'ready'}
+                    title='Shortcut: C'
+                  >
+                    Clear paths
+                  </Button>
+                  <Button
                     variant='secondary'
                     size='small'
                     icon={<SwapOutlined />}
@@ -1838,7 +2055,7 @@ export default function Pathfinding() {
                   </Button>
                 </div>
                 <p className='text-[11px] text-fg-muted leading-snug mt-1'>
-                  Play/Pause animation. Reset clears state. Random picks a fresh start/end pair.
+                  Play/Pause animation. Reset clears state. Clear paths (or press <span className='text-amber-300'>C</span>) wipes overlays and the comparison table but keeps your pins. Random picks a fresh start/end pair.
                 </p>
               </div>
 
@@ -1873,7 +2090,7 @@ export default function Pathfinding() {
             <div className='luxe-glass p-3'>
               <div className='flex items-center gap-2 mb-2'>
                 <ThunderboltFilled className='text-amber-300' />
-                <p className='eyebrow-mono text-amber-300/80 font-bold'>— Live telemetry</p>
+                <p className='eyebrow-mono text-amber-300/80 font-bold'>Live telemetry</p>
               </div>
               <div className='grid grid-cols-2 gap-2 text-xs'>
                 <Metric label='Algorithm' value={info.name} color='text-amber-200' />
@@ -1910,7 +2127,7 @@ export default function Pathfinding() {
         {enrichedRows.length > 0 && (
           <div className='luxe-glass p-3 mt-4'>
             <div className='flex items-center justify-between mb-2 flex-wrap gap-2'>
-              <p className='eyebrow-mono text-fuchsia-300/80 font-bold'>— Comparison</p>
+              <p className='eyebrow-mono text-fuchsia-300/80 font-bold'>Comparison</p>
               <div className='text-[11px] text-fg-muted'>
                 Toggle any row's <EyeOutlined /> to hide/show its coloured path overlay on the map.
               </div>
@@ -1975,7 +2192,7 @@ export default function Pathfinding() {
         {/* City meta — below the canvas as spec'd. No endpoint strings. */}
         {cityMeta && (
           <div className='luxe-glass p-3 mt-4'>
-            <p className='eyebrow-mono mb-2 text-cyan-300/80 font-bold'>— Current city</p>
+            <p className='eyebrow-mono mb-2 text-cyan-300/80 font-bold'>Current city</p>
             <div className='grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs'>
               <Metric label='Name'        value={cityMeta.name} color='text-amber-200' />
               <Metric label='Nodes'       value={cityMeta.node_count?.toLocaleString?.() ?? '—'} color='text-white' />
@@ -2022,4 +2239,138 @@ function VerdictBadge({ v, timedOut }) {
   if (v === 'near-optimal') return <Tag color='gold' className='!m-0'>near-opt</Tag>
   if (v === 'suboptimal') return <Tag color='orange' className='!m-0'>suboptimal</Tag>
   return <Tag color='red' className='!m-0'>failed</Tag>
+}
+
+// ─── Autocomplete composer row ─────────────────────────────────
+// Google-Maps-style: labelled coloured dot, big text input, floating
+// suggestion dropdown, keyboard nav, recents fallback when empty +
+// focused. Suggestion rows show a kind-icon on the left, highlighted
+// name in the middle, kind + city small muted below, and a distance
+// chip on the right when a source pin is set.
+function ComposerRow({
+  id, which, iconDot, iconRing, placeholder, value, onChange, onFocus, onBlur,
+  onKeyDown, open, suggestions, recents, highlight, setHighlight,
+  onPick, query, srcNodeLatLng, disabled, helper,
+}) {
+  const showRecents = !value && open && recents.length > 0
+  const list = showRecents ? recents : suggestions
+  const showList = open && list.length > 0
+
+  return (
+    <div className='relative'>
+      <div className='relative'>
+        <span className={`absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full ${iconDot} ring-4 ${iconRing}`} />
+        <Input
+          id={id}
+          allowClear
+          size='middle'
+          placeholder={placeholder}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={onFocus}
+          onBlur={onBlur}
+          onKeyDown={onKeyDown}
+          disabled={disabled}
+          className='!pl-10 !text-sm'
+        />
+      </div>
+      {showList && (
+        <div className='absolute z-30 left-0 right-0 top-full mt-1 max-h-80 overflow-y-auto rounded-lg border border-line bg-[#0a0a0e]/95 backdrop-blur shadow-2xl'>
+          {showRecents && (
+            <div className='px-3 py-1.5 text-[10px] font-mono uppercase text-fg-muted border-b border-line/60 flex items-center gap-1.5'>
+              <HistoryOutlined /> Recent
+            </div>
+          )}
+          {list.map((p, i) => (
+            <SuggestionRow
+              key={`${which}-${p.name}-${i}`}
+              p={p}
+              q={query}
+              active={i === highlight}
+              onMouseEnter={() => setHighlight(i)}
+              onMouseDown={(e) => { e.preventDefault(); onPick(p) }}
+              srcNodeLatLng={srcNodeLatLng}
+            />
+          ))}
+        </div>
+      )}
+      {helper && <p className='text-[11px] text-fg-muted leading-snug mt-1'>{helper}</p>}
+    </div>
+  )
+}
+
+// Kind → emoji glyph. Kept as a plain lookup so unknown kinds fall
+// through to a neutral pin without runtime cost.
+const KIND_ICON = {
+  landmark:       '📍',
+  suburb:         '🏘️',
+  neighbourhood:  '🏙️',
+  quarter:        '🏙️',
+  square:         '⛲',
+  town:           '🏛️',
+  village:        '🏡',
+}
+function iconForKind(k) { return KIND_ICON[k] || '📌' }
+
+// Highlight the matched substring in a name using <mark>. Case-insensitive,
+// only the FIRST occurrence is bolded — multiple matches get noisy fast.
+function HighlightedName({ name, q }) {
+  const s = String(name || '')
+  const query = String(q || '').trim()
+  if (!query) return <>{s}</>
+  const idx = s.toLowerCase().indexOf(query.toLowerCase())
+  if (idx === -1) return <>{s}</>
+  const before = s.slice(0, idx)
+  const mid = s.slice(idx, idx + query.length)
+  const after = s.slice(idx + query.length)
+  return (
+    <>
+      {before}
+      <mark className='bg-amber-400/30 text-amber-100 rounded-sm px-0.5'>{mid}</mark>
+      {after}
+    </>
+  )
+}
+
+// Very approximate great-circle km — reused from the main file's helper
+// pattern; kept local so this component has no external dep.
+function kmBetween(a, b) {
+  const R = 6371
+  const toRad = (d) => (d * Math.PI) / 180
+  const dLat = toRad(b.lat - a.lat)
+  const dLng = toRad(b.lng - a.lng)
+  const la1 = toRad(a.lat), la2 = toRad(b.lat)
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2
+  return 2 * R * Math.asin(Math.sqrt(h))
+}
+
+function SuggestionRow({ p, q, active, onMouseEnter, onMouseDown, srcNodeLatLng }) {
+  const km = srcNodeLatLng ? kmBetween(srcNodeLatLng, { lat: p.lat, lng: p.lng }) : null
+  return (
+    <button
+      type='button'
+      onMouseEnter={onMouseEnter}
+      onMouseDown={onMouseDown}
+      className={`w-full text-left px-3 py-2 flex items-center gap-2 border-b border-line/40 last:border-b-0 transition ${
+        active ? 'bg-amber-400/10' : 'hover:bg-white/[0.04]'
+      }`}
+    >
+      <span className='text-base leading-none shrink-0 w-6 text-center'>{iconForKind(p.kind)}</span>
+      <span className='flex-1 min-w-0'>
+        <span className='block text-sm text-fg-primary truncate'>
+          <HighlightedName name={p.name} q={q} />
+        </span>
+        <span className='block text-[11px] text-fg-muted truncate'>
+          <span className='uppercase font-mono'>{p.kind || 'place'}</span>
+          {p.city_name && <span className='mx-1 text-fg-dim'>·</span>}
+          {p.city_name && <span>{p.city_name}</span>}
+        </span>
+      </span>
+      {km != null && (
+        <span className='text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-fg-muted shrink-0'>
+          {km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`}
+        </span>
+      )}
+    </button>
+  )
 }

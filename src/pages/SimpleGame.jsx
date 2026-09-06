@@ -89,7 +89,7 @@ export default function SimpleGame() {
     <div className='min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 sm:pt-28 pb-16 px-3 sm:px-6' style={{ fontVariantNumeric: 'tabular-nums' }}>
       <div className='max-w-6xl mx-auto'>
         <header className='mb-6'>
-          <p className='eyebrow-mono mb-2 text-amber-300/80'>— Simple Games</p>
+          <p className='eyebrow-mono mb-2 text-amber-300/80'>Simple Games</p>
           <h1 className='text-3xl sm:text-4xl font-bold gradient-text-amber leading-tight'>
             Code + game, side by side
           </h1>
@@ -303,7 +303,7 @@ function Explainer({ activeLine }) {
   return (
     <div className='luxe-glass p-2'>
       <div className='px-3 py-2 border-b border-white/10'>
-        <p className='eyebrow-mono text-amber-300/80'>— How each line works</p>
+        <p className='eyebrow-mono text-amber-300/80'>How each line works</p>
       </div>
       <Collapse
         items={items}

@@ -194,7 +194,7 @@ export default function Cinema({ embedded = false, view = 'all', refreshKey = 0 
     <div className={embedded ? '' : 'max-w-5xl mx-auto'}>
         {!embedded && (
           <header className="mb-8">
-            <p className="eyebrow-mono">— AI Studio · Cinema</p>
+            <p className="eyebrow-mono">AI Studio · Cinema</p>
             <div className="flex items-center gap-3 mt-2">
               <VideoCameraOutlined className="text-amber-400 text-2xl" />
               <h1 className="text-3xl sm:text-5xl font-bold leading-tight text-white">
@@ -667,7 +667,7 @@ function PlannedShotsPanel({ project, navigate }) {
     <section className="luxe-card p-5 sm:p-6 mb-6 border-amber-500/30">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
-          <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80">— Planned shots</p>
+          <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80">Planned shots</p>
           <h3 className="mt-1 text-lg font-bold text-fg-primary tabular-nums">
             {project.shotPrompts.length} shots · {project.durationPerShot || 5}s each · {project.aspectRatio || '16:9'} · {project.resolution || '720p'}
           </h3>
@@ -1708,7 +1708,7 @@ function ActiveRendersPanel({ refreshKey, onChanged }) {
     <div className="luxe-card p-4 mb-3 border-amber-500/30">
       <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
         <div>
-          <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80">— Manage Cinema · {rows.length} active</p>
+          <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80">Manage Cinema · {rows.length} active</p>
           <p className="text-[11px] text-fg-muted mt-0.5">
             In-flight + failed renders. Cancel stops the chain (GPU finishes current shot, no new ones queued). Purge deletes the render row.
           </p>
@@ -1794,7 +1794,7 @@ function CinemaDiskStatsBanner({ refreshKey }) {
   return (
     <div className="luxe-card p-3 mb-3 flex flex-wrap items-center justify-between gap-3">
       <div>
-        <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80">— Cinema disk usage</p>
+        <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80">Cinema disk usage</p>
         <p className="text-sm text-white mt-1 tabular-nums">
           <span className="font-mono text-amber-200">{total.count.toLocaleString()}</span> rendered combine{total.count === 1 ? '' : 's'} ·{' '}
           <span className="font-mono text-amber-200">{fmt(total.bytes)}</span> on disk

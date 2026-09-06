@@ -205,7 +205,7 @@ export default function GestureMemes() {
     <div className='min-h-screen bg-[var(--luxe-bg-base)] text-fg-primary pt-24 sm:pt-28 pb-16 px-3 sm:px-6'>
       <div className='max-w-6xl mx-auto'>
         <header className='mb-6'>
-          <p className='eyebrow-mono mb-2 text-amber-300/80'>— Hand Gesture · MediaPipe</p>
+          <p className='eyebrow-mono mb-2 text-amber-300/80'>Hand Gesture · MediaPipe</p>
           <h1 className='text-3xl sm:text-4xl font-bold gradient-text-amber leading-tight'>Gesture Memes</h1>
           <p className='text-sm text-fg-muted mt-1 max-w-2xl'>
             Point your camera at yourself. Make one of 11 gestures below and the matching cat meme swaps in live.
@@ -249,7 +249,7 @@ export default function GestureMemes() {
         </div>
 
         <div className='mt-6 luxe-glass p-4'>
-          <p className='eyebrow-mono mb-3 text-amber-300/80'>— How to trigger each meme</p>
+          <p className='eyebrow-mono mb-3 text-amber-300/80'>How to trigger each meme</p>
           <ul className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1.5 text-xs'>
             <li><b className='text-amber-200'>Fist</b> — all four fingers curled</li>
             <li><b className='text-amber-200'>Rockstar</b> — thumb + pinky out, others curled</li>

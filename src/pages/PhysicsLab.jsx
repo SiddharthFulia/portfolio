@@ -799,7 +799,7 @@ export default function PhysicsLab() {
           </div>
           <div className='luxe-glass p-3 flex flex-col' style={{ height: 'min(60vh, 520px)' }}>
             <div className='flex items-center justify-between mb-2'>
-              <p className='eyebrow-mono text-amber-300/80 font-bold'>— θ(t) · angles over time</p>
+              <p className='eyebrow-mono text-amber-300/80 font-bold'>θ(t) · angles over time</p>
               <div className='flex items-center gap-3 text-[10px] font-mono'>
                 <span className='flex items-center gap-1'><span className='w-2.5 h-2.5 rounded-full bg-rose-400' /> <Sym tex='\theta_1' help={HELP.theta1} /></span>
                 <span className='flex items-center gap-1'><span className='w-2.5 h-2.5 rounded-full bg-cyan-400' /> <Sym tex='\theta_2' help={HELP.theta2} /></span>
@@ -815,7 +815,7 @@ export default function PhysicsLab() {
         <div className='luxe-glass p-4 mb-4'>
           <div className='flex items-center gap-2 mb-3'>
             <ThunderboltFilled className='text-amber-300' />
-            <p className='eyebrow-mono text-amber-300/80 font-bold'>— Live telemetry (pendulum 1)</p>
+            <p className='eyebrow-mono text-amber-300/80 font-bold'>Live telemetry (pendulum 1)</p>
           </div>
           <div className='grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 text-xs'>
             <Metric tex='\theta_1'  unit='°'     value={(telemetry.t1 / DEG).toFixed(1)} color='text-rose-300'    help={HELP.theta1} />
@@ -868,7 +868,7 @@ export default function PhysicsLab() {
         <div className='luxe-glass p-4 mb-4'>
           <div className='flex items-center gap-2 mb-3 flex-wrap'>
             <CloudServerOutlined className='text-cyan-300' />
-            <p className='eyebrow-mono text-cyan-300/80 font-bold'>— Compute on server</p>
+            <p className='eyebrow-mono text-cyan-300/80 font-bold'>Compute on server</p>
             <div className='ml-auto flex flex-col items-end gap-1'>
               <div className='flex items-center gap-2 flex-wrap'>
                 <Segmented
@@ -965,7 +965,7 @@ export default function PhysicsLab() {
         {/* ── Row 7 · Equations (KaTeX) ── */}
         <div className='grid grid-cols-1 lg:grid-cols-2 gap-4'>
           <div className='luxe-glass p-4'>
-            <p className='eyebrow-mono mb-3 text-cyan-300/80 font-bold'>— Kinetic + Potential Energy</p>
+            <p className='eyebrow-mono mb-3 text-cyan-300/80 font-bold'>Kinetic + Potential Energy</p>
             <div className='space-y-4 text-sm leading-relaxed'>
               <div>
                 <div className='text-fg-muted mb-1 flex items-center gap-2'>
@@ -986,7 +986,7 @@ export default function PhysicsLab() {
           </div>
 
           <div className='luxe-glass p-4'>
-            <p className='eyebrow-mono mb-3 text-emerald-300/80 font-bold'>— Euler–Lagrange EOM</p>
+            <p className='eyebrow-mono mb-3 text-emerald-300/80 font-bold'>Euler–Lagrange EOM</p>
             <div className='space-y-4 text-sm leading-relaxed'>
               <div>
                 <div className='text-fg-muted mb-1'><Sym tex='\ddot{\theta}_1' help={HELP.a1} /> =</div>
@@ -1123,7 +1123,7 @@ function KinematicDiagram({ L1, L2, m1, m2, t1, t2 }) {
   const y2 = y1 + scale * L2 * Math.cos(t2)
   return (
     <div className='luxe-glass p-3 flex flex-col min-h-[320px]'>
-      <p className='eyebrow-mono mb-2 text-fuchsia-300/80 font-bold'>— Kinematic diagram</p>
+      <p className='eyebrow-mono mb-2 text-fuchsia-300/80 font-bold'>Kinematic diagram</p>
       <div className='flex-1 flex items-center justify-center min-h-[280px]'>
         <svg
           viewBox={`0 0 ${W} ${H}`}

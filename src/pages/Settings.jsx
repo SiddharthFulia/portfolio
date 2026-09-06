@@ -1305,7 +1305,7 @@ function CloudinaryTab() {
       <div className="luxe-card p-4">
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <div>
-            <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80">— Cloudinary free tier</p>
+            <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80">Cloudinary free tier</p>
             <p className="text-[11px] text-fg-muted mt-0.5">
               {usage?.cached ? `cached ${usage.cacheAgeSec}s ago` : 'live'} · plan {usage?.plan || 'Free'}
             </p>

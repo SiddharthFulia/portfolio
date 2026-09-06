@@ -77,7 +77,7 @@ const Contact = () => {
         <div className='relative max-w-6xl mx-auto'>
           {/* Section header */}
           <div className='mb-10 sm:mb-14'>
-            <p className='eyebrow-mono'>— Contact</p>
+            <p className='eyebrow-mono'>Contact</p>
             <h1 className='gradient-text-amber luxe-section-title text-4xl sm:text-5xl mt-3 leading-[1.05]'>
               Get in touch
             </h1>
@@ -216,7 +216,7 @@ const Contact = () => {
               {/* Direct contacts — labeled rows so the actual handles +
                   email are visible at a glance, not buried behind icons. */}
               <div className='luxe-glass p-5 sm:p-6'>
-                <p className='eyebrow-mono mb-4'>— Find me here</p>
+                <p className='eyebrow-mono mb-4'>Find me here</p>
                 <div className='grid grid-cols-1 sm:grid-cols-2 gap-2 auto-rows-fr items-stretch'>
                   <a href='mailto:siddharthfulia7@gmail.com'
                     className='min-h-[64px] flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-white/[0.04] transition-colors group'>

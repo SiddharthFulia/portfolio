@@ -838,7 +838,7 @@ export default function VideoCombiner({ refreshKey = 0 } = {}) {
   return (
     <div className='space-y-6'>
       <div>
-        <p className='eyebrow-mono'>— Tools · combine</p>
+        <p className='eyebrow-mono'>Tools · combine</p>
         <h2 className='text-amber-300 text-h2 mt-2 font-bold'>Combine videos</h2>
         <p className='mt-2 text-fg-secondary max-w-2xl text-sm'>
           Stitch any 2–12 clips into one mp4. Pick from your library or paste URLs.

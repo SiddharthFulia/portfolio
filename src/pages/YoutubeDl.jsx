@@ -256,7 +256,7 @@ export default function YoutubeDl() {
       <div className='relative max-w-5xl mx-auto'>
         {/* ── Hero ── */}
         <header className='mb-6'>
-          <p className='text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80'>— Tools</p>
+          <p className='text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80'>Tools</p>
           <h1 className='mt-2 text-4xl sm:text-5xl font-bold leading-tight pb-1 text-white'>
             YouTube Downloader
           </h1>

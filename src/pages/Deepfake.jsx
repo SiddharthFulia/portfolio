@@ -156,7 +156,7 @@ function DeepfakeInner() {
       <div aria-hidden className="ambient-orb ambient-orb-cool -bottom-40 -right-32" />
       <div className="relative max-w-5xl mx-auto">
         <header className="mb-8">
-          <p className="eyebrow-mono">— AI Studio · Vault</p>
+          <p className="eyebrow-mono">AI Studio · Vault</p>
           <div className="flex items-center gap-3 mt-2 flex-wrap">
             <LockOutlined className="text-rose-400 text-2xl" />
             <h1 className="text-4xl sm:text-5xl font-bold leading-tight text-white">

@@ -870,7 +870,7 @@ function MaterialAccountingPanel({ series, last }) {
 
       <div className='mt-4 grid grid-cols-1 md:grid-cols-2 gap-3'>
         <div>
-          <p className='eyebrow-mono font-bold mb-1 text-rose-300/80 text-[11px]'>— Radiation output (dose rate @ 1 m, log scale)</p>
+          <p className='eyebrow-mono font-bold mb-1 text-rose-300/80 text-[11px]'>Radiation output (dose rate @ 1 m, log scale)</p>
           <DoseBar label='α'   sv={doseAlpha}   c='#fbbf24' help='Alpha — Helium nuclei. Stopped by paper. Deadly if inhaled/ingested.' />
           <DoseBar label='β⁻'  sv={doseBeta}    c='#a78bfa' help='Beta — high-energy electrons. Stopped by aluminium foil / plastic.' />
           <DoseBar label='γ'   sv={doseGamma}   c='#22d3ee' help='Gamma — high-energy photons. Need lead / concrete. Cs-137 line: 662 keV.' />
@@ -881,7 +881,7 @@ function MaterialAccountingPanel({ series, last }) {
           </p>
         </div>
         <div>
-          <p className='eyebrow-mono font-bold mb-1 text-emerald-300/80 text-[11px]'>— Energy accounting</p>
+          <p className='eyebrow-mono font-bold mb-1 text-emerald-300/80 text-[11px]'>Energy accounting</p>
           <div className='text-[11px] leading-snug text-fg-muted space-y-1'>
             <p>Each fission liberates <b className='text-amber-300'>≈ 200 MeV</b> = 3.204 × 10⁻¹¹ J.</p>
             <p>Fission rate: {(rawPower * 3.12e16).toExponential(2)} fissions/s at current power.</p>
@@ -979,7 +979,7 @@ function RadiationExplainer() {
       </div>
 
       <div className='mt-4 border-t border-white/5 pt-3'>
-        <p className='eyebrow-mono font-bold mb-2 text-rose-300/80'>— Interactive · stop the ray</p>
+        <p className='eyebrow-mono font-bold mb-2 text-rose-300/80'>Interactive · stop the ray</p>
         <div className='grid grid-cols-2 gap-2 text-[11px]'>
           <div>
             <div className='text-fg-muted mb-1'>Shield material</div>
@@ -1162,11 +1162,11 @@ function FissionBreakdownPanel() {
         </p>
       </div>
 
-      <p className='eyebrow-mono font-bold mb-1 text-amber-300/80 text-[11px]'>— Mass-yield distribution (camel hump)</p>
+      <p className='eyebrow-mono font-bold mb-1 text-amber-300/80 text-[11px]'>Mass-yield distribution (camel hump)</p>
       <FissionYieldChart height={140} />
       <p className='text-[10px] text-fg-muted mt-1'>Two peaks at A ≈ 95 and A ≈ 137; symmetric fission (A ≈ 118) is ~600× less likely.</p>
 
-      <p className='eyebrow-mono font-bold mt-3 mb-1 text-emerald-300/80 text-[11px]'>— Energy release breakdown (per fission)</p>
+      <p className='eyebrow-mono font-bold mt-3 mb-1 text-emerald-300/80 text-[11px]'>Energy release breakdown (per fission)</p>
       <div className='space-y-1.5'>
         {parts.map((p, i) => (
           <div key={i}>
@@ -1423,7 +1423,7 @@ export default function Chernobyl() {
         <div className={`luxe-glass p-4 mb-4 border ${verdict === 'meltdown' ? 'border-rose-500/50' : verdict === 'runaway' ? 'border-amber-500/50' : 'border-emerald-500/40'}`}>
           <div className='flex flex-col md:flex-row md:items-center gap-3'>
             <div className='flex-1 min-w-0'>
-              <p className='eyebrow-mono font-bold text-fg-muted'>— Reactor status</p>
+              <p className='eyebrow-mono font-bold text-fg-muted'>Reactor status</p>
               <div className='flex flex-wrap items-baseline gap-x-4 gap-y-1 mt-1'>
                 <span className='text-3xl font-bold font-mono text-amber-300'>{currentPower.toFixed(0)}</span>
                 <span className='text-fg-muted text-sm'>MW thermal</span>
@@ -1510,7 +1510,7 @@ export default function Chernobyl() {
 
           <div className='luxe-glass p-4 space-y-4'>
             <div>
-              <p className='eyebrow-mono font-bold mb-1 text-cyan-300/80'>— Scenario</p>
+              <p className='eyebrow-mono font-bold mb-1 text-cyan-300/80'>Scenario</p>
               <Segmented
                 size='small'
                 value={scenario}
@@ -1742,7 +1742,7 @@ export default function Chernobyl() {
         <div className='luxe-glass p-4 mb-4'>
           <div className='flex items-center gap-2 mb-3'>
             <ExperimentOutlined className='text-rose-300' />
-            <p className='eyebrow-mono font-bold text-rose-300/80'>— Event timeline</p>
+            <p className='eyebrow-mono font-bold text-rose-300/80'>Event timeline</p>
             <span className='ml-auto text-[10px] font-mono text-fg-muted'>{events.length} events</span>
           </div>
           {events.length === 0 ? (
@@ -1770,7 +1770,7 @@ export default function Chernobyl() {
         {/* ── 5 · Equations ──────────────────────────────────── */}
         <div className='grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4'>
           <div className='luxe-glass p-4'>
-            <p className='eyebrow-mono font-bold mb-3 text-cyan-300/80'>— Point kinetics · 6 delayed groups</p>
+            <p className='eyebrow-mono font-bold mb-3 text-cyan-300/80'>Point kinetics · 6 delayed groups</p>
             <div className='space-y-4 text-sm leading-relaxed'>
               <div>
                 <div className='text-fg-muted mb-1 flex items-center gap-2'>
@@ -1794,7 +1794,7 @@ export default function Chernobyl() {
           </div>
 
           <div className='luxe-glass p-4'>
-            <p className='eyebrow-mono font-bold mb-3 text-fuchsia-300/80'>— Iodine → Xenon chain (Bateman)</p>
+            <p className='eyebrow-mono font-bold mb-3 text-fuchsia-300/80'>Iodine → Xenon chain (Bateman)</p>
             <div className='space-y-4 text-sm leading-relaxed'>
               <div>
                 <div className='text-fg-muted mb-1'><Sym tex='\dfrac{dI}{dt}' help={HELP.I} /> =</div>
@@ -1812,7 +1812,7 @@ export default function Chernobyl() {
           </div>
 
           <div className='luxe-glass p-4'>
-            <p className='eyebrow-mono font-bold mb-3 text-rose-300/80'>— Reactivity balance</p>
+            <p className='eyebrow-mono font-bold mb-3 text-rose-300/80'>Reactivity balance</p>
             <Tex display src={String.raw`\rho(t) = \rho_{\text{control}}(t) + \rho_{\text{void}}(\alpha) + \rho_D(T_f) + \rho_{Xe}(X)`} />
             <ul className='mt-3 space-y-1.5 text-[12px]'>
               <li className='flex gap-2'><span className='inline-block w-2 h-2 rounded-full bg-cyan-400 mt-1.5' /><span><Sym tex='\rho_{\text{control}}' help={HELP.rho_c} /> — rod position. In RBMK the graphite tip briefly adds <b className='text-rose-300'>positive</b> reactivity on re-entry.</span></li>
@@ -1823,7 +1823,7 @@ export default function Chernobyl() {
           </div>
 
           <div className='luxe-glass p-4'>
-            <p className='eyebrow-mono font-bold mb-3 text-amber-300/80'>— Way-Wigner decay heat</p>
+            <p className='eyebrow-mono font-bold mb-3 text-amber-300/80'>Way-Wigner decay heat</p>
             <Tex display src={String.raw`\frac{P(t)}{P_0} \approx 0.066\left[\,t^{-0.2} - (t + T)^{-0.2}\right]`} />
             <p className='mt-2 text-[11px] text-fg-muted'>
               Even after SCRAM, fission-product decay produces ~<b className='text-amber-300'>7 %</b> of nominal power for the first minute, dropping to ~1 % after a day. In a loss-of-coolant event this is enough to melt the core.
@@ -1873,7 +1873,7 @@ export default function Chernobyl() {
 
         {/* ── 7 · Historical footer ──────────────────────────── */}
         <div className='luxe-glass p-4 text-[12px] text-fg-muted leading-relaxed'>
-          <p className='eyebrow-mono font-bold mb-2 text-fg-dim'>— Reactor 4 · Chernobyl Nuclear Power Plant · Pripyat, Ukrainian SSR</p>
+          <p className='eyebrow-mono font-bold mb-2 text-fg-dim'>Reactor 4 · Chernobyl Nuclear Power Plant · Pripyat, Ukrainian SSR</p>
           <p>
             <b className='text-amber-300'>25 April 1986 · 01:06</b> — Power reduction begins for a planned turbine coast-down test.
             &nbsp;·&nbsp;
@@ -1904,7 +1904,7 @@ function ChartPanel({ title, color, legend, children }) {
   return (
     <div className='luxe-glass p-3 flex flex-col' style={{ height: 240 }}>
       <div className='flex items-center justify-between mb-2 flex-wrap gap-1'>
-        <p className={`eyebrow-mono font-bold ${color}`}>— {title}</p>
+        <p className={`eyebrow-mono font-bold ${color}`}>{title}</p>
         <div className='text-[10px] font-mono text-fg-muted flex items-center gap-1'>{legend}</div>
       </div>
       <div className='flex-1 min-h-0'>{children}</div>

@@ -30,7 +30,7 @@ export default function StartMenu({ onPlay, onLeaderboard }) {
 
       <div className='relative w-full max-w-xl'>
         <header className='mb-6 text-center'>
-          <p className='text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80'>— Endless Runner</p>
+          <p className='text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80'>Endless Runner</p>
           <h1 className='mt-2 text-4xl sm:text-5xl font-bold leading-tight pb-1 bg-gradient-to-r from-amber-200 via-rose-300 to-fuchsia-300 bg-clip-text text-transparent'>
             Hand Runner
           </h1>

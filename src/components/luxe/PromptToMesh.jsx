@@ -172,7 +172,7 @@ function Section({ title, eyebrow, children, collapsible = false, defaultOpen = 
         className="w-full flex items-center justify-between text-left"
         disabled={!collapsible}
       >
-        <p className={`luxe-eyebrow ${eyebrowTint}`}>— {eyebrow}</p>
+        <p className={`luxe-eyebrow ${eyebrowTint}`}>{eyebrow}</p>
         {collapsible && (
           <span className="text-xs text-gray-500">{open ? '−' : '+'}</span>
         )}
@@ -684,7 +684,7 @@ export default function PromptToMesh({ presetGlbUrl = '', clearPreset } = {}) {
             {/* Prompt */}
             <div className="luxe-card p-4">
               <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-                <p className="luxe-eyebrow text-amber-300/90">— Real mesh on the 5090</p>
+                <p className="luxe-eyebrow text-amber-300/90">Real mesh on the 5090</p>
                 <button type="button"
                   onClick={() => setHelperOpen(true)}
                   disabled={isWorking}

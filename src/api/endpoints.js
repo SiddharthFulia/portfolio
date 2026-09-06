@@ -171,7 +171,9 @@ export const ENDPOINTS = {
   // Pathfinding Lab — SQLite-cached city road graphs. GET list of cities,
   // GET /:slug for the {nodes, edges} payload (server fetches from Overpass
   // on cache miss, then serves gzipped on every subsequent hit).
-  // /:slug/places drives the Trie-backed area/neighbourhood search.
-  CITY_GRAPHS:        '/api/city-graphs',
-  CITY_GRAPHS_PLACES: '/api/city-graphs',   // /:slug/places appended at call site
+  // /:slug/places drives the Trie/trigram-backed area/neighbourhood search.
+  // /places (no slug) is the cross-city fallback used when no city is picked.
+  CITY_GRAPHS:            '/api/city-graphs',
+  CITY_GRAPHS_PLACES:     '/api/city-graphs',   // /:slug/places appended at call site
+  CITY_GRAPHS_PLACES_ALL: '/api/city-graphs/places',
 };

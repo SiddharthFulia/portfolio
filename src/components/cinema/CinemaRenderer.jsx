@@ -768,7 +768,7 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
       {/* Header — title + global status + start/cancel */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
-          <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80">— Inline render</p>
+          <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80">Inline render</p>
           <h3 className="mt-1 text-lg font-bold text-fg-primary tabular-nums">
             {shotPrompts.length} shots · {projectDuration}s each · {projectAspect} · {projectResolution}
           </h3>
@@ -916,7 +916,7 @@ export default function CinemaRenderer({ project, renderId, initialRender }) {
         <div className="mt-4 pt-4 border-t border-line">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
-              <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80">— Final combine</p>
+              <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-300/80">Final combine</p>
               <h4 className="mt-1 text-sm font-semibold text-fg-primary tabular-nums">
                 {combineRow?.status === 'completed' ? 'Stitched mp4 ready' : `ffmpeg-concat #${combineJobId}`}
               </h4>

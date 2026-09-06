@@ -296,7 +296,7 @@ export default function VideoEditor() {
       <div className="relative z-10 max-w-6xl mx-auto">
         <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-[10px] font-mono uppercase tracking-[0.32em] text-rose-300/80">— Video editor</p>
+            <p className="text-[10px] font-mono uppercase tracking-[0.32em] text-rose-300/80">Video editor</p>
             <h1 className="mt-2 font-poppins font-black tracking-tight text-3xl sm:text-4xl md:text-5xl">
               Trim · join · crop · render
             </h1>

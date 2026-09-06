@@ -560,7 +560,7 @@ export default function Atoms() {
       {/* ── Hero strip ───────────────────────────────────── */}
       <div className='pt-24 sm:pt-28 px-4 sm:px-8 lg:px-12 max-w-[1400px] mx-auto'>
         <div className='flex items-center gap-2 mb-3 flex-wrap'>
-          <p className='eyebrow-mono font-bold text-amber-300/80'>— Nuclear Playground</p>
+          <p className='eyebrow-mono font-bold text-amber-300/80'>Nuclear Playground</p>
           <span className='text-fg-muted text-xs'>·</span>
           <span className='text-[10px] font-mono uppercase tracking-widest text-fg-muted'>
             algorithm: C++ core ported to JS · Bethe-Weizsäcker · Bohr · Schrödinger
@@ -591,7 +591,7 @@ export default function Atoms() {
         <div className='luxe-glass p-4 mb-4'>
           <div className='flex items-center gap-2 mb-3'>
             <RadarChartOutlined className='text-amber-300' />
-            <p className='eyebrow-mono font-bold text-amber-300/80'>— Periodic table  ·  click to load the nuclide</p>
+            <p className='eyebrow-mono font-bold text-amber-300/80'>Periodic table  ·  click to load the nuclide</p>
             <span className='ml-auto text-[10px] font-mono text-fg-muted'>H → Cf  ·  Z = 1..98</span>
           </div>
           <PeriodicTable Z={Z} onPick={pickElement} />
@@ -615,7 +615,7 @@ export default function Atoms() {
           <div className='xl:col-span-2 luxe-glass p-3'>
             <div className='flex items-center gap-2 mb-2 flex-wrap'>
               <ThunderboltFilled className='text-cyan-300' />
-              <p className='eyebrow-mono font-bold text-cyan-300/80'>— {mode === 'cloud' ? 'Quantum probability cloud' : 'Bohr model'}  ·  {element?.symbol}-{A}</p>
+              <p className='eyebrow-mono font-bold text-cyan-300/80'>{mode === 'cloud' ? 'Quantum probability cloud' : 'Bohr model'}  ·  {element?.symbol}-{A}</p>
               <span className='ml-auto flex items-center gap-2'>
                 <Segmented
                   size='small'
@@ -667,7 +667,7 @@ export default function Atoms() {
             <div className='luxe-glass p-4'>
               <div className='flex items-center gap-2 mb-3'>
                 <InfoCircleOutlined className='text-fuchsia-300' />
-                <p className='eyebrow-mono font-bold text-fuchsia-300/80'>— Orbital quantum numbers</p>
+                <p className='eyebrow-mono font-bold text-fuchsia-300/80'>Orbital quantum numbers</p>
               </div>
               <div>
                 <div className='flex items-center justify-between text-[11px] mb-0.5'>
@@ -765,7 +765,7 @@ export default function Atoms() {
             <div className='luxe-glass p-4'>
               <div className='flex items-center gap-2 mb-3'>
                 <FireFilled className='text-rose-300' />
-                <p className='eyebrow-mono font-bold text-rose-300/80'>— Radioactive decay</p>
+                <p className='eyebrow-mono font-bold text-rose-300/80'>Radioactive decay</p>
               </div>
               <div className='grid grid-cols-2 gap-2'>
                 <DecayBtn label='α  ·  ⁴He'   sub='Z−2, A−4'    color='violet'  onClick={() => emit('alpha')}
@@ -787,7 +787,7 @@ export default function Atoms() {
             <div className='luxe-glass p-4'>
               <div className='flex items-center gap-2 mb-3'>
                 <WarningFilled className='text-rose-300' />
-                <p className='eyebrow-mono font-bold text-rose-300/80'>— Neutron-induced fission  ·  ²³⁵U</p>
+                <p className='eyebrow-mono font-bold text-rose-300/80'>Neutron-induced fission  ·  ²³⁵U</p>
               </div>
               <div className='flex flex-wrap gap-2 items-center'>
                 <button className='luxe-btn luxe-btn-primary text-xs' onClick={fireNeutron}>
@@ -815,7 +815,7 @@ export default function Atoms() {
         <div className='grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4'>
           {/* Telemetry */}
           <div className='luxe-glass p-4'>
-            <p className='eyebrow-mono font-bold text-amber-300/80 mb-3'>— Live telemetry</p>
+            <p className='eyebrow-mono font-bold text-amber-300/80 mb-3'>Live telemetry</p>
             <ul className='space-y-2 text-[13px]'>
               <TelRow k={<><Sym tex='Z' help={HELP.Z} /> · protons</>} v={Z} tone='amber' />
               <TelRow k={<><Sym tex='A' help={HELP.A} /> · mass number</>} v={A} tone='rose' />
@@ -840,7 +840,7 @@ export default function Atoms() {
           {/* Decay chain explorer */}
           <div className='luxe-glass p-4 lg:col-span-2'>
             <div className='flex items-center gap-2 mb-3 flex-wrap'>
-              <p className='eyebrow-mono font-bold text-fuchsia-300/80'>— Decay chain explorer</p>
+              <p className='eyebrow-mono font-bold text-fuchsia-300/80'>Decay chain explorer</p>
               <Segmented
                 size='small'
                 value={chainRoot}
@@ -863,7 +863,7 @@ export default function Atoms() {
         <div className='luxe-glass p-4 mb-4'>
           <div className='flex items-center gap-2 mb-3'>
             <ExperimentOutlined className='text-cyan-300' />
-            <p className='eyebrow-mono font-bold text-cyan-300/80'>— Event log</p>
+            <p className='eyebrow-mono font-bold text-cyan-300/80'>Event log</p>
             <span className='ml-auto text-[10px] font-mono text-fg-muted'>{events.length} events</span>
           </div>
           {events.length === 0 ? (
@@ -883,7 +883,7 @@ export default function Atoms() {
         {/* ── Row: equations (KaTeX) ──────────────────── */}
         <div className='grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4'>
           <div className='luxe-glass p-4'>
-            <p className='eyebrow-mono font-bold mb-3 text-cyan-300/80'>— Bohr model</p>
+            <p className='eyebrow-mono font-bold mb-3 text-cyan-300/80'>Bohr model</p>
             <Tex display src={String.raw`r_n = \dfrac{n^2 \hbar^2}{m_e k_e e^2 \, Z} \;=\; \dfrac{n^2 a_0}{Z}`} />
             <Tex display src={String.raw`E_n = -\dfrac{Z^2 \, k_e^2 \, e^4 \, m_e}{2 \hbar^2 n^2} \;=\; -\dfrac{13.606\ \text{eV} \cdot Z^2}{n^2}`} />
             <p className='text-[11px] text-fg-muted mt-2'>
@@ -895,7 +895,7 @@ export default function Atoms() {
           </div>
 
           <div className='luxe-glass p-4'>
-            <p className='eyebrow-mono font-bold mb-3 text-fuchsia-300/80'>— Hydrogen orbital ψ(r,θ,φ)</p>
+            <p className='eyebrow-mono font-bold mb-3 text-fuchsia-300/80'>Hydrogen orbital ψ(r,θ,φ)</p>
             <Tex display src={String.raw`\psi_{n\ell m}(r,\theta,\phi) \;=\; R_{n\ell}(r)\, Y_{\ell}^{m}(\theta,\phi)`} />
             <Tex display src={String.raw`R_{n\ell}(r) \propto e^{-\rho/2}\, \rho^{\ell}\, L_{n-\ell-1}^{2\ell+1}(\rho), \quad \rho = \dfrac{2r}{n a_0}`} />
             <p className='text-[11px] text-fg-muted mt-2'>
@@ -904,7 +904,7 @@ export default function Atoms() {
           </div>
 
           <div className='luxe-glass p-4'>
-            <p className='eyebrow-mono font-bold mb-3 text-amber-300/80'>— Semi-empirical mass formula (Bethe–Weizsäcker)</p>
+            <p className='eyebrow-mono font-bold mb-3 text-amber-300/80'>Semi-empirical mass formula (Bethe–Weizsäcker)</p>
             <Tex display src={String.raw`B(A,Z) = a_V A - a_S A^{2/3} - a_C\dfrac{Z(Z-1)}{A^{1/3}} - a_A\dfrac{(A-2Z)^2}{A} + \delta(A,Z)`} />
             <p className='text-[11px] text-fg-muted mt-2'>
               Volume <Sym tex='a_V' help='a_V ≈ 15.75 MeV — strong-force binding proportional to nucleon count.' />,
@@ -916,7 +916,7 @@ export default function Atoms() {
           </div>
 
           <div className='luxe-glass p-4'>
-            <p className='eyebrow-mono font-bold mb-3 text-rose-300/80'>— Radioactive decay & α energetics</p>
+            <p className='eyebrow-mono font-bold mb-3 text-rose-300/80'>Radioactive decay & α energetics</p>
             <Tex display src={String.raw`N(t) = N_0\, e^{-\lambda t}, \quad t_{1/2} = \dfrac{\ln 2}{\lambda}`} />
             <Tex display src={String.raw`Q_\alpha = \bigl[M(A,Z) - M(A-4, Z-2) - M(^{4}\!\text{He})\bigr] c^2`} />
             <p className='text-[11px] text-fg-muted mt-2'>
@@ -928,7 +928,7 @@ export default function Atoms() {
 
         {/* ── Footer note ─────────────────────────────── */}
         <div className='luxe-glass p-4 text-[12px] text-fg-muted leading-relaxed'>
-          <p className='eyebrow-mono font-bold mb-2 text-fg-dim'>— Sources & implementation notes</p>
+          <p className='eyebrow-mono font-bold mb-2 text-fg-dim'>Sources & implementation notes</p>
           <p>
             Sampling kernel: direct JS port of <b className='text-amber-300'>kavan010/Atoms</b> (E:/Github/Atoms/src/atom_raytracer.cpp) — CDF-sampled hydrogen-like orbitals via associated Laguerre × associated Legendre polynomials. Emscripten was not available on this machine so the C++ math kernel was rewritten in JS with identical recurrences; the public sim API mirrors what the WASM export would have been.
             &nbsp;·&nbsp;

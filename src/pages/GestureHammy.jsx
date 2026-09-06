@@ -358,7 +358,7 @@ export default function GestureHammy() {
     <div className='min-h-screen bg-[var(--luxe-bg-base)] text-fg-primary pt-24 sm:pt-28 pb-16 px-3 sm:px-6'>
       <div className='max-w-6xl mx-auto'>
         <header className='mb-6'>
-          <p className='eyebrow-mono mb-2 text-amber-300/80'>— Hand + Face + Pose · MediaPipe</p>
+          <p className='eyebrow-mono mb-2 text-amber-300/80'>Hand + Face + Pose · MediaPipe</p>
           <h1 className='text-3xl sm:text-4xl font-bold gradient-text-amber leading-tight'>Hammy Hamster</h1>
           <p className='text-sm text-fg-muted mt-1 max-w-2xl'>
             Point your camera at yourself. 15 gestures — hand shapes, head angles, and full-body pose —
@@ -413,7 +413,7 @@ export default function GestureHammy() {
         </div>
 
         <div className='mt-6 luxe-glass p-4'>
-          <p className='eyebrow-mono mb-3 text-amber-300/80'>— How to trigger each meme</p>
+          <p className='eyebrow-mono mb-3 text-amber-300/80'>How to trigger each meme</p>
           <ul className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1.5 text-xs'>
             {GESTURE_REF.map(([name, how]) => (
               <li key={name}><b className='text-amber-200'>{name}</b> — {how}</li>

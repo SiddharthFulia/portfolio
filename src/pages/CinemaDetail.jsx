@@ -103,7 +103,7 @@ function CinemaOutput({ job }) {
       {(downloadHref || latestRender) && (
         <div className="rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/8 to-amber-500/8 p-4 flex flex-wrap items-center gap-3 justify-between">
           <div>
-            <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-emerald-300/80">— Latest render</p>
+            <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-emerald-300/80">Latest render</p>
             <p className="text-sm text-white mt-1">
               {latestRender
                 ? <>render <span className="font-mono text-amber-200">{latestRender.renderId.slice(-12)}</span> · status <span className="font-mono text-amber-200">{latestRender.status}</span></>

@@ -213,7 +213,7 @@ export default function MeshVisualize() {
       {/* Right rail — file picker, paste URL, render options, exports */}
       <div className="lg:col-span-2 space-y-3">
         <div className="luxe-card p-4">
-          <p className="luxe-eyebrow mb-2">— Visualize a mesh</p>
+          <p className="luxe-eyebrow mb-2">Visualize a mesh</p>
           <p className="text-xs text-gray-400 mb-3">
             Upload or paste any {SUPPORTED_HINT} file. Renders in the same viewer the generator uses.
           </p>

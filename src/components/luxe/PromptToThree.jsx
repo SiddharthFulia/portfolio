@@ -341,7 +341,7 @@ export default function PromptToThree() {
       <div className="lg:col-span-2 space-y-3">
         {/* Prompt */}
         <div className="luxe-card p-4">
-          <p className="luxe-eyebrow text-violet-300/80 mb-2">— Describe a scene</p>
+          <p className="luxe-eyebrow text-violet-300/80 mb-2">Describe a scene</p>
           <textarea
             value={prompt}
             onChange={e => setPrompt(e.target.value)}
@@ -375,7 +375,7 @@ export default function PromptToThree() {
         ) : (
           <div className="luxe-card p-4">
             <div className="flex items-center justify-between mb-2">
-              <p className="luxe-eyebrow text-cyan-300/80">— Try one</p>
+              <p className="luxe-eyebrow text-cyan-300/80">Try one</p>
               <button onClick={addMesh}
                 className="luxe-btn luxe-btn-secondary text-[11px] px-2 py-1">
                 + Add mesh
@@ -396,7 +396,7 @@ export default function PromptToThree() {
         {/* Recent */}
         {history.length > 0 && (
           <div className="luxe-card p-4">
-            <p className="luxe-eyebrow text-fuchsia-300/80 mb-2">— Recent</p>
+            <p className="luxe-eyebrow text-fuchsia-300/80 mb-2">Recent</p>
             <ul className="space-y-1.5">
               {history.map((h, i) => (
                 <li key={i}>
