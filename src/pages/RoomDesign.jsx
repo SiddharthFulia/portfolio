@@ -498,7 +498,7 @@ export default function RoomDesign() {
                       </div>
                     )}
                     <div className="p-3 bg-black/40 backdrop-blur-md">
-                      <p className="text-sm font-semibold text-white truncate">{item.label}</p>
+                      <p className="text-sm font-semibold text-white line-clamp-2 leading-tight">{item.label}</p>
                       <p className="text-[11px] text-gray-400 mt-0.5 line-clamp-2">
                         {slotMatch?.why || `${item.tone} tone · ${item.price}`}
                       </p>

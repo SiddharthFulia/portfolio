@@ -449,7 +449,7 @@ function Tile({ item, selected, onToggle, onDelete, onView }) {
 
       {/* Footer */}
       <div className="px-3 py-2.5 bg-black/40 backdrop-blur-sm">
-        <p className="text-sm font-semibold text-white truncate">{item.title}</p>
+        <p className="text-sm font-semibold text-white line-clamp-2 leading-tight" title={item.title}>{item.title}</p>
         <div className="mt-0.5 flex items-center justify-between gap-2">
           <p className="text-[11px] text-gray-500 truncate flex-1 min-w-0">
             {[item.aspectRatio, item.durationSec ? `${Math.round(item.durationSec)}s` : null, fmtDate(item.createdAt)]

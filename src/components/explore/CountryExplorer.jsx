@@ -75,7 +75,7 @@ const CountryExplorer = () => {
               <AnimatedCard key={c.name?.common} tiltAmount={8} onClick={() => setSelected(c)}
                 className="cursor-pointer rounded-xl border border-gray-800 bg-gray-900 p-3 hover:border-gray-600 transition-colors">
                 {c.flags?.png && <img src={c.flags.png} alt="" className="w-10 h-7 object-cover rounded mb-2" loading="lazy" />}
-                <h3 className="text-white text-xs font-semibold line-clamp-1">{c.name?.common}</h3>
+                <h3 className="text-white text-xs font-semibold line-clamp-2 leading-tight">{c.name?.common}</h3>
                 <div className="text-gray-500 text-[10px] mt-0.5">{c.capital?.[0] || '—'}</div>
                 <div className="text-cyan-400 text-[10px] font-mono">{formatPop(c.population)}</div>
               </AnimatedCard>

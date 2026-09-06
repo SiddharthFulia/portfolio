@@ -127,7 +127,7 @@ const EventCard = ({ event, isSelected, onSelect }) => {
           </svg>
         </div>
         <div className="flex-1 min-w-0">
-          <h4 className="text-white text-sm font-medium truncate">{event.title}</h4>
+          <h4 className="text-white text-sm font-medium line-clamp-2 leading-tight">{event.title}</h4>
           <div className="flex items-center gap-2 mt-1">
             <span className="text-xs font-medium px-1.5 py-0.5 rounded" style={{ color: catConf.color, backgroundColor: catConf.color + '15' }}>
               {catConf.label}

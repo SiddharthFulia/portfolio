@@ -247,7 +247,7 @@ function PendingTile({ entry, onOpen }) {
         </div>
       </div>
       <div className="px-3 py-2.5">
-        <p className="text-sm font-semibold text-white truncate" title={entry.title}>{entry.title}</p>
+        <p className="text-sm font-semibold text-white line-clamp-2 leading-tight" title={entry.title}>{entry.title}</p>
         <p className="text-[11px] text-amber-200/80 truncate font-mono">{entry.progressMessage || "Worker is processing…"}</p>
       </div>
     </button>
@@ -297,7 +297,7 @@ function Tile({ item, onView, onLogs, onDelete }) {
       </div>
 
       <div className="px-3 py-2.5 bg-black/40 backdrop-blur-sm">
-        <p className="text-sm font-semibold text-white truncate" title={item.title}>{item.title}</p>
+        <p className="text-sm font-semibold text-white line-clamp-2 leading-tight" title={item.title}>{item.title}</p>
         <div className="mt-0.5 flex items-center justify-between gap-2">
           <p className="text-[11px] text-gray-500 truncate flex-1 min-w-0">
             {[item.resolution, item.steps ? `${item.steps} steps` : null, fmtDate(item.createdAt)].filter(Boolean).join(" · ")}

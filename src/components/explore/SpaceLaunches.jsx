@@ -74,7 +74,7 @@ const SpaceLaunches = () => {
                   )}
                   <div className="p-4 flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-1">
-                      <h3 className="text-white text-sm font-bold line-clamp-1">{l.name}</h3>
+                      <h3 className="text-white text-sm font-bold line-clamp-2 leading-tight">{l.name}</h3>
                       {countdown && (
                         <span className="shrink-0 px-2 py-0.5 bg-cyan-900/40 text-cyan-400 text-[10px] font-mono font-bold rounded">{countdown}</span>
                       )}

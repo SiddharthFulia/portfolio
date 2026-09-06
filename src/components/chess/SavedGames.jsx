@@ -146,7 +146,7 @@ export default function SavedGames({ refreshKey, onLoad }) {
               className="flex-1 bg-surface-elevated border border-amber-500/40 rounded px-1.5 py-0.5 text-xs text-gray-100" />
           ) : (
             <button onClick={() => onLoad?.(row)}
-              className="flex-1 text-left text-xs font-semibold text-gray-100 hover:text-amber-200 truncate">
+              className="flex-1 text-left text-xs font-semibold text-gray-100 hover:text-amber-200 line-clamp-2 leading-tight">
               {row.name}
             </button>
           )}
@@ -218,7 +218,7 @@ export default function SavedGames({ refreshKey, onLoad }) {
                   onClick={() => toggle(name)}
                   className="w-full flex items-center justify-between gap-2 px-2 py-1 rounded border border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-200 transition-colors"
                 >
-                  <span className="text-[11px] font-semibold truncate">
+                  <span className="text-[11px] font-semibold line-clamp-2 leading-tight text-left">
                     <span className="mr-1">{isCollapsed ? '▶' : '▼'}</span>
                     📁 {name}
                   </span>

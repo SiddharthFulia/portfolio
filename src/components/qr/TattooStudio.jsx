@@ -507,7 +507,7 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
               <div className='flex items-start justify-between gap-2'>
                 <div className='min-w-0'>
                   <span className='text-[10px] uppercase tracking-widest text-fuchsia-300 font-bold'>Tattoo</span>
-                  <div className='font-bold text-sm truncate' title={g.title || 'Untitled'}>
+                  <div className='font-bold text-sm line-clamp-2 leading-tight' title={g.title || 'Untitled'}>
                     {g.title || 'Untitled'}
                   </div>
                 </div>

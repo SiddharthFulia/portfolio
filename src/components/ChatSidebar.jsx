@@ -341,7 +341,7 @@ export default function ChatSidebar({ refreshKey = 0, onNewChat, isOpenMobile, o
                               className="flex-1 bg-gray-950 border border-cyan-500/50 rounded px-1.5 py-0.5 text-xs text-white outline-none min-w-0"
                             />
                           ) : (
-                            <div className={`text-xs font-semibold truncate ${active ? 'text-white' : 'text-gray-200'}`}>
+                            <div className={`text-xs font-semibold line-clamp-2 leading-tight ${active ? 'text-white' : 'text-gray-200'}`}>
                               {c.title || 'Untitled'}
                             </div>
                           )}

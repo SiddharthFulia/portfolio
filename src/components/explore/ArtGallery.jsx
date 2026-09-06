@@ -79,8 +79,8 @@ const ArtGallery = () => {
                 <img src={imgUrl(art.image_id, 400)} alt={art.title} loading="lazy"
                   className="w-full h-48 sm:h-56 object-cover group-hover:scale-105 transition-transform duration-500" />
                 <div className="p-3">
-                  <h3 className="text-white text-sm font-semibold line-clamp-1">{art.title}</h3>
-                  <p className="text-gray-500 text-xs line-clamp-1 mt-0.5">{art.artist_display}</p>
+                  <h3 className="text-white text-sm font-semibold line-clamp-2 leading-tight">{art.title}</h3>
+                  <p className="text-gray-500 text-xs line-clamp-2 leading-snug mt-0.5">{art.artist_display}</p>
                   {art.date_display && <p className="text-gray-600 text-[10px] mt-0.5">{art.date_display}</p>}
                 </div>
               </div>

@@ -1061,7 +1061,7 @@ const FullCatalog = () => {
     label: (
       <div className="flex items-center gap-2 min-w-0">
         <span className="text-lg">{CATEGORY_ICONS[cat.name] || '📂'}</span>
-        <span className="text-white text-sm font-bold truncate">{cat.name}</span>
+        <span className="text-white text-sm font-bold line-clamp-2 leading-tight">{cat.name}</span>
         <Badge count={cat.apis.length} style={{ backgroundColor: 'rgba(251,191,36,0.2)', color: '#fbbf24', boxShadow: 'none' }} />
       </div>
     ),

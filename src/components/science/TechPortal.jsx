@@ -201,7 +201,7 @@ const TechPortal = () => {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-white font-semibold text-sm line-clamp-1">{title}</h4>
+                    <h4 className="text-white font-semibold text-sm line-clamp-2 leading-tight">{title}</h4>
                     <p className="text-gray-400 text-xs mt-1 line-clamp-2">{desc}</p>
                     <div className="flex items-center gap-2 mt-2">
                       {category && (

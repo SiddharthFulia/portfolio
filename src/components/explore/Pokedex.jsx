@@ -86,7 +86,7 @@ const Pokedex = () => {
                 <div className="p-2 text-center">
                   <img src={spriteUrl(p.id)} alt={p.name} className="w-16 h-16 mx-auto object-contain drop-shadow-lg" loading="lazy" />
                   <div className="text-[9px] text-gray-600 font-mono">#{String(p.id).padStart(3, '0')}</div>
-                  <div className="text-white text-[11px] font-semibold capitalize truncate">{p.name}</div>
+                  <div className="text-white text-[11px] font-semibold capitalize line-clamp-2 leading-tight">{p.name}</div>
                 </div>
               </AnimatedCard>
             ))}

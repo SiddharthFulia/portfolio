@@ -2367,7 +2367,7 @@ function PromptHelperModal({
               <li key={i} className="rounded-xl border border-gray-800 bg-gray-900/40 hover:border-cyan-500/40 transition-colors p-3 group">
                 <div className="flex items-center justify-between mb-1.5 gap-2">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="text-[12px] font-semibold text-gray-100 truncate">{s.title}</span>
+                    <span className="text-[12px] font-semibold text-gray-100 line-clamp-2 leading-tight">{s.title}</span>
                     <div className="flex gap-1 shrink-0">
                       {(s.tags || []).map(t => (
                         <span key={t} className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-gray-800 text-gray-500">

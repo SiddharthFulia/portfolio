@@ -1896,7 +1896,7 @@ ${inner}
                     <span className='text-[10px] uppercase tracking-widest text-amber-300 font-bold'>
                       {(KIND_FROM_BE[h.payloadKind] || h.payloadKind).toUpperCase()}
                     </span>
-                    <div className='font-bold text-sm truncate' title={h.title || 'Untitled'}>
+                    <div className='font-bold text-sm line-clamp-2 leading-tight' title={h.title || 'Untitled'}>
                       {h.title || 'Untitled'}
                     </div>
                   </div>
