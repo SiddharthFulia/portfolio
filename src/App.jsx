@@ -105,6 +105,7 @@ const Atoms               = lazyWithReload(() => import("./pages/Atoms"));
 const GestureMemes        = lazyWithReload(() => import("./pages/GestureMemes"));
 const GestureHammy        = lazyWithReload(() => import("./pages/GestureHammy"));
 const Osint               = lazyWithReload(() => import("./pages/OsintHub"));
+const QRCompiler          = lazyWithReload(() => import("./pages/QRCompiler"));
 
 import GlassFilter from './components/GlassFilter';
 
@@ -295,6 +296,7 @@ const ROUTE_TITLES = {
   '/realism/library' : 'Realism Library · Sid',
   '/osint'           : 'OSINT Powerhouse · Sid',
   '/tools'           : 'OSINT Powerhouse · Sid',
+  '/qr'              : 'QR Compiler · Sid',
 };
 const DEFAULT_TITLE = 'Siddharth Fulia · AI Engineer';
 const TitleManager = () => {
@@ -394,6 +396,8 @@ const App = () => {
               `/tools` is an alias so both URLs resolve to the same page. */}
           <Route path='/osint'           element={<Suspense fallback={<PageLoader />}><Osint /></Suspense>} />
           <Route path='/tools'           element={<Suspense fallback={<PageLoader />}><Osint /></Suspense>} />
+          {/* QR Compiler — pure FE Reed-Solomon studio, artistic + scan-tested. */}
+          <Route path='/qr'              element={<Suspense fallback={<PageLoader />}><QRCompiler /></Suspense>} />
           <Route path='/summarizer'      element={<Suspense fallback={<PageLoader />}><SummarizerPage /></Suspense>} />
           <Route path='/yt-dl'           element={<Suspense fallback={<PageLoader />}><YoutubeDl /></Suspense>} />
           <Route path='/youtube'         element={<Suspense fallback={<PageLoader />}><YoutubeDl /></Suspense>} />

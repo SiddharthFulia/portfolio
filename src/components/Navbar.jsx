@@ -110,6 +110,7 @@ const Navbar = () => {
       accent: 'text-cyan-300',
       items: [
         { to: '/chess',       label: 'Chess Engine',  desc: 'Stockfish · clocks · saved games · piece themes' },
+        { to: '/qr',          label: 'QR Compiler',   desc: 'Reed–Solomon ECC studio · artistic QRs · live scan-test · image bake-in' },
         { to: '/simple-game', label: 'Simple Games',  desc: 'Snake · code + live game · pause · step through' },
         { to: '/osint',       label: 'OSINT Powerhouse', desc: '150+ intel APIs · live earthquakes / fires / ISS / breaches' },
       ],
