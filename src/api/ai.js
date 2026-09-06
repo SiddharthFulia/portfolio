@@ -1099,6 +1099,10 @@ export async function adminActivity(days = 14) { try { const data = await get(EN
 // Keep-alive queue — fire one message manually + read consumer history.
 export async function adminKeepAliveTrigger() { try { const data = await post(ENDPOINTS.ADMIN_KEEP_ALIVE_TRIGGER, {}, { timeout: 10000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 export async function adminKeepAliveStatus()  { try { const data = await get(ENDPOINTS.ADMIN_KEEP_ALIVE_STATUS,  {}, { timeout: 10000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+// City-graphs cron — fires the full 10-city Overpass sweep. Takes 90-300s
+// server-side; overlap-guarded on the BE (returns 409 if already running).
+export async function adminCityGraphsCronTrigger() { try { const data = await post(ENDPOINTS.ADMIN_CITY_GRAPHS_CRON_TRIGGER, {}, { timeout: 600000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+export async function adminCityGraphsList()        { try { const data = await get(ENDPOINTS.CITY_GRAPHS,                    {}, { timeout: 10000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 
 // ─── Database Explorer (Settings → Database) ────────────────────
 // Schema introspection + paginated browse + read-only SQL + Groq Q&A.

@@ -112,6 +112,8 @@ export const ENDPOINTS = {
   // Keep-alive queue — Settings → Keep-alive tab
   ADMIN_KEEP_ALIVE_TRIGGER: '/api/admin/keep-alive/trigger',
   ADMIN_KEEP_ALIVE_STATUS:  '/api/admin/keep-alive/status',
+  // Manual triggers for scheduled crons — Settings → Keep-alive tab
+  ADMIN_CITY_GRAPHS_CRON_TRIGGER: '/api/admin/city-graphs/cron/trigger',
   JOB_LOGS:             '/api/job-logs',   // /:lane/:jobId?since=<ms>&limit=80
   EXPORT:               '/api/export',     // POST { format, rows|content, title, filename }
 
