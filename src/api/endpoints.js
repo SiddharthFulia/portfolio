@@ -165,4 +165,11 @@ export const ENDPOINTS = {
   PHYSICS_PENDULUM_SIMULATE: '/api/physics/pendulum/simulate',
   PHYSICS_PENDULUM_PHASE:    '/api/physics/pendulum/phase',
   PHYSICS_PENDULUM_LYAPUNOV: '/api/physics/pendulum/lyapunov',
+
+  // Pathfinding Lab — SQLite-cached city road graphs. GET list of cities,
+  // GET /:slug for the {nodes, edges} payload (server fetches from Overpass
+  // on cache miss, then serves gzipped on every subsequent hit).
+  // /:slug/places drives the Trie-backed area/neighbourhood search.
+  CITY_GRAPHS:        '/api/city-graphs',
+  CITY_GRAPHS_PLACES: '/api/city-graphs',   // /:slug/places appended at call site
 };

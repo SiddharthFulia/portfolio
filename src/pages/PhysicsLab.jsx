@@ -15,7 +15,7 @@
 // charts, three BE-powered heavy-compute lanes.
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
-import { Segmented, Slider, Switch, Tooltip } from 'antd'
+import { Segmented, Slider, Switch, Tooltip, InputNumber } from 'antd'
 import {
   PlayCircleFilled, PauseCircleFilled, ReloadOutlined,
   ExperimentOutlined, ThunderboltFilled, CloudServerOutlined,
@@ -27,6 +27,22 @@ import {
 } from '../api/physics'
 
 const DEG = Math.PI / 180
+
+// ─── Deterministic PRNG (mulberry32) ────────────────────────────
+// Seed-in → repeatable pseudo-random sequence out. Used for every bit
+// of visual jitter on this page (trail hue offsets, telemetry flash
+// keying, "randomise initial conditions" button) so a given seed
+// reproduces the same run pixel-for-pixel.
+function mulberry32(seed) {
+  let a = seed >>> 0
+  return function () {
+    a = (a + 0x6D2B79F5) >>> 0
+    let t = a
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
 
 // ─── Equations of motion ───────────────────────────────────────
 // θ̈₁, θ̈₂ from Euler-Lagrange on the double-pendulum Lagrangian.
@@ -75,12 +91,18 @@ function energies({ t1, t2, w1, w2, m1, m2, L1, L2, g }) {
   return { K, V, E: K + V }
 }
 
+// Presets set every relevant param — pick a preset and every slider on
+// the page snaps to that scenario. Picking `custom` unlocks nothing new
+// (all sliders are always editable); it's just the label the segmented
+// control shows when the user has dirty-edited any slider.
 const PRESETS = {
-  chaos:    { t1: 120 * DEG, t2: -10 * DEG, w1: 0, w2: 0 },
-  lissajous:{ t1: 90 * DEG,  t2: 90 * DEG,  w1: 0, w2: 0 },
-  spin:     { t1: 179 * DEG, t2: 179 * DEG, w1: 0, w2: 0 },
-  calm:     { t1: 30 * DEG,  t2: 15 * DEG,  w1: 0, w2: 0 },
+  chaos:    { t1: 120 * DEG, t2: -10 * DEG, w1: 0, w2: 0, L1: 1.0, L2: 1.0, m1: 1.0, m2: 1.0, g: 9.81,  damping: 0.0 },
+  lissajous:{ t1: 90 * DEG,  t2: 90 * DEG,  w1: 0, w2: 0, L1: 1.0, L2: 1.0, m1: 1.0, m2: 1.0, g: 9.81,  damping: 0.0 },
+  spin:     { t1: 179 * DEG, t2: 179 * DEG, w1: 0, w2: 0, L1: 1.0, L2: 1.0, m1: 1.0, m2: 1.0, g: 9.81,  damping: 0.0 },
+  calm:     { t1: 30 * DEG,  t2: 15 * DEG,  w1: 0, w2: 0, L1: 1.0, L2: 1.0, m1: 1.0, m2: 1.0, g: 9.81,  damping: 0.0 },
 }
+// The `custom` preset is a sentinel — no defaults, just means the user
+// has manually edited a slider. It never overwrites their values.
 
 // ─── Tooltip copy for every symbol / constant ──────────────────
 // Kept in one dictionary so hovering matches everywhere — telemetry,
@@ -181,6 +203,12 @@ export default function PhysicsLab() {
   const [ico1, setIco1]      = useState(0)    // ω₁ initial (rad/s)
   const [ico2, setIco2]      = useState(0)    // ω₂ initial (rad/s)
 
+  // Seed for deterministic visuals + randomise-IC helper.
+  const [seed, setSeed]      = useState(42)
+  // When a preset is applied programmatically we don't want the effect
+  // that watches slider values to immediately flip us back to 'custom'.
+  const applyingPresetRef    = useRef(false)
+
   const [running, setRunning] = useState(true)
   const [now, setNow]         = useState(0)   // simulated seconds
 
@@ -192,7 +220,6 @@ export default function PhysicsLab() {
   // Chart series — bounded ring buffer of {t, θ1(deg), θ2(deg)}.
   const CHART_MAX = 400
   const [chart, setChart] = useState([])
-  const [energyChart, setEnergyChart] = useState([])
   const [phasePts, setPhasePts]       = useState([])
   const [poincarePts, setPoincarePts] = useState([])
 
@@ -206,7 +233,6 @@ export default function PhysicsLab() {
 
   const canvasRef      = useRef(null)
   const chartRef       = useRef(null)
-  const energyRef      = useRef(null)
   const phaseRef       = useRef(null)
   const poincareRef    = useRef(null)
   const beSeriesRef    = useRef(null)
@@ -215,7 +241,6 @@ export default function PhysicsLab() {
   const stateRef       = useRef([])
   const trailsRef      = useRef([])
   const chartRefBuf    = useRef([])
-  const energyRefBuf   = useRef([])
   const phaseBufRef    = useRef([])
   const poincareBufRef = useRef([])
   const lastT2SignRef  = useRef(null)   // Poincaré cross detector
@@ -226,15 +251,44 @@ export default function PhysicsLab() {
 
   useEffect(() => { document.title = 'Physics Lab · Sid' }, [])
 
-  // Apply preset → snap initial condition sliders.
+  // Apply preset → snap every slider that the preset touches. The
+  // `applyingPresetRef` flag suppresses the dirty-state detector below.
   useEffect(() => {
     const p = PRESETS[preset]
-    if (!p) return
+    if (!p) return                // custom → do nothing, keep user's values
+    applyingPresetRef.current = true
     setIc1Deg(Math.round(p.t1 / DEG))
     setIc2Deg(Math.round(p.t2 / DEG))
     setIco1(p.w1)
     setIco2(p.w2)
+    setL1(p.L1)
+    setL2(p.L2)
+    setM1(p.m1)
+    setM2(p.m2)
+    setG(p.g)
+    setDamping(p.damping)
+    // Drop the flag on the next tick, after all state updates have
+    // flushed. React batches these so a single microtask is enough.
+    Promise.resolve().then(() => { applyingPresetRef.current = false })
   }, [preset])
+
+  // Dirty-state detector — if the user manually nudges any slider away
+  // from what the current preset specifies, flip the segmented to
+  // 'custom' so the label reflects reality.
+  useEffect(() => {
+    if (applyingPresetRef.current) return
+    if (preset === 'custom') return
+    const p = PRESETS[preset]
+    if (!p) return
+    const dirty =
+      Math.round(p.t1 / DEG) !== ic1Deg ||
+      Math.round(p.t2 / DEG) !== ic2Deg ||
+      p.w1 !== ico1 || p.w2 !== ico2 ||
+      p.L1 !== L1 || p.L2 !== L2 ||
+      p.m1 !== m1 || p.m2 !== m2 ||
+      p.g !== g || p.damping !== damping
+    if (dirty) setPreset('custom')
+  }, [ic1Deg, ic2Deg, ico1, ico2, L1, L2, m1, m2, g, damping, preset])
 
   // Rebuild population on any parameter that changes the initial
   // condition set. Also runs on gravity / L / m changes so the sim
@@ -250,13 +304,11 @@ export default function PhysicsLab() {
     }))
     trailsRef.current = Array.from({ length: count }, () => [])
     chartRefBuf.current = []
-    energyRefBuf.current = []
     phaseBufRef.current = []
     poincareBufRef.current = []
     lastT2SignRef.current = null
     simTRef.current = 0
     setChart([])
-    setEnergyChart([])
     setPhasePts([])
     setPoincarePts([])
     setNow(0)
@@ -325,7 +377,11 @@ export default function PhysicsLab() {
       const totalArm = L1 + L2
       const scale = Math.min(w, h) * 0.42 / totalArm
 
-      // Draw trails for every pendulum.
+      // Draw trails for every pendulum. Hue offset is driven by the
+      // deterministic PRNG (mulberry32 seeded from `seed`) so runs are
+      // reproducible: same seed → identical colours across reloads.
+      const rng = mulberry32(seed)
+      const hueOffset = rng() * 360
       for (let i = 0; i < stateRef.current.length; i++) {
         const st = stateRef.current[i]
         const x1 = cx + scale * L1 * Math.sin(st.t1)
@@ -337,7 +393,9 @@ export default function PhysicsLab() {
         tr.push({ x: x2, y: y2 })
         while (tr.length > trailLen) tr.shift()
 
-        const hue = rainbow ? (i / stateRef.current.length) * 300 + 20 : 45
+        const hue = rainbow
+          ? (hueOffset + (i / stateRef.current.length) * 300 + 20) % 360
+          : 45
         ctx.strokeStyle = `hsla(${hue}, 90%, 62%, 0.55)`
         ctx.lineWidth = 1
         ctx.beginPath()
@@ -440,10 +498,6 @@ export default function PhysicsLab() {
           chartRefBuf.current.push({ t: simTRef.current, a: p0.t1 / DEG, b: p0.t2 / DEG })
           if (chartRefBuf.current.length > CHART_MAX) chartRefBuf.current.shift()
 
-          const { K, V, E } = energies({ ...p0, ...params })
-          energyRefBuf.current.push({ t: simTRef.current, K, V, E })
-          if (energyRefBuf.current.length > CHART_MAX) energyRefBuf.current.shift()
-
           // Phase portrait — θ₁ wrapped, ω₁.
           let th = p0.t1
           th = ((th + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI
@@ -456,12 +510,6 @@ export default function PhysicsLab() {
       drawTimeChart(chartRef.current, chartRefBuf.current,
         [{ key: 'a', color: '#fb7185' }, { key: 'b', color: '#22d3ee' }],
         { yLabel: '°' })
-      drawTimeChart(energyRef.current, energyRefBuf.current,
-        [
-          { key: 'K', color: '#fbbf24' },
-          { key: 'V', color: '#e879f9' },
-          { key: 'E', color: '#4ade80' },
-        ], { yLabel: 'J' })
       drawScatter(phaseRef.current, phaseBufRef.current,
         { xLabel: 'θ₁ (rad)', yLabel: 'ω₁ (rad/s)', lines: true, color: '#a78bfa' })
       drawScatter(poincareRef.current, poincareBufRef.current,
@@ -472,14 +520,13 @@ export default function PhysicsLab() {
 
     rafRef.current = requestAnimationFrame(step)
     return () => rafRef.current && cancelAnimationFrame(rafRef.current)
-  }, [running, m1, m2, L1, L2, g, damping, trailLen, rainbow, showForces])
+  }, [running, m1, m2, L1, L2, g, damping, trailLen, rainbow, showForces, seed])
 
   // Also stream chart samples into React state periodically so the
   // rendered chart component knows to redraw (~5 Hz is smooth enough).
   useEffect(() => {
     const id = setInterval(() => {
       setChart([...chartRefBuf.current])
-      setEnergyChart([...energyRefBuf.current])
       setPhasePts([...phaseBufRef.current])
       setPoincarePts([...poincareBufRef.current])
     }, 200)
@@ -540,16 +587,37 @@ export default function PhysicsLab() {
     }))
     trailsRef.current = Array.from({ length: count }, () => [])
     chartRefBuf.current = []
-    energyRefBuf.current = []
     phaseBufRef.current = []
     poincareBufRef.current = []
     lastT2SignRef.current = null
     simTRef.current = 0
     setChart([])
-    setEnergyChart([])
     setPhasePts([])
     setPoincarePts([])
     setNow(0)
+  }
+
+  // Pick a fresh integer seed and re-seed. mulberry32 wants an unsigned
+  // 32-bit integer; Math.random() * 2^32 gives us that comfortably.
+  const randomiseSeed = () => {
+    const next = Math.floor(Math.random() * 0xFFFFFFFF)
+    setSeed(next)
+    reset()
+  }
+
+  // Randomise initial conditions using the current seed. Deterministic:
+  // same seed → same "random" ICs. Useful for reproducible demos.
+  const randomiseIC = () => {
+    const rng = mulberry32(seed)
+    const t1 = Math.round((rng() * 360 - 180))
+    const t2 = Math.round((rng() * 360 - 180))
+    const w1 = +(rng() * 4 - 2).toFixed(2)
+    const w2 = +(rng() * 4 - 2).toFixed(2)
+    setPreset('custom')
+    setIc1Deg(t1)
+    setIc2Deg(t2)
+    setIco1(w1)
+    setIco2(w2)
   }
 
   // Live force estimate on bob 2 (magnitude of net force on m₂).
@@ -608,8 +676,8 @@ export default function PhysicsLab() {
           </p>
         </header>
 
-        {/* ── Row 1 · Kinematic diagram + Controls ── */}
-        <div className='grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-4 mb-4'>
+        {/* ── Row 1 · Kinematic diagram (LEFT, ~35-40%) + Controls (RIGHT) ── */}
+        <div className='grid grid-cols-1 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-4 mb-4'>
           <KinematicDiagram L1={L1} L2={L2} m1={m1} m2={m2} t1={ic1Deg * DEG} t2={ic2Deg * DEG} />
           <div className='luxe-glass p-4 space-y-3'>
             <div className='flex items-center gap-2 flex-wrap'>
@@ -625,7 +693,7 @@ export default function PhysicsLab() {
             </div>
 
             <div>
-              <p className='eyebrow-mono mb-1 text-fg-muted'>Preset</p>
+              <p className='eyebrow-mono mb-1 text-fg-muted font-bold'>Preset</p>
               <Segmented
                 size='small'
                 value={preset}
@@ -635,11 +703,40 @@ export default function PhysicsLab() {
                   { label: 'Lissajous', value: 'lissajous' },
                   { label: 'Spin', value: 'spin' },
                   { label: 'Calm', value: 'calm' },
+                  { label: 'Custom', value: 'custom' },
                 ]}
                 block
               />
               <p className='text-[11px] text-fg-muted leading-snug mt-1'>
-                Snap all sliders to a canned initial condition — instant demo mode.
+                Snap all sliders to a canned initial condition — or pick <b>Custom</b> to
+                unlock every parameter. Editing any slider auto-flips to Custom.
+              </p>
+            </div>
+
+            {/* Seed row — deterministic PRNG source for all visual jitter. */}
+            <div className='flex items-center gap-2 flex-wrap border-t border-white/5 pt-3'>
+              <span className='eyebrow-mono text-fg-muted font-bold'>Seed</span>
+              <InputNumber
+                size='small'
+                min={0}
+                max={0xFFFFFFFF}
+                step={1}
+                precision={0}
+                value={seed}
+                onChange={(v) => v != null && setSeed(v)}
+                parser={(v) => (v ?? '').replace(/[^0-9]/g, '')}
+                className='w-[120px]'
+              />
+              <span className='text-amber-300 font-mono text-[12px]'>#seed {seed}</span>
+              <button onClick={randomiseSeed} className='luxe-btn luxe-btn-secondary text-xs ml-auto' title='Pick a new random seed and re-run'>
+                🎲 Random seed
+              </button>
+              <button onClick={randomiseIC} className='luxe-btn luxe-btn-secondary text-xs' title='Randomise initial conditions using the current seed (deterministic)'>
+                Randomise IC
+              </button>
+              <p className='basis-full text-[11px] text-fg-muted leading-snug'>
+                Seeds a deterministic PRNG that drives trail colours, telemetry flashes,
+                and the randomise-IC helper — the same seed reproduces the same run.
               </p>
             </div>
 
@@ -650,13 +747,13 @@ export default function PhysicsLab() {
               <NumRow tex='m_2'    unit='kg'   help={HELP.m2}     hint='Lower bob mass, kg. Heavier tip amplifies chaotic motion.' value={m2}     min={0.2} max={4}   step={0.1}  onChange={setM2} />
               <NumRow tex='g'      unit='m/s²' help={HELP.g}      hint='Gravity, m/s². 9.81 = Earth, 1.62 = Moon, 24.79 = Jupiter.' value={g}      min={0}   max={30}  step={0.1}  onChange={setG} />
               <NumRow tex='\zeta'  unit=''     help={HELP.damping} hint='Viscous damping on ω. 0 = frictionless; higher = energy decays.' value={damping} min={0}  max={0.5} step={0.01} onChange={setDamping} />
-              <NumRow tex='\theta_{1,0}' unit='°' help={HELP.theta1} hint='Upper pendulum start angle, degrees. Bigger angle = more chaos.' value={ic1Deg}   min={-180} max={180} step={1}   onChange={setIc1Deg} />
-              <NumRow tex='\theta_{2,0}' unit='°' help={HELP.theta2} hint='Lower pendulum start angle, degrees.' value={ic2Deg}   min={-180} max={180} step={1}   onChange={setIc2Deg} />
+              <NumRow tex='\theta_{1,0}' unit='°' help={HELP.theta1} hint='Upper pendulum start angle, degrees. Bigger angle = more chaos.' value={ic1Deg}   min={-180} max={180} step={1}   integer onChange={setIc1Deg} />
+              <NumRow tex='\theta_{2,0}' unit='°' help={HELP.theta2} hint='Lower pendulum start angle, degrees.' value={ic2Deg}   min={-180} max={180} step={1}   integer onChange={setIc2Deg} />
               <NumRow tex='\omega_{1,0}' unit='rad/s' help={HELP.w1} hint='Upper initial angular velocity, rad/s. Start at 0 for a drop.' value={ico1}    min={-8} max={8} step={0.1}     onChange={setIco1} />
               <NumRow tex='\omega_{2,0}' unit='rad/s' help={HELP.w2} hint='Lower initial angular velocity, rad/s. Start at 0 for a drop.' value={ico2}    min={-8} max={8} step={0.1}     onChange={setIco2} />
-              <NumRow label='Pendulums' help={HELP.count}  hint='How many near-identical pendulums to run side by side.' value={count}   min={1}   max={200} step={1}    onChange={setCount} />
+              <NumRow label='Pendulums' help={HELP.count}  hint='How many near-identical pendulums to run side by side.' value={count}   min={1}   max={200} step={1}   integer onChange={setCount} />
               <NumRow tex='\Delta\theta' unit='°' help={HELP.offset} hint='Angle offset between neighbours. Even 0.1° fans chaos in seconds.' value={offsetDeg} min={0} max={5} step={0.05} onChange={setOffsetDeg} />
-              <NumRow label='Trail length' help={HELP.trail} hint='Past positions kept on screen per pendulum. Higher = prettier trails.' value={trailLen} min={0} max={2000} step={50} onChange={setTrailLen} />
+              <NumRow label='Trail length' help={HELP.trail} hint='Past positions kept on screen per pendulum. Higher = prettier trails.' value={trailLen} min={0} max={2000} step={50} integer onChange={setTrailLen} />
               <div>
                 <div className='flex items-center justify-between text-[11px]'>
                   <span className='text-fg-muted'>Rainbow</span>
@@ -702,7 +799,7 @@ export default function PhysicsLab() {
           </div>
           <div className='luxe-glass p-3 flex flex-col' style={{ height: 'min(60vh, 520px)' }}>
             <div className='flex items-center justify-between mb-2'>
-              <p className='eyebrow-mono text-amber-300/80'>— θ(t) · angles over time</p>
+              <p className='eyebrow-mono text-amber-300/80 font-bold'>— θ(t) · angles over time</p>
               <div className='flex items-center gap-3 text-[10px] font-mono'>
                 <span className='flex items-center gap-1'><span className='w-2.5 h-2.5 rounded-full bg-rose-400' /> <Sym tex='\theta_1' help={HELP.theta1} /></span>
                 <span className='flex items-center gap-1'><span className='w-2.5 h-2.5 rounded-full bg-cyan-400' /> <Sym tex='\theta_2' help={HELP.theta2} /></span>
@@ -718,7 +815,7 @@ export default function PhysicsLab() {
         <div className='luxe-glass p-4 mb-4'>
           <div className='flex items-center gap-2 mb-3'>
             <ThunderboltFilled className='text-amber-300' />
-            <p className='eyebrow-mono text-amber-300/80'>— Live telemetry (pendulum 1)</p>
+            <p className='eyebrow-mono text-amber-300/80 font-bold'>— Live telemetry (pendulum 1)</p>
           </div>
           <div className='grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 text-xs'>
             <Metric tex='\theta_1'  unit='°'     value={(telemetry.t1 / DEG).toFixed(1)} color='text-rose-300'    help={HELP.theta1} />
@@ -737,27 +834,14 @@ export default function PhysicsLab() {
           </div>
         </div>
 
-        {/* ── Row 4 · Energy chart + Phase portrait ── */}
+        {/* ── Row 4 · Phase portrait + Poincaré section ── */}
+        {/* (Energy-over-time chart intentionally removed — the telemetry
+             strip above already reports K, V, E live, and the BE-computed
+             chart below shows the settled energy curve.) */}
         <div className='grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4'>
           <div className='luxe-glass p-3 flex flex-col' style={{ height: 320 }}>
             <div className='flex items-center justify-between mb-2'>
-              <p className='eyebrow-mono text-amber-300/80 flex items-center gap-1'>
-                — Energy over time
-                <Tooltip title={HELP.energy}><InfoCircleOutlined className='text-fg-muted text-[10px]' /></Tooltip>
-              </p>
-              <div className='flex items-center gap-3 text-[10px] font-mono'>
-                <span className='flex items-center gap-1'><span className='w-2.5 h-2.5 rounded-full bg-amber-400' /> <Sym tex='K' help={HELP.K} /></span>
-                <span className='flex items-center gap-1'><span className='w-2.5 h-2.5 rounded-full bg-fuchsia-400' /> <Sym tex='V' help={HELP.V} /></span>
-                <span className='flex items-center gap-1'><span className='w-2.5 h-2.5 rounded-full bg-emerald-400' /> <Sym tex='E' help={HELP.E} /></span>
-              </div>
-            </div>
-            <div className='flex-1 min-h-0'>
-              <canvas ref={energyRef} style={{ display: 'block', width: '100%', height: '100%' }} />
-            </div>
-          </div>
-          <div className='luxe-glass p-3 flex flex-col' style={{ height: 320 }}>
-            <div className='flex items-center justify-between mb-2'>
-              <p className='eyebrow-mono text-fuchsia-300/80 flex items-center gap-1'>
+              <p className='eyebrow-mono text-fuchsia-300/80 flex items-center gap-1 font-bold'>
                 — Phase portrait <span className='text-fg-muted normal-case font-mono ml-1'>θ₁ vs ω₁</span>
                 <Tooltip title={HELP.phase}><InfoCircleOutlined className='text-fg-muted text-[10px]' /></Tooltip>
               </p>
@@ -766,19 +850,17 @@ export default function PhysicsLab() {
               <canvas ref={phaseRef} style={{ display: 'block', width: '100%', height: '100%' }} />
             </div>
           </div>
-        </div>
-
-        {/* ── Row 5 · Poincaré section ── */}
-        <div className='luxe-glass p-3 mb-4' style={{ height: 320 }}>
-          <div className='flex items-center justify-between mb-2'>
-            <p className='eyebrow-mono text-pink-300/80 flex items-center gap-1'>
-              — Poincaré section
-              <Tooltip title={HELP.poincare}><InfoCircleOutlined className='text-fg-muted text-[10px]' /></Tooltip>
-            </p>
-            <span className='text-[10px] font-mono text-fg-muted'>{poincarePts.length} crossings</span>
-          </div>
-          <div style={{ height: 260 }}>
-            <canvas ref={poincareRef} style={{ display: 'block', width: '100%', height: '100%' }} />
+          <div className='luxe-glass p-3 flex flex-col' style={{ height: 320 }}>
+            <div className='flex items-center justify-between mb-2'>
+              <p className='eyebrow-mono text-pink-300/80 flex items-center gap-1 font-bold'>
+                — Poincaré section
+                <Tooltip title={HELP.poincare}><InfoCircleOutlined className='text-fg-muted text-[10px]' /></Tooltip>
+              </p>
+              <span className='text-[10px] font-mono text-fg-muted'>{poincarePts.length} crossings</span>
+            </div>
+            <div className='flex-1 min-h-0'>
+              <canvas ref={poincareRef} style={{ display: 'block', width: '100%', height: '100%' }} />
+            </div>
           </div>
         </div>
 
@@ -786,7 +868,7 @@ export default function PhysicsLab() {
         <div className='luxe-glass p-4 mb-4'>
           <div className='flex items-center gap-2 mb-3 flex-wrap'>
             <CloudServerOutlined className='text-cyan-300' />
-            <p className='eyebrow-mono text-cyan-300/80'>— Compute on server</p>
+            <p className='eyebrow-mono text-cyan-300/80 font-bold'>— Compute on server</p>
             <div className='ml-auto flex flex-col items-end gap-1'>
               <div className='flex items-center gap-2 flex-wrap'>
                 <Segmented
@@ -808,7 +890,7 @@ export default function PhysicsLab() {
                 </button>
               </div>
               <p className='text-[11px] text-fg-muted leading-snug'>
-                Server compute mode. Server compute window ~30s; capped at 60s.
+                Server compute mode. Server simulate window ~30 s; capped at 60 s.
               </p>
             </div>
           </div>
@@ -822,7 +904,7 @@ export default function PhysicsLab() {
           {beMode === 'simulate' && (
             <div>
               <div className='text-[10px] font-mono text-fg-muted mb-2'>
-                POST <span className='text-cyan-300'>/api/physics/pendulum/simulate</span> — 30 s @ dt = 0.001 (server), decimated for wire.
+                <span className='text-cyan-300'>Server simulate (30 s)</span> — dt = 0.001 (server), decimated for wire.
                 {beSimulate?.series?.length && <> · <span className='text-emerald-300'>{beSimulate.series.length}</span> samples returned.</>}
               </div>
               <div style={{ height: 280 }} className={beLoading ? 'animate-pulse opacity-70' : ''}>
@@ -839,7 +921,7 @@ export default function PhysicsLab() {
           {beMode === 'phase' && (
             <div>
               <div className='text-[10px] font-mono text-fg-muted mb-2'>
-                POST <span className='text-cyan-300'>/api/physics/pendulum/phase</span> — 8 seeded trajectories, θ₁ wrapped to [−π, π].
+                <span className='text-cyan-300'>Server phase space</span> — 8 seeded trajectories, θ₁ wrapped to [−π, π].
                 {bePhase?.curves?.length && <> · <span className='text-emerald-300'>{bePhase.curves.length}</span> curves × <span className='text-emerald-300'>{bePhase.curves[0]?.t1?.length ?? 0}</span> pts.</>}
               </div>
               <div style={{ height: 340 }} className={beLoading ? 'animate-pulse opacity-70' : ''}>
@@ -851,7 +933,7 @@ export default function PhysicsLab() {
           {beMode === 'lyapunov' && (
             <div>
               <div className='text-[10px] font-mono text-fg-muted mb-2'>
-                POST <span className='text-cyan-300'>/api/physics/pendulum/lyapunov</span> — two trajectories seeded ε = 10⁻⁸ apart, endpoint-form estimate.
+                <span className='text-cyan-300'>Server Lyapunov λ</span> — two trajectories seeded ε = 10⁻⁸ apart, endpoint-form estimate.
               </div>
               <div className='flex flex-wrap items-center gap-4 mb-2 text-xs font-mono'>
                 <div className='flex items-center gap-2'>
@@ -883,7 +965,7 @@ export default function PhysicsLab() {
         {/* ── Row 7 · Equations (KaTeX) ── */}
         <div className='grid grid-cols-1 lg:grid-cols-2 gap-4'>
           <div className='luxe-glass p-4'>
-            <p className='eyebrow-mono mb-3 text-cyan-300/80'>— Kinetic + Potential Energy</p>
+            <p className='eyebrow-mono mb-3 text-cyan-300/80 font-bold'>— Kinetic + Potential Energy</p>
             <div className='space-y-4 text-sm leading-relaxed'>
               <div>
                 <div className='text-fg-muted mb-1 flex items-center gap-2'>
@@ -904,7 +986,7 @@ export default function PhysicsLab() {
           </div>
 
           <div className='luxe-glass p-4'>
-            <p className='eyebrow-mono mb-3 text-emerald-300/80'>— Euler–Lagrange EOM</p>
+            <p className='eyebrow-mono mb-3 text-emerald-300/80 font-bold'>— Euler–Lagrange EOM</p>
             <div className='space-y-4 text-sm leading-relaxed'>
               <div>
                 <div className='text-fg-muted mb-1'><Sym tex='\ddot{\theta}_1' help={HELP.a1} /> =</div>
@@ -938,20 +1020,54 @@ const PULSE_KEYFRAMES = `
 .sid-pulse { animation: sid-metric-pulse 200ms ease-out; }
 `
 
-function NumRow({ label, tex, unit, help, hint, value, min, max, step, onChange }) {
+// NumRow — slider + typed input, sharing the same value.
+// The input rejects non-numeric text via the antd `parser` prop and
+// clamps to [min, max] on blur. `integer` prop forces precision=0 and a
+// digits-only parser (e.g. for count, bob count, seed).
+function NumRow({ label, tex, unit, help, hint, value, min, max, step, onChange, integer = false }) {
+  const clamp = (v) => {
+    if (v == null || Number.isNaN(v)) return value
+    return Math.min(max, Math.max(min, v))
+  }
+  const handleInput = (v) => {
+    if (v == null) return
+    onChange(integer ? Math.round(v) : v)
+  }
+  const handleBlur = () => {
+    // Clamp on blur if somehow the value drifted out of range.
+    const clamped = clamp(value)
+    if (clamped !== value) onChange(clamped)
+  }
   const head = (
     <div className='flex items-center justify-between text-[11px] mb-0.5'>
       <span className='text-fg-muted flex items-center gap-1'>
         {tex ? <Sym tex={tex} help={help} /> : label}
         {unit && <span className='text-fg-dim ml-0.5'>({unit})</span>}
       </span>
-      <span className='font-mono text-amber-300 tabular-nums'>{Number(value).toFixed(step < 0.1 ? 2 : step < 1 ? 1 : 0)}</span>
     </div>
   )
   return (
     <div>
       {head}
-      <Slider min={min} max={max} step={step} value={value} onChange={onChange} tooltip={{ open: false }} />
+      <div className='flex items-center gap-2'>
+        <div className='flex-1 min-w-0'>
+          <Slider min={min} max={max} step={step} value={value} onChange={onChange} tooltip={{ open: false }} />
+        </div>
+        <InputNumber
+          size='small'
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={handleInput}
+          onBlur={handleBlur}
+          precision={integer ? 0 : (step < 0.1 ? 2 : step < 1 ? 1 : 0)}
+          parser={integer
+            ? (v) => (v ?? '').toString().replace(/[^0-9-]/g, '')
+            : (v) => (v ?? '').toString().replace(/[^0-9.\-]/g, '')}
+          className='w-[88px]'
+        />
+      </div>
       {hint && <p className='text-[11px] text-fg-muted leading-snug mt-1'>{hint}</p>}
     </div>
   )
@@ -991,7 +1107,11 @@ function drawArrow(ctx, x1, y1, x2, y2, color) {
   ctx.restore()
 }
 
-// Static SVG kinematic diagram showing the labelled geometry.
+// Kinematic SVG diagram — live-updated to reflect the current slider
+// values (L1, L2, m1, m2, θ₁, θ₂). Uses a fixed viewBox with
+// preserveAspectRatio="xMidYMid meet" so the drawing scales to whatever
+// column width it lives in and stays centred both horizontally and
+// vertically inside a `flex items-center justify-center` wrapper.
 function KinematicDiagram({ L1, L2, m1, m2, t1, t2 }) {
   const W = 380, H = 300
   const cx = W / 2, cy = 50
@@ -1002,32 +1122,38 @@ function KinematicDiagram({ L1, L2, m1, m2, t1, t2 }) {
   const x2 = x1 + scale * L2 * Math.sin(t2)
   const y2 = y1 + scale * L2 * Math.cos(t2)
   return (
-    <div className='luxe-glass p-3'>
-      <p className='eyebrow-mono mb-2 text-fuchsia-300/80'>— Kinematic diagram</p>
-      <svg viewBox={`0 0 ${W} ${H}`} className='w-full h-auto'>
-        {/* Ceiling hatch */}
-        <line x1={cx - 40} y1={cy - 12} x2={cx + 40} y2={cy - 12} stroke='#e5e5e5' strokeWidth='1' />
-        {Array.from({ length: 14 }).map((_, i) => (
-          <line key={i} x1={cx - 40 + i * 6} y1={cy - 12} x2={cx - 40 + i * 6 - 6} y2={cy - 20} stroke='#e5e5e5' strokeWidth='1' />
-        ))}
-        <line x1={cx} y1={cy} x2={cx} y2={cy + 90} stroke='#666' strokeDasharray='4 4' strokeWidth='1' />
-        <line x1={cx} y1={cy} x2={x1} y2={y1} stroke='#fafafa' strokeWidth='2.5' />
-        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke='#fafafa' strokeWidth='2.5' />
-        <line x1={x1} y1={y1} x2={x1} y2={y1 + 80} stroke='#666' strokeDasharray='4 4' strokeWidth='1' />
-        <circle cx={cx} cy={cy} r='3' fill='#fbbf24' />
-        <circle cx={x1} cy={y1} r={Math.max(6, 6 + m1 * 3)} fill='#3b82f6' stroke='#93c5fd' strokeWidth='1' />
-        <circle cx={x2} cy={y2} r={Math.max(6, 6 + m2 * 3)} fill='#3b82f6' stroke='#93c5fd' strokeWidth='1' />
-        <path d={`M ${cx} ${cy + 30} A 30 30 0 0 ${t1 > 0 ? 1 : 0} ${cx + 30 * Math.sin(t1)} ${cy + 30 * Math.cos(t1)}`}
-              fill='none' stroke='#4ade80' strokeWidth='1.5' />
-        <path d={`M ${x1} ${y1 + 30} A 30 30 0 0 ${t2 > 0 ? 1 : 0} ${x1 + 30 * Math.sin(t2)} ${y1 + 30 * Math.cos(t2)}`}
-              fill='none' stroke='#4ade80' strokeWidth='1.5' />
-        <text x={cx + 8} y={cy + 22} fill='#fbbf24' fontSize='12' fontStyle='italic'>θ₁</text>
-        <text x={x1 + 8} y={y1 + 22} fill='#fbbf24' fontSize='12' fontStyle='italic'>θ₂</text>
-        <text x={(cx + x1) / 2 + 8} y={(cy + y1) / 2} fill='#e5e5e5' fontSize='12' fontStyle='italic'>ℓ₁</text>
-        <text x={(x1 + x2) / 2 + 8} y={(y1 + y2) / 2} fill='#e5e5e5' fontSize='12' fontStyle='italic'>ℓ₂</text>
-        <text x={x1 + 12} y={y1 + 4} fill='#93c5fd' fontSize='12' fontStyle='italic'>m₁</text>
-        <text x={x2 + 12} y={y2 + 4} fill='#93c5fd' fontSize='12' fontStyle='italic'>m₂</text>
-      </svg>
+    <div className='luxe-glass p-3 flex flex-col min-h-[320px]'>
+      <p className='eyebrow-mono mb-2 text-fuchsia-300/80 font-bold'>— Kinematic diagram</p>
+      <div className='flex-1 flex items-center justify-center min-h-[280px]'>
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          preserveAspectRatio='xMidYMid meet'
+          className='w-full h-full max-h-[420px]'
+        >
+          {/* Ceiling hatch */}
+          <line x1={cx - 40} y1={cy - 12} x2={cx + 40} y2={cy - 12} stroke='#e5e5e5' strokeWidth='1' />
+          {Array.from({ length: 14 }).map((_, i) => (
+            <line key={i} x1={cx - 40 + i * 6} y1={cy - 12} x2={cx - 40 + i * 6 - 6} y2={cy - 20} stroke='#e5e5e5' strokeWidth='1' />
+          ))}
+          <line x1={cx} y1={cy} x2={cx} y2={cy + 90} stroke='#666' strokeDasharray='4 4' strokeWidth='1' />
+          <line x1={cx} y1={cy} x2={x1} y2={y1} stroke='#fafafa' strokeWidth='2.5' />
+          <line x1={x1} y1={y1} x2={x2} y2={y2} stroke='#fafafa' strokeWidth='2.5' />
+          <line x1={x1} y1={y1} x2={x1} y2={y1 + 80} stroke='#666' strokeDasharray='4 4' strokeWidth='1' />
+          <circle cx={cx} cy={cy} r='3' fill='#fbbf24' />
+          <circle cx={x1} cy={y1} r={Math.max(6, 6 + m1 * 3)} fill='#3b82f6' stroke='#93c5fd' strokeWidth='1' />
+          <circle cx={x2} cy={y2} r={Math.max(6, 6 + m2 * 3)} fill='#3b82f6' stroke='#93c5fd' strokeWidth='1' />
+          <path d={`M ${cx} ${cy + 30} A 30 30 0 0 ${t1 > 0 ? 1 : 0} ${cx + 30 * Math.sin(t1)} ${cy + 30 * Math.cos(t1)}`}
+                fill='none' stroke='#4ade80' strokeWidth='1.5' />
+          <path d={`M ${x1} ${y1 + 30} A 30 30 0 0 ${t2 > 0 ? 1 : 0} ${x1 + 30 * Math.sin(t2)} ${y1 + 30 * Math.cos(t2)}`}
+                fill='none' stroke='#4ade80' strokeWidth='1.5' />
+          <text x={cx + 8} y={cy + 22} fill='#fbbf24' fontSize='12' fontStyle='italic'>θ₁</text>
+          <text x={x1 + 8} y={y1 + 22} fill='#fbbf24' fontSize='12' fontStyle='italic'>θ₂</text>
+          <text x={(cx + x1) / 2 + 8} y={(cy + y1) / 2} fill='#e5e5e5' fontSize='12' fontStyle='italic'>ℓ₁</text>
+          <text x={(x1 + x2) / 2 + 8} y={(y1 + y2) / 2} fill='#e5e5e5' fontSize='12' fontStyle='italic'>ℓ₂</text>
+          <text x={x1 + 12} y={y1 + 4} fill='#93c5fd' fontSize='12' fontStyle='italic'>m₁</text>
+          <text x={x2 + 12} y={y2 + 4} fill='#93c5fd' fontSize='12' fontStyle='italic'>m₂</text>
+        </svg>
+      </div>
     </div>
   )
 }

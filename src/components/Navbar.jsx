@@ -121,6 +121,7 @@ const Navbar = () => {
         { to: '/physics',     label: 'Double Pendulum', desc: 'Lagrangian chaos · phase portrait · Lyapunov · KaTeX equations' },
         { to: '/pathfinding', label: 'City Router',     desc: 'Dijkstra · A* · BFS · DFS on live Bangalore OSM' },
         { to: '/chernobyl',   label: 'Chernobyl RBMK',  desc: 'Point-kinetics · xenon poison · positive scram · AZ-5 button' },
+        { to: '/atoms',       label: 'Atom Playground', desc: 'Bohr orbits · quantum clouds · α/β/γ decay · U-235 fission · C++ core' },
       ],
     },
     {

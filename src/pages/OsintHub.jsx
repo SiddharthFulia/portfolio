@@ -70,7 +70,7 @@ const StatCard = ({ icon, label, value, ctx, tone = 'amber', loading, updated })
     <div className={`luxe-glass relative overflow-hidden border rounded-xl p-3 sm:p-4 bg-gradient-to-br ${toneMap[tone]}`}>
       <div className="flex items-center gap-2 mb-1">
         <span className="opacity-90">{icon}</span>
-        <span className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold">{label}</span>
+        <span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">{label}</span>
       </div>
       {loading ? (
         <Skeleton.Input active size="small" style={{ width: '90%' }} />
@@ -103,7 +103,7 @@ const PricingTag = ({ pricing }) => {
 
 const SectionTitle = ({ eyebrow, title, sub }) => (
   <div className="mb-4 sm:mb-5">
-    <div className="eyebrow-mono text-xs tracking-widest text-gray-500 mb-1">{eyebrow}</div>
+    <div className="eyebrow-mono font-bold text-xs tracking-widest text-gray-500 mb-1">{eyebrow}</div>
     <h2 className="text-white font-bold text-xl sm:text-2xl">{title}</h2>
     {sub && <p className="text-gray-400 text-xs sm:text-sm mt-1 max-w-2xl">{sub}</p>}
   </div>
@@ -317,7 +317,7 @@ const IPPanel = () => {
     <div className="luxe-glass rounded-2xl p-4 sm:p-5">
       <div className="flex items-center gap-2 mb-3">
         <GlobalOutlined className="text-cyan-400" />
-        <span className="text-white font-semibold text-sm">IP Lookup</span>
+        <span className="text-white font-bold text-sm">IP Lookup</span>
         <span className="text-[10px] uppercase tracking-widest text-gray-500 ml-auto">ip-api</span>
       </div>
       <Input.Search
@@ -385,7 +385,7 @@ const NamePanel = () => {
     <div className="luxe-glass rounded-2xl p-4 sm:p-5">
       <div className="flex items-center gap-2 mb-3">
         <UserOutlined className="text-fuchsia-400" />
-        <span className="text-white font-semibold text-sm">Name Predictor</span>
+        <span className="text-white font-bold text-sm">Name Predictor</span>
         <span className="text-[10px] uppercase tracking-widest text-gray-500 ml-auto">Genderize · Agify · Nationalize</span>
       </div>
       <Input.Search
@@ -496,7 +496,7 @@ const DNSPanel = () => {
     <div className="luxe-glass rounded-2xl p-4 sm:p-5">
       <div className="flex items-center gap-2 mb-3">
         <ApiOutlined className="text-emerald-400" />
-        <span className="text-white font-semibold text-sm">DNS Resolver</span>
+        <span className="text-white font-bold text-sm">DNS Resolver</span>
         <span className="text-[10px] uppercase tracking-widest text-gray-500 ml-auto">Cloudflare DoH · A records</span>
       </div>
       <Input.Search
@@ -603,7 +603,7 @@ const CVEPanel = () => {
     <div className="luxe-glass rounded-2xl p-4 sm:p-5">
       <div className="flex items-center gap-2 mb-3">
         <BugOutlined className="text-rose-400" />
-        <span className="text-white font-semibold text-sm">CVE Lookup</span>
+        <span className="text-white font-bold text-sm">CVE Lookup</span>
         <span className="text-[10px] uppercase tracking-widest text-gray-500 ml-auto">NIST NVD</span>
       </div>
       <Input.Search
@@ -676,7 +676,7 @@ const HNPanel = () => {
     <div className="luxe-glass rounded-2xl p-4 sm:p-5">
       <div className="flex items-center gap-2 mb-3">
         <ReadOutlined className="text-amber-400" />
-        <span className="text-white font-semibold text-sm">HackerNews Live</span>
+        <span className="text-white font-bold text-sm">HackerNews Live</span>
         <div className="ml-auto">
           <Segmented
             size="small"
@@ -796,7 +796,7 @@ const FullCatalog = () => {
     label: (
       <div className="flex items-center gap-2 min-w-0">
         <span className="text-lg">{CATEGORY_ICONS[cat.name] || '📂'}</span>
-        <span className="text-white text-sm font-semibold truncate">{cat.name}</span>
+        <span className="text-white text-sm font-bold truncate">{cat.name}</span>
         <Badge count={cat.apis.length} style={{ backgroundColor: 'rgba(251,191,36,0.2)', color: '#fbbf24', boxShadow: 'none' }} />
       </div>
     ),
@@ -963,7 +963,7 @@ export default function OsintHub() {
           <div className="luxe-glass rounded-3xl p-5 sm:p-7 relative overflow-hidden">
             <div aria-hidden className="ambient-orb -top-24 -left-16 opacity-40" />
             <div aria-hidden className="ambient-orb ambient-orb-cool -bottom-24 -right-16 opacity-30" />
-            <div className="eyebrow-mono text-xs tracking-widest text-gray-500 mb-2">
+            <div className="eyebrow-mono font-bold text-xs tracking-widest text-gray-500 mb-2">
               // {catalog.stats.total} APIs · {catalog.stats.categoriesCount} categories · {catalog.stats.free + catalog.stats.freemium} free
             </div>
             <h1 className="font-poppins font-black text-3xl sm:text-5xl lg:text-6xl leading-tight">

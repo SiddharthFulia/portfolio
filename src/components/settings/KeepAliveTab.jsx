@@ -101,7 +101,7 @@ export default function KeepAliveTab() {
             </span>
           </div>
           <p className="text-xs text-gray-400">
-            Fires one message to <span className="font-mono text-gray-300">keep_alive</span>. Consumer probes <span className="font-mono text-gray-300">/api/health</span> + <span className="font-mono text-gray-300">/api/stats</span> and records the outcome below. Nightly cron runs at <span className="font-mono text-gray-300">00:00 IST</span>.
+            Fires one message to <span className="font-mono text-gray-300">keep_alive</span>. Consumer probes <span className="font-mono text-gray-300">Server health</span> + <span className="font-mono text-gray-300">Server stats</span> and records the outcome below. Nightly cron runs at <span className="font-mono text-gray-300">00:00 IST</span>.
           </p>
         </div>
         <div className="flex items-center gap-2">

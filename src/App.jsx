@@ -101,6 +101,7 @@ const SimpleGame          = lazyWithReload(() => import("./pages/SimpleGame"));
 const PhysicsLab          = lazyWithReload(() => import("./pages/PhysicsLab"));
 const Pathfinding         = lazyWithReload(() => import("./pages/Pathfinding"));
 const Chernobyl           = lazyWithReload(() => import("./pages/Chernobyl"));
+const Atoms               = lazyWithReload(() => import("./pages/Atoms"));
 const GestureMemes        = lazyWithReload(() => import("./pages/GestureMemes"));
 const GestureHammy        = lazyWithReload(() => import("./pages/GestureHammy"));
 const Osint               = lazyWithReload(() => import("./pages/OsintHub"));
@@ -271,6 +272,7 @@ const ROUTE_TITLES = {
   '/pathfinding'   : 'Pathfinding Lab · Sid',
   '/routes'        : 'Pathfinding Lab · Sid',
   '/chernobyl'     : 'Chernobyl RBMK · Sid',
+  '/atoms'         : 'Atom · Nuclear Playground · Sid',
   '/gesture-memes' : 'Gesture Memes · Sid',
   '/gesture-hammy' : 'Hammy Hamster · Sid',
   '/summarizer'    : 'Summarizer · Sid',
@@ -385,6 +387,7 @@ const App = () => {
           <Route path='/pathfinding'     element={<Suspense fallback={<PageLoader />}><Pathfinding /></Suspense>} />
           <Route path='/routes'          element={<Suspense fallback={<PageLoader />}><Pathfinding /></Suspense>} />
           <Route path='/chernobyl'       element={<Suspense fallback={<PageLoader />}><Chernobyl /></Suspense>} />
+          <Route path='/atoms'           element={<Suspense fallback={<PageLoader />}><Atoms /></Suspense>} />
           <Route path='/gesture-memes'   element={<Suspense fallback={<PageLoader />}><GestureMemes /></Suspense>} />
           <Route path='/gesture-hammy'   element={<Suspense fallback={<PageLoader />}><GestureHammy /></Suspense>} />
           {/* OSINT Powerhouse — 150+ intel APIs (live telemetry + full catalog).
