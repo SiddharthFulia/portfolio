@@ -164,7 +164,7 @@ export default function Showreel() {
   }, []);
 
   return (
-    <div ref={containerRef} className="relative min-h-screen bg-[#05050a] text-gray-100 overflow-hidden">
+    <div ref={containerRef} className="relative min-h-screen bg-[var(--luxe-bg-base)] text-fg-primary overflow-hidden">
       {/* Fixed Three.js volumetric backdrop — drifts behind every chapter. */}
       <div className="fixed inset-0 -z-10">
         <Canvas

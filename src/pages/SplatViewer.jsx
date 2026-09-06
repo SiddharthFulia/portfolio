@@ -82,7 +82,7 @@ export default function SplatViewer() {
   }, []);
 
   return (
-    <div className="relative min-h-screen w-full bg-[#05050a] text-gray-100 pt-24 sm:pt-32 pb-16 px-4 sm:px-6 overflow-hidden">
+    <div className="relative min-h-screen w-full bg-[var(--luxe-bg-base)] text-fg-primary pt-24 sm:pt-32 pb-16 px-4 sm:px-6 overflow-hidden">
       {/* Ambient backdrop */}
       <div aria-hidden className="pointer-events-none absolute inset-0">
         <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[60vw] h-[60vw] rounded-full bg-rose-500/10 blur-[120px]" />

@@ -103,7 +103,7 @@ const Home = () => {
     <>
       <ScrollCinematicHero />
 
-      <section id="below" className="relative w-full overflow-hidden bg-[#07070b] text-gray-100 px-6 sm:px-10 lg:px-16 py-20 sm:py-24 scroll-mt-20">
+      <section id="below" className="relative w-full overflow-hidden bg-[var(--luxe-bg-base)] text-fg-primary px-6 sm:px-10 lg:px-16 py-20 sm:py-24 scroll-mt-20">
         <div aria-hidden className="ambient-orb absolute -top-32 left-1/2 -translate-x-1/2 opacity-60" />
         <div aria-hidden className="ambient-orb ambient-orb-cool absolute top-1/3 -right-40 opacity-50" />
 

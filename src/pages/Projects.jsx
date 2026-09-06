@@ -333,19 +333,17 @@ const Projects = () => {
           ))}
         </motion.div>
 
-        {/* ── All projects ── */}
-        <motion.div
-          className="mt-10 space-y-5"
-          initial="hidden"
-          whileInView="show"
-          variants={stagger}
-          viewport={{ once: true, amount: 0.05 }}
-        >
-          <motion.div variants={fadeUp} className="flex items-center gap-3 mb-3 mt-4 flex-wrap">
+        {/* ── All projects ──
+             No framer-motion wrapping on the grid. `whileInView` with
+             `once: true` was locking newly-mounted cards at opacity 0
+             after a filter change — the cards were there but invisible.
+             Plain divs render reliably every time. */}
+        <div className="mt-10 space-y-5">
+          <div className="flex items-center gap-3 mb-3 mt-4 flex-wrap">
             <SectionPill dotColor={null} tone="gray">All projects</SectionPill>
             <span className="h-px flex-1 bg-gray-800" />
             <span className="text-[10px] font-mono tracking-wider text-gray-600 tabular-nums">{shown.length} / {projects.length}</span>
-          </motion.div>
+          </div>
 
           <div className="sticky top-20 sm:top-24 z-20 -mx-4 sm:-mx-8 lg:-mx-12 px-4 sm:px-8 lg:px-12 py-3 bg-[var(--luxe-bg-base)]/85 backdrop-blur border-b border-[var(--luxe-border)]/60 mb-4 flex flex-wrap items-center gap-2">
             {categories.map(c => {
@@ -453,13 +451,13 @@ const Projects = () => {
             );
 
             return (
-              <motion.div key={project.name} variants={fadeUp}>
+              <div key={project.name}>
                 {cardInner}
-              </motion.div>
+              </div>
             );
           })}
           </div>
-        </motion.div>
+        </div>
 
         <div className="luxe-divider my-16" />
         <CTA />

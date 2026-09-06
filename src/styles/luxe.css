@@ -553,6 +553,62 @@ body.theme-light .ant-modal-title {
   color: var(--luxe-fg) !important;
 }
 
+/* ── Semantic Tailwind color tokens — light mode overrides ──────
+   Tailwind's `bg-surface-base`, `bg-surface-elevated`, `bg-surface-
+   overlay`, `text-fg-primary`, `text-fg-secondary`, `text-fg-muted`,
+   `border-line`, `border-line-strong` are compiled to fixed dark hex
+   values at build time. They DON'T flip when body.theme-light is set —
+   so pages using them (Projects, Contact, Cinema, chess, etc.) stay
+   dark even after the theme toggle. These overrides remap the compiled
+   classes to the light palette on `.theme-light`. */
+body.theme-light {
+  /* Backgrounds */
+  --tw-bg-surface-base:     #faf7f2;
+  --tw-bg-surface-elevated: #ffffff;
+  --tw-bg-surface-overlay:  #f5f2ec;
+}
+body.theme-light .bg-surface-base     { background-color: #faf7f2 !important; }
+body.theme-light .bg-surface-elevated { background-color: #ffffff !important; }
+body.theme-light .bg-surface-overlay  { background-color: #f5f2ec !important; }
+
+body.theme-light .text-fg-primary   { color: #1c1917 !important; }
+body.theme-light .text-fg-secondary { color: #292524 !important; }
+body.theme-light .text-fg-muted     { color: #57534e !important; }
+
+body.theme-light .border-line        { border-color: #e7e2d9 !important; }
+body.theme-light .border-line-strong { border-color: #d6d3d1 !important; }
+body.theme-light .hover\:border-line-strong:hover { border-color: #d6d3d1 !important; }
+
+/* luxe-card + luxe-glass fallbacks in case token remap doesn't catch */
+body.theme-light .luxe-card {
+  background: #ffffff;
+  border-color: #e7e2d9;
+}
+
+/* Section wrappers that use bg-surface-base as the page bg */
+body.theme-light section.bg-surface-base {
+  background-color: #faf7f2 !important;
+}
+body.theme-light .min-h-screen.bg-surface-base {
+  background-color: #faf7f2 !important;
+}
+
+/* Tailwind's gray-900 / gray-800 borders on nested chrome */
+body.theme-light .border-gray-800,
+body.theme-light .border-gray-900 {
+  border-color: #e7e2d9 !important;
+}
+
+/* Chip / pill dark-mode overrides for common patterns */
+body.theme-light .bg-gray-900\/60 { background-color: rgba(230, 225, 217, 0.6) !important; }
+body.theme-light .bg-gray-800\/60 { background-color: rgba(230, 225, 217, 0.6) !important; }
+body.theme-light .bg-gray-800     { background-color: #f0ece5 !important; }
+body.theme-light .bg-gray-700     { background-color: #e7e2d9 !important; }
+
+/* Amber gradient text — legible on cream */
+body.theme-light .gradient-text-amber { color: #b45309 !important; }
+body.theme-light .gradient-text-cyan  { color: #0e7490 !important; }
+
 /* ── Mobile viewport height fix ───────────────────────────────
    Tailwind's `h-screen` compiles to `100vh` which on mobile ignores the
    URL bar height — panes render 60-80px too tall and clip content off
