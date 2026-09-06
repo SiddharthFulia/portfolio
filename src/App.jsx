@@ -102,6 +102,7 @@ const PhysicsLab          = lazyWithReload(() => import("./pages/PhysicsLab"));
 const Pathfinding         = lazyWithReload(() => import("./pages/Pathfinding"));
 const GestureMemes        = lazyWithReload(() => import("./pages/GestureMemes"));
 const GestureHammy        = lazyWithReload(() => import("./pages/GestureHammy"));
+const Osint               = lazyWithReload(() => import("./pages/OsintHub"));
 
 import GlassFilter from './components/GlassFilter';
 
@@ -288,6 +289,8 @@ const ROUTE_TITLES = {
   '/edit/library'  : 'Edited Videos · Sid',
   '/realism'         : 'Realism Lab · Sid',
   '/realism/library' : 'Realism Library · Sid',
+  '/osint'           : 'OSINT Powerhouse · Sid',
+  '/tools'           : 'OSINT Powerhouse · Sid',
 };
 const DEFAULT_TITLE = 'Siddharth Fulia · AI Engineer';
 const TitleManager = () => {
@@ -381,6 +384,10 @@ const App = () => {
           <Route path='/routes'          element={<Suspense fallback={<PageLoader />}><Pathfinding /></Suspense>} />
           <Route path='/gesture-memes'   element={<Suspense fallback={<PageLoader />}><GestureMemes /></Suspense>} />
           <Route path='/gesture-hammy'   element={<Suspense fallback={<PageLoader />}><GestureHammy /></Suspense>} />
+          {/* OSINT Powerhouse — 150+ intel APIs (live telemetry + full catalog).
+              `/tools` is an alias so both URLs resolve to the same page. */}
+          <Route path='/osint'           element={<Suspense fallback={<PageLoader />}><Osint /></Suspense>} />
+          <Route path='/tools'           element={<Suspense fallback={<PageLoader />}><Osint /></Suspense>} />
           <Route path='/summarizer'      element={<Suspense fallback={<PageLoader />}><SummarizerPage /></Suspense>} />
           <Route path='/yt-dl'           element={<Suspense fallback={<PageLoader />}><YoutubeDl /></Suspense>} />
           <Route path='/youtube'         element={<Suspense fallback={<PageLoader />}><YoutubeDl /></Suspense>} />
