@@ -18,13 +18,29 @@
 //
 // Camera: iso 45° or ortho top-down. Auto-rotate is a smooth 30 rpm.
 // Tap the canvas → toggles iso/top-down (matches tree.icqr.com's UX).
+//
+// ─── Scan-validity architecture ───────────────────────────────────────
+// The iso view is fully artistic — trees, towers, crystals, forests, lights.
+// But that same geometry would obscure the finder patterns and code modules
+// in a top-down snapshot, so jsQR can never lock on.
+//
+// So we keep the top-down snapshot on a SEPARATE code path
+// (renderTopDownFrame). It:
+//   • hides every "artistic" mesh (trees, towers, crystals, forest trees)
+//   • swaps the tile grid to pure black/white MeshBasic (no lighting)
+//   • frames the QR + a 4-module quiet zone
+//   • renders to an offscreen 720×720 canvas
+//   • feeds the ImageData to jsQR, retrying at 90/180/270°
+//   • restores the artistic scene for the next iso frame
+// A "Debug frame" button dumps that offscreen buffer as PNG so we can
+// inspect exactly what jsQR is decoding.
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Segmented, Switch, Tooltip } from 'antd'
 import { Button } from '../ui'
 import {
   CheckCircleFilled, CloseCircleFilled, DownloadOutlined,
-  ReloadOutlined, InfoCircleOutlined,
+  InfoCircleOutlined, BugOutlined,
 } from '@ant-design/icons'
 import * as THREE from 'three'
 import jsQR from 'jsqr'
@@ -45,24 +61,36 @@ const SEASONS = {
 const PALETTES = {
   'Tree Garden': {
     Spring: {
-      sky: '#f9e6ee', tileDark: '#3d3a48', tileLight: '#a3d977',
-      leaf: '#f9a8d4', wood: '#6b4d3a', ground: '#7ac74f',
-      ambient: 0.6, sunColor: '#ffe6b3',
+      sky: '#f9e6ee', tileDark: '#3d3a48', tileLight: '#8ec96a',
+      leaf: '#f9a8d4', wood: '#4a2f1c', ground: '#7ac74f',
+      ambient: 0.55, sunColor: '#ffe6b3',
+      // Per-leaf palette — a pastel spring mix (pink blossom + cream + tender green).
+      leafPalette: ['#f9c5d5', '#fbd6e4', '#fff1c1', '#c6e6a4', '#a2d47a'],
+      grassTuft: '#5b9b3a', snow: null,
     },
     Summer: {
       sky: '#dff5ff', tileDark: '#2b2e35', tileLight: '#5fbf47',
-      leaf: '#3f9142', wood: '#5a3f2b', ground: '#4fa93d',
-      ambient: 0.55, sunColor: '#fff2cc',
+      leaf: '#3f9142', wood: '#4a2f1c', ground: '#4fa93d',
+      ambient: 0.5, sunColor: '#fff2cc',
+      // Rich mixed greens — deep shadow → mid canopy → sunlit tips.
+      leafPalette: ['#2f7a34', '#3f9142', '#4faa4f', '#6bbf5c', '#88cc6b'],
+      grassTuft: '#357a2c', snow: null,
     },
     Autumn: {
       sky: '#ffd8a8', tileDark: '#3a2f28', tileLight: '#c78a3d',
-      leaf: '#e07a3f', wood: '#4a3120', ground: '#a55e2c',
+      leaf: '#e07a3f', wood: '#4a2f1c', ground: '#a55e2c',
       ambient: 0.5, sunColor: '#ffb480',
+      // Mustard yellow + burnt orange + brick red + brown.
+      leafPalette: ['#d4a017', '#e07a3f', '#c85a2b', '#8f3b1c', '#6b3a20'],
+      grassTuft: '#8c5a2c', snow: null,
     },
     Winter: {
       sky: '#dfe8f2', tileDark: '#3f4550', tileLight: '#ecf4ff',
       leaf: '#ffffff', wood: '#3b2b1e', ground: '#f0f4fa',
       ambient: 0.7, sunColor: '#cfd8e6',
+      // A few sparse snow-white leaves + a snow cap on the trunk.
+      leafPalette: ['#ffffff', '#f4f8fb', '#e7edf3'],
+      grassTuft: '#c9d3dd', snow: '#ffffff',
     },
   },
   'Voxel City': {
@@ -119,6 +147,19 @@ const PALETTES = {
   },
 }
 
+// Mesh keys that represent "artistic" geometry — everything that must be
+// hidden when we take the top-down scan snapshot. The tile grid + finder
+// pattern stays visible. `ground` is a big under-plate that also needs to
+// stay hidden so the QR sits on a clean quiet-zone white background.
+const ARTISTIC_KEYS = new Set([
+  'treeWood', 'treeLeaf',      // Tree Garden voxel tree, Fractal Forest trees
+  'buildingDark', 'buildingLight', // Voxel City towers (both dark towers + light plazas
+                                    // — light plazas are also raised blocks that
+                                    // would occlude the flat scan grid)
+  'crystal',                    // Crystal Cave columns
+  'ground',                     // Big fog-tinted under-plate
+])
+
 // A cheap deterministic hash so the same QR + theme produces the same
 // tree jitter / building height every render — flicker-free.
 function hash2(a, b) {
@@ -127,9 +168,293 @@ function hash2(a, b) {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296
 }
 
+// Deterministic RNG that walks forward — useful when we need a stream of
+// pseudo-randoms per tree (branches, leaves, tufts) but still want the
+// same shape on re-render.
+function makeRng(seed) {
+  let s = (seed | 0) || 1
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0
+    return s / 4294967296
+  }
+}
+
+// Convert a hex to a THREE.Color, then jitter its HSL slightly so a batch
+// of "the same colour" reads as a hand-painted variance range instead of
+// a flat block.
+function jitterColor(hex, rng, satJ = 0.1, lightJ = 0.1) {
+  const c = new THREE.Color(hex)
+  const hsl = { h: 0, s: 0, l: 0 }
+  c.getHSL(hsl)
+  hsl.s = Math.max(0, Math.min(1, hsl.s + (rng() - 0.5) * satJ * 2))
+  hsl.l = Math.max(0, Math.min(1, hsl.l + (rng() - 0.5) * lightJ * 2))
+  c.setHSL(hsl.h, hsl.s, hsl.l)
+  return c
+}
+
+// easeInOutCubic — used for the iso ↔ top-down camera transition.
+const easeInOutCubic = (t) => (t < 0.5
+  ? 4 * t * t * t
+  : 1 - Math.pow(-2 * t + 2, 3) / 2)
+
+// ─── Tree Garden — hand-crafted centrepiece tree ──────────────────────
+// Returns a THREE.Group with a tapered LatheGeometry trunk, 4-5 tapered
+// cylinder branches + twigs, an InstancedMesh of icosahedron leaf clusters
+// (200-500 leaves tinted from a per-season palette with per-leaf HSL
+// jitter), an optional Winter snow cap, and two soft ground-shadow rings.
+// Every material that needs to fade during the iso↔top transition is
+// pushed into `group.userData.fadeMaterials`.
+function buildTreeGardenCentrepiece(palette, season) {
+  const group = new THREE.Group()
+  group.name = 'treeGardenCentrepiece'
+  const rng = makeRng((season.length * 271) + 13)
+
+  const fadeMaterials = []
+  const registerFade = (mat) => {
+    mat.transparent = true
+    mat.opacity = 1
+    fadeMaterials.push(mat)
+  }
+
+  // Trunk — tapered LatheGeometry silhouette; base flare → narrow at fork.
+  const trunkH = 4.2
+  const trunkPoints = [
+    new THREE.Vector2(0.62, 0.0),
+    new THREE.Vector2(0.58, 0.35),
+    new THREE.Vector2(0.48, 0.9),
+    new THREE.Vector2(0.42, 1.7),
+    new THREE.Vector2(0.36, 2.6),
+    new THREE.Vector2(0.30, 3.4),
+    new THREE.Vector2(0.24, trunkH),
+  ]
+  const trunkGeom = new THREE.LatheGeometry(trunkPoints, 14)
+  const trunkMat = new THREE.MeshStandardMaterial({
+    color: palette.wood, roughness: 0.95, metalness: 0,
+  })
+  registerFade(trunkMat)
+  const trunk = new THREE.Mesh(trunkGeom, trunkMat)
+  trunk.castShadow = true; trunk.receiveShadow = true
+  group.add(trunk)
+
+  // Branches — 4 or 5 tapered cylinders splayed outward + up.
+  const branchCount = 4 + Math.floor(rng() * 2)
+  const branchTips = []
+  for (let i = 0; i < branchCount; i++) {
+    const azimuth = (i / branchCount) * Math.PI * 2 + rng() * 0.35
+    const yStart = trunkH * (0.55 + rng() * 0.15)
+    const length = 1.6 + rng() * 0.6
+    const tilt = 0.55 + rng() * 0.25
+    const rBase = 0.18, rTip = 0.07
+
+    const geom = new THREE.CylinderGeometry(rTip, rBase, length, 8, 1, false)
+    geom.translate(0, length / 2, 0)   // pivot at base
+    const mesh = new THREE.Mesh(geom, trunkMat)
+    mesh.rotation.set(0, azimuth, tilt)
+    mesh.position.set(0, yStart, 0)
+    mesh.castShadow = true
+    group.add(mesh)
+
+    const dirX = Math.sin(azimuth) * Math.sin(tilt)
+    const dirZ = Math.cos(azimuth) * Math.sin(tilt)
+    const dirY = Math.cos(tilt)
+    branchTips.push({
+      x: dirX * length,
+      y: yStart + dirY * length,
+      z: dirZ * length,
+    })
+
+    // 2-3 twigs per branch.
+    const twigCount = 2 + Math.floor(rng() * 2)
+    for (let t = 0; t < twigCount; t++) {
+      const twigLen = 0.5 + rng() * 0.4
+      const alongT = 0.55 + rng() * 0.35
+      const twigTilt = tilt - 0.35 - rng() * 0.25
+      const twigAz = azimuth + (rng() - 0.5) * 0.9
+      const twigGeom = new THREE.CylinderGeometry(0.03, 0.06, twigLen, 6, 1, false)
+      twigGeom.translate(0, twigLen / 2, 0)
+      const twig = new THREE.Mesh(twigGeom, trunkMat)
+      twig.rotation.set(0, twigAz, twigTilt)
+      twig.position.set(
+        dirX * length * alongT,
+        yStart + dirY * length * alongT,
+        dirZ * length * alongT,
+      )
+      group.add(twig)
+
+      const twigDirX = Math.sin(twigAz) * Math.sin(twigTilt)
+      const twigDirZ = Math.cos(twigAz) * Math.sin(twigTilt)
+      const twigDirY = Math.cos(twigTilt)
+      branchTips.push({
+        x: dirX * length * alongT + twigDirX * twigLen,
+        y: yStart + dirY * length * alongT + twigDirY * twigLen,
+        z: dirZ * length * alongT + twigDirZ * twigLen,
+        small: true,
+      })
+    }
+  }
+
+  // Leaves — InstancedMesh of icosahedra with per-instance palette colour.
+  const isWinter = season === 'Winter'
+  const leavesPerAnchor = isWinter ? 4 : 22
+  const crownExtraLeaves = isWinter ? 18 : 130
+
+  const anchors = branchTips.map((t) => ({
+    ...t, count: t.small ? Math.floor(leavesPerAnchor * 0.6) : leavesPerAnchor,
+  }))
+  const totalLeaves = anchors.reduce((s, a) => s + a.count, 0) + crownExtraLeaves
+
+  const leafGeom = new THREE.IcosahedronGeometry(0.42, 1)
+  const leafMat = new THREE.MeshStandardMaterial({
+    color: '#ffffff', roughness: 0.75, metalness: 0,
+  })
+  registerFade(leafMat)
+  const leafMesh = new THREE.InstancedMesh(leafGeom, leafMat, totalLeaves)
+  leafMesh.instanceColor = new THREE.InstancedBufferAttribute(
+    new Float32Array(totalLeaves * 3), 3,
+  )
+
+  const dummy = new THREE.Object3D()
+  let li = 0
+  const palettePool = palette.leafPalette || [palette.leaf]
+  const putLeaf = (px, py, pz, scale) => {
+    dummy.position.set(px, py, pz)
+    const s = scale * (0.75 + rng() * 0.6)
+    dummy.scale.set(s, s, s)
+    dummy.rotation.set(rng() * Math.PI, rng() * Math.PI, rng() * Math.PI)
+    dummy.updateMatrix()
+    leafMesh.setMatrixAt(li, dummy.matrix)
+    const baseHex = palettePool[Math.floor(rng() * palettePool.length)]
+    const c = jitterColor(baseHex, rng, 0.12, 0.12)
+    leafMesh.instanceColor.setXYZ(li, c.r, c.g, c.b)
+    li++
+  }
+
+  for (const a of anchors) {
+    for (let k = 0; k < a.count; k++) {
+      const jr = 0.35 + rng() * 0.4
+      const dx = (rng() - 0.5) * jr * 2
+      const dy = (rng() - 0.5) * jr * 1.6
+      const dz = (rng() - 0.5) * jr * 2
+      putLeaf(a.x + dx, a.y + dy, a.z + dz, a.small ? 0.8 : 1.0)
+    }
+  }
+  // Extra puff inside an ellipsoid above the trunk — reads as one canopy.
+  const crownCentreY = trunkH + 0.9
+  for (let k = 0; k < crownExtraLeaves; k++) {
+    const u = rng(), v = rng(), w = rng()
+    const r = Math.cbrt(u) * 2.1
+    const theta = Math.acos(1 - 2 * v)
+    const phi = 2 * Math.PI * w
+    const dx = r * Math.sin(theta) * Math.cos(phi)
+    const dy = r * Math.cos(theta) * 0.7
+    const dz = r * Math.sin(theta) * Math.sin(phi)
+    putLeaf(dx, crownCentreY + dy, dz, 1.0)
+  }
+  leafMesh.count = li
+  leafMesh.instanceMatrix.needsUpdate = true
+  leafMesh.instanceColor.needsUpdate = true
+  group.add(leafMesh)
+
+  // Winter snow cap on the trunk head.
+  if (isWinter && palette.snow) {
+    const snowMat = new THREE.MeshStandardMaterial({
+      color: palette.snow, roughness: 1, metalness: 0,
+    })
+    registerFade(snowMat)
+    const snowGeom = new THREE.SphereGeometry(
+      0.42, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2,
+    )
+    const cap = new THREE.Mesh(snowGeom, snowMat)
+    cap.position.set(0, trunkH + 0.05, 0)
+    cap.scale.set(1, 0.6, 1)
+    group.add(cap)
+  }
+
+  // Ground shadow — two rings simulate a radial falloff cheaply.
+  const shadowMat = new THREE.MeshBasicMaterial({
+    color: '#000000', transparent: true, opacity: 0.24, depthWrite: false,
+  })
+  fadeMaterials.push(shadowMat)
+  const shadow = new THREE.Mesh(new THREE.RingGeometry(0.1, 3.8, 40, 1), shadowMat)
+  shadow.rotation.x = -Math.PI / 2
+  shadow.position.y = 1.05  // sits above raised stone tiles
+  group.add(shadow)
+
+  const shadow2Mat = new THREE.MeshBasicMaterial({
+    color: '#000000', transparent: true, opacity: 0.18, depthWrite: false,
+  })
+  fadeMaterials.push(shadow2Mat)
+  const shadow2 = new THREE.Mesh(new THREE.RingGeometry(0.1, 2.4, 40, 1), shadow2Mat)
+  shadow2.rotation.x = -Math.PI / 2
+  shadow2.position.y = 1.055
+  group.add(shadow2)
+
+  group.userData.fadeMaterials = fadeMaterials
+  return group
+}
+
+// Grass tufts + snow scatter on ~20-60% of light cells — one InstancedMesh
+// of tiny icosahedrons so hundreds render in a single draw call.
+function buildTreeGardenGroundDressing(matrix, N, palette, season) {
+  const group = new THREE.Group()
+  group.name = 'treeGardenGround'
+  const isWinter = season === 'Winter'
+  const halfN = N / 2
+
+  const grassCells = []
+  for (let r = 0; r < N; r++) {
+    for (let c = 0; c < N; c++) {
+      if (matrix[r * N + c] === 1) continue
+      const h = hash2(r * 11 + 3, c * 17 + 5)
+      const inFinderQuiet =
+        (r < 8 && c < 8) || (r < 8 && c >= N - 8) || (r >= N - 8 && c < 8)
+      const nearTrunk = Math.abs(c - halfN + 0.5) < 1.2 && Math.abs(r - halfN + 0.5) < 1.2
+      if (inFinderQuiet || nearTrunk) continue
+      const threshold = isWinter ? 0.55 : 0.78
+      if (h < threshold) continue
+      grassCells.push({ r, c })
+    }
+  }
+  if (grassCells.length === 0) return group
+
+  const tuftGeom = new THREE.IcosahedronGeometry(0.06, 0)
+  const tuftMat = new THREE.MeshStandardMaterial({
+    color: isWinter ? (palette.snow || '#ffffff') : palette.grassTuft,
+    roughness: 0.9, metalness: 0,
+  })
+  tuftMat.transparent = true; tuftMat.opacity = 1
+  const im = new THREE.InstancedMesh(tuftGeom, tuftMat, grassCells.length * 3)
+  const dummy = new THREE.Object3D()
+  let i = 0
+  const rng = makeRng(matrix.length * 7 + N * 13)
+  for (const { r, c } of grassCells) {
+    const x = c - halfN + 0.5
+    const z = r - halfN + 0.5
+    const n = 1 + Math.floor(rng() * 3)
+    for (let k = 0; k < n; k++) {
+      const jx = (rng() - 0.5) * 0.6
+      const jz = (rng() - 0.5) * 0.6
+      const sy = 0.8 + rng() * 0.9
+      dummy.position.set(x + jx, 0.19 + (isWinter ? 0.02 : 0), z + jz)
+      dummy.scale.set(1, sy, 1)
+      dummy.rotation.set(0, rng() * Math.PI, 0)
+      dummy.updateMatrix()
+      im.setMatrixAt(i, dummy.matrix)
+      i++
+    }
+  }
+  im.count = i
+  im.instanceMatrix.needsUpdate = true
+  group.add(im)
+  group.userData.fadeMaterials = [tuftMat]
+  return group
+}
+
 // Build a small voxel tree — trunk + a puffball crown. Returns a list of
 // { position:[x,y,z], scale:[sx,sy,sz], type:'wood'|'leaf' } items so the
 // caller can push them into the correct InstancedMesh.
+// NOTE: retained for reference; Tree Garden theme now uses
+// buildTreeGardenCentrepiece() for a more realistic result.
 function buildVoxelTree(cx, cz, seed, opts = {}) {
   const trunkH = 3 + Math.floor(hash2(seed, 1) * 3)     // 3..5 units
   const crownR = opts.crownR ?? 2.2
@@ -183,6 +508,11 @@ function buildForestTree(cx, cz, seed) {
 // separated out so we can reason about instance counts without the
 // three.js side-effects.
 //
+// The output also carries a "scan" companion for every cell — a pure
+// black/white flat tile at y=0 that the top-down snapshot uses. Those
+// tiles live under separate keys (`scanDark`, `scanLight`, `scanQuiet`)
+// so we can toggle them independently of the artistic geometry.
+//
 // Returns { instances: { key: { color, transforms: [] } }, meta: { counts } }
 function buildSceneData(matrix, N, theme, season) {
   const palette = PALETTES[theme][season]
@@ -193,8 +523,34 @@ function buildSceneData(matrix, N, theme, season) {
   }
 
   const halfN = N / 2
-  const cellSize = 1 // world units per module
+  const QUIET = 4  // modules of quiet zone on each side — jsQR needs ≥4
 
+  // ── Flat scan tiles (used only by top-down snapshot) ──
+  // One pure-black tile per dark module, one pure-white tile per light
+  // module. Rendered as thin flat cubes at y = 0.02 so they always sit
+  // ABOVE the ground plane and BELOW any artistic geometry.
+  for (let r = 0; r < N; r++) {
+    for (let c = 0; c < N; c++) {
+      const dark = matrix[r * N + c] === 1
+      const x = c - halfN + 0.5
+      const z = r - halfN + 0.5
+      if (dark) {
+        push('scanDark', { color: '#000000' },
+          { pos: [x, 0.02, z], scale: [1, 0.02, 1] })
+      } else {
+        push('scanLight', { color: '#ffffff' },
+          { pos: [x, 0.02, z], scale: [1, 0.02, 1] })
+      }
+    }
+  }
+  // Quiet-zone ring — a single big white plate under the QR, extending
+  // QUIET modules past each side. Sits at y = 0.015 so it's below the
+  // per-cell scan tiles. During snapshot everything else is hidden so
+  // this reads as a clean white margin.
+  push('scanQuiet', { color: '#ffffff' },
+    { pos: [0, 0.015, 0], scale: [N + QUIET * 2, 0.01, N + QUIET * 2] })
+
+  // ── Artistic tiles (iso view) ──
   for (let r = 0; r < N; r++) {
     for (let c = 0; c < N; c++) {
       const idx = r * N + c
@@ -206,13 +562,20 @@ function buildSceneData(matrix, N, theme, season) {
 
       if (theme === 'Tree Garden') {
         if (dark) {
-          // Raised stone tile — cube height 0.9.
-          push('tileDark', { color: palette.tileDark, roughness: 0.85 },
-            { pos: [x, 0.45, z], scale: [1, 0.9, 1] })
+          // Raised stone tile — cube height 0.9. Per-instance shade adds
+          // a low-frequency brightness variance so the field of stones
+          // reads as slightly weathered instead of flat blocks.
+          const h1 = hash2(r + 17, c + 91)
+          const shade = 0.85 + h1 * 0.3
+          push('tileDark', { color: palette.tileDark, roughness: 0.95 },
+            { pos: [x, 0.45, z], scale: [1, 0.9, 1], shade })
         } else {
-          // Grass tile — cube height 0.15.
-          push('tileLight', { color: palette.tileLight, roughness: 0.9 },
-            { pos: [x, 0.075, z], scale: [1, 0.15, 1] })
+          // Grass tile — cube height 0.15. Slight per-instance hue jitter
+          // so tufts sit on subtly different greens (or snows).
+          const h1 = hash2(r * 3 + 7, c * 5 + 11)
+          const shade = 0.9 + h1 * 0.25
+          push('tileLight', { color: palette.tileLight, roughness: 0.95 },
+            { pos: [x, 0.075, z], scale: [1, 0.15, 1], shade })
         }
       } else if (theme === 'Voxel City') {
         if (dark) {
@@ -255,22 +618,12 @@ function buildSceneData(matrix, N, theme, season) {
     }
   }
 
-  // Overlay geometry (voxel tree in the centre for Tree Garden, forest
-  // trees per dark cell for Fractal Forest).
-  if (theme === 'Tree Garden') {
-    // The tree lives at the centre of the QR (which may fall on a real
-    // cell). We use hash of theme+season for a stable seed so re-renders
-    // don't jitter.
-    const treeSeed = theme.length * 31 + season.length
-    const parts = buildVoxelTree(0, 0, treeSeed, { crownR: 3.2 })
-    for (const p of parts) {
-      const mat = p.type === 'wood'
-        ? { color: palette.wood, roughness: 0.9 }
-        : { color: palette.leaf, roughness: 0.7 }
-      push(p.type === 'wood' ? 'treeWood' : 'treeLeaf', mat,
-        { pos: p.pos, scale: p.scale })
-    }
-  } else if (theme === 'Fractal Forest') {
+  // Overlay geometry. Tree Garden's centrepiece tree lives outside the
+  // instance graph as a THREE.Group (see buildTreeGardenCentrepiece) so
+  // we can fade its opacity independently during camera transitions and
+  // the sibling top-down scan pass can hide it without touching the tiles.
+  // Fractal Forest still uses the instance path — one small tree per dark cell.
+  if (theme === 'Fractal Forest') {
     // One small tree per dark cell. Skip finder ring corners for
     // scannability + performance.
     for (let r = 0; r < N; r++) {
@@ -307,11 +660,15 @@ function buildSceneData(matrix, N, theme, season) {
     counts[k] = inst[k].transforms.length
     total += counts[k]
   }
-  return { instances: inst, meta: { counts, total, palette } }
+  return { instances: inst, meta: { counts, total, palette, quiet: QUIET } }
 }
 
+// Keys used by the scan-only render path. Everything else stays hidden
+// during the snapshot.
+const SCAN_KEYS = new Set(['scanDark', 'scanLight', 'scanQuiet'])
+
 // ─── Three renderer — wires up scene / camera / lights / instances. ───
-function buildThreeScene(canvas, sceneData, theme, season, N) {
+function buildThreeScene(canvas, sceneData, theme, season, N, matrix) {
   const dpr = Math.min(window.devicePixelRatio || 1, 2)
   const w = canvas.clientWidth || 640
   const h = canvas.clientHeight || 640
@@ -320,48 +677,80 @@ function buildThreeScene(canvas, sceneData, theme, season, N) {
   })
   renderer.setPixelRatio(dpr)
   renderer.setSize(w, h, false)
-  renderer.shadowMap.enabled = false
+  // PCFSoftShadowMap enables the soft-drop-shadow reading on the tree
+  // trunk + tiles for Tree Garden. Other themes ignore it (nothing casts).
+  renderer.shadowMap.enabled = true
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(sceneData.meta.palette.sky)
   scene.fog = new THREE.Fog(sceneData.meta.palette.sky, N * 1.5, N * 4)
 
-  // Lights
-  const ambient = new THREE.AmbientLight(0xffffff, sceneData.meta.palette.ambient)
+  // Lights — kept as refs so the scan pass can temporarily neutralise
+  // them (we want unlit black/white for jsQR).
+  const ambient = new THREE.AmbientLight(
+    0xffffff, Math.min(sceneData.meta.palette.ambient, 0.4),
+  )
   scene.add(ambient)
-  const sun = new THREE.DirectionalLight(sceneData.meta.palette.sunColor, 0.8)
+  const sun = new THREE.DirectionalLight(sceneData.meta.palette.sunColor, 0.9)
   sun.position.set(N * 0.6, N * 1.2, N * 0.4)
   scene.add(sun)
-  // A small fill from the opposite side keeps voxel faces from going flat black.
-  const fill = new THREE.DirectionalLight('#ffffff', 0.25)
+  // HemisphereLight — sky/ground wrap-around. Reads as gentle bounce
+  // light and stops voxel faces from going flat black.
+  const hemi = new THREE.HemisphereLight(
+    sceneData.meta.palette.sky, sceneData.meta.palette.ground || '#333', 0.35,
+  )
+  scene.add(hemi)
+  const fill = new THREE.DirectionalLight('#ffffff', 0.2)
   fill.position.set(-N * 0.5, N * 0.4, -N * 0.5)
   scene.add(fill)
 
   // Cameras
   const isoCam = new THREE.OrthographicCamera(-N, N, N, -N, 0.1, N * 6)
   isoCam.position.set(N * 1.2, N * 1.3, N * 1.2)
+  isoCam.up.set(0, 1, 0)
   isoCam.lookAt(0, 0, 0)
 
-  const topCam = new THREE.OrthographicCamera(-N * 0.65, N * 0.65, N * 0.65, -N * 0.65, 0.1, N * 6)
-  topCam.position.set(0, N * 2.2, 0.001)  // tiny z offset avoids up-vector ambiguity
+  // Top-down camera — pure ortho, tight framing = N + 2*quiet zone. We
+  // use up=(0,0,-1) so matrix row 0 (top of the QR) renders at the top
+  // of the image; that matches jsQR's row-major expectation exactly.
+  const quiet = sceneData.meta.quiet ?? 4
+  const half = (N + quiet * 2) / 2
+  const topCam = new THREE.OrthographicCamera(-half, half, half, -half, 0.1, N * 6)
+  topCam.position.set(0, N * 3, 0.001)  // near-vertical, tiny z avoids up-vector nan
+  topCam.up.set(0, 0, -1)
   topCam.lookAt(0, 0, 0)
+  topCam.updateProjectionMatrix()
 
-  // InstancedMeshes
+  // liveCam — the camera we actually render with each frame. Its position
+  // + up are lerped between isoCam and topCam whenever the user toggles
+  // the view, giving a smooth easeInOutCubic transition instead of a snap.
+  const liveCam = new THREE.OrthographicCamera(-N, N, N, -N, 0.1, N * 6)
+  liveCam.position.copy(isoCam.position)
+  liveCam.up.copy(isoCam.up)
+  liveCam.lookAt(0, 0, 0)
+  liveCam.updateProjectionMatrix()
+
+  // InstancedMeshes for tiles / buildings / crystals / fractal-forest trees.
   const boxGeom = new THREE.BoxGeometry(1, 1, 1)
   const meshes = {}
   const dummy = new THREE.Object3D()
   for (const key of Object.keys(sceneData.instances)) {
     const entry = sceneData.instances[key]
     const matProps = entry.material
-    const mat = new THREE.MeshStandardMaterial({
-      color: matProps.color,
-      roughness: matProps.roughness ?? 0.7,
-      metalness: matProps.metalness ?? 0,
-      emissive: matProps.emissive ?? '#000000',
-      emissiveIntensity: matProps.emissiveIntensity ?? 0,
-      transparent: matProps.transparent || false,
-      opacity: matProps.opacity ?? 1,
-    })
+    // Scan tiles are unlit — MeshBasic gives us pure #000/#fff regardless
+    // of ambient / directional lights, which is exactly what jsQR wants.
+    const mat = SCAN_KEYS.has(key)
+      ? new THREE.MeshBasicMaterial({ color: matProps.color, toneMapped: false })
+      : new THREE.MeshStandardMaterial({
+          color: matProps.color,
+          roughness: matProps.roughness ?? 0.7,
+          metalness: matProps.metalness ?? 0,
+          emissive: matProps.emissive ?? '#000000',
+          emissiveIntensity: matProps.emissiveIntensity ?? 0,
+          transparent: matProps.transparent || false,
+          opacity: matProps.opacity ?? 1,
+        })
     const im = new THREE.InstancedMesh(boxGeom, mat, entry.transforms.length)
     im.count = entry.transforms.length
     entry.transforms.forEach((t, i) => {
@@ -372,33 +761,224 @@ function buildThreeScene(canvas, sceneData, theme, season, N) {
       im.setMatrixAt(i, dummy.matrix)
     })
     im.instanceMatrix.needsUpdate = true
+    // Per-instance shade — if any transform carries a `shade` field, we
+    // build an instanceColor attribute so tiles/stones shimmer with a
+    // low-frequency brightness variance instead of reading as flat.
+    if (entry.transforms.some((t) => t.shade !== undefined)) {
+      const baseColor = new THREE.Color(matProps.color)
+      const arr = new Float32Array(entry.transforms.length * 3)
+      for (let i = 0; i < entry.transforms.length; i++) {
+        const shade = entry.transforms[i].shade ?? 1
+        const c = baseColor.clone().multiplyScalar(shade)
+        arr[i * 3 + 0] = c.r
+        arr[i * 3 + 1] = c.g
+        arr[i * 3 + 2] = c.b
+      }
+      im.instanceColor = new THREE.InstancedBufferAttribute(arr, 3)
+      im.instanceColor.needsUpdate = true
+    }
+    // Tile grid receives shadows so the tree's cast reads.
+    if (key === 'tileDark' || key === 'tileLight') im.receiveShadow = true
+    // Scan meshes stay hidden by default — iso view never shows them.
+    if (SCAN_KEYS.has(key)) im.visible = false
     scene.add(im)
     meshes[key] = im
   }
 
-  return { renderer, scene, isoCam, topCam, meshes }
+  // Tree Garden centrepiece + ground dressing live outside the instance
+  // graph so we can fade them independently during camera transitions
+  // AND the sibling top-down scan pass can hide them wholesale.
+  let treeOverlay = null
+  let groundOverlay = null
+  if (theme === 'Tree Garden' && matrix) {
+    treeOverlay = buildTreeGardenCentrepiece(sceneData.meta.palette, season)
+    scene.add(treeOverlay)
+    groundOverlay = buildTreeGardenGroundDressing(
+      matrix, N, sceneData.meta.palette, season,
+    )
+    scene.add(groundOverlay)
+  }
+
+  return {
+    renderer, scene, isoCam, topCam, liveCam, meshes,
+    treeOverlay, groundOverlay,
+    lights: { ambient, sun, fill, hemi },
+  }
+}
+
+// ─── Top-down scan-frame renderer ─────────────────────────────────────
+// Renders the QR + quiet-zone as a pure black/white top-down snapshot
+// into `outCanvas` (a 2D canvas — used only for the debug PNG), and
+// returns the RGBA ImageData for jsQR.
+//
+// Implementation note: three.js WebGLRenderer takes over a canvas's
+// context, so we can't share one canvas between WebGL rendering + 2D
+// pixel reads. We render to an internal WebGL canvas, then blit into
+// the caller's 2D canvas via drawImage so `getImageData` and
+// `toDataURL` both work on `outCanvas`.
+function renderTopDownFrame(state, outCanvas) {
+  const size = outCanvas.width
+  // Dedicated WebGL canvas — kept off-DOM. One per call is fine; renderer
+  // + context are cheap at 720² and immediately disposed.
+  const glCanvas = document.createElement('canvas')
+  glCanvas.width = size
+  glCanvas.height = size
+  const snap = new THREE.WebGLRenderer({
+    canvas: glCanvas, antialias: false, preserveDrawingBuffer: true, alpha: false,
+  })
+  snap.setPixelRatio(1)
+  snap.setSize(size, size, false)
+  snap.setClearColor(new THREE.Color('#ffffff'), 1)  // white quiet zone
+
+  // Stash + swap: hide artistic meshes, show scan meshes.
+  const prevVis = {}
+  for (const key of Object.keys(state.meshes)) {
+    prevVis[key] = state.meshes[key].visible
+  }
+  for (const key of Object.keys(state.meshes)) {
+    if (SCAN_KEYS.has(key)) state.meshes[key].visible = true
+    else state.meshes[key].visible = false
+  }
+  // Tree Garden overlay Groups (centrepiece + ground dressing) live
+  // outside the instance graph — hide them for the snapshot too.
+  const prevTreeVis = state.treeOverlay?.visible
+  const prevGroundVis = state.groundOverlay?.visible
+  if (state.treeOverlay) state.treeOverlay.visible = false
+  if (state.groundOverlay) state.groundOverlay.visible = false
+
+  // Stash + neutralise background/fog. Scan meshes are MeshBasic so
+  // lights don't matter, but killing the fog also removes the sky-tinted
+  // haze from the render.
+  const prevBg = state.scene.background
+  const prevFog = state.scene.fog
+  state.scene.background = new THREE.Color('#ffffff')
+  state.scene.fog = null
+
+  snap.render(state.scene, state.topCam)
+
+  // Blit the WebGL frame into the 2D canvas so downstream getImageData /
+  // toDataURL calls work.
+  const ctx = outCanvas.getContext('2d')
+  ctx.clearRect(0, 0, size, size)
+  ctx.drawImage(glCanvas, 0, 0, size, size)
+  const img = ctx.getImageData(0, 0, size, size)
+
+  // Restore artistic scene.
+  for (const key of Object.keys(state.meshes)) {
+    state.meshes[key].visible = prevVis[key]
+  }
+  if (state.treeOverlay) state.treeOverlay.visible = prevTreeVis
+  if (state.groundOverlay) state.groundOverlay.visible = prevGroundVis
+  state.scene.background = prevBg
+  state.scene.fog = prevFog
+
+  snap.dispose()
+  return img
+}
+
+// Rotate an RGBA ImageData 90° clockwise into a fresh ImageData.
+function rotateImageData90(img) {
+  const w = img.width, h = img.height
+  const out = new ImageData(h, w)
+  const src = img.data, dst = out.data
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const si = (y * w + x) * 4
+      const dx = h - 1 - y
+      const dy = x
+      const di = (dy * h + dx) * 4
+      dst[di] = src[si]
+      dst[di + 1] = src[si + 1]
+      dst[di + 2] = src[si + 2]
+      dst[di + 3] = src[si + 3]
+    }
+  }
+  return out
+}
+
+// Compute contrast between mean dark-cell luminance and mean light-cell
+// luminance in an ImageData. Returns { contrast, meanDark, meanLight }
+// on a 0..255 scale. Used for the failure-reason heuristic.
+function measureContrast(img) {
+  const { data, width, height } = img
+  let sumDark = 0, cntDark = 0, sumLight = 0, cntLight = 0
+  // Sample every 4th pixel to keep the maths fast on 720×720.
+  for (let i = 0; i < data.length; i += 16) {
+    const l = (data[i] + data[i + 1] + data[i + 2]) / 3
+    if (l < 96)      { sumDark += l;  cntDark++ }
+    else if (l > 160) { sumLight += l; cntLight++ }
+  }
+  const meanDark = cntDark ? sumDark / cntDark : 0
+  const meanLight = cntLight ? sumLight / cntLight : 255
+  return { contrast: meanLight - meanDark, meanDark, meanLight }
+}
+
+// Run jsQR at 4 rotations and return the first hit. `expected` is the
+// payload we're supposed to be encoding — if jsQR returns something
+// but it doesn't match, we treat that as a data mismatch (still a fail).
+function decodeWithRotations(img, expected) {
+  const attempts = []
+  let cur = img
+  for (let rot = 0; rot < 4; rot++) {
+    if (rot > 0) cur = rotateImageData90(cur)
+    const r = jsQR(cur.data, cur.width, cur.height, { inversionAttempts: 'attemptBoth' })
+    attempts.push({ rot: rot * 90, hit: !!r, data: r?.data ?? null })
+    if (r) {
+      // Success if we didn't specify an expected payload, OR if it matches
+      // exactly. If we got a QR but the data is wrong, keep trying — but
+      // remember it in case nothing else works.
+      if (!expected || r.data === expected) {
+        return { ok: true, data: r.data, rot: rot * 90, attempts }
+      }
+    }
+  }
+  // Nothing matched. If jsQR decoded SOMETHING (even a mismatch), report
+  // that specifically. Otherwise report "no decode".
+  const anyHit = attempts.find((a) => a.hit)
+  return {
+    ok: false,
+    data: anyHit?.data ?? '',
+    rot: anyHit?.rot ?? null,
+    mismatch: !!anyHit,
+    attempts,
+  }
 }
 
 // ─── The React component ──────────────────────────────────────────────
-export default function QRScenes3D({ matrixData, ecc }) {
+export default function QRScenes3D({ matrixData, ecc, payload }) {
   const [theme, setTheme] = useState('Tree Garden')
   const [season, setSeason] = useState('Summer')
   const [view, setView] = useState('Iso')      // 'Iso' | 'Top'
   const [autoRotate, setAutoRotate] = useState(true)
   const [instanceTotal, setInstanceTotal] = useState(0)
   const [scenePresent, setScenePresent] = useState(false)
-  const [scanRes, setScanRes] = useState({ ok: false, data: '' })
+  // scanRes: { ok, data, rot, reason?, contrast?, pxPerModule? }
+  const [scanRes, setScanRes] = useState({ ok: false, data: '', reason: 'pending' })
+  const [debugPngUrl, setDebugPngUrl] = useState(null)
 
   // Keep season valid whenever theme changes.
   useEffect(() => {
     if (!SEASONS[theme].includes(season)) setSeason(SEASONS[theme][0])
   }, [theme, season])
 
+  // Progress bar % during the iso↔top camera transition (0 when idle).
+  const [transitionPct, setTransitionPct] = useState(0)
+
   // three.js refs — persist across renders without triggering React.
   const canvasRef = useRef(null)
   const stateRef = useRef({
-    renderer: null, scene: null, isoCam: null, topCam: null,
-    meshes: {}, raf: 0, angle: 0, lastTS: 0, view: 'Iso', autoRotate: true, N: 21,
+    renderer: null, scene: null,
+    isoCam: null, topCam: null, liveCam: null,
+    meshes: {}, treeOverlay: null, groundOverlay: null,
+    lights: null, raf: 0, angle: 0, lastTS: 0,
+    view: 'Iso', autoRotate: true, N: 21,
+    // Cached offscreen scan canvas — 720 px gives ~24 px/module on a
+    // 30-module QR, plenty of headroom for jsQR's ≥10 px/module target.
+    scanCanvas: null,
+    // Camera easing state. `transition` is null when settled, otherwise
+    // holds { fromPos, fromUp, toPos, toUp, targetMode, start, dur }.
+    // `currentMode` is where we're settled ('Iso' or 'Top').
+    transition: null, currentMode: 'Iso',
   })
 
   // Cleanup on unmount — release the WebGL context and cancel any RAF.
@@ -440,19 +1020,61 @@ export default function QRScenes3D({ matrixData, ecc }) {
     }
     const sceneData = buildSceneData(matrixData.matrix, matrixData.N, theme, season)
     setInstanceTotal(sceneData.meta.total)
-    const built = buildThreeScene(canvas, sceneData, theme, season, matrixData.N)
+    const built = buildThreeScene(
+      canvas, sceneData, theme, season, matrixData.N, matrixData.matrix,
+    )
     stateRef.current.renderer = built.renderer
     stateRef.current.scene = built.scene
     stateRef.current.isoCam = built.isoCam
     stateRef.current.topCam = built.topCam
+    stateRef.current.liveCam = built.liveCam
     stateRef.current.meshes = built.meshes
+    stateRef.current.treeOverlay = built.treeOverlay
+    stateRef.current.groundOverlay = built.groundOverlay
+    stateRef.current.lights = built.lights
     stateRef.current.N = matrixData.N
+    // Cache the iso sky / fog on the scene itself so the animation tick
+    // can restore them cleanly after a top-down frame. Storing on
+    // stateRef would leak across scene rebuilds; storing on the scene
+    // makes it self-contained.
+    stateRef.current.scene.userData.isoBg = built.scene.background
+    stateRef.current.scene.userData.isoFog = built.scene.fog
+    // Re-seat the live camera to whichever mode is currently selected.
+    // No transition on scene rebuild — it's a hard reset.
+    const targetCam = view === 'Top' ? built.topCam : built.isoCam
+    built.liveCam.position.copy(targetCam.position)
+    built.liveCam.up.copy(targetCam.up)
+    built.liveCam.lookAt(0, 0, 0)
+    built.liveCam.updateProjectionMatrix()
+    stateRef.current.currentMode = view
+    stateRef.current.transition = null
+    setTransitionPct(0)
     setScenePresent(true)
   }, [matrixData, theme, season])
 
   // Keep the refs' latest view/autoRotate in sync without recreating the RAF.
   useEffect(() => { stateRef.current.view = view }, [view])
   useEffect(() => { stateRef.current.autoRotate = autoRotate }, [autoRotate])
+
+  // View toggle → schedule a smooth easeInOutCubic camera transition.
+  // Iso ↔ Top interpolates position + up over ~750ms. Auto-rotate is
+  // implicitly suppressed by the loop while `transition` is non-null.
+  useEffect(() => {
+    const s = stateRef.current
+    if (!s.liveCam || !s.isoCam || !s.topCam) return
+    if (s.currentMode === view && !s.transition) return
+    const targetCam = view === 'Top' ? s.topCam : s.isoCam
+    s.transition = {
+      fromPos: s.liveCam.position.clone(),
+      fromUp: s.liveCam.up.clone(),
+      toPos: targetCam.position.clone(),
+      toUp: targetCam.up.clone(),
+      targetMode: view,
+      start: performance.now(),
+      dur: 750,   // ms — comfortable easeInOutCubic in the 600-900 range
+    }
+    setTransitionPct(1)
+  }, [view])
 
   // Resize handling.
   useEffect(() => {
@@ -470,30 +1092,162 @@ export default function QRScenes3D({ matrixData, ecc }) {
     return () => window.removeEventListener('resize', on)
   }, [scenePresent])
 
-  // Animation loop — camera orbit for iso, static top-down.
+  // Animation loop — camera orbit for iso, static top-down, and a smooth
+  // easeInOutCubic blend between the two whenever the user toggles view.
+  //
+  // During a transition:
+  //   • liveCam.position + liveCam.up lerp toward the target pose
+  //   • artistic geometry (tiles/buildings/etc + Tree Garden overlay)
+  //     opacity-fades so the top-down snapshot lands clean
+  //   • scan meshes stay hidden — sibling agent's scan pass runs off-screen
+  //     against the same scene, we just don't reveal the raw B/W tiles
+  //     until we've settled at the top pose
+  //
+  // When settled:
+  //   • iso mode → artistic meshes visible + solid, scan meshes hidden,
+  //     palette-tinted sky/fog restored, auto-rotate resumes
+  //   • top mode → scan meshes visible + white background (sibling's
+  //     established "clean preview" behaviour), artistic meshes hidden
   useEffect(() => {
     if (!scenePresent) return
     const s = stateRef.current
     let running = true
 
+    const whiteBg = new THREE.Color('#ffffff')
+
+    // Snap mesh visibility for a settled mode.
+    const settleMeshVisibility = (mode) => {
+      for (const key of Object.keys(s.meshes)) {
+        const im = s.meshes[key]
+        if (SCAN_KEYS.has(key)) im.visible = mode === 'top'
+        else im.visible = mode === 'iso'
+      }
+      if (s.treeOverlay) s.treeOverlay.visible = mode === 'iso'
+      if (s.groundOverlay) s.groundOverlay.visible = mode === 'iso'
+    }
+
+    // During a transition we keep artistic geometry visible but crossfade
+    // its opacity. Overlays fade via their fadeMaterials array.
+    const applyTransitionOpacity = (artisticOpacity) => {
+      for (const key of Object.keys(s.meshes)) {
+        if (SCAN_KEYS.has(key)) { s.meshes[key].visible = false; continue }
+        const im = s.meshes[key]
+        im.visible = true
+        const mat = im.material
+        if (mat) {
+          mat.transparent = true
+          mat.opacity = artisticOpacity
+          mat.depthWrite = artisticOpacity > 0.98
+        }
+      }
+      for (const overlay of [s.treeOverlay, s.groundOverlay]) {
+        if (!overlay) continue
+        overlay.visible = true
+        const mats = overlay.userData?.fadeMaterials || []
+        for (const m of mats) {
+          m.transparent = true
+          m.opacity = artisticOpacity
+        }
+      }
+    }
+
+    // Restore artistic meshes' materials to a fully-opaque state (used
+    // when a transition settles at Iso — we don't want the tile grid to
+    // stay transparent forever).
+    const resetArtisticOpacity = () => {
+      for (const key of Object.keys(s.meshes)) {
+        if (SCAN_KEYS.has(key)) continue
+        const mat = s.meshes[key].material
+        if (mat) {
+          // Only reset materials we might have touched. Crystal Cave
+          // columns are naturally transparent — leave those alone.
+          if (key === 'crystal') { mat.opacity = 0.85; continue }
+          mat.opacity = 1
+          mat.transparent = false
+          mat.depthWrite = true
+        }
+      }
+      for (const overlay of [s.treeOverlay, s.groundOverlay]) {
+        if (!overlay) continue
+        for (const m of (overlay.userData?.fadeMaterials || [])) {
+          m.opacity = 1
+        }
+      }
+    }
+
     const tick = (ts) => {
       if (!running) return
       const dt = s.lastTS ? (ts - s.lastTS) / 1000 : 0
       s.lastTS = ts
-      let cam = s.view === 'Top' ? s.topCam : s.isoCam
-      if (s.view === 'Iso' && s.autoRotate) {
-        // 30 rpm = 0.5 rev/s = π rad/s → but the brief says slowly at 30 rpm
-        // which for a "slow" camera looks better as one revolution per 8s.
-        s.angle += dt * (2 * Math.PI / 8)
-        const N = s.N
-        const R = N * 1.6
-        cam.position.set(
-          Math.cos(s.angle) * R,
-          N * 1.3,
-          Math.sin(s.angle) * R,
-        )
+
+      const cam = s.liveCam
+      const N = s.N
+
+      if (s.transition) {
+        // Camera easing.
+        const rawT = Math.min(1, (ts - s.transition.start) / s.transition.dur)
+        const k = easeInOutCubic(rawT)
+        cam.position.lerpVectors(s.transition.fromPos, s.transition.toPos, k)
+        cam.up.copy(s.transition.fromUp).lerp(s.transition.toUp, k).normalize()
         cam.lookAt(0, 0, 0)
+        cam.updateProjectionMatrix()
+
+        // Artistic opacity: 1 → 0 when moving to Top, 0 → 1 when back to Iso.
+        const toTop = s.transition.targetMode === 'Top'
+        const artisticOpacity = toTop ? (1 - k) : k
+        applyTransitionOpacity(artisticOpacity)
+
+        // Keep the palette sky during Iso→Top so the artistic geometry
+        // fades against its natural background; switch to white right as
+        // we settle so the top preview reads clean.
+        s.scene.background = s.scene.userData.isoBg ?? s.scene.background
+        s.scene.fog = s.scene.userData.isoFog ?? s.scene.fog
+
+        setTransitionPct(Math.round(k * 100))
+
+        if (rawT >= 1) {
+          s.currentMode = s.transition.targetMode
+          s.transition = null
+          setTransitionPct(0)
+          if (s.currentMode === 'Iso') resetArtisticOpacity()
+          settleMeshVisibility(s.currentMode === 'Top' ? 'top' : 'iso')
+        }
+      } else {
+        // Settled — sibling agent's mode logic controls the on-screen view.
+        const mode = s.view === 'Top' ? 'top' : 'iso'
+        settleMeshVisibility(mode)
+        if (mode === 'top') {
+          s.scene.background = whiteBg
+          s.scene.fog = null
+        } else {
+          s.scene.background = s.scene.userData.isoBg ?? s.scene.background
+          s.scene.fog = s.scene.userData.isoFog ?? s.scene.fog
+        }
+
+        if (mode === 'iso' && s.autoRotate) {
+          // Slow premium orbit — one revolution every 14s.
+          s.angle += dt * (2 * Math.PI / 14)
+          const R = N * 1.6
+          cam.position.set(
+            Math.cos(s.angle) * R,
+            N * 1.3,
+            Math.sin(s.angle) * R,
+          )
+          cam.up.set(0, 1, 0)
+          // Mirror onto isoCam so a subsequent transition starts from the
+          // same pose the user was watching.
+          s.isoCam.position.copy(cam.position)
+          s.isoCam.up.copy(cam.up)
+          cam.lookAt(0, 0, 0)
+          cam.updateProjectionMatrix()
+        } else if (mode === 'top') {
+          cam.position.copy(s.topCam.position)
+          cam.up.copy(s.topCam.up)
+          cam.lookAt(0, 0, 0)
+          cam.updateProjectionMatrix()
+        }
       }
+
       s.renderer.render(s.scene, cam)
       s.raf = requestAnimationFrame(tick)
     }
@@ -504,35 +1258,60 @@ export default function QRScenes3D({ matrixData, ecc }) {
     }
   }, [scenePresent])
 
-  // ─── Top-down scan validity check — every time the top-down view mounts
-  // or the theme changes, we render one top-down frame to an offscreen
-  // canvas, feed to jsQR, and store the result. Debounced so we don't
-  // thrash while auto-rotate is spinning.
+  // ─── Top-down scan validity check ─────────────────────────────────
+  // Fired 200ms after scene / theme / season changes (debounced so we
+  // don't thrash during auto-rotate). Renders the pure black/white QR
+  // to a 720×720 offscreen canvas and feeds jsQR at all four rotations.
   useEffect(() => {
     if (!scenePresent) return
     if (!matrixData) return
-    // Delay a frame so the scene has been rendered at least once.
     const t = setTimeout(() => {
       const s = stateRef.current
-      if (!s.renderer) return
-      // Render into an offscreen 512×512 canvas.
-      const off = document.createElement('canvas')
-      const size = 512
-      off.width = size; off.height = size
-      const tmpRenderer = new THREE.WebGLRenderer({
-        canvas: off, antialias: true, preserveDrawingBuffer: true,
-      })
-      tmpRenderer.setPixelRatio(1)
-      tmpRenderer.setSize(size, size, false)
-      tmpRenderer.render(s.scene, s.topCam)
-      const ctx = off.getContext('2d')
-      const img = ctx.getImageData(0, 0, size, size)
-      const r = jsQR(img.data, size, size, { inversionAttempts: 'attemptBoth' })
-      setScanRes({ ok: !!r, data: r?.data || '' })
-      tmpRenderer.dispose()
-    }, 120)
+      if (!s.renderer || !s.scene || !s.topCam) return
+
+      // Lazily create the 720×720 offscreen canvas — reused across scans.
+      if (!s.scanCanvas) {
+        s.scanCanvas = document.createElement('canvas')
+        s.scanCanvas.width = 720
+        s.scanCanvas.height = 720
+      }
+      const off = s.scanCanvas
+
+      const img = renderTopDownFrame(s, off)
+      const decoded = decodeWithRotations(img, payload || '')
+      const { contrast, meanDark, meanLight } = measureContrast(img)
+      const pxPerModule = Math.round(720 / (matrixData.N + 8))
+
+      // Cache the debug PNG so the button works even if the user hasn't
+      // rescanned. `toDataURL` is heavy — only do it when we actually
+      // have a fresh scan to expose.
+      try { setDebugPngUrl(off.toDataURL('image/png')) } catch { /* CORS should never bite here */ }
+
+      if (decoded.ok) {
+        setScanRes({
+          ok: true, data: decoded.data, rot: decoded.rot,
+          contrast, meanDark, meanLight, pxPerModule,
+        })
+      } else {
+        // Pick a specific reason.
+        let reason
+        if (decoded.mismatch) {
+          reason = 'decoded but payload mismatch'
+        } else if (contrast < 80) {
+          reason = `not enough contrast (${Math.round(contrast)}/255)`
+        } else if (pxPerModule < 6) {
+          reason = `resolution too low (${pxPerModule} px per module)`
+        } else {
+          reason = 'finder pattern obscured or quiet zone insufficient'
+        }
+        setScanRes({
+          ok: false, data: decoded.data, rot: decoded.rot,
+          contrast, meanDark, meanLight, pxPerModule, reason,
+        })
+      }
+    }, 200)
     return () => clearTimeout(t)
-  }, [scenePresent, matrixData, theme, season])
+  }, [scenePresent, matrixData, theme, season, payload])
 
   // ─── Download PNG snapshot of current camera at 2× DPR ────────────────
   const download = () => {
@@ -545,6 +1324,15 @@ export default function QRScenes3D({ matrixData, ecc }) {
     const a = document.createElement('a')
     a.href = url
     a.download = `qr-${theme.replace(/\s+/g, '-').toLowerCase()}-${season.toLowerCase()}-${Date.now()}.png`
+    document.body.appendChild(a); a.click(); a.remove()
+  }
+
+  // Save the last top-down scan snapshot so we can eyeball what jsQR sees.
+  const downloadDebugFrame = () => {
+    if (!debugPngUrl) return
+    const a = document.createElement('a')
+    a.href = debugPngUrl
+    a.download = `qr-scan-debug-${theme.replace(/\s+/g, '-').toLowerCase()}-${season.toLowerCase()}-${Date.now()}.png`
     document.body.appendChild(a); a.click(); a.remove()
   }
 
@@ -600,15 +1388,23 @@ export default function QRScenes3D({ matrixData, ecc }) {
               ]}
             />
             <p className='text-[11px] text-fg-muted mt-1 leading-snug'>
-              Top-down flattens the scene to the QR silhouette so the code is scannable in-camera. Tap the canvas to toggle at any time.
+              Top-down flattens the scene to the QR silhouette so the code is scannable in-camera. Tap the canvas to toggle — the camera eases between poses over ~750ms with an easeInOutCubic curve.
             </p>
           </div>
           <div>
             <div className='text-xs uppercase tracking-wide text-fg-muted mb-1'>Auto-rotate camera</div>
             <div className='flex items-center gap-3'>
-              <Switch checked={autoRotate} onChange={setAutoRotate} disabled={view === 'Top'} />
+              <Switch
+                checked={autoRotate}
+                onChange={setAutoRotate}
+                disabled={view === 'Top' || transitionPct > 0}
+              />
               <span className='text-sm text-fg-muted'>
-                {view === 'Top' ? 'Disabled in top-down view' : 'One revolution ≈ 8s'}
+                {view === 'Top'
+                  ? 'Disabled in top-down view'
+                  : transitionPct > 0
+                    ? 'Paused during transition'
+                    : 'One revolution ≈ 14s'}
               </span>
             </div>
             <p className='text-[11px] text-fg-muted mt-1 leading-snug'>
@@ -623,16 +1419,29 @@ export default function QRScenes3D({ matrixData, ecc }) {
         <div className='flex items-center justify-between mb-3 gap-2 flex-wrap'>
           <h2 className='font-bold text-lg'>3D scene</h2>
           <div className='flex items-center gap-2 flex-wrap'>
-            <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs border
-              ${scanRes.ok
-                ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
-                : 'border-rose-400/30 bg-rose-500/10 text-rose-200'}`}>
-              {scanRes.ok ? <CheckCircleFilled /> : <CloseCircleFilled />}
-              {scanRes.ok ? 'Top-down scans' : 'Top-down broken'}
-            </span>
+            <Tooltip
+              title={
+                scanRes.ok
+                  ? `jsQR decoded at ${scanRes.rot ?? 0}°. Contrast ${Math.round(scanRes.contrast ?? 0)}/255, ${scanRes.pxPerModule ?? '?'} px per module.`
+                  : scanRes.reason
+                    ? `Reason: ${scanRes.reason}. Contrast ${Math.round(scanRes.contrast ?? 0)}/255, ${scanRes.pxPerModule ?? '?'} px per module.`
+                    : 'Scanning…'
+              }
+            >
+              <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs border cursor-help
+                ${scanRes.ok
+                  ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+                  : 'border-rose-400/30 bg-rose-500/10 text-rose-200'}`}>
+                {scanRes.ok ? <CheckCircleFilled /> : <CloseCircleFilled />}
+                {scanRes.ok ? 'Top-down scans' : 'Top-down broken'}
+              </span>
+            </Tooltip>
             <span className='inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs'>
               {instanceTotal.toLocaleString()} mesh instances
             </span>
+            <Button size='small' variant='ghost' icon={<BugOutlined />} onClick={downloadDebugFrame} disabled={!debugPngUrl}>
+              Debug frame
+            </Button>
             <Button size='small' variant='ghost' icon={<DownloadOutlined />} onClick={download}>
               PNG
             </Button>
@@ -647,6 +1456,22 @@ export default function QRScenes3D({ matrixData, ecc }) {
           {!scenePresent && (
             <div className='absolute inset-0 flex items-center justify-center text-fg-muted text-sm'>
               Enter a payload in the 2D Editor tab to render the scene.
+            </div>
+          )}
+          {transitionPct > 0 && (
+            <div className='absolute bottom-3 left-3 md:w-56 w-[calc(100%-1.5rem)] pointer-events-none'>
+              <div className='rounded-md bg-black/55 backdrop-blur-sm px-3 py-2 border border-white/10'>
+                <div className='text-[10px] uppercase tracking-wide text-fg-muted mb-1'>
+                  Camera transition
+                </div>
+                <Progress
+                  percent={transitionPct}
+                  showInfo={false}
+                  strokeColor={{ from: '#fbbf24', to: '#f43f5e' }}
+                  trailColor='rgba(255,255,255,0.08)'
+                  size='small'
+                />
+              </div>
             </div>
           )}
         </div>
@@ -671,7 +1496,7 @@ export default function QRScenes3D({ matrixData, ecc }) {
           </div>
         </div>
         <p className='text-[11px] text-fg-muted mt-3 leading-relaxed'>
-          Every cell of the QR is a real mesh instance, so tapping the top-down toggle gives a straight-down view where jsQR can still decode the payload. If the badge above says "broken", the scene has drifted from a valid QR — usually because the top-down camera framing lost the quiet zone; retry once the initial render settles.
+          The iso view is fully artistic — trees, towers, crystals, lights. The scan check runs on a separate offscreen pass that hides all that geometry and renders the QR as pure black-and-white cells with a 4-module quiet zone, then feeds it to jsQR at four rotations. Hit the "Debug frame" button to download exactly what the scanner sees.
         </p>
       </div>
     </div>

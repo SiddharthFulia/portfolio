@@ -1478,7 +1478,7 @@ ${inner}
 
       {topTab === '3D Scenes' && (
         <div className='max-w-7xl mx-auto px-4 md:px-6 pb-16'>
-          <QRScenes3D matrixData={matrixData} ecc={ecc} />
+          <QRScenes3D matrixData={matrixData} ecc={ecc} payload={payload} />
         </div>
       )}
 

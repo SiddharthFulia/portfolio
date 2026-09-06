@@ -1034,8 +1034,12 @@ export default function Pathfinding() {
     setComparisonRows([])
     setTransform({ tx: 0, ty: 0, scale: 1 })
     setLabels([])
-    setPlaceSuggestions([])
-    setPlaceQuery('')
+    setFromSuggestions([])
+    setToSuggestions([])
+    setFromQuery('')
+    setToQuery('')
+    setFromOpen(false)
+    setToOpen(false)
     setStatus('ready')
   }
 
