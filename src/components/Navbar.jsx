@@ -269,7 +269,7 @@ const Navbar = () => {
                               }`}>
                             {({ isActive }) => (
                               <>
-                                <span className={`text-[13px] font-semibold transition-colors inline-flex items-center gap-1.5 truncate ${
+                                <span className={`text-[13px] font-semibold transition-colors inline-flex items-start flex-wrap gap-1.5 leading-tight ${
                                   isActive
                                     ? (isDark ? 'text-white' : 'text-black')
                                     : (isDark ? 'text-gray-100 group-hover:text-white' : 'text-gray-900')
@@ -277,11 +277,11 @@ const Navbar = () => {
                                   {it.label}
                                   {it.vault && (
                                     <LockOutlined
-                                      className="text-[9px] text-fuchsia-400 shrink-0"
+                                      className="text-[9px] text-fuchsia-400 shrink-0 mt-1"
                                       title="Vault password required" />
                                   )}
                                 </span>
-                                <span className={`text-[10px] leading-snug line-clamp-1 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                                <span className={`text-[10px] leading-snug line-clamp-2 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
                                   {it.desc}
                                 </span>
                               </>

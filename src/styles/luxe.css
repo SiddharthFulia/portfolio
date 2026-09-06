@@ -621,4 +621,102 @@ body.theme-light .gradient-text-cyan  { color: #0e7490 !important; }
   .max-h-screen { max-height: 100dvh; }
 }
 
+/* ── Button + label visibility (site-wide) ──────────────────────
+   Antd's Segmented / Tabs / Radio.Button / Button all default to
+   `white-space: nowrap` + `text-overflow: ellipsis`, which chops
+   real labels like "Diamond", "Rounded", "Autumn", "Sunset",
+   "Kolkata", "Bidi-A*", "IDA*", "Uniform Cost" on narrow
+   viewports — and worse, on Segmented the ellipsized label can
+   slip under sibling elements because the item height doesn't
+   grow.
+
+   Rule of thumb: never ellipsize a meaningful button label.
+   Allow up to 2 lines of wrap. Grow the control's height to fit.
+   Applies to antd Segmented, Tabs, Radio.Button, Button (when
+   text-based), and our local <Button> ui wrapper. */
+
+.ant-segmented .ant-segmented-item {
+  height: auto !important;
+  min-height: 32px;
+}
+.ant-segmented .ant-segmented-item-label {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  line-height: 1.15 !important;
+  padding: 6px 10px !important;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-break: normal;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+.ant-segmented.ant-segmented-lg .ant-segmented-item-label { padding: 8px 12px !important; }
+.ant-segmented.ant-segmented-sm .ant-segmented-item-label { padding: 4px 8px !important; font-size: 12px; }
+
+/* When Segmented is `block`, each item shares row width — allow
+   the sliding thumb + item to match the taller of the wrapped rows. */
+.ant-segmented.ant-segmented-block .ant-segmented-item,
+.ant-segmented.ant-segmented-block .ant-segmented-thumb {
+  min-height: 32px;
+}
+
+.ant-tabs-tab-btn {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  line-height: 1.15 !important;
+}
+
+.ant-radio-button-wrapper {
+  white-space: normal !important;
+  height: auto !important;
+  min-height: 32px;
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+  line-height: 1.2 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ant-btn {
+  white-space: normal !important;
+  height: auto !important;
+  min-height: 32px;
+  line-height: 1.2;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.ant-btn.ant-btn-lg { min-height: 40px; padding-top: 6px; padding-bottom: 6px; }
+.ant-btn.ant-btn-sm { min-height: 24px; }
+
+/* Icon-only antd Buttons should NOT get the wrap padding — they
+   were sized around a single glyph. Icon-only means the button
+   has the .ant-btn-icon-only marker antd already applies. */
+.ant-btn.ant-btn-icon-only {
+  white-space: nowrap !important;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+/* Our local Button wrapper (see src/components/ui/Button.jsx) */
+.sid-btn {
+  white-space: normal !important;
+  min-height: 32px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+/* Override the .luxe-btn nowrap for the wrapped-label case. luxe-btn
+   is used for fully custom CTAs where the caller usually picks the
+   label length; still, allow wrap so long labels don't blow layout. */
+.luxe-btn {
+  white-space: normal;
+  height: auto;
+  min-height: 32px;
+  line-height: 1.2;
+}
+
 /* End of luxe.css */

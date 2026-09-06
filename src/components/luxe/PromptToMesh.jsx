@@ -130,7 +130,7 @@ function Chip({ active, onClick, children, disabled, tint = 'amber' }) {
   return (
     <button
       type="button" onClick={onClick} disabled={disabled}
-      className={`px-2.5 py-1.5 rounded-md text-[11px] font-semibold border transition-all whitespace-nowrap ${
+      className={`px-2.5 py-1.5 rounded-md text-[11px] font-semibold border transition-all ${
         active
           ? `${tintMap[tint]} ring-1`
           : 'border-gray-800 bg-gray-900/40 text-gray-400 hover:text-white hover:border-gray-700'

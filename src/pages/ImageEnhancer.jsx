@@ -1520,7 +1520,7 @@ function GenerateSection({
                       const active = familyFilterProp === c.id
                       return (
                         <button key={c.id} onClick={() => setFamilyFilter(c.id)}
-                          className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap ${
+                          className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg transition-colors ${
                             active
                               ? 'bg-cyan-500 text-white'
                               : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/60'

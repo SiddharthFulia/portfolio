@@ -223,7 +223,7 @@ export default function Cinema({ embedded = false, view = 'all', refreshKey = 0 
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <button type="button" onClick={() => setHelperOpen(true)}
                     title="AI helper + sample stories"
-                    className="tap-44 px-3 py-1.5 text-[11px] font-semibold rounded-full border border-amber-500/40 hover:border-amber-400 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-colors whitespace-nowrap inline-flex items-center gap-1.5">
+                    className="tap-44 px-3 py-1.5 text-[11px] font-semibold rounded-full border border-amber-500/40 hover:border-amber-400 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-colors inline-flex items-center gap-1.5">
                     <BulbOutlined className="text-[11px]" /> Help me write
                   </button>
                   {masterPrompt && (

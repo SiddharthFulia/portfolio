@@ -965,7 +965,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <button type="button" onClick={() => setHelperOpen(true)}
                     title="AI prompt helper + sample prompts"
-                    className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg border border-amber-500/40 hover:border-amber-400 bg-amber-500/12 hover:bg-amber-500/20 text-amber-300 transition-colors whitespace-nowrap">
+                    className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg border border-amber-500/40 hover:border-amber-400 bg-amber-500/12 hover:bg-amber-500/20 text-amber-300 transition-colors">
                     <BulbOutlined className="text-[10px]" /> Help me write
                   </button>
                   {prompt && (

@@ -61,7 +61,7 @@ const MemeGenerator = () => {
               <img src={m.url} alt={m.name} loading="lazy"
                 className="w-full aspect-square object-cover" />
               <div className="p-2">
-                <p className="text-white text-[11px] font-semibold line-clamp-1">{m.name}</p>
+                <p className="text-white text-[11px] font-semibold line-clamp-2 leading-tight">{m.name}</p>
                 <p className="text-gray-600 text-[9px]">{m.box_count} text boxes</p>
               </div>
             </AnimatedCard>

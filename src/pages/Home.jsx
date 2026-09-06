@@ -212,7 +212,7 @@ const Home = () => {
                       className="luxe-glass group text-left px-3.5 py-3 sm:px-4 sm:py-3.5 transition-all hover:-translate-y-0.5"
                     >
                       <div className="flex items-center gap-1.5 mb-0.5 sm:mb-1">
-                        <h4 className="text-[13px] sm:text-[14px] font-semibold text-white group-hover:text-amber-200 transition-colors line-clamp-1">
+                        <h4 className="text-[13px] sm:text-[14px] font-semibold text-white group-hover:text-amber-200 transition-colors leading-tight line-clamp-2">
                           {it.label}
                         </h4>
                         {it.vault && (

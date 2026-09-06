@@ -132,11 +132,11 @@ const GitHubHeatmap = ({ username = 'Sid-passion' }) => {
             {repos.filter(r => !r.fork).slice(0, 6).map(r => (
               <a key={r.id} href={r.html_url} target="_blank" rel="noopener noreferrer"
                 className="p-3 bg-gray-800/50 border border-gray-700/50 rounded-lg hover:border-gray-600 transition-colors">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-white text-xs font-semibold truncate">{r.name}</span>
-                  {r.private && <span className="text-[9px] bg-gray-700 text-gray-400 px-1 rounded">Private</span>}
+                <div className="flex items-center gap-2 mb-1 min-w-0">
+                  <span className="text-white text-xs font-semibold break-words min-w-0">{r.name}</span>
+                  {r.private && <span className="text-[9px] bg-gray-700 text-gray-400 px-1 rounded shrink-0">Private</span>}
                 </div>
-                {r.description && <p className="text-gray-500 text-[10px] line-clamp-1">{r.description}</p>}
+                {r.description && <p className="text-gray-500 text-[10px] line-clamp-2 leading-snug">{r.description}</p>}
                 <div className="flex items-center gap-3 mt-1.5">
                   {r.language && (
                     <span className="flex items-center gap-1 text-[10px] text-gray-400">

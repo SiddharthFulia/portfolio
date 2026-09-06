@@ -100,13 +100,17 @@ export default function Button({
   const antType = type ?? v.type
   // Caller-supplied `htmlType` wins over our hard-default of "button".
   // Real submit buttons stay opt-in: <Button htmlType="submit"/>.
+  // `sid-btn` is a marker class — see the "Button + label
+  // visibility" block in src/styles/luxe.css. It flips
+  // `white-space: nowrap` off so long labels wrap to two lines
+  // instead of ellipsing under a sibling element on mobile.
   return (
     <AntButton
       type={antType}
       danger={v.danger}
       ghost={v.ghost}
       htmlType={htmlType ?? 'button'}
-      className={`${v.className || ''} ${className}`.trim()}
+      className={`sid-btn ${v.className || ''} ${className}`.trim()}
       {...rest}
     >
       {children}
