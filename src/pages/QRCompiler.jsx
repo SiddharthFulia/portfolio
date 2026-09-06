@@ -25,6 +25,12 @@ import {
 import katex from 'katex'
 import qrcode from 'qrcode-generator'
 import jsQR from 'jsqr'
+import { Link } from 'react-router-dom'
+import {
+  createQrSave, listQrSaves, deleteQrSave, patchQrSave,
+} from '../api/qrSaves'
+import { notice } from '../lib/notice'
+import QRScenes3D from '../components/qr/QRScenes3D'
 
 // ─── KaTeX helpers (identical shape to PhysicsLab / Atoms) ─────────
 function renderTex(src, opts = {}) {
@@ -705,23 +711,26 @@ function SliderNum({ min, max, step = 1, value, onChange, accent = 'amber' }) {
   )
 }
 
-// ─── LocalStorage history ───────────────────────────────────────────
-const HISTORY_KEY = 'sid-qr-history-v1'
-function loadHistory() {
-  try {
-    const raw = localStorage.getItem(HISTORY_KEY)
-    if (!raw) return []
-    return JSON.parse(raw)
-  } catch { return [] }
+// ─── History — BE-backed via /api/qr-saves ──────────────────────────
+// Was localStorage-only; moved to a real store so users can share saved
+// QRs at /qr/s/:id. Nothing else in this module knows about the network:
+// the client + owner-key helpers live in src/api/qrSaves.js and
+// src/lib/qrOwnerKey.js. This map bridges the FE Segmented values
+// (`URL`, `Wi-Fi`, `vCard`) with the BE's lowercase kind column.
+const KIND_TO_BE = {
+  URL: 'url', Text: 'text', 'Wi-Fi': 'wifi', vCard: 'vcard',
+  SMS: 'sms', Email: 'email', Geo: 'geo', UPI: 'upi',
 }
-function saveHistory(items) {
-  try {
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(items.slice(0, 20)))
-  } catch {}
-}
+const KIND_FROM_BE = Object.fromEntries(
+  Object.entries(KIND_TO_BE).map(([fe, be]) => [be, fe])
+)
 
 // ─── Main component ────────────────────────────────────────────────
 export default function QRCompiler() {
+  // Top-level tab — 2D editor (all the classic controls) vs 3D scenes.
+  // Payload input is shared, so switching tabs keeps whatever was typed.
+  const [topTab, setTopTab] = useState('2D Editor')
+
   // Payload
   const [payloadKind, setPayloadKind] = useState('URL')
   const [fields, setFields] = useState({
@@ -801,9 +810,23 @@ export default function QRCompiler() {
   const canvasRef = useRef(null)
   const sweepRef  = useRef(null)   // small chart
 
-  // History
+  // History — BE-backed. `history` mirrors the caller's rows from
+  // /api/qr-saves; refreshHistory refetches. `saving` disables the
+  // Save-to-Library button while a request is in flight.
   const [history, setHistory] = useState([])
-  useEffect(() => { setHistory(loadHistory()) }, [])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyErr, setHistoryErr] = useState('')
+  const [saving, setSaving] = useState(false)
+  const refreshHistory = useCallback(async () => {
+    setHistoryLoading(true); setHistoryErr('')
+    try {
+      const data = await listQrSaves({ limit: 30 })
+      setHistory(Array.isArray(data?.items) ? data.items : [])
+    } catch (e) {
+      setHistoryErr(e.message || 'Could not load library')
+    } finally { setHistoryLoading(false) }
+  }, [])
+  useEffect(() => { refreshHistory() }, [refreshHistory])
 
   // Canvas size — responsive within 320..640
   const [pxSize, setPxSize] = useState(520)
@@ -1089,44 +1112,126 @@ ${inner}
     downloadDataURL('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg), `qr-${Date.now()}.svg`)
   }, [matrixData, bgColor, fgColor, gap, radius, cellShape])
 
-  // ─── History wiring ────────────────────────────────────────────────
-  const snapshotToHistory = useCallback(() => {
-    if (!payload) return
-    const item = {
-      id: Date.now(),
-      payloadKind, payload,
-      version, ecc,
+  // ─── Save to library (BE-backed) ──────────────────────────────────
+  // Bakes the current canvas to a small PNG (≤ 500 KB per BE cap), posts
+  // it along with the style config, then refreshes the list. Returns the
+  // public share URL so the caller can copy-link.
+  const bakePreviewDataUrl = useCallback((maxKb = 480) => {
+    if (!matrixData) return null
+    const off = document.createElement('canvas')
+    const cfg = {
+      pxSize: 480,
       cellShape, eyeShape, eyeInnerShape,
       fgColor, bgColor, gradientOn, gradientType, gradientAngle, fgColor2,
       gap, radius,
-      logoOn, logoPct,
+      bgImageOn, bgImageAlpha, blendMode,
+      logoOn, logoPct, logoPad, logoRound,
+      bakeMask,
     }
-    const next = [item, ...history.filter((h) => h.id !== item.id)].slice(0, 20)
-    setHistory(next); saveHistory(next)
+    renderQR(off, cfg, matrixData, bgImage, logoImg)
+    // Try PNG first; if we blow the size cap, fall back to JPEG.
+    let url = off.toDataURL('image/png')
+    if (url.length > maxKb * 1024) {
+      // 480×480 JPEG @ q=0.8 lands well under 100 KB for most designs.
+      url = off.toDataURL('image/jpeg', 0.82)
+    }
+    return url
   }, [
-    payload, payloadKind, version, ecc, cellShape, eyeShape, eyeInnerShape,
+    matrixData, cellShape, eyeShape, eyeInnerShape,
     fgColor, bgColor, gradientOn, gradientType, gradientAngle, fgColor2,
-    gap, radius, logoOn, logoPct, history,
+    gap, radius, bgImageOn, bgImageAlpha, blendMode, bgImage,
+    logoOn, logoPct, logoPad, logoRound, logoImg, bakeMask,
   ])
+
+  const styleConfigSnapshot = useCallback(() => ({
+    version, ecc,
+    cellShape, eyeShape, eyeInnerShape,
+    fgColor, bgColor,
+    gradientOn, gradientType, gradientAngle, fgColor2,
+    gap, radius,
+    logoOn, logoPct, logoPad, logoRound,
+    bgImageOn, bgImageAlpha, blendMode,
+    payloadKind, payload,
+  }), [
+    version, ecc, cellShape, eyeShape, eyeInnerShape,
+    fgColor, bgColor, gradientOn, gradientType, gradientAngle, fgColor2,
+    gap, radius, logoOn, logoPct, logoPad, logoRound,
+    bgImageOn, bgImageAlpha, blendMode, payloadKind, payload,
+  ])
+
+  const saveToLibrary = useCallback(async () => {
+    if (!payload) { notice.warning('Nothing to save — enter a payload first'); return }
+    // Simple prompt for the title. Keeps the surface small and dodges
+    // building a modal for a one-field ask. Empty title is allowed.
+    let title = window.prompt('Give this QR a title (optional)', '') || ''
+    title = title.trim().slice(0, 120)
+    setSaving(true)
+    try {
+      const png = bakePreviewDataUrl()
+      const res = await createQrSave({
+        title,
+        payload,
+        payload_kind: KIND_TO_BE[payloadKind] || 'text',
+        style_config: styleConfigSnapshot(),
+        png_data_url: png,
+        public: true,
+      })
+      const shareUrl = `${window.location.origin}/qr/s/${res.id}`
+      notice.success('Saved. Share link copied.')
+      try { await navigator.clipboard.writeText(shareUrl) } catch {}
+      await refreshHistory()
+    } catch (e) {
+      notice.error(e.message || 'Could not save')
+    } finally { setSaving(false) }
+  }, [payload, payloadKind, bakePreviewDataUrl, styleConfigSnapshot, refreshHistory])
+
+  // Restore a saved row into the current editor state. `h` is the BE
+  // shape — style_config lives under `styleConfig` (see api/qrSaves.js).
   const restoreHistory = (h) => {
-    setPayloadKind(h.payloadKind)
-    // Restore the field for the specific kind so the encoded string
-    // matches what was saved (a bit lossy for shared fields).
-    if (h.payloadKind === 'URL') setFields((f) => ({ ...f, url: h.payload }))
-    else if (h.payloadKind === 'Text') setFields((f) => ({ ...f, text: h.payload }))
-    setVersion(h.version); setEcc(h.ecc)
-    setCellShape(h.cellShape); setEyeShape(h.eyeShape); setEyeInnerShape(h.eyeInnerShape)
-    setFgColor(h.fgColor); setBgColor(h.bgColor)
-    setGradientOn(h.gradientOn); setGradientType(h.gradientType)
-    setGradientAngle(h.gradientAngle); setFgColor2(h.fgColor2)
-    setGap(h.gap); setRadius(h.radius)
-    setLogoOn(h.logoOn); setLogoPct(h.logoPct)
+    const s = h.styleConfig || {}
+    const feKind = KIND_FROM_BE[h.payloadKind] || 'URL'
+    setPayloadKind(feKind)
+    if (feKind === 'URL')  setFields((f) => ({ ...f, url:  h.payload }))
+    if (feKind === 'Text') setFields((f) => ({ ...f, text: h.payload }))
+    if (s.version != null) setVersion(s.version)
+    if (s.ecc)     setEcc(s.ecc)
+    if (s.cellShape)     setCellShape(s.cellShape)
+    if (s.eyeShape)      setEyeShape(s.eyeShape)
+    if (s.eyeInnerShape) setEyeInnerShape(s.eyeInnerShape)
+    if (s.fgColor)  setFgColor(s.fgColor)
+    if (s.bgColor)  setBgColor(s.bgColor)
+    if (typeof s.gradientOn === 'boolean') setGradientOn(s.gradientOn)
+    if (s.gradientType)  setGradientType(s.gradientType)
+    if (s.gradientAngle != null) setGradientAngle(s.gradientAngle)
+    if (s.fgColor2) setFgColor2(s.fgColor2)
+    if (s.gap    != null) setGap(s.gap)
+    if (s.radius != null) setRadius(s.radius)
+    if (typeof s.logoOn === 'boolean') setLogoOn(s.logoOn)
+    if (s.logoPct != null) setLogoPct(s.logoPct)
+    notice.info(`Restored: ${h.title || 'Untitled'}`)
   }
-  const deleteHistory = (id) => {
-    const next = history.filter((h) => h.id !== id)
-    setHistory(next); saveHistory(next)
+  const deleteHistory = async (id) => {
+    try {
+      await deleteQrSave(id)
+      setHistory((prev) => prev.filter((h) => h.id !== id))
+      notice.success('Deleted')
+    } catch (e) { notice.error(e.message || 'Could not delete') }
   }
-  const clearHistory = () => { setHistory([]); saveHistory([]) }
+  const togglePublicHistory = async (id, next) => {
+    try {
+      const res = await patchQrSave(id, { public: next })
+      const isPublic = res?.item?.public ?? next
+      setHistory((prev) => prev.map((h) => h.id === id ? { ...h, public: isPublic } : h))
+      notice.success(isPublic ? 'Now public' : 'Now private')
+    } catch (e) { notice.error(e.message || 'Could not update') }
+  }
+  const copyShareLink = async (id) => {
+    const url = `${window.location.origin}/qr/s/${id}`
+    try {
+      await navigator.clipboard.writeText(url)
+      notice.success('Share link copied')
+    } catch { notice.error('Could not copy') }
+  }
 
   // ─── Payload input UI switch ───────────────────────────────────────
   const renderPayloadFields = () => {
@@ -1353,6 +1458,30 @@ ${inner}
           </div>
         </div>
       </div>
+
+      {/* Top-level view switch: 2D Editor vs 3D Scenes.
+          The payload above is shared, so encoding once shows up in both. */}
+      <div className='max-w-7xl mx-auto px-4 md:px-6 pb-4'>
+        <div className='luxe-glass p-3'>
+          <Segmented
+            block
+            value={topTab}
+            onChange={setTopTab}
+            options={['2D Editor', '3D Scenes']}
+          />
+          <p className='text-[11px] text-fg-muted mt-2 leading-snug px-1'>
+            2D Editor gives you every classic knob — cell shapes, gradients, ECC, logo overlay, damage sim. 3D Scenes reinterprets the same matrix as an isometric world you can rotate, snapshot, and still scan from directly above.
+          </p>
+        </div>
+      </div>
+
+      {topTab === '3D Scenes' && (
+        <div className='max-w-7xl mx-auto px-4 md:px-6 pb-16'>
+          <QRScenes3D matrixData={matrixData} ecc={ecc} />
+        </div>
+      )}
+
+      {topTab === '2D Editor' && (<>
 
       {/* Style controls */}
       <div className='max-w-7xl mx-auto px-4 md:px-6 pb-4'>
@@ -1638,7 +1767,9 @@ ${inner}
             <Button variant='ghost' icon={<DownloadOutlined />} onClick={() => downloadPNG(4)}>PNG 4×</Button>
             <Button variant='ghost' icon={<DownloadOutlined />} onClick={() => downloadPNG(8)}>PNG 8×</Button>
             <Button variant='accent' icon={<DownloadOutlined />} onClick={downloadSVG}>SVG</Button>
-            <Button variant='success' onClick={snapshotToHistory}>Save to history</Button>
+            <Button variant='success' loading={saving} onClick={saveToLibrary}>
+              Save to my library
+            </Button>
           </div>
           <FieldHelp>
             SVG exports use the simple cell renderer (Square / Rounded / Dot) — for gradients, image bake-in, and blend modes, use PNG at the resolution you need.
@@ -1689,48 +1820,92 @@ ${inner}
         </div>
       </div>
 
-      {/* History */}
+      {/* History — BE-backed shareable library. Each row has a public
+          share URL at /qr/s/:id. Public toggle + delete are owner-only
+          (identified by the X-QR-Owner fingerprint header). */}
       <div className='max-w-7xl mx-auto px-4 md:px-6 pb-16'>
         <div className='luxe-glass p-5'>
           <div className='flex items-center justify-between mb-3'>
-            <h2 className='font-bold text-lg'>10. History (localStorage)</h2>
+            <div>
+              <h2 className='font-bold text-lg'>10. My library</h2>
+              <FieldHelp>
+                Saved QRs live on the server so you can share them by URL. Only your browser can edit or delete these — no login required.
+              </FieldHelp>
+            </div>
             <div className='flex gap-2'>
-              <Button variant='ghost' icon={<ReloadOutlined />} onClick={snapshotToHistory}>Snapshot current</Button>
-              <Button variant='danger' icon={<DeleteOutlined />} onClick={clearHistory} disabled={!history.length}>
-                Clear all
+              <Button variant='ghost' icon={<ReloadOutlined />} loading={historyLoading} onClick={refreshHistory}>
+                Refresh
+              </Button>
+              <Button variant='primary' loading={saving} onClick={saveToLibrary}>
+                Save current
               </Button>
             </div>
           </div>
-          {!history.length && (
-            <div className='text-sm text-fg-muted py-4 text-center'>
-              No snapshots yet. Hit "Save to history" or "Snapshot current" to remember the current config for later.
+          {historyErr && (
+            <div className='text-sm text-rose-300 bg-rose-500/10 border border-rose-400/30 rounded-lg px-3 py-2 mb-3'>
+              {historyErr}
+            </div>
+          )}
+          {!historyLoading && !history.length && !historyErr && (
+            <div className='text-sm text-fg-muted py-6 text-center'>
+              Nothing saved yet. Hit "Save current" or "Save to my library" (in the Export panel) to create your first shareable QR.
             </div>
           )}
           <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3'>
             {history.map((h) => (
-              <div key={h.id} className='luxe-card p-3 flex flex-col gap-1 group'>
-                <div className='flex items-center justify-between gap-2'>
-                  <span className='text-xs uppercase tracking-wide text-amber-300'>{h.payloadKind}</span>
-                  <button
-                    type='button'
-                    onClick={() => deleteHistory(h.id)}
-                    className='text-fg-muted opacity-0 group-hover:opacity-100 hover:text-rose-300 transition'
-                    aria-label='Delete'>
-                    <DeleteOutlined />
-                  </button>
+              <div key={h.id} className='luxe-card p-3 flex flex-col gap-2 group'>
+                <div className='flex items-start justify-between gap-2'>
+                  <div className='min-w-0'>
+                    <span className='text-[10px] uppercase tracking-widest text-amber-300 font-bold'>
+                      {(KIND_FROM_BE[h.payloadKind] || h.payloadKind).toUpperCase()}
+                    </span>
+                    <div className='font-bold text-sm truncate' title={h.title || 'Untitled'}>
+                      {h.title || 'Untitled'}
+                    </div>
+                  </div>
+                  {h.hasPng && h.pngDataUrl && (
+                    <img
+                      src={h.pngDataUrl}
+                      alt=''
+                      className='w-12 h-12 rounded object-cover bg-white shrink-0'
+                    />
+                  )}
                 </div>
-                <div className='font-mono text-[11px] break-all opacity-80 line-clamp-2'>{h.payload}</div>
-                <div className='text-[10px] text-fg-muted'>
-                  v{h.version || 'auto'} · ECC {h.ecc} · {h.cellShape}
+                <div className='font-mono text-[11px] break-all opacity-70 line-clamp-2'>
+                  {h.payload}
                 </div>
-                <div className='pt-1'>
-                  <Button size='small' variant='subtle' onClick={() => restoreHistory(h)}>Restore</Button>
+                <div className='flex items-center justify-between text-[10px] text-fg-muted'>
+                  <span>{h.views} view{h.views === 1 ? '' : 's'}</span>
+                  <span>{new Date(h.createdAt).toLocaleDateString()}</span>
+                </div>
+                <div className='pt-1 flex flex-wrap gap-1'>
+                  <Button size='small' variant='subtle' onClick={() => restoreHistory(h)}>
+                    Restore
+                  </Button>
+                  <Link to={`/qr/s/${h.id}`}>
+                    <Button size='small' variant='ghost'>Open</Button>
+                  </Link>
+                  <Button size='small' variant='ghost' onClick={() => copyShareLink(h.id)}>
+                    Copy link
+                  </Button>
+                  <Button
+                    size='small'
+                    variant={h.public ? 'secondary' : 'subtle'}
+                    onClick={() => togglePublicHistory(h.id, !h.public)}>
+                    {h.public ? 'Public' : 'Private'}
+                  </Button>
+                  <Button size='small' variant='danger' icon={<DeleteOutlined />}
+                    onClick={() => deleteHistory(h.id)}>
+                    Delete
+                  </Button>
                 </div>
               </div>
             ))}
           </div>
         </div>
       </div>
+
+      </>)}
     </div>
   )
 }

@@ -1,10 +1,65 @@
 import emailjs from "@emailjs/browser";
 import { Canvas } from "@react-three/fiber";
-import { Suspense, useState } from "react";
-import { Form, Input, Button, ConfigProvider, theme as antdTheme } from "antd";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Form, Input, Button, ConfigProvider, theme as antdTheme, Segmented } from "antd";
+import qrcode from "qrcode-generator";
 
 import { Fox } from "../models";
 import { Loader } from "../components";
+import { notice } from "../lib/notice";
+
+// ─── Support / Buy me a coffee ────────────────────────────────────
+// Two payment surfaces, tabbed. The UPI payload uses the NPCI-standard
+// `upi://pay` schema so any UPI app (Paytm, GPay, PhonePe, BHIM) can
+// resolve it directly from a QR scan.
+//
+// FIXME: replace `pa` with the user's real UPI VPA once he shares it.
+const UPI_PAYLOAD = 'upi://pay?pa=siddharth@example&pn=Siddharth%20Fulia&cu=INR';
+const KOFI_URL = 'https://ko-fi.com/siddharthfulia';
+
+// Tiny QR canvas — same qrcode-generator lib the /qr studio uses,
+// but stripped down to plain square modules at a fixed size. Redraws
+// whenever the payload changes.
+function SupportQR({ payload, size = 220, fg = '#0a0a0e', bg = '#ffffff' }) {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !payload) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = size * dpr;
+    canvas.height = size * dpr;
+    canvas.style.width = `${size}px`;
+    canvas.style.height = `${size}px`;
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, size, size);
+    try {
+      // 0 = auto-fit version; 'H' = 30% ECC so a screenshot survives
+      // camera glare + moderate cropping.
+      const qr = qrcode(0, 'H');
+      qr.addData(payload);
+      qr.make();
+      const N = qr.getModuleCount();
+      const margin = 4;                // quiet zone in modules
+      const total = N + margin * 2;
+      const cell = size / total;
+      const origin = margin * cell;
+      ctx.fillStyle = fg;
+      for (let r = 0; r < N; r++) {
+        for (let c = 0; c < N; c++) {
+          if (!qr.isDark(r, c)) continue;
+          ctx.fillRect(origin + c * cell, origin + r * cell, cell + 0.5, cell + 0.5);
+        }
+      }
+    } catch { /* payload too long / unsupported — leave the empty canvas */ }
+  }, [payload, size, fg, bg]);
+  return (
+    <div className='rounded-xl overflow-hidden bg-white p-2 shadow-2xl' style={{ width: size + 16, height: size + 16 }}>
+      <canvas ref={canvasRef} className='block' />
+    </div>
+  );
+}
 
 const { useForm } = Form;
 
@@ -346,10 +401,122 @@ const Contact = () => {
               </Canvas>
             </div>
           </div>
+
+          {/* Support / Buy me a coffee — UPI QR (India) + Ko-fi.
+              Amber-gradient border matches the rest of the page's
+              accent language without hijacking attention. */}
+          <SupportPanel />
         </div>
       </section>
     </ConfigProvider>
   );
 };
+
+// ─── Support / Buy me a coffee ───────────────────────────────────
+// Own component so the state (which tab is active) doesn't invalidate
+// the Contact form's memoisation on every tab switch.
+function SupportPanel() {
+  const [tab, setTab] = useState('UPI (India)');
+
+  const isUpi = tab === 'UPI (India)';
+  const payload = isUpi ? UPI_PAYLOAD : KOFI_URL;
+  const shareUrl = isUpi ? UPI_PAYLOAD : KOFI_URL;
+
+  const copyShare = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      notice.success(isUpi ? 'UPI payment link copied' : 'Ko-fi link copied');
+    } catch { notice.error('Could not copy'); }
+  };
+
+  return (
+    <div className='mt-10 sm:mt-14'>
+      {/* Amber gradient border ring — the extra div gives us a 1px
+          gradient outline via padding + inner solid bg. */}
+      <div className='relative rounded-2xl p-[1px] bg-gradient-to-br from-amber-300/70 via-rose-300/50 to-fuchsia-400/60'>
+        <div className='rounded-2xl bg-[#0a0a0e]/85 luxe-glass p-5 sm:p-7'>
+          <div className='flex items-center justify-between gap-4 mb-4 flex-wrap'>
+            <div>
+              <p className='eyebrow-mono !text-amber-300'>Support</p>
+              <h2 className='font-bold text-2xl sm:text-3xl bg-gradient-to-r from-amber-300 via-rose-300 to-fuchsia-400 bg-clip-text text-transparent leading-tight'>
+                Buy me a coffee
+              </h2>
+            </div>
+            <div className='min-w-[220px]'>
+              <Segmented
+                block
+                value={tab}
+                onChange={setTab}
+                options={['UPI (India)', 'Ko-fi']}
+              />
+            </div>
+          </div>
+
+          <div className='grid grid-cols-1 md:grid-cols-2 gap-6 items-center'>
+            {/* QR */}
+            <div className='flex justify-center md:justify-start'>
+              <SupportQR payload={payload} size={220} />
+            </div>
+
+            {/* Copy / details */}
+            <div className='flex flex-col gap-3'>
+              {isUpi ? (
+                <>
+                  <div>
+                    <div className='text-[10px] uppercase tracking-widest text-fg-muted mb-1'>Scan with any UPI app</div>
+                    <p className='text-sm text-fg-secondary leading-relaxed'>
+                      Point Paytm, GPay, PhonePe, or BHIM at the code. Amount is open — pay whatever you like.
+                    </p>
+                  </div>
+                  <div className='rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 font-mono text-[11px] break-all'>
+                    {UPI_PAYLOAD}
+                  </div>
+                  <div className='flex gap-2 flex-wrap'>
+                    <Button
+                      type='primary'
+                      onClick={copyShare}
+                      style={{ background: '#fbbf24', border: 'none', color: '#0a0a0e', fontWeight: 600 }}
+                    >
+                      Copy UPI link
+                    </Button>
+                    <a href={UPI_PAYLOAD}>
+                      <Button>Open in UPI app</Button>
+                    </a>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <div className='text-[10px] uppercase tracking-widest text-fg-muted mb-1'>Support on Ko-fi</div>
+                    <p className='text-sm text-fg-secondary leading-relaxed'>
+                      One-off tips or monthly membership — either helps keep the experiments running.
+                    </p>
+                  </div>
+                  <div className='rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 font-mono text-[11px] break-all'>
+                    {KOFI_URL}
+                  </div>
+                  <div className='flex gap-2 flex-wrap'>
+                    <a href={KOFI_URL} target='_blank' rel='noreferrer'>
+                      <Button
+                        type='primary'
+                        style={{ background: '#ff5e5b', border: 'none', color: 'white', fontWeight: 600 }}
+                      >
+                        Open Ko-fi
+                      </Button>
+                    </a>
+                    <Button onClick={copyShare}>Copy link</Button>
+                  </div>
+                </>
+              )}
+              <p className='text-[11px] text-fg-muted leading-snug mt-1'>
+                Every scan is optional — thank you for reading this far.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default Contact;

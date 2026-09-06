@@ -136,7 +136,7 @@ const Navbar = () => {
       ],
     },
     {
-      title: 'Others',
+      title: 'Toolbox',
       accent: 'text-emerald-300',
       items: [
         { to: '/lab',        label: 'Interactive Lab',  desc: '17 mini-demos · 7 categories' },
