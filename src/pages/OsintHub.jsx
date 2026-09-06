@@ -15,14 +15,17 @@ import { useEffect, useMemo, useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Collapse, Input, Tag, Skeleton, Statistic, Segmented, Progress, Empty,
-  Tooltip, Badge, message,
+  Tooltip, Badge, message, InputNumber, Spin,
 } from 'antd'
 import {
   ThunderboltFilled, FireFilled, RocketFilled, GlobalOutlined,
   AlertOutlined, TeamOutlined, SearchOutlined, LinkOutlined,
   SafetyCertificateFilled, UserOutlined, ApiOutlined, BugOutlined,
-  ReadOutlined, ReloadOutlined, ArrowRightOutlined,
+  ReadOutlined, ReloadOutlined, ArrowRightOutlined, PlayCircleFilled,
+  CheckCircleFilled, CloseCircleFilled, ExclamationCircleFilled,
+  ExperimentOutlined,
 } from '@ant-design/icons'
+import { Button } from '../components/ui'
 
 import catalog from '../constants/osintCatalog.json'
 
@@ -725,6 +728,268 @@ const HNPanel = () => {
   )
 }
 
+// ── All Tools (auto-rendered from BE manifest) ──────────────
+//
+// Fetches `/api/osint/tools` once on mount and renders each registered tool
+// as a small card. Every input is generated from the paramSchema returned by
+// the BE — so shipping a new tool on the BE means it just appears here on the
+// next page load with zero FE changes.
+//
+// Each card has:
+//   • title + description
+//   • one input per paramSchema entry (with helper text)
+//   • Run button → hits `/api/osint/tool/:name/:pathParams…?queryParams`
+//   • collapsible result panel with pretty-printed JSON
+//   • status badge (green ✓ passed once, red ✗ failed, grey · not configured)
+const AllToolsPanel = () => {
+  // manifest = list of { name, description, paramSchema, needsKey, configured }
+  const [manifest, setManifest] = useState(null)
+  const [manifestErr, setManifestErr] = useState(null)
+  const [q, setQ] = useState('')
+  const [filter, setFilter] = useState('all')
+
+  // Per-tool state: { [toolName]: { inputs, loading, data, error, expanded } }
+  const [state, setState] = useState({})
+
+  useEffect(() => {
+    osintGet('/tools')
+      .then((r) => {
+        setManifest(r.tools || [])
+        // Seed input state with placeholders as defaults so a first-time Run
+        // still gets a meaningful response.
+        const seed = {}
+        for (const t of r.tools || []) {
+          seed[t.name] = {
+            inputs: Object.fromEntries((t.paramSchema || []).map((s) => [s.key, s.placeholder ?? ''])),
+            loading: false, data: null, error: null, expanded: false,
+            lastStatus: null,   // 'ok' | 'err' | null
+          }
+        }
+        setState(seed)
+      })
+      .catch((e) => setManifestErr(e.message || 'failed to load tools'))
+  }, [])
+
+  const setInput = (toolName, key, val) => {
+    setState((s) => ({ ...s, [toolName]: { ...s[toolName], inputs: { ...s[toolName].inputs, [key]: val } } }))
+  }
+
+  const runTool = async (tool) => {
+    const cur = state[tool.name] || { inputs: {} }
+    const inputs = cur.inputs || {}
+
+    // Split schema into path + query parts; build the URL.
+    const pathParts = (tool.paramSchema || []).filter((s) => s.source === 'path')
+    const queryParts = (tool.paramSchema || []).filter((s) => s.source === 'query')
+    for (const s of pathParts) {
+      if (s.required && !String(inputs[s.key] ?? '').trim()) {
+        setState((st) => ({ ...st, [tool.name]: { ...st[tool.name], error: `${s.label} is required`, data: null, lastStatus: 'err' } }))
+        return
+      }
+    }
+    const pathSeg = pathParts.map((s) => encodeURIComponent(String(inputs[s.key] ?? '').trim())).filter(Boolean).join('/')
+    const qs = new URLSearchParams()
+    for (const s of queryParts) {
+      const v = String(inputs[s.key] ?? '').trim()
+      if (v) qs.set(s.key, v)
+    }
+    const url = `/tool/${tool.name}${pathSeg ? '/' + pathSeg : ''}${qs.toString() ? '?' + qs.toString() : ''}`
+
+    setState((st) => ({ ...st, [tool.name]: { ...st[tool.name], loading: true, error: null, expanded: true } }))
+    try {
+      const r = await osintGet(url)
+      setState((st) => ({
+        ...st,
+        [tool.name]: { ...st[tool.name], loading: false, data: r?.data ?? r, error: null, lastStatus: 'ok' },
+      }))
+    } catch (e) {
+      setState((st) => ({
+        ...st,
+        [tool.name]: {
+          ...st[tool.name],
+          loading: false, data: null,
+          error: e?.body?.error || e.message || 'failed',
+          lastStatus: 'err',
+        },
+      }))
+    }
+  }
+
+  const toggleExpand = (name) => {
+    setState((st) => ({ ...st, [name]: { ...st[name], expanded: !st[name]?.expanded } }))
+  }
+
+  const filtered = useMemo(() => {
+    if (!manifest) return []
+    const needle = q.trim().toLowerCase()
+    return manifest.filter((t) => {
+      if (filter === 'keyless' && t.needsKey) return false
+      if (filter === 'key' && !t.needsKey) return false
+      if (!needle) return true
+      return t.name.toLowerCase().includes(needle) || (t.description || '').toLowerCase().includes(needle)
+    })
+  }, [manifest, q, filter])
+
+  if (manifestErr) {
+    return (
+      <div className="luxe-glass rounded-2xl p-5 text-rose-300 text-sm">
+        Could not load tool manifest — {manifestErr}
+      </div>
+    )
+  }
+
+  if (!manifest) {
+    return (
+      <div className="luxe-glass rounded-2xl p-5">
+        <Skeleton active paragraph={{ rows: 6 }} />
+      </div>
+    )
+  }
+
+  const total    = manifest.length
+  const configured = manifest.filter((t) => t.configured).length
+  const keyless   = manifest.filter((t) => !t.needsKey).length
+
+  return (
+    <div className="luxe-glass rounded-2xl p-4 sm:p-5">
+      {/* Header / search */}
+      <div className="flex flex-col sm:flex-row sm:items-start gap-3 mb-4">
+        <div className="flex-1">
+          <Input
+            allowClear
+            size="middle"
+            prefix={<SearchOutlined className="text-gray-500" />}
+            placeholder={`Search ${total} tools — try ipwho, coingecko, wikipedia…`}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          <p className="text-[11px] text-fg-muted leading-snug mt-1">
+            {total} tools indexed · {configured} configured · {keyless} keyless
+          </p>
+        </div>
+        <div>
+          <Segmented
+            size="small"
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { label: 'All',       value: 'all' },
+              { label: 'Keyless',   value: 'keyless' },
+              { label: 'Key-only',  value: 'key' },
+            ]}
+          />
+          <p className="text-[11px] text-fg-muted leading-snug mt-1 text-right">
+            Filter by whether the tool needs an API key on the server.
+          </p>
+        </div>
+      </div>
+
+      {filtered.length === 0 ? (
+        <Empty description={<span className="text-gray-500">no tools match</span>} />
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          {filtered.map((t) => {
+            const s = state[t.name] || { inputs: {}, loading: false }
+            const badge = s.lastStatus === 'ok'
+              ? <Tooltip title="last run passed"><CheckCircleFilled className="text-emerald-400" /></Tooltip>
+              : s.lastStatus === 'err'
+                ? <Tooltip title="last run failed"><CloseCircleFilled className="text-rose-400" /></Tooltip>
+                : !t.configured
+                  ? <Tooltip title={`needs ${t.needsKey}`}><ExclamationCircleFilled className="text-amber-400" /></Tooltip>
+                  : <Tooltip title="not yet run"><span className="inline-block w-2 h-2 rounded-full bg-gray-600" /></Tooltip>
+
+            return (
+              <div key={t.name} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 sm:p-4 flex flex-col">
+                {/* Title row */}
+                <div className="flex items-start gap-2 mb-2">
+                  <ExperimentOutlined className="text-cyan-400 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-white font-bold text-sm font-mono">{t.name}</span>
+                      {badge}
+                      {t.needsKey && <Tag color="orange" className="!m-0 !text-[10px]">key</Tag>}
+                      {!t.needsKey && <Tag color="green" className="!m-0 !text-[10px]">free</Tag>}
+                    </div>
+                    <p className="text-gray-400 text-xs leading-snug mt-0.5">{t.description}</p>
+                  </div>
+                </div>
+
+                {/* Inputs */}
+                {(t.paramSchema || []).length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+                    {t.paramSchema.map((f) => (
+                      <div key={f.key}>
+                        <label className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
+                          {f.label}{f.required && <span className="text-rose-400"> *</span>}
+                        </label>
+                        {f.type === 'number' ? (
+                          <InputNumber
+                            size="small"
+                            className="!w-full"
+                            placeholder={f.placeholder}
+                            value={s.inputs?.[f.key] ?? ''}
+                            onChange={(v) => setInput(t.name, f.key, v ?? '')}
+                          />
+                        ) : (
+                          <Input
+                            size="small"
+                            placeholder={f.placeholder}
+                            value={s.inputs?.[f.key] ?? ''}
+                            onChange={(e) => setInput(t.name, f.key, e.target.value)}
+                            onPressEnter={() => runTool(t)}
+                          />
+                        )}
+                        <div className="text-[10px] text-gray-500 mt-0.5 leading-snug">{f.helper}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex items-center gap-2 mt-1">
+                  <Button
+                    variant="primary"
+                    size="small"
+                    onClick={() => runTool(t)}
+                    disabled={s.loading}
+                    icon={s.loading ? <Spin size="small" /> : <PlayCircleFilled />}
+                  >
+                    {s.loading ? 'Running…' : 'Run'}
+                  </Button>
+                  {(s.data || s.error) && (
+                    <Button variant="subtle" size="small" onClick={() => toggleExpand(t.name)}>
+                      {s.expanded ? 'Hide result' : 'Show result'}
+                    </Button>
+                  )}
+                  {!t.configured && (
+                    <span className="text-[10px] text-amber-300 ml-auto">
+                      env {t.needsKey} not set — 501 expected
+                    </span>
+                  )}
+                </div>
+
+                {/* Result */}
+                {(s.data || s.error) && s.expanded && (
+                  <div className="mt-3 rounded-lg border border-white/[0.05] bg-black/40 overflow-hidden">
+                    {s.error ? (
+                      <div className="p-2 text-rose-300 text-xs">Error · {s.error}</div>
+                    ) : (
+                      <pre className="p-2 text-[11px] text-emerald-200 overflow-auto max-h-64 leading-snug whitespace-pre-wrap break-all">
+                        {JSON.stringify(s.data, null, 2).slice(0, 4000)}
+                        {JSON.stringify(s.data, null, 2).length > 4000 && '\n\n… (truncated)'}
+                      </pre>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Full Catalog (search + Collapse per category) ───────────
 const CATEGORY_ICONS = {
   'Username'                       : '👤',
@@ -975,7 +1240,7 @@ export default function OsintHub() {
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <Tag icon={<SafetyCertificateFilled />} color="green">CORS-safe proxy</Tag>
               <Tag icon={<ThunderboltFilled />} color="gold">Live telemetry</Tag>
-              <Tag icon={<ApiOutlined />} color="cyan">17 BE endpoints</Tag>
+              <Tag icon={<ApiOutlined />} color="cyan">50+ BE tools</Tag>
               <Tag color="magenta">Mobile-friendly</Tag>
             </div>
           </div>
@@ -1007,6 +1272,16 @@ export default function OsintHub() {
               <HNPanel />
             </div>
           </div>
+        </section>
+
+        {/* ── All Tools (auto-rendered from BE registry) ── */}
+        <section>
+          <SectionTitle
+            eyebrow="// all tools · auto-generated from BE"
+            title="Full tool registry"
+            sub="Every OSINT tool registered on the backend, auto-rendered from its paramSchema. Fields, helper text, and validation come straight from the server so shipping a new tool is a one-file BE change."
+          />
+          <AllToolsPanel />
         </section>
 
         {/* ── Coverage ───────────────────────────────────── */}
