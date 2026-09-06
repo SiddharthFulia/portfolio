@@ -789,6 +789,9 @@ export default function Pathfinding() {
                   { label: 'Bidi',     value: 'bidirectional' },
                 ]}
               />
+              <p className='text-[11px] text-fg-muted leading-snug mt-1'>
+                Dijkstra: shortest cost. A*: heuristic-guided. BFS: fewest edges. DFS: depth. Bidi: two-ended.
+              </p>
               <div className='mt-2 text-[11px] leading-snug text-fg-muted'>
                 <span className='text-amber-300 font-semibold'>{info.name}</span> · {info.tc}
                 <div className='mt-0.5 text-fg-dim'>{info.desc}</div>
@@ -797,25 +800,30 @@ export default function Pathfinding() {
 
             {/* Controls */}
             <div className='luxe-glass p-3 space-y-3'>
-              <div className='flex flex-wrap items-center gap-2'>
-                <button
-                  onClick={() => setRunning(r => !r)}
-                  disabled={status !== 'ready' || tele.done || src == null || dst == null}
-                  className='luxe-btn luxe-btn-primary text-xs disabled:opacity-40'>
-                  {running ? <><PauseCircleFilled /> Pause</> : <><PlayCircleFilled /> Play</>}
-                </button>
-                <button
-                  onClick={resetRun}
-                  disabled={status !== 'ready'}
-                  className='luxe-btn luxe-btn-secondary text-xs disabled:opacity-40'>
-                  <ReloadOutlined /> Reset
-                </button>
-                <button
-                  onClick={randomize}
-                  disabled={status !== 'ready'}
-                  className='luxe-btn luxe-btn-secondary text-xs disabled:opacity-40'>
-                  <SwapOutlined /> Random
-                </button>
+              <div>
+                <div className='flex flex-wrap items-center gap-2'>
+                  <button
+                    onClick={() => setRunning(r => !r)}
+                    disabled={status !== 'ready' || tele.done || src == null || dst == null}
+                    className='luxe-btn luxe-btn-primary text-xs disabled:opacity-40'>
+                    {running ? <><PauseCircleFilled /> Pause</> : <><PlayCircleFilled /> Play</>}
+                  </button>
+                  <button
+                    onClick={resetRun}
+                    disabled={status !== 'ready'}
+                    className='luxe-btn luxe-btn-secondary text-xs disabled:opacity-40'>
+                    <ReloadOutlined /> Reset
+                  </button>
+                  <button
+                    onClick={randomize}
+                    disabled={status !== 'ready'}
+                    className='luxe-btn luxe-btn-secondary text-xs disabled:opacity-40'>
+                    <SwapOutlined /> Random
+                  </button>
+                </div>
+                <p className='text-[11px] text-fg-muted leading-snug mt-1'>
+                  Play/Pause animation. Reset clears state. Random picks fresh start/end.
+                </p>
               </div>
 
               <div>
@@ -824,6 +832,9 @@ export default function Pathfinding() {
                   <span className='font-mono text-amber-300'>{speed}</span>
                 </div>
                 <Slider min={1} max={500} step={1} value={speed} onChange={setSpeed} tooltip={{ open: false }} />
+                <p className='text-[11px] text-fg-muted leading-snug mt-1'>
+                  Nodes expanded per animation frame. Higher = faster traversal.
+                </p>
               </div>
 
               <div className='text-[11px] text-fg-muted'>

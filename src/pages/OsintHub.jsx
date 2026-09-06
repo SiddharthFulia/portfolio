@@ -327,6 +327,9 @@ const IPPanel = () => {
         onSearch={() => run()}
         loading={loading}
       />
+      <p className="text-[11px] text-fg-muted leading-snug mt-1">
+        Any public IPv4 · e.g. 8.8.8.8. Returns country, ISP, coordinates.
+      </p>
       <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
           {loading ? (
@@ -392,6 +395,9 @@ const NamePanel = () => {
         onSearch={() => run()}
         loading={loading}
       />
+      <p className="text-[11px] text-fg-muted leading-snug mt-1">
+        First name only · e.g. Sarah. Predicts gender %, age, top nationalities.
+      </p>
       <div className="mt-3">
         {loading ? (
           <Skeleton active paragraph={{ rows: 3 }} />
@@ -500,6 +506,9 @@ const DNSPanel = () => {
         onSearch={() => run()}
         loading={loading}
       />
+      <p className="text-[11px] text-fg-muted leading-snug mt-1">
+        Bare domain · e.g. github.com. Resolves A records via Cloudflare DoH.
+      </p>
       <div className="mt-3">
         {loading ? (
           <Skeleton active paragraph={{ rows: 3 }} />
@@ -604,6 +613,9 @@ const CVEPanel = () => {
         onSearch={() => run()}
         loading={loading}
       />
+      <p className="text-[11px] text-fg-muted leading-snug mt-1">
+        Format: CVE-YYYY-NNNN. Pulls severity + description from NVD.
+      </p>
       <div className="mt-3">
         {loading ? (
           <Skeleton active paragraph={{ rows: 4 }} />
@@ -676,6 +688,9 @@ const HNPanel = () => {
               { label: 'Best', value: 'beststories' },
             ]}
           />
+          <p className="text-[11px] text-fg-muted leading-snug mt-1 text-right">
+            Top: trending now. New: freshest. Best: highest recent scores.
+          </p>
         </div>
       </div>
       {loading ? (
@@ -833,7 +848,7 @@ const FullCatalog = () => {
 
   return (
     <div className="luxe-glass rounded-2xl p-4 sm:p-5">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-start gap-3 mb-4">
         <div className="flex-1">
           <Input
             allowClear
@@ -843,18 +858,26 @@ const FullCatalog = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          <p className="text-[11px] text-fg-muted leading-snug mt-1">
+            Search {catalog.stats.total} APIs across {catalog.stats.categoriesCount} categories by name or keyword.
+          </p>
         </div>
-        <Segmented
-          size="small"
-          value={pricingFilter}
-          onChange={setPricingFilter}
-          options={[
-            { label: 'All',      value: 'all' },
-            { label: 'Free',     value: 'free' },
-            { label: 'Freemium', value: 'freemium' },
-            { label: 'Paid',     value: 'paid' },
-          ]}
-        />
+        <div>
+          <Segmented
+            size="small"
+            value={pricingFilter}
+            onChange={setPricingFilter}
+            options={[
+              { label: 'All',      value: 'all' },
+              { label: 'Free',     value: 'free' },
+              { label: 'Freemium', value: 'freemium' },
+              { label: 'Paid',     value: 'paid' },
+            ]}
+          />
+          <p className="text-[11px] text-fg-muted leading-snug mt-1">
+            Filter by tier. Free = no key or free tier available.
+          </p>
+        </div>
       </div>
       <div className="text-[10px] text-gray-500 mb-2">
         showing {totalShown} of {catalog.stats.total} APIs in {filteredCats.length} categor{filteredCats.length === 1 ? 'y' : 'ies'}

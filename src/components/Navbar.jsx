@@ -111,9 +111,16 @@ const Navbar = () => {
       items: [
         { to: '/chess',       label: 'Chess Engine',  desc: 'Stockfish · clocks · saved games · piece themes' },
         { to: '/simple-game', label: 'Simple Games',  desc: 'Snake · code + live game · pause · step through' },
-        { to: '/physics',     label: 'Physics Lab',   desc: 'N-body double pendulum · Lagrangian mechanics · chaos' },
-        { to: '/pathfinding', label: 'Pathfinding',   desc: 'Dijkstra · A* · BFS · DFS · Bidi on live BLR OSM roads' },
         { to: '/osint',       label: 'OSINT Powerhouse', desc: '150+ intel APIs · live earthquakes / fires / ISS / breaches' },
+      ],
+    },
+    {
+      title: 'Simulations',
+      accent: 'text-rose-300',
+      items: [
+        { to: '/physics',     label: 'Double Pendulum', desc: 'Lagrangian chaos · phase portrait · Lyapunov · KaTeX equations' },
+        { to: '/pathfinding', label: 'City Router',     desc: 'Dijkstra · A* · BFS · DFS on live Bangalore OSM' },
+        { to: '/chernobyl',   label: 'Chernobyl RBMK',  desc: 'Point-kinetics · xenon poison · positive scram · AZ-5 button' },
       ],
     },
     {

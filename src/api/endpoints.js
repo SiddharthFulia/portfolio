@@ -160,4 +160,9 @@ export const ENDPOINTS = {
   GITHUB_USER:          '/api/proxy/github-user',
   GITHUB_REPOS:         '/api/proxy/github-repos',
   GITHUB_CONTRIBUTIONS: '/api/proxy/github-contributions',
+
+  // Physics Lab (heavy compute on the server)
+  PHYSICS_PENDULUM_SIMULATE: '/api/physics/pendulum/simulate',
+  PHYSICS_PENDULUM_PHASE:    '/api/physics/pendulum/phase',
+  PHYSICS_PENDULUM_LYAPUNOV: '/api/physics/pendulum/lyapunov',
 };

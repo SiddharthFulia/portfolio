@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
 import './styles/luxe.css'
+import 'katex/dist/katex.min.css'
 
 // Global auto-recover for Vite/Vercel chunk-hash mismatches. After a deploy,
 // any open tab holds an index.html that references chunks with old hashes;
