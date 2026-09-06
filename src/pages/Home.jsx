@@ -61,6 +61,7 @@ const GROUPS = [
     items: [
       { to: "/chess",       label: "Chess Engine",  desc: "Stockfish · clocks · saved games · piece themes" },
       { to: "/simple-game", label: "Simple Games",  desc: "Snake · code + live game · step through algorithms" },
+      { to: "/physics",     label: "Physics Lab",   desc: "N-body double pendulum · Lagrangian mechanics · chaos" },
     ],
   },
   {
