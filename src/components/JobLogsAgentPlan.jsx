@@ -242,7 +242,7 @@ export default function JobLogsAgentPlan({
     : 'Listening for events…'
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-black/40 overflow-hidden">
+    <div className="rounded-xl border border-line bg-surface-elevated overflow-hidden">
       {(progressMessage || error || noLogsYet) && (
         <div className="px-4 py-2 border-b border-gray-800/80 bg-cyan-500/5">
           {progressMessage && (

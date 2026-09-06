@@ -175,7 +175,7 @@ const ObjectDetect = () => {
               <div className="text-center">
                 <div style={{ fontSize: 48, marginBottom: 16 }}>🔧</div>
                 <div style={{ fontSize: 15, color: '#e91e8c', fontWeight: 600 }}>Detection Service Offline</div>
-                <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>Start the Python service with YOLOv8</div>
+                <div style={{ fontSize: 12, color: 'var(--luxe-fg-muted)', marginTop: 4 }}>Start the Python service with YOLOv8</div>
               </div>
             </div>
           )}
@@ -191,9 +191,9 @@ const ObjectDetect = () => {
               className="w-20 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-pink-500" />
             <span className="text-xs text-pink-400 font-mono">{Math.round(threshold * 100)}%</span>
           </div>
-          <div style={{ fontSize: 12, color: '#888', padding: '6px 10px', background: 'var(--luxe-surface)', borderRadius: 8, border: '1px solid #ffffff10' }}>
+          <div style={{ fontSize: 12, color: 'var(--luxe-fg-muted)', padding: '6px 10px', background: 'var(--luxe-surface)', borderRadius: 8, border: '1px solid #ffffff10' }}>
             <span style={{ color: '#e91e8c', fontWeight: 600 }}>{fps}</span> FPS
-            <span style={{ color: '#555', marginLeft: 8 }}>{processMs}ms</span>
+            <span style={{ color: 'var(--luxe-fg-dim)', marginLeft: 8 }}>{processMs}ms</span>
           </div>
         </div>
       </div>
@@ -215,7 +215,7 @@ const ObjectDetect = () => {
           )}
         </GlassCard>
         <GlassCard>
-          <p style={{ color: '#666', fontSize: 11 }}>YOLOv8-nano on server. 80 classes. No download needed on your device.</p>
+          <p style={{ color: 'var(--luxe-fg-dim)', fontSize: 11 }}>YOLOv8-nano on server. 80 classes. No download needed on your device.</p>
         </GlassCard>
       </div>
     </div>

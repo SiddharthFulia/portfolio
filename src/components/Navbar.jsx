@@ -335,8 +335,9 @@ const Navbar = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.22, ease: 'easeOut' }}
-            className={`absolute top-full left-0 right-0 z-50 py-4 px-6 flex flex-col gap-1 shadow-xl border-t
-              ${isDark ? 'bg-gray-950/95 border-gray-800' : 'bg-white/95 border-gray-200'}`}>
+            className={`fixed top-[76px] left-0 right-0 z-50 py-4 px-6 flex flex-col gap-1 shadow-2xl border-t
+              max-h-[calc(100dvh-76px)] overflow-y-auto overscroll-contain
+              ${isDark ? 'bg-gray-950/95 border-gray-800 backdrop-blur' : 'bg-white/95 border-gray-200 backdrop-blur'}`}>
 
           {/* Vault control — same as the desktop dropdown entry */}
           <div className="px-2 pt-2">

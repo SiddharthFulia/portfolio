@@ -135,7 +135,7 @@ function CinemaOutput({ job }) {
           )}
           <ol className="space-y-2">
             {shots.map((p, i) => (
-              <li key={i} className="rounded-lg border border-gray-800 bg-black/40 p-3 hover:border-amber-500/40 transition-colors">
+              <li key={i} className="rounded-lg border border-line bg-surface-elevated p-3 hover:border-amber-500/40 transition-colors">
                 <div className="flex items-center justify-between mb-1 gap-2 flex-wrap">
                   <span className="text-[10px] font-mono text-amber-400 font-bold">SHOT {i + 1}</span>
                   <div className="flex items-center gap-1">
@@ -178,7 +178,7 @@ function CinemaOutput({ job }) {
               <ReloadOutlined className="text-[9px]" /> Refresh
             </button>
           </div>
-          <div className="max-h-96 overflow-y-auto p-3 bg-black/40">
+          <div className="max-h-96 overflow-y-auto p-3 bg-surface-elevated">
             {logs.length === 0 ? (
               <p className="text-center text-gray-600 text-xs py-6">
                 No logs yet — they stream in as each shot runs.

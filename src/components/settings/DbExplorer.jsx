@@ -460,7 +460,7 @@ export default function DbExplorer() {
                             {askError.data?.generatedSql && (
                               <>
                                 <div className="text-[10px] uppercase tracking-wider text-rose-300/80 mt-1">Generated SQL (not executed):</div>
-                                <pre className="font-mono text-[11px] whitespace-pre-wrap bg-black/40 p-2 rounded">{askError.data.generatedSql}</pre>
+                                <pre className="font-mono text-[11px] whitespace-pre-wrap bg-surface-elevated p-2 rounded">{askError.data.generatedSql}</pre>
                                 <Button
                                   variant="ghost"
                                   size="small"

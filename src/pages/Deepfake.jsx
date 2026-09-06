@@ -222,7 +222,7 @@ function DeepfakeInner() {
                   <Upload.Dragger multiple={false} showUploadList={false}
                     accept="audio/*"
                     beforeUpload={handleRefUpload}
-                    style={{ background: 'transparent', borderColor: '#374151', padding: '24px 0' }}>
+                    style={{ background: 'transparent', borderColor: 'var(--luxe-border)', padding: '24px 0' }}>
                     <UploadOutlined className="text-3xl text-rose-400 mb-2" />
                     <p className="text-sm text-gray-300">Drop a reference clip</p>
                     <p className="text-[10px] text-gray-500 mt-1">mp3 · wav · m4a · max 16 MB</p>
@@ -258,7 +258,7 @@ function DeepfakeInner() {
                   <Upload.Dragger multiple={false} showUploadList={false}
                     accept="audio/*"
                     beforeUpload={handleMelodyUpload}
-                    style={{ background: 'transparent', borderColor: '#374151', padding: '16px 0' }}>
+                    style={{ background: 'transparent', borderColor: 'var(--luxe-border)', padding: '16px 0' }}>
                     <UploadOutlined className="text-2xl text-amber-400 mb-1" />
                     <p className="text-xs text-gray-300">Upload a hummed / sung melody</p>
                   </Upload.Dragger>
@@ -492,7 +492,7 @@ function UploadCard({ label, accent, dataUrl, file, onUpload, onClear, onCapture
           <Upload.Dragger multiple={false} showUploadList={false}
             accept="image/*"
             beforeUpload={onUpload}
-            style={{ background: 'transparent', borderColor: '#374151', padding: '32px 0' }}>
+            style={{ background: 'transparent', borderColor: 'var(--luxe-border)', padding: '32px 0' }}>
             <UploadOutlined className={`text-3xl ${a.icon} mb-2`} />
             <p className="text-sm text-gray-300">Drop an image</p>
             <p className="text-[10px] text-gray-500 mt-1">{hint}</p>

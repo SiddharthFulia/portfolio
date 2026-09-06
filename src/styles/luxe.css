@@ -553,4 +553,16 @@ body.theme-light .ant-modal-title {
   color: var(--luxe-fg) !important;
 }
 
+/* ── Mobile viewport height fix ───────────────────────────────
+   Tailwind's `h-screen` compiles to `100vh` which on mobile ignores the
+   URL bar height — panes render 60-80px too tall and clip content off
+   the bottom. `100dvh` (dynamic viewport height) accounts for browser
+   chrome. Overriding here so we don't have to touch every h-screen /
+   min-h-screen usage across ~40 pages. */
+@supports (height: 100dvh) {
+  .h-screen     { height: 100dvh; }
+  .min-h-screen { min-height: 100dvh; }
+  .max-h-screen { max-height: 100dvh; }
+}
+
 /* End of luxe.css */

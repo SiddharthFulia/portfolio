@@ -356,7 +356,7 @@ const About = () => {
                     {/* node */}
                     <span
                       aria-hidden
-                      className="absolute -left-5 top-5 w-3 h-3 rounded-full bg-[#0a0a0e] border-2"
+                      className="absolute -left-5 top-5 w-3 h-3 rounded-full bg-surface-elevated border-2"
                       style={{ borderColor: '#fbbf24' }}
                     />
                     <div className="luxe-glass luxe-card-hover p-5 sm:p-6">

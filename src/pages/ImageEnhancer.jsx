@@ -1424,7 +1424,7 @@ function GenerateSection({
                       </button>
                     </div>
                     <button type="button" onClick={() => setLogsModalOpen(true)}
-                      className="block w-full text-left rounded-lg bg-black/40 border border-gray-800/60 hover:border-cyan-500/40 transition-colors overflow-hidden">
+                      className="block w-full text-left rounded-lg bg-surface-elevated border border-gray-800/60 hover:border-cyan-500/40 transition-colors overflow-hidden">
                       <div className="max-h-40 sm:max-h-48 overflow-y-auto p-2">
                         <ul className="space-y-0.5">
                           {job.logs.slice(-12).map((entry, i) => (
@@ -2348,7 +2348,7 @@ function PromptHelperModal({
             <div className="w-full border-t border-gray-800" />
           </div>
           <div className="relative flex justify-center">
-            <span className="px-2 bg-[#0b0f17] text-[9px] uppercase tracking-widest text-gray-600">
+            <span className="px-2 bg-surface-base text-[9px] uppercase tracking-widest text-gray-600">
               or pick a starter
             </span>
           </div>
@@ -2469,7 +2469,7 @@ function ImageLogModal({ open, onClose, job }) {
           </button>
         </div>
       </div>
-      <div ref={scrollRef} className="max-h-[65vh] overflow-y-auto p-4 sm:p-5 bg-[#06080d]">
+      <div ref={scrollRef} className="max-h-[65vh] overflow-y-auto p-4 sm:p-5 bg-surface-overlay">
         {logs.length === 0 ? (
           <p className="text-gray-500 text-sm text-center py-12">Waiting for the worker to emit its first event…</p>
         ) : (
@@ -2525,9 +2525,9 @@ function ImageEnhancerModal({ expanded, setExpandedPreset, setSelectedPreset }) 
               </button>
             </div>
           </div>
-          <div className="max-h-[65vh] overflow-y-auto p-5 bg-[#06080d]">
+          <div className="max-h-[65vh] overflow-y-auto p-5 bg-surface-overlay">
             <p className="text-xs text-gray-400 mb-3">{expanded.short}</p>
-            <pre className="text-[12px] font-mono text-gray-200 leading-relaxed whitespace-pre-wrap break-words bg-black/40 border border-gray-800 rounded-lg p-4">
+            <pre className="text-[12px] font-mono text-gray-200 leading-relaxed whitespace-pre-wrap break-words bg-surface-elevated border border-line rounded-lg p-4">
 {expanded.prompt}
             </pre>
           </div>

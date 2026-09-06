@@ -268,7 +268,7 @@ export default function JobDetailPage({
           </div>
           <button type="button"
             onClick={() => allLogs.length > 0 && setLogsOpen(true)}
-            className="block w-full text-left bg-black/40 hover:bg-black/60 transition-colors">
+            className="block w-full text-left bg-surface-elevated hover:bg-surface-overlay transition-colors">
             <div className="max-h-80 overflow-y-auto p-4">
               {allLogs.length === 0 ? (
                 <p className="text-center text-gray-600 text-xs py-6">
@@ -310,7 +310,7 @@ export default function JobDetailPage({
             <button onClick={() => setLogsOpen(false)}
               className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded">✕</button>
           </div>
-          <div className="max-h-[65vh] overflow-y-auto p-5 bg-[#06080d]">
+          <div className="max-h-[65vh] overflow-y-auto p-5 bg-surface-overlay">
             {allLogs.length === 0 ? (
               <p className="text-gray-500 text-sm text-center py-12">No events yet.</p>
             ) : (

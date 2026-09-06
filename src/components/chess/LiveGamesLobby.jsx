@@ -89,7 +89,7 @@ export default function LiveGamesLobby({ defaultOpen = true }) {
                   <span className="text-xs font-semibold text-gray-200 truncate">
                     {m.whiteName || 'Anonymous'}
                   </span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-gray-800 bg-black/40 text-gray-400">
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-line bg-surface-elevated text-gray-400">
                     {tcLabel(m.timeControlId)}
                   </span>
                   <span className="text-[10px] text-gray-500 font-mono">#{m.id}</span>

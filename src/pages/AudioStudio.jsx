@@ -453,7 +453,7 @@ export default function AudioStudio() {
                   <Upload.Dragger multiple={false} showUploadList={false}
                     accept="audio/*,video/*"
                     beforeUpload={handleSttUpload}
-                    style={{ background: 'transparent', borderColor: '#374151', padding: '24px 0' }}>
+                    style={{ background: 'transparent', borderColor: 'var(--luxe-border)', padding: '24px 0' }}>
                     <UploadOutlined className="text-3xl text-amber-400 mb-2" />
                     <p className="text-sm text-gray-300">Drop a song or music video</p>
                     <p className="text-[10px] text-gray-500 mt-1">mp3 · wav · m4a · mp4 · webm · max 100 MB · audio track auto-extracted from video · runs on 5090</p>
@@ -528,7 +528,7 @@ export default function AudioStudio() {
                     <Upload.Dragger multiple={false} showUploadList={false}
                       accept="audio/*,video/*"
                       beforeUpload={handleSttUpload}
-                      style={{ background: 'transparent', borderColor: '#374151', padding: '24px 0' }}>
+                      style={{ background: 'transparent', borderColor: 'var(--luxe-border)', padding: '24px 0' }}>
                       <UploadOutlined className="text-3xl text-amber-400 mb-2" />
                       <p className="text-sm text-gray-300">Drop audio or click to upload</p>
                       <p className="text-[10px] text-gray-500 mt-1">mp3 · wav · m4a · ogg · video (audio track) · max 25 MB</p>
@@ -578,7 +578,7 @@ export default function AudioStudio() {
                     <Upload.Dragger multiple={false} showUploadList={false}
                       accept="audio/*"
                       beforeUpload={handleVcRefUpload}
-                      style={{ background: 'transparent', borderColor: '#374151', padding: '24px 0' }}>
+                      style={{ background: 'transparent', borderColor: 'var(--luxe-border)', padding: '24px 0' }}>
                       <UploadOutlined className="text-3xl text-amber-400 mb-2" />
                       <p className="text-sm text-gray-300">Drop a reference clip or click to upload</p>
                       <p className="text-[10px] text-gray-500 mt-1">mp3 · wav · m4a · ogg · max 8 MB · 6–30s ideal</p>
@@ -615,7 +615,7 @@ export default function AudioStudio() {
                       <Upload.Dragger multiple={false} showUploadList={false}
                         accept="audio/*"
                         beforeUpload={handleVcMelodyUpload}
-                        style={{ background: 'transparent', borderColor: '#374151', padding: '16px 0' }}>
+                        style={{ background: 'transparent', borderColor: 'var(--luxe-border)', padding: '16px 0' }}>
                         <UploadOutlined className="text-2xl text-amber-400 mb-1" />
                         <p className="text-xs text-gray-300">Upload a hummed / sung melody (max 16 MB)</p>
                       </Upload.Dragger>
@@ -755,7 +755,7 @@ export default function AudioStudio() {
                 ))}
               </div>
               {sepResult.stems?.lyrics ? (
-                <details className="rounded-lg border border-gray-800 bg-black/40 p-3 mb-3">
+                <details className="rounded-lg border border-line bg-surface-elevated p-3 mb-3">
                   <summary className="text-xs font-semibold text-amber-300 cursor-pointer inline-flex items-center gap-1.5">
                     <EditOutlined /> Lyrics (Whisper on vocals stem)
                   </summary>
@@ -775,7 +775,7 @@ export default function AudioStudio() {
           /* STT result — synchronous, no job row */
           kind === 'stt' && sttResult ? (
             <>
-              <div className="rounded-lg bg-black/40 border border-gray-800 p-3 mb-3 max-h-72 overflow-y-auto">
+              <div className="rounded-lg bg-surface-elevated border border-line p-3 mb-3 max-h-72 overflow-y-auto">
                 <p className="text-sm text-gray-100 leading-relaxed whitespace-pre-wrap">{sttResult.text || '(empty)'}</p>
               </div>
               {Array.isArray(sttResult.chunks) && sttResult.chunks.length > 0 && (
@@ -783,7 +783,7 @@ export default function AudioStudio() {
                   <summary className="text-[10px] uppercase tracking-wider text-gray-500 cursor-pointer hover:text-gray-300">
                     Timestamps · {sttResult.chunks.length} segments
                   </summary>
-                  <ul className="mt-2 space-y-0.5 max-h-40 overflow-y-auto bg-black/30 rounded p-2">
+                  <ul className="mt-2 space-y-0.5 max-h-40 overflow-y-auto bg-surface-elevated rounded p-2">
                     {sttResult.chunks.map((c, i) => (
                       <li key={i} className="text-[10px] font-mono text-gray-400">
                         <span className="text-amber-300">[{(c.timestamp?.[0] ?? 0).toFixed(1)}s → {(c.timestamp?.[1] ?? 0).toFixed(1)}s]</span> {c.text}
@@ -828,7 +828,7 @@ export default function AudioStudio() {
               <div className="w-8 h-8 rounded-full border-2 border-amber-500/30 border-t-amber-400 animate-spin" />
               <p className="text-amber-300 text-sm font-semibold">{job?.status === 'processing' ? 'Generating audio…' : 'Queued'}</p>
               {Array.isArray(job?.logs) && job.logs.length > 0 && (
-                <ul className="mt-3 w-full max-h-40 overflow-y-auto bg-black/40 rounded-lg p-2 space-y-0.5">
+                <ul className="mt-3 w-full max-h-40 overflow-y-auto bg-surface-elevated rounded-lg p-2 space-y-0.5">
                   {job.logs.slice(-10).map((l, i) => (
                     <li key={i} className="text-[10px] font-mono text-amber-200/80 break-all">{l.msg}</li>
                   ))}
@@ -962,7 +962,7 @@ function AudioCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
             { key: 'bass',   tint: 'border-emerald-500/40' },
             { key: 'other',  tint: 'border-cyan-500/40' },
           ].map(s => stemsObj[s.key] ? (
-            <div key={s.key} className={`rounded-md border ${s.tint} p-1 bg-black/30`}>
+            <div key={s.key} className={`rounded-md border ${s.tint} p-1 bg-surface-elevated`}>
               <div className="flex items-center gap-1 mb-0.5">
                 <span className="text-[9px] uppercase text-gray-500 font-semibold">{s.key}</span>
               </div>
@@ -974,7 +974,7 @@ function AudioCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
       ) :
       /* STT completed cards: show the transcript snippet inline */
       item.kind === 'stt' && item.transcript ? (
-        <div className="rounded-md border border-gray-800 bg-black/40 p-2 text-[11px] text-gray-200 leading-snug line-clamp-3"
+        <div className="rounded-md border border-line bg-surface-elevated p-2 text-[11px] text-gray-200 leading-snug line-clamp-3"
           onClick={e => e.stopPropagation()}>
           {item.transcript}
         </div>
@@ -1014,7 +1014,7 @@ function AudioCard({ item, selectMode, checked, onToggleSelect, onDelete }) {
       {!selectMode && onDelete && (
         <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete() }}
           title="Delete"
-          className="absolute top-1.5 right-1.5 w-7 h-7 flex items-center justify-center rounded-lg bg-black/70 hover:bg-rose-600 text-gray-200 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
+          className="absolute top-1.5 right-1.5 w-7 h-7 flex items-center justify-center rounded-lg bg-surface-elevated hover:bg-rose-600 text-gray-200 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
           <DeleteOutlined className="text-xs" />
         </button>
       )}

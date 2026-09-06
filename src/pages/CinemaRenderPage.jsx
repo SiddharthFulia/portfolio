@@ -237,7 +237,7 @@ export default function CinemaRenderPage() {
             </span>
           </button>
           {unifiedLogsOpen && (
-            <div className="mt-3 max-h-[480px] overflow-y-auto rounded-md border border-gray-800 bg-black/40 p-2">
+            <div className="mt-3 max-h-[480px] overflow-y-auto rounded-md border border-line bg-surface-elevated p-2">
               {unifiedLogs.length === 0 ? (
                 <p className="text-xs text-gray-500 py-6 text-center">
                   No logs yet — they stream in as each shot runs.

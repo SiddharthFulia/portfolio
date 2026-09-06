@@ -143,7 +143,7 @@ export default function SavedGames({ refreshKey, onLoad }) {
               onBlur={() => commitRename(row)}
               onKeyDown={e => { if (e.key === 'Enter') commitRename(row); if (e.key === 'Escape') setEditingId(null) }}
               autoFocus
-              className="flex-1 bg-black/60 border border-amber-500/40 rounded px-1.5 py-0.5 text-xs text-gray-100" />
+              className="flex-1 bg-surface-elevated border border-amber-500/40 rounded px-1.5 py-0.5 text-xs text-gray-100" />
           ) : (
             <button onClick={() => onLoad?.(row)}
               className="flex-1 text-left text-xs font-semibold text-gray-100 hover:text-amber-200 truncate">

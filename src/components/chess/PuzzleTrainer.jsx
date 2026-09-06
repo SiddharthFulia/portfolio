@@ -731,7 +731,7 @@ function AnalyzePanel({ puzzle, resultKind, outcomeMessage, ratingDelta }) {
         <div className="space-y-3">
           <div>
             <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5">Move sequence</div>
-            <div className="text-xs font-mono text-gray-200 leading-relaxed bg-black/40 rounded p-2 border border-gray-800">
+            <div className="text-xs font-mono text-gray-200 leading-relaxed bg-surface-elevated rounded p-2 border border-line">
               {timeline.slice(1).map((t, i) => (
                 <span key={i}
                   onClick={() => setStep(i + 1)}
@@ -767,7 +767,7 @@ function AnalyzePanel({ puzzle, resultKind, outcomeMessage, ratingDelta }) {
 
           <div className="pt-1">
             <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">Starting FEN</div>
-            <code className="block text-[10px] text-gray-300 bg-black/40 rounded p-2 break-all border border-gray-800 font-mono">
+            <code className="block text-[10px] text-gray-300 bg-surface-elevated rounded p-2 break-all border border-line font-mono">
               {puzzle.fen}
             </code>
           </div>

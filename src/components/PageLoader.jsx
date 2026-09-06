@@ -11,14 +11,14 @@ import { Skeleton } from 'antd'
 export default function PageLoader({ variant = 'page' }) {
   if (variant === 'home') {
     return (
-      <div className="w-full h-screen flex items-center justify-center bg-[#0a0a0e]">
+      <div className="w-full h-screen flex items-center justify-center bg-surface-base">
         <div className="w-14 h-14 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
       </div>
     )
   }
   // Standard page — title + paragraph + grid skeleton on a dark bg.
   return (
-    <div className="min-h-screen bg-[#0a0a0e] pt-28 px-6 pb-16">
+    <div className="min-h-screen bg-surface-base pt-28 px-6 pb-16">
       <div className="max-w-5xl mx-auto space-y-6">
         {/* Header band */}
         <Skeleton.Input active size="large" style={{ width: 320, height: 44 }} />

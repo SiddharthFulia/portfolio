@@ -1579,7 +1579,7 @@ function FenImport({ value, setValue, onLoad, currentFen }) {
       <div className="flex gap-2">
         <input value={value} onChange={e => setValue(e.target.value)}
           placeholder="rnbqkbnr/... w KQkq - 0 1"
-          className="flex-1 bg-black/40 border border-gray-800 rounded-lg px-3 py-1.5 text-xs font-mono text-gray-200 focus:outline-none focus:border-amber-500/60" />
+          className="flex-1 bg-surface-elevated border border-line rounded-lg px-3 py-1.5 text-xs font-mono text-gray-200 focus:outline-none focus:border-amber-500/60" />
         <button onClick={onLoad}
           disabled={!value.trim()}
           className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-amber-500/40 bg-amber-500/15 text-amber-200 hover:bg-amber-500/25 disabled:opacity-40 disabled:cursor-not-allowed">
@@ -1601,7 +1601,7 @@ function PgnImport({ value, setValue, onLoad }) {
       <textarea value={value} onChange={e => setValue(e.target.value)}
         placeholder={'1. e4 e5 2. Nf3 Nc6 3. Bb5 ...'}
         rows={3}
-        className="w-full bg-black/40 border border-gray-800 rounded-lg px-3 py-1.5 text-xs font-mono text-gray-200 focus:outline-none focus:border-amber-500/60 resize-y" />
+        className="w-full bg-surface-elevated border border-line rounded-lg px-3 py-1.5 text-xs font-mono text-gray-200 focus:outline-none focus:border-amber-500/60 resize-y" />
       <button onClick={onLoad}
         disabled={!value.trim()}
         className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-amber-500/40 bg-amber-500/15 text-amber-200 hover:bg-amber-500/25 disabled:opacity-40 disabled:cursor-not-allowed">
@@ -1648,7 +1648,7 @@ function OpeningHeading({ info, expanded, onToggle, detail }) {
         )}
       </button>
       {expanded && (
-        <div className="mt-2 rounded-lg border border-amber-500/20 bg-black/30 p-2.5 space-y-2">
+        <div className="mt-2 rounded-lg border border-amber-500/20 bg-surface-elevated p-2.5 space-y-2">
           <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] uppercase tracking-wider text-gray-500">Canonical line · {info.matchedPly} ply</p>
             <button

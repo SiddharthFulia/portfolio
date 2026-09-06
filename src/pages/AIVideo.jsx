@@ -484,7 +484,7 @@ const Skeleton = ({ jobId, status, job, paused = false, onTogglePause }) => {
                 </button>
               </div>
             </div>
-            <div ref={modalScrollRef} className="max-h-[65vh] overflow-y-auto p-5 bg-[#06080d]">
+            <div ref={modalScrollRef} className="max-h-[65vh] overflow-y-auto p-5 bg-surface-overlay">
               {allLogs.length === 0 ? (
                 <p className="text-gray-500 text-sm text-center py-12">Waiting for the worker to emit its first event…</p>
               ) : (

@@ -244,7 +244,7 @@ export default function Cinema({ embedded = false, view = 'all', refreshKey = 0 
                 Numeric values get tabular-nums so the slider readout doesn't
                 jitter as the user drags. */}
             <div
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-xl bg-black/30 border border-line"
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-xl bg-surface-elevated border border-line"
               style={{ fontVariantNumeric: 'tabular-nums' }}
             >
               <div>

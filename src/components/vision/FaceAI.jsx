@@ -44,7 +44,7 @@ function FeatureBar({ label, value, color }) {
   return (
     <div style={{ marginBottom: 8 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
-        <span style={{ color: '#ccc' }}>{label}</span>
+        <span style={{ color: 'var(--luxe-fg)' }}>{label}</span>
         <span style={{ color, fontWeight: 600 }}>{pct}%</span>
       </div>
       <div style={{ height: 5, borderRadius: 3, background: 'var(--luxe-surface-hi)', overflow: 'hidden' }}>
@@ -257,7 +257,7 @@ const FaceAI = () => {
             <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', padding: 24, width: '80%' }}>
               <div style={{ fontSize: 48, marginBottom: 16 }}>🔧</div>
               <div style={{ fontSize: 15, color: '#e91e8c', marginBottom: 8, fontWeight: 600 }}>Face Service Offline</div>
-              <div style={{ fontSize: 12, color: '#999' }}>Start the Python face service on the backend</div>
+              <div style={{ fontSize: 12, color: 'var(--luxe-fg-muted)' }}>Start the Python face service on the backend</div>
             </div>
           )}
         </div>
@@ -266,7 +266,7 @@ const FaceAI = () => {
           <ToggleBtn active={showLandmarks} onClick={() => setShowLandmarks(l => !l)} label="Landmarks" />
           <ToggleBtn active={showBox} onClick={() => setShowBox(b => !b)} label="Box" />
           <ToggleBtn active={showAge} onClick={() => setShowAge(a => !a)} label="Age" />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#888', padding: '6px 10px', background: 'var(--luxe-surface)', borderRadius: 8, border: '1px solid #ffffff10' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--luxe-fg-muted)', padding: '6px 10px', background: 'var(--luxe-surface)', borderRadius: 8, border: '1px solid #ffffff10' }}>
             <span style={{ color: '#b388ff', fontWeight: 600 }}>{fps}</span> FPS
           </div>
         </div>
@@ -277,7 +277,7 @@ const FaceAI = () => {
         <GlassCard title="Confidence">
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
             <span style={{ fontSize: 36, fontWeight: 700, color: confColor, lineHeight: 1 }}>{confidence}%</span>
-            <span style={{ fontSize: 12, color: '#888' }}>detection</span>
+            <span style={{ fontSize: 12, color: 'var(--luxe-fg-muted)' }}>detection</span>
           </div>
           <div style={{ height: 6, borderRadius: 3, background: 'var(--luxe-surface-hi)', overflow: 'hidden' }}>
             <div style={{ height: '100%', width: `${confidence}%`, background: `linear-gradient(90deg, ${confColor}88, ${confColor})`, borderRadius: 3, transition: 'width 0.3s ease' }} />
@@ -288,18 +288,18 @@ const FaceAI = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
             <span style={{ fontSize: 36 }}>{moodLabel ? (MOOD_EMOJIS[moodLabel] || '😐') : '—'}</span>
             <div>
-              <div style={{ fontSize: 16, fontWeight: 600, color: moodLabel ? (MOOD_COLORS[moodLabel] || '#fff') : '#555', textTransform: 'capitalize' }}>{moodLabel || 'Unknown'}</div>
-              <div style={{ fontSize: 12, color: '#888' }}>{moodLabel ? `${moodConf}% confident` : 'Waiting...'}</div>
+              <div style={{ fontSize: 16, fontWeight: 600, color: moodLabel ? (MOOD_COLORS[moodLabel] || 'var(--luxe-fg)') : 'var(--luxe-fg-dim)', textTransform: 'capitalize' }}>{moodLabel || 'Unknown'}</div>
+              <div style={{ fontSize: 12, color: 'var(--luxe-fg-muted)' }}>{moodLabel ? `${moodConf}% confident` : 'Waiting...'}</div>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 40 }}>
-            {moodHistory.length === 0 && <span style={{ fontSize: 11, color: '#555' }}>No mood history yet</span>}
+            {moodHistory.length === 0 && <span style={{ fontSize: 11, color: 'var(--luxe-fg-dim)' }}>No mood history yet</span>}
             {moodHistory.map((m, i) => (
               <div key={i} title={`${m.mood} (${Math.round(m.confidence * 100)}%)`}
                 style={{ flex: 1, height: `${Math.max(10, m.confidence * 100)}%`, background: MOOD_COLORS[m.mood] || '#666', borderRadius: '2px 2px 0 0', transition: 'height 0.3s ease', minWidth: 8, opacity: 0.5 + (i / moodHistory.length) * 0.5 }} />
             ))}
           </div>
-          <div style={{ fontSize: 10, color: '#555', marginTop: 4 }}>Last {moodHistory.length} readings</div>
+          <div style={{ fontSize: 10, color: 'var(--luxe-fg-dim)', marginTop: 4 }}>Last {moodHistory.length} readings</div>
         </GlassCard>
 
         {showAge && (
@@ -310,12 +310,12 @@ const FaceAI = () => {
                 <div style={{ fontSize: 22, fontWeight: 700, color: '#b388ff', lineHeight: 1 }}>
                   {face?.age?.band || '—'}
                 </div>
-                <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
+                <div style={{ fontSize: 11, color: 'var(--luxe-fg-muted)', marginTop: 4 }}>
                   {face?.age?.estimate ? `~${face.age.estimate} yrs · ${face.age.method || 'heuristic'}` : 'Waiting...'}
                 </div>
               </div>
             </div>
-            <div style={{ fontSize: 10, color: '#555', marginTop: 8, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 10, color: 'var(--luxe-fg-dim)', marginTop: 8, lineHeight: 1.5 }}>
               Estimated from face proportions (landmark geometry). ML-based age
               detection (DeepFace) is planned — band-only output for now to keep
               the UI honest about precision.
@@ -330,7 +330,7 @@ const FaceAI = () => {
             </div>
             <div>
               <span style={{ fontSize: 24, fontWeight: 700, color: '#b388ff' }}>{typeof faceAngle === 'number' ? faceAngle.toFixed(1) : '0.0'}°</span>
-              <div style={{ fontSize: 11, color: '#888' }}>rotation</div>
+              <div style={{ fontSize: 11, color: 'var(--luxe-fg-muted)' }}>rotation</div>
             </div>
           </div>
         </GlassCard>
@@ -341,8 +341,8 @@ const FaceAI = () => {
           <FeatureBar label="Right Eye" value={features?.rightEyeOpen ?? 0} color="#4caf50" />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: features?.smiling ? '#4caf50' : '#555', display: 'inline-block', boxShadow: features?.smiling ? '0 0 6px #4caf50' : 'none' }} />
-            <span style={{ fontSize: 13, color: '#ccc' }}>Smiling</span>
-            <span style={{ fontSize: 12, color: features?.smiling ? '#4caf50' : '#666', marginLeft: 'auto' }}>{features?.smiling ? 'Yes' : 'No'}</span>
+            <span style={{ fontSize: 13, color: 'var(--luxe-fg)' }}>Smiling</span>
+            <span style={{ fontSize: 12, color: features?.smiling ? '#4caf50' : 'var(--luxe-fg-dim)', marginLeft: 'auto' }}>{features?.smiling ? 'Yes' : 'No'}</span>
           </div>
         </GlassCard>
 
@@ -352,7 +352,7 @@ const FaceAI = () => {
           </GlassCard>
           <GlassCard title="Processing" style={{ flex: 1 }}>
             <span style={{ fontSize: 28, fontWeight: 700, color: '#b388ff' }}>{processMs}</span>
-            <span style={{ fontSize: 13, color: '#888', marginLeft: 4 }}>ms</span>
+            <span style={{ fontSize: 13, color: 'var(--luxe-fg-muted)', marginLeft: 4 }}>ms</span>
           </GlassCard>
         </div>
       </div>
