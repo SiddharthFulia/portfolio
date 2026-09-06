@@ -99,6 +99,7 @@ const RealismLibrary      = lazyWithReload(() => import("./pages/RealismLibrary"
 const RealismJob          = lazyWithReload(() => import("./pages/RealismJob"));
 const SimpleGame          = lazyWithReload(() => import("./pages/SimpleGame"));
 const PhysicsLab          = lazyWithReload(() => import("./pages/PhysicsLab"));
+const Pathfinding         = lazyWithReload(() => import("./pages/Pathfinding"));
 const GestureMemes        = lazyWithReload(() => import("./pages/GestureMemes"));
 const GestureHammy        = lazyWithReload(() => import("./pages/GestureHammy"));
 
@@ -265,6 +266,8 @@ const ROUTE_TITLES = {
   '/simple-game'   : 'Simple Games · Sid',
   '/physics'       : 'Physics Lab · Sid',
   '/engineering'   : 'Physics Lab · Sid',
+  '/pathfinding'   : 'Pathfinding Lab · Sid',
+  '/routes'        : 'Pathfinding Lab · Sid',
   '/gesture-memes' : 'Gesture Memes · Sid',
   '/gesture-hammy' : 'Hammy Hamster · Sid',
   '/summarizer'    : 'Summarizer · Sid',
@@ -374,6 +377,8 @@ const App = () => {
           <Route path='/simple-game/:id' element={<Suspense fallback={<PageLoader />}><SimpleGame /></Suspense>} />
           <Route path='/physics'         element={<Suspense fallback={<PageLoader />}><PhysicsLab /></Suspense>} />
           <Route path='/engineering'     element={<Suspense fallback={<PageLoader />}><PhysicsLab /></Suspense>} />
+          <Route path='/pathfinding'     element={<Suspense fallback={<PageLoader />}><Pathfinding /></Suspense>} />
+          <Route path='/routes'          element={<Suspense fallback={<PageLoader />}><Pathfinding /></Suspense>} />
           <Route path='/gesture-memes'   element={<Suspense fallback={<PageLoader />}><GestureMemes /></Suspense>} />
           <Route path='/gesture-hammy'   element={<Suspense fallback={<PageLoader />}><GestureHammy /></Suspense>} />
           <Route path='/summarizer'      element={<Suspense fallback={<PageLoader />}><SummarizerPage /></Suspense>} />
