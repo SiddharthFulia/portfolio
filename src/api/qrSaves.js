@@ -34,11 +34,15 @@ export async function createQrSave(payload) {
 }
 
 // GET — list caller's saves.
-export async function listQrSaves({ limit = 30, offset = 0 } = {}) {
+// `source_kind` (optional) filters server-side to one provenance bucket
+// (e.g. 'tattoo' for the Tattoo Studio gallery). Falls back to "all" when
+// unset so the main library keeps its current behaviour.
+export async function listQrSaves({ limit = 30, offset = 0, source_kind } = {}) {
   const headers = { ...(await qrOwnerHeader()) };
   const url = new URL('/api/qr-saves', BE_URL);
   url.searchParams.set('limit', String(limit));
   url.searchParams.set('offset', String(offset));
+  if (source_kind) url.searchParams.set('source_kind', String(source_kind));
   const res = await fetch(url.toString(), { method: 'GET', headers });
   return unwrap(res);
 }

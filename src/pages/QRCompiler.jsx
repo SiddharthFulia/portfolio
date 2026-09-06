@@ -31,6 +31,7 @@ import {
 } from '../api/qrSaves'
 import { notice } from '../lib/notice'
 import QRScenes3D from '../components/qr/QRScenes3D'
+import TattooStudio from '../components/qr/TattooStudio'
 
 // ─── KaTeX helpers (identical shape to PhysicsLab / Atoms) ─────────
 function renderTex(src, opts = {}) {
@@ -1467,10 +1468,10 @@ ${inner}
             block
             value={topTab}
             onChange={setTopTab}
-            options={['2D Editor', '3D Scenes']}
+            options={['2D Editor', '3D Scenes', 'Tattoo Studio']}
           />
           <p className='text-[11px] text-fg-muted mt-2 leading-snug px-1'>
-            2D Editor gives you every classic knob — cell shapes, gradients, ECC, logo overlay, damage sim. 3D Scenes reinterprets the same matrix as an isometric world you can rotate, snapshot, and still scan from directly above.
+            2D Editor gives you every classic knob — cell shapes, gradients, ECC, logo overlay, damage sim. 3D Scenes reinterprets the same matrix as an isometric world. Tattoo Studio reads a tattoo photo with Gemini Vision and auto-styles a QR from its palette, motifs, and energy.
           </p>
         </div>
       </div>
@@ -1478,6 +1479,42 @@ ${inner}
       {topTab === '3D Scenes' && (
         <div className='max-w-7xl mx-auto px-4 md:px-6 pb-16'>
           <QRScenes3D matrixData={matrixData} ecc={ecc} />
+        </div>
+      )}
+
+      {topTab === 'Tattoo Studio' && (
+        <div className='max-w-7xl mx-auto px-4 md:px-6 pb-16'>
+          <TattooStudio
+            currentPayload={payload}
+            onApplyStyle={(state, opts) => {
+              // Wire the Gemini-suggested style into the 2D editor's own
+              // React state. We flip cell + eye shapes, foreground gradient,
+              // and ECC so the user immediately sees a live QR that echoes
+              // the tattoo. gradientOn = true forces the two-colour rendering
+              // path so both hex codes matter.
+              if (state.cellShape)     setCellShape(state.cellShape)
+              if (state.eyeShape)      setEyeShape(state.eyeShape)
+              if (state.eyeInnerShape) setEyeInnerShape(state.eyeInnerShape)
+              if (state.fgColor)       setFgColor(state.fgColor)
+              if (state.fgColor2)      setFgColor2(state.fgColor2)
+              if (typeof state.gradientOn === 'boolean') setGradientOn(state.gradientOn)
+              if (state.gradientType)  setGradientType(state.gradientType)
+              if (state.gradientAngle != null) setGradientAngle(state.gradientAngle)
+              if (state.ecc)           setEcc(state.ecc)
+              // Optional payload swap when the user opted in.
+              if (opts?.payload) {
+                setPayloadKind('URL')
+                setFields((f) => ({ ...f, url: opts.payload, text: opts.payload }))
+              }
+              // Jump back to the 2D editor so the redraw is visible.
+              setTopTab('2D Editor')
+            }}
+            onUsePayload={(p) => {
+              // Just swap the payload without switching tabs.
+              setPayloadKind('URL')
+              setFields((f) => ({ ...f, url: p, text: p }))
+            }}
+          />
         </div>
       )}
 
