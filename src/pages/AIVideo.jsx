@@ -603,7 +603,7 @@ const GenerateTab = ({ today, setToday, onJobCompleted }) => {
     if (qImage) setImageUrl(qImage)
     if (qVault) setSourceIsVault(true)
     if (fromDeepfake) {
-      notice.info('Imported from Deepfake Studio — image pre-filled.')
+      notice.info('Imported from Persona Studio — image pre-filled.')
     } else if (fromImage) {
       notice.info(qVault
         ? 'Imported from Image Studio (Vault) — output will save to Vault.'

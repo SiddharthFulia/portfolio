@@ -67,7 +67,7 @@ function DeepfakeInner() {
   const [libraryFilter, setLibraryFilter] = useQueryState('lib', 'all', { allowed: ['all', 'face-swap', 'voice-any'] })
   const [libraryRefresh, setLibraryRefresh] = useState(0)
 
-  useEffect(() => { document.title = 'Deepfake · Sid' }, [])
+  useEffect(() => { document.title = 'Persona Studio · Sid' }, [])
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
 
   // Pull the library on mount + after every successful submission. Filter
@@ -160,7 +160,7 @@ function DeepfakeInner() {
           <div className="flex items-center gap-3 mt-2 flex-wrap">
             <LockOutlined className="text-rose-400 text-2xl" />
             <h1 className="text-4xl sm:text-5xl font-bold leading-tight text-white">
-              Deepfake Studio
+              Persona Studio
             </h1>
             <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-lg border border-rose-500/40 bg-rose-500/10 text-rose-300 inline-flex items-center gap-1">
               <LockOutlined /> Vault · Private
@@ -518,7 +518,7 @@ function UploadCard({ label, accent, dataUrl, file, onUpload, onClear, onCapture
 
 export default function Deepfake() {
   return (
-    <VaultGate label="Deepfake Studio">
+    <VaultGate label="Persona Studio">
       <DeepfakeInner />
     </VaultGate>
   )

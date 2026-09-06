@@ -145,7 +145,7 @@ const Navbar = () => {
       accent: 'text-fuchsia-300',
       vault: true,
       items: [
-        { to: '/deepfake', label: 'Deepfake Studio', desc: 'Face-swap · voice-clone · Vault password required', vault: true },
+        { to: '/deepfake', label: 'Persona Studio', desc: 'Face-swap · voice-clone · Vault password required', vault: true },
         { to: '/settings', label: 'Settings',        desc: "Admin · Sid's monitoring panel · server / DB / queues", vault: true },
       ],
     },

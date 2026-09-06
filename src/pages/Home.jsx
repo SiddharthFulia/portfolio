@@ -90,7 +90,7 @@ const GROUPS = [
     title: "Vault",
     accent: "text-fuchsia-300",
     items: [
-      { to: "/deepfake", label: "Deepfake Studio", desc: "Face-swap · voice-clone · Vault required", vault: true },
+      { to: "/deepfake", label: "Persona Studio", desc: "Face-swap · voice-clone · Vault required", vault: true },
       { to: "/settings", label: "Settings",        desc: "Admin · monitoring · server / DB / queues", vault: true },
     ],
   },
