@@ -139,11 +139,16 @@ async function fetchScenarios(signal) {
 }
 
 // ─── Preset scenarios (local UI-side; matches the BE presets) ──
+// IMPORTANT: keys MUST match the BE enum in services/physics/reactor.js
+// SCENARIOS[].id exactly. The BE validates against:
+//   nominal · xenon-transient · az5-scram · controlled-shutdown · custom
+// Enum drift here → 400 Bad Request on /api/chernobyl/simulate.
 const SCENARIOS = {
-  nominal:   { label: 'Nominal',          rod: 60, flow: 8000, power: 3200, xenon: 1.0 },
-  az5:       { label: 'AZ-5 SCRAM',       rod: 95, flow: 3800, power: 200,  xenon: 2.6 },
-  xenon:     { label: 'Xenon transient',  rod: 75, flow: 8000, power: 3000, xenon: 2.8 },
-  custom:    { label: 'Custom',           rod: 70, flow: 8000, power: 3200, xenon: 1.0 },
+  'nominal':              { label: 'Nominal',             rod: 60, flow: 8000, power: 3200, xenon: 1.0 },
+  'xenon-transient':      { label: 'Xenon Transient',     rod: 75, flow: 8000, power: 3000, xenon: 2.8 },
+  'az5-scram':            { label: 'AZ-5 SCRAM',          rod: 95, flow: 3800, power: 200,  xenon: 2.6 },
+  'controlled-shutdown':  { label: 'Controlled Shutdown', rod: 50, flow: 8000, power: 3200, xenon: 1.0 },
+  'custom':               { label: 'Custom',              rod: 70, flow: 8000, power: 3200, xenon: 1.0 },
 }
 
 const MELT_LINE = 2800
@@ -1300,7 +1305,7 @@ export default function Chernobyl() {
     } catch (e) {
       setBeError(e?.message || 'AZ-5 endpoint unavailable — showing client-side fallback.')
       // Local AZ-5 mimic: full rod withdrawal at start, positive tip effect.
-      setScenario('az5')
+      setScenario('az5-scram')
       setRod(95)
       setData(fallbackSeries({ rod: 95, flow, power: powerSet, xenon: xenon0, duration, dt }))
     } finally {
@@ -1525,10 +1530,11 @@ export default function Chernobyl() {
                 onChange={setScenario}
                 block
                 options={[
-                  { label: 'Nominal',       value: 'nominal' },
-                  { label: 'AZ-5 SCRAM',    value: 'az5' },
-                  { label: 'Xenon transient', value: 'xenon' },
-                  { label: 'Custom',        value: 'custom' },
+                  { label: 'Nominal',             value: 'nominal' },
+                  { label: 'Xenon Transient',     value: 'xenon-transient' },
+                  { label: 'AZ-5 SCRAM',          value: 'az5-scram' },
+                  { label: 'Controlled Shutdown', value: 'controlled-shutdown' },
+                  { label: 'Custom',              value: 'custom' },
                 ]}
               />
               <FieldHelp>Snaps the sliders to a canonical starting condition. Switch to <b>Custom</b> to hand-tune every value.</FieldHelp>
