@@ -1096,6 +1096,23 @@ export async function adminQueueStats({ page = 1, pageSize = 20, q = '', sort = 
 export async function adminWorkers() { try { const data = await get(ENDPOINTS.ADMIN_WORKERS, {}, { timeout: 10000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 export async function adminPurgeQueue(queue) { try { const data = await post(ENDPOINTS.ADMIN_PURGE_QUEUE, { queue }, { timeout: 15000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 export async function adminActivity(days = 14) { try { const data = await get(ENDPOINTS.ADMIN_ACTIVITY, { days }, { timeout: 20000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
+// APIs Explorer (§75) — Settings → APIs tab.
+//   apiCatalog  → GET /api/api-catalog          — full endpoint catalog, unauthenticated
+//   apiUsage    → GET /api/admin/api-usage      — vault-gated aggregated metrics
+// Both are best-effort: sibling agents are shipping the BE side in parallel,
+// so the FE tolerates 404 / 502 gracefully and shows a "waiting for BE" state.
+export async function apiCatalog() {
+  try {
+    const data = await get(ENDPOINTS.API_CATALOG, {}, { timeout: 10000 });
+    return { data: data?.data || data, error: null, status: 200 };
+  } catch (err) { return { data: null, error: err.message, status: err.status || 0 }; }
+}
+export async function apiUsage({ range = '24h' } = {}) {
+  try {
+    const data = await get(ENDPOINTS.ADMIN_API_USAGE, { range }, { timeout: 15000 });
+    return { data: data?.data || data, error: null, status: 200 };
+  } catch (err) { return { data: null, error: err.message, status: err.status || 0 }; }
+}
 // Keep-alive queue — fire one message manually + read consumer history.
 export async function adminKeepAliveTrigger() { try { const data = await post(ENDPOINTS.ADMIN_KEEP_ALIVE_TRIGGER, {}, { timeout: 10000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }
 export async function adminKeepAliveStatus()  { try { const data = await get(ENDPOINTS.ADMIN_KEEP_ALIVE_STATUS,  {}, { timeout: 10000 }); return { data: data?.data || data, error: null } } catch (err) { return { data: null, error: err.message } } }

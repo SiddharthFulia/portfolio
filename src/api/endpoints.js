@@ -109,6 +109,9 @@ export const ENDPOINTS = {
   ADMIN_DB_TABLE:       '/api/admin/db/tables',   // /:name appended at call site
   ADMIN_DB_QUERY:       '/api/admin/db/query',
   ADMIN_DB_ASK:         '/api/admin/db/ask',
+  // APIs Explorer — Settings → APIs tab
+  API_CATALOG:          '/api/api-catalog',        // public, unauthenticated
+  ADMIN_API_USAGE:      '/api/admin/api-usage',    // vault-gated aggregated metrics
   // Keep-alive queue — Settings → Keep-alive tab
   ADMIN_KEEP_ALIVE_TRIGGER: '/api/admin/keep-alive/trigger',
   ADMIN_KEEP_ALIVE_STATUS:  '/api/admin/keep-alive/status',
