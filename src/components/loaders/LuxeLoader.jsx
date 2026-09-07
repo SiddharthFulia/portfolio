@@ -170,6 +170,9 @@ function RoadSVG({ px }) {
       <motion.circle
         r={3}
         fill='#fbbf24'
+        // Framer-motion needs an initial cx/cy so the first render doesn't
+        // emit `cx="undefined"` before the animation loop kicks in.
+        initial={{ cx: px*0.08, cy: px*0.18 }}
         animate={{
           cx: [px*0.08, px*0.5, px*0.92],
           cy: [px*0.18, px*0.55, px*0.82],

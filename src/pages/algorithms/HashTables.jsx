@@ -182,9 +182,10 @@ function rehashProbe(state, newCap) {
 /* ---------- render ---------- */
 
 function ChainViz({ state, touch }) {
+  const table = state?.table ?? []
   return (
     <div className="grid grid-cols-2 gap-1.5">
-      {state.table.map((chain, i) => {
+      {table.map((chain, i) => {
         const hi = i === touch
         return (
           <div
@@ -221,9 +222,10 @@ function ChainViz({ state, touch }) {
 }
 
 function ProbeViz({ state, touch }) {
+  const arr = state?.arr ?? []
   return (
     <div className="flex flex-wrap gap-1.5">
-      {state.arr.map((e, i) => {
+      {arr.map((e, i) => {
         const hi = i === touch
         const filled = e && e !== TOMB
         const tomb = e === TOMB
@@ -375,8 +377,8 @@ export default function HashTables() {
       <VisualiserSection>
         <VizPanel>
           <div className="mb-3 flex gap-2 justify-center">
-            <Button variant={mode === 'chain' ? 'primary' : 'ghost'} size="small" onClick={() => setMode('chain')}>Separate chaining</Button>
-            <Button variant={mode === 'probe' ? 'primary' : 'ghost'} size="small" onClick={() => setMode('probe')}>Open addressing</Button>
+            <Button variant={mode === 'chain' ? 'primary' : 'ghost'} size="small" onClick={() => { setMode('chain'); setFrames([{ ...chain, msg: 'ready' }]); engine.reset() }}>Separate chaining</Button>
+            <Button variant={mode === 'probe' ? 'primary' : 'ghost'} size="small" onClick={() => { setMode('probe'); setFrames([{ ...probe, msg: 'ready' }]); engine.reset() }}>Open addressing</Button>
           </div>
           {mode === 'chain'
             ? <ChainViz state={current} touch={current?.touch} />
