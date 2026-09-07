@@ -20,6 +20,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
+import { BST_INSERT_CODE, BST_DELETE_CODE } from './code/BST'
 
 /* ---------- tree ops ---------- */
 
@@ -167,8 +168,6 @@ function TreeSVG({ root, current, path, title, tone = 'amber' }) {
     </div>
   )
 }
-
-import { BST_INSERT_CODE, BST_DELETE_CODE } from './code/BST'
 
 // Skewed shape: inserting in sorted order makes a right-leaning list.
 function buildSkewed(vals) {

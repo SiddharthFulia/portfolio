@@ -16,6 +16,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
+import { DSU_CODE } from './code/DSU'
 
 /* ---------- ops ---------- */
 
@@ -142,8 +143,6 @@ function ForestSVG({ parent, rank, touch }) {
     </svg>
   )
 }
-
-import { DSU_CODE } from './code/DSU'
 
 const N = 10
 const SEED_EDGES = [[0, 1], [2, 3], [4, 5], [1, 2], [6, 7], [8, 9]]

@@ -19,6 +19,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
+import { TREES_PRE, TREES_IN, TREES_POST, TREES_LEVEL } from './code/Trees'
 
 let NID = 100
 const mkNode = (v, children = []) => ({ id: NID++, v, children })
@@ -176,8 +177,6 @@ function TreeSVG({ root, visits, currentIdx }) {
     </svg>
   )
 }
-
-import { TREES_PRE, TREES_IN, TREES_POST, TREES_LEVEL } from './code/Trees'
 
 const TRAVERSAL_CODE = { pre: TREES_PRE, in: TREES_IN, post: TREES_POST, level: TREES_LEVEL }
 

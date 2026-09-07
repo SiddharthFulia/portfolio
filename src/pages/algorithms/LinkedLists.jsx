@@ -20,6 +20,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
 import { motion } from 'framer-motion'
+import { LL_INSERT_CODE, LL_REVERSE_CODE } from './code/LinkedLists'
 
 /* ---------- data model ----------
    Store list as a flat array of {id, value} nodes and a separate
@@ -185,8 +186,6 @@ function ListViz({ frame, doubly }) {
 }
 
 /* ---------- page ---------- */
-
-import { LL_INSERT_CODE, LL_REVERSE_CODE } from './code/LinkedLists'
 
 export default function LinkedLists() {
   const [doubly, setDoubly] = useState(false)

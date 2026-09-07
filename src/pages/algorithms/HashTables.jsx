@@ -22,6 +22,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button, Slider } from '../../components/ui'
+import { HASH_CHAIN_CODE, HASH_PROBE_CODE } from './code/HashTables'
 
 const INITIAL_CAP = 8
 
@@ -247,8 +248,6 @@ function ProbeViz({ state, touch }) {
     </div>
   )
 }
-
-import { HASH_CHAIN_CODE, HASH_PROBE_CODE } from './code/HashTables'
 
 export default function HashTables() {
   const [mode, setMode] = useState('chain') // chain | probe

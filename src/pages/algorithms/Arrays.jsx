@@ -23,6 +23,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
+import { ARRAYS_CODE } from './code/Arrays'
 
 const INITIAL = [3, 8, 15, 21, 42, 61]
 const INITIAL_CAP = 8
@@ -146,8 +147,6 @@ function ArrayViz({ frame }) {
 }
 
 /* ---------- page ---------- */
-
-import { ARRAYS_CODE } from './code/Arrays'
 
 export default function Arrays() {
   const [arr, setArr] = useState(INITIAL)

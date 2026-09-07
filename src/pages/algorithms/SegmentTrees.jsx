@@ -19,6 +19,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
+import { SEG_QUERY_CODE, SEG_UPDATE_CODE } from './code/SegmentTrees'
 
 const OP_SUM = 'sum'
 const OP_MIN = 'min'
@@ -172,8 +173,6 @@ function ArrayStrip({ arr, hi }) {
     </div>
   )
 }
-
-import { SEG_QUERY_CODE, SEG_UPDATE_CODE } from './code/SegmentTrees'
 
 const INITIAL = [1, 3, -2, 8, 7, 4, 6, 5]
 

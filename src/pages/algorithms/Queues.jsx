@@ -11,6 +11,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
+import { QUEUE_CODE } from './code/Queues'
 
 const CAP = 8
 
@@ -143,8 +144,6 @@ function LinearViz({ frame }) {
     </div>
   )
 }
-
-import { QUEUE_CODE } from './code/Queues'
 
 export default function Queues() {
   const [state, setState] = useState(() => ({

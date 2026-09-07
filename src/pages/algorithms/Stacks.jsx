@@ -20,6 +20,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
+import { STACK_CORE_CODE, STACK_BRACKETS_CODE } from './code/Stacks'
 
 const OPEN = { '(': ')', '[': ']', '{': '}' }
 const CLOSE = { ')': '(', ']': '[', '}': '{' }
@@ -133,8 +134,6 @@ function StackViz({ frame, input, mode }) {
     </div>
   )
 }
-
-import { STACK_CORE_CODE, STACK_BRACKETS_CODE } from './code/Stacks'
 
 export default function Stacks() {
   const [stack, setStack] = useState([12, 34, 55])

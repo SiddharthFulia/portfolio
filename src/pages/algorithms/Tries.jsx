@@ -13,6 +13,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   Field, TextInput, Chip,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
+import { TRIES_CODE } from './code/Tries'
 
 /* ---------- trie ops ---------- */
 
@@ -144,8 +145,6 @@ function TrieSVG({ root, walkPath, activeIdx }) {
     </svg>
   )
 }
-
-import { TRIES_CODE } from './code/Tries'
 
 const SEEDS = ['app', 'apple', 'apply', 'ape', 'bat', 'batch', 'bad', 'bar', 'cat', 'car', 'carbon']
 

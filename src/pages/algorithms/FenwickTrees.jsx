@@ -21,6 +21,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
+import { BIT_CODE } from './code/FenwickTrees'
 
 const lowbit = (x) => x & -x
 
@@ -111,8 +112,6 @@ function BitChart({ bit, arr, activeSet, takeSet }) {
     </svg>
   )
 }
-
-import { BIT_CODE } from './code/FenwickTrees'
 
 const INITIAL = [3, 5, 2, 7, 4, 1, 6, 8]
 

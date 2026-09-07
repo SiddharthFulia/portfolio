@@ -17,6 +17,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
+import { MST_KRUSKAL_CODE, MST_PRIM_CODE } from './code/MST'
 
 /* ---------- graph ---------- */
 
@@ -153,8 +154,6 @@ function GraphViz({ frame, algo }) {
     </svg>
   )
 }
-
-import { MST_KRUSKAL_CODE, MST_PRIM_CODE } from './code/MST'
 
 export default function MST() {
   const [algo, setAlgo] = useState('kruskal')

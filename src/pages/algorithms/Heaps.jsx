@@ -18,6 +18,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
+import { HEAP_INSERT_CODE, HEAP_EXTRACT_CODE } from './code/Heaps'
 
 const cmp = (a, b, isMin) => isMin ? a < b : a > b
 
@@ -149,8 +150,6 @@ function HeapArrayStrip({ frame }) {
     </div>
   )
 }
-
-import { HEAP_INSERT_CODE, HEAP_EXTRACT_CODE } from './code/Heaps'
 
 export default function Heaps() {
   const [isMin, setIsMin] = useState(true)
