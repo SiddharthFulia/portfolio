@@ -6,8 +6,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { InputNumber } from 'antd'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel,
   ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
@@ -215,8 +214,7 @@ export default function GraphTraversal() {
   const dfsF = dfsAll[dfsEng.i] || dfsAll[0]
 
   return (
-    <TopicShell slug='graph-traversal' title='BFS & DFS' category='Algorithms'>
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           BFS and DFS are the same skeleton — mark visited, expand
           neighbours — with different frontier data structures. BFS uses
@@ -295,7 +293,6 @@ export default function GraphTraversal() {
           strongly-connected components (Tarjan / Kosaraju), and every
           "find a path" problem where you don't need the shortest one.
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }

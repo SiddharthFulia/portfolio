@@ -16,8 +16,7 @@
 
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   MultiLangCode, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
@@ -182,8 +181,7 @@ export default function FenwickTrees() {
   }, [current, mode])
 
   return (
-    <TopicShell slug="fenwick-trees" title="Fenwick Trees (BIT)">
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           A <b>Binary Indexed Tree</b> (Fenwick) is a compact structure for
           prefix sums with point updates: both O(log n). It uses only <b>n + 1</b>
@@ -283,7 +281,6 @@ export default function FenwickTrees() {
           the same idea. And any "how many elements less than x are still
           alive" question in a game engine's collision system.
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }

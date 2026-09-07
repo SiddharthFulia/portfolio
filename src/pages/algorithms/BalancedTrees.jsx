@@ -20,8 +20,7 @@
 
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   MultiLangCode, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
@@ -211,8 +210,7 @@ export default function BalancedTrees() {
   const logFrames = inserts.map((v, i) => ({ msg: `insert ${v}` }))
 
   return (
-    <TopicShell slug="balanced-trees" title="Balanced Trees">
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           A plain BST degrades to O(n) if you insert values in sorted order.
           <b> Self-balancing BSTs</b> guarantee O(log n) even in the adversarial
@@ -319,7 +317,6 @@ export default function BalancedTrees() {
           scheduler use variants. Any time you need "sorted + O(log n)
           insert/lookup", it's one of these.
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }

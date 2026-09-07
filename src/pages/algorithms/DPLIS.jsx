@@ -11,8 +11,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { InputNumber } from 'antd'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel,
   ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
@@ -219,8 +218,7 @@ export default function DPLIS() {
   const patF = pat[patEng.i] || pat[0]
 
   return (
-    <TopicShell slug='dp-lis' title='Longest Increasing Subsequence' category='Algorithms'>
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           Given a sequence, find the longest strictly increasing
           subsequence. For <TeX tex='[10, 9, 2, 5, 3, 7, 101, 18]' /> the
@@ -306,7 +304,6 @@ export default function DPLIS() {
           makes the pile count equal the LIS length. Named by Persi
           Diaconis.
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }

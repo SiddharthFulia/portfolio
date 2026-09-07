@@ -9,8 +9,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Input } from 'antd'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel,
   ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
@@ -265,8 +264,7 @@ export default function DPLCS() {
   const f = frames[idx] || frames[0]
 
   return (
-    <TopicShell slug='dp-lcs' title='Longest Common Subsequence' category='Algorithms'>
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           A subsequence of a string keeps some characters in order but
           drops others. The <b>Longest Common Subsequence</b> of two
@@ -384,7 +382,6 @@ export default function DPLCS() {
           phone: autocorrect looks for smallest-edit fixes (a related
           DP over Levenshtein distance).
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }

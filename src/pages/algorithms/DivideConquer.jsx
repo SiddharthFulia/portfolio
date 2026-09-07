@@ -17,8 +17,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { InputNumber } from 'antd'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel,
   ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
@@ -472,8 +471,7 @@ export default function DivideConquer() {
   const activeLines = activeLinesForKind(frame?.kind)
 
   return (
-    <TopicShell slug='divide-conquer' title='Divide & Conquer' category='Algorithms'>
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           <b>Divide & Conquer</b> attacks a big problem by chopping it into
           smaller versions of itself, solving each recursively, then merging
@@ -560,7 +558,6 @@ export default function DivideConquer() {
           call is independent, so map-reduce / Rust's Rayon / OpenMP just
           fan the calls out to threads.
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }

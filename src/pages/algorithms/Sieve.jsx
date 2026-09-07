@@ -6,8 +6,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { InputNumber } from 'antd'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel,
   ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
@@ -199,8 +198,7 @@ export default function Sieve() {
   const density = n > 1 ? (finalCount / (n - 1)) * 100 : 0
 
   return (
-    <TopicShell slug='sieve' title='Sieve of Eratosthenes' category='Algorithms'>
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           Around 240 BC Eratosthenes of Cyrene noticed that if you list
           all integers from 2 to N and repeatedly cross out multiples of
@@ -339,7 +337,6 @@ export default function Sieve() {
           generation, and hashcash-style proof-of-work touches primality
           testing — but always probabilistic, never sieve.
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }

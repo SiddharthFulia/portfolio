@@ -15,8 +15,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { InputNumber, Segmented, Progress } from 'antd'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel,
   ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
@@ -350,8 +349,7 @@ export default function Sorting() {
   useEffect(() => { setRunning(false) }, [base, mode])
 
   return (
-    <TopicShell slug='sorting' title='Sorting' category='Algorithms'>
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           Sorting is the algorithmic pantry. Almost every non-trivial
           problem starts with "first, sort the input" — searches become
@@ -492,8 +490,7 @@ export default function Sorting() {
           keys. They dodge the <TeX tex='\\Omega(n \\log n)' /> comparison
           lower bound by not using comparisons.
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }
 

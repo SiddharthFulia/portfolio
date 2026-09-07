@@ -14,8 +14,7 @@
 
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   MultiLangCode, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
@@ -209,8 +208,7 @@ export default function Trees() {
   const visitFrames = useMemo(() => visits.map((v, i) => ({ msg: `visit ${v.v}`, i })), [visits])
 
   return (
-    <TopicShell slug="trees" title="Trees">
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           A <b>tree</b> is a connected graph with no cycles and one designated
           root. Every non-root node has exactly one parent; nodes with no
@@ -326,7 +324,6 @@ export default function Trees() {
           B-trees back nearly every database index — one N-ary tree per
           index, one node per disk page.
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }

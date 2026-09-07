@@ -8,8 +8,7 @@
 
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   MultiLangCode, ComplexityTable, RealWorldCard,
   Field, TextInput, Chip,
 } from '../../components/algorithms'
@@ -171,8 +170,7 @@ export default function Tries() {
   }
 
   return (
-    <TopicShell slug="tries" title="Tries">
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           A <b>trie</b> (retrieval tree) stores a set of strings so that any
           prefix walk goes through the same nodes. Each edge is a character;
@@ -256,7 +254,6 @@ export default function Tries() {
           Snort) builds a trie of patterns and adds failure links for
           O(n + z) matching.
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }

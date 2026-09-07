@@ -8,8 +8,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { InputNumber } from 'antd'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel,
   ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
@@ -285,8 +284,7 @@ export default function ConvexHull() {
   }
 
   return (
-    <TopicShell slug='convex-hull' title='Convex Hull' category='Algorithms'>
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           The convex hull of a point set is the smallest convex polygon
           that contains every point. Think of a rubber band snapped
@@ -402,7 +400,6 @@ export default function ConvexHull() {
           vector geometry, and the α-shape family generalises hulls to
           concave outlines.
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }

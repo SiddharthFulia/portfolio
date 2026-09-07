@@ -60,6 +60,7 @@ const Contact = lazyWithReload(() => import("./pages/Contact"));
 const Lab = lazyWithReload(() => import("./pages/Lab"));
 const Learn = lazyWithReload(() => import("./pages/Learn"));
 const Algorithms = lazyWithReload(() => import("./pages/Algorithms"));
+const AlgorithmsShell = lazyWithReload(() => import("./pages/AlgorithmsShell"));
 
 /* ── Algorithms topic pages (30 total). Every route lives at
  *    /algorithms/:slug and mounts a page that composes shared
@@ -362,10 +363,23 @@ const TitleManager = () => {
  * navigation mounts a FRESH boundary instance, so an error on one page
  * doesn't stick around when you move to another. Without this, a render
  * exception in a lazy page bubbles up to the root and unmounts the whole
- * tree → "page just goes blank" feeling the user reported. */
+ * tree → "page just goes blank" feeling the user reported.
+ *
+ * EXCEPTION: `/algorithms/*` uses a shared layout route (see
+ * AlgorithmsShell) that keeps the sidebar mounted across topic
+ * navigation. Rekeying the boundary on every pathname change would
+ * unmount that shared layout on each sidebar click — the exact flash
+ * we're trying to fix. Collapse all algorithm topic paths to one key
+ * so the boundary stays stable while the user browses topics. */
+const boundaryKeyFor = (pathname) => {
+  if (pathname === '/algorithms' || pathname.startsWith('/algorithms/')) {
+    return '/algorithms';
+  }
+  return pathname;
+};
 const RoutesWithBoundary = ({ children }) => {
   const { pathname } = useLocation();
-  return <RouteErrorBoundary key={pathname}>{children}</RouteErrorBoundary>;
+  return <RouteErrorBoundary key={boundaryKeyFor(pathname)}>{children}</RouteErrorBoundary>;
 };
 
 const App = () => {
@@ -392,38 +406,47 @@ const App = () => {
               markdown tutorials into 30 interactive visualisers with
               scrubbable animation, KaTeX proofs, and a real-world use
               case per topic. Old URL kept as a permanent redirect. */}
-          <Route path='/algorithms' element={<Suspense fallback={<PageBoot />}><Algorithms /></Suspense>} />
           <Route path='/learn'      element={<Navigate to='/algorithms' replace />} />
-          <Route path='/algorithms/arrays'           element={<Suspense fallback={<PageBoot />}><AlgArrays          /></Suspense>} />
-          <Route path='/algorithms/linked-lists'     element={<Suspense fallback={<PageBoot />}><AlgLinkedLists     /></Suspense>} />
-          <Route path='/algorithms/stacks'           element={<Suspense fallback={<PageBoot />}><AlgStacks          /></Suspense>} />
-          <Route path='/algorithms/queues'           element={<Suspense fallback={<PageBoot />}><AlgQueues          /></Suspense>} />
-          <Route path='/algorithms/hash-tables'      element={<Suspense fallback={<PageBoot />}><AlgHashTables      /></Suspense>} />
-          <Route path='/algorithms/graphs'           element={<Suspense fallback={<PageBoot />}><AlgGraphs          /></Suspense>} />
-          <Route path='/algorithms/trees'            element={<Suspense fallback={<PageBoot />}><AlgTrees           /></Suspense>} />
-          <Route path='/algorithms/bst'              element={<Suspense fallback={<PageBoot />}><AlgBST             /></Suspense>} />
-          <Route path='/algorithms/balanced-trees'   element={<Suspense fallback={<PageBoot />}><AlgBalancedTrees   /></Suspense>} />
-          <Route path='/algorithms/heaps'            element={<Suspense fallback={<PageBoot />}><AlgHeaps           /></Suspense>} />
-          <Route path='/algorithms/tries'            element={<Suspense fallback={<PageBoot />}><AlgTries           /></Suspense>} />
-          <Route path='/algorithms/segment-trees'    element={<Suspense fallback={<PageBoot />}><AlgSegmentTrees    /></Suspense>} />
-          <Route path='/algorithms/fenwick-trees'    element={<Suspense fallback={<PageBoot />}><AlgFenwickTrees    /></Suspense>} />
-          <Route path='/algorithms/dsu'              element={<Suspense fallback={<PageBoot />}><AlgDSU             /></Suspense>} />
-          <Route path='/algorithms/mst'              element={<Suspense fallback={<PageBoot />}><AlgMST             /></Suspense>} />
-          <Route path='/algorithms/divide-conquer'   element={<Suspense fallback={<PageBoot />}><AlgDivideConquer   /></Suspense>} />
-          <Route path='/algorithms/sorting'          element={<Suspense fallback={<PageBoot />}><AlgSorting         /></Suspense>} />
-          <Route path='/algorithms/searching'        element={<Suspense fallback={<PageBoot />}><AlgSearching       /></Suspense>} />
-          <Route path='/algorithms/sieve'            element={<Suspense fallback={<PageBoot />}><AlgSieve           /></Suspense>} />
-          <Route path='/algorithms/kmp'              element={<Suspense fallback={<PageBoot />}><AlgKMP             /></Suspense>} />
-          <Route path='/algorithms/greedy-intervals' element={<Suspense fallback={<PageBoot />}><AlgGreedyIntervals /></Suspense>} />
-          <Route path='/algorithms/greedy-knapsack'  element={<Suspense fallback={<PageBoot />}><AlgGreedyKnapsack  /></Suspense>} />
-          <Route path='/algorithms/dp-knapsack'      element={<Suspense fallback={<PageBoot />}><AlgDPKnapsack      /></Suspense>} />
-          <Route path='/algorithms/dp-lcs'           element={<Suspense fallback={<PageBoot />}><AlgDPLCS           /></Suspense>} />
-          <Route path='/algorithms/dp-lis'           element={<Suspense fallback={<PageBoot />}><AlgDPLIS           /></Suspense>} />
-          <Route path='/algorithms/convex-hull'      element={<Suspense fallback={<PageBoot />}><AlgConvexHull      /></Suspense>} />
-          <Route path='/algorithms/graph-traversal'  element={<Suspense fallback={<PageBoot />}><AlgGraphTraversal  /></Suspense>} />
-          <Route path='/algorithms/floyd-warshall'   element={<Suspense fallback={<PageBoot />}><AlgFloydWarshall   /></Suspense>} />
-          <Route path='/algorithms/dijkstra-bellman' element={<Suspense fallback={<PageBoot />}><AlgDijkstraBellman /></Suspense>} />
-          <Route path='/algorithms/topological-sort' element={<Suspense fallback={<PageBoot />}><AlgTopologicalSort /></Suspense>} />
+          {/* /algorithms hub is a leaf (index) route rendering the hub.
+              Nested `/algorithms/:slug` routes share a layout route that
+              renders <TopicShell> ONCE and swaps the topic body via
+              <Outlet />. Prevents the whole-page-reload flash the user
+              saw when every topic route mounted its own TopicShell. */}
+          <Route path='/algorithms'>
+            <Route index element={<Suspense fallback={<PageBoot />}><Algorithms /></Suspense>} />
+            <Route element={<Suspense fallback={<PageBoot />}><AlgorithmsShell /></Suspense>}>
+              <Route path='arrays'           element={<AlgArrays          />} />
+              <Route path='linked-lists'     element={<AlgLinkedLists     />} />
+              <Route path='stacks'           element={<AlgStacks          />} />
+              <Route path='queues'           element={<AlgQueues          />} />
+              <Route path='hash-tables'      element={<AlgHashTables      />} />
+              <Route path='graphs'           element={<AlgGraphs          />} />
+              <Route path='trees'            element={<AlgTrees           />} />
+              <Route path='bst'              element={<AlgBST             />} />
+              <Route path='balanced-trees'   element={<AlgBalancedTrees   />} />
+              <Route path='heaps'            element={<AlgHeaps           />} />
+              <Route path='tries'            element={<AlgTries           />} />
+              <Route path='segment-trees'    element={<AlgSegmentTrees    />} />
+              <Route path='fenwick-trees'    element={<AlgFenwickTrees    />} />
+              <Route path='dsu'              element={<AlgDSU             />} />
+              <Route path='mst'              element={<AlgMST             />} />
+              <Route path='divide-conquer'   element={<AlgDivideConquer   />} />
+              <Route path='sorting'          element={<AlgSorting         />} />
+              <Route path='searching'        element={<AlgSearching       />} />
+              <Route path='sieve'            element={<AlgSieve           />} />
+              <Route path='kmp'              element={<AlgKMP             />} />
+              <Route path='greedy-intervals' element={<AlgGreedyIntervals />} />
+              <Route path='greedy-knapsack'  element={<AlgGreedyKnapsack  />} />
+              <Route path='dp-knapsack'      element={<AlgDPKnapsack      />} />
+              <Route path='dp-lcs'           element={<AlgDPLCS           />} />
+              <Route path='dp-lis'           element={<AlgDPLIS           />} />
+              <Route path='convex-hull'      element={<AlgConvexHull      />} />
+              <Route path='graph-traversal'  element={<AlgGraphTraversal  />} />
+              <Route path='floyd-warshall'   element={<AlgFloydWarshall   />} />
+              <Route path='dijkstra-bellman' element={<AlgDijkstraBellman />} />
+              <Route path='topological-sort' element={<AlgTopologicalSort />} />
+            </Route>
+          </Route>
           {/* /creative merged into /lab. Old links redirect to the unified Lab. */}
           <Route path='/creative' element={<Navigate to='/lab' replace />} />
           {/* /chess — new Stockfish-backed page. Old custom-engine version

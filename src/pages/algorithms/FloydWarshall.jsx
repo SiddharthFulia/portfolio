@@ -10,8 +10,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { InputNumber } from 'antd'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel,
   ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
@@ -245,8 +244,7 @@ export default function FloydWarshall() {
   const f = frames[idx] || frames[0]
 
   return (
-    <TopicShell slug='floyd-warshall' title='Floyd–Warshall' category='Algorithms'>
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           Floyd–Warshall computes shortest paths between <b>every</b>
           pair of vertices in <TeX tex='O(V^3)' /> time and
@@ -354,7 +352,6 @@ export default function FloydWarshall() {
           <TeX tex='dist[i][i] < 0' /> after the algorithm finishes, the
           graph has one.
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }

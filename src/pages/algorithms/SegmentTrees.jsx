@@ -14,8 +14,7 @@
 
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   MultiLangCode, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
@@ -236,8 +235,7 @@ export default function SegmentTrees() {
   }, [frames, engine.i])
 
   return (
-    <TopicShell slug="segment-trees" title="Segment Trees">
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           A <b>segment tree</b> supports range queries (sum, min, max, gcd, …)
           + point updates in O(log n) each. It stores an associative reduction
@@ -344,7 +342,6 @@ export default function SegmentTrees() {
           RedisTimeSeries module uses a segment-tree-like index for range
           aggregates.
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }

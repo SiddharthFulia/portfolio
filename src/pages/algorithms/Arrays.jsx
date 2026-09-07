@@ -18,8 +18,7 @@
 
 import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   MultiLangCode, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
@@ -214,8 +213,7 @@ export default function Arrays() {
   }
 
   return (
-    <TopicShell slug="arrays" title="Arrays">
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           An <b>array</b> is a run of contiguous memory that stores fixed-size
           elements. Because every slot is the same size, the address of index{' '}
@@ -320,7 +318,6 @@ export default function Arrays() {
           the hood. Any time you're processing a batch of same-shaped items
           in a tight loop, an array is going to win on cache behaviour alone.
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }

@@ -15,8 +15,7 @@
 
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   MultiLangCode, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
@@ -241,8 +240,7 @@ export default function BST() {
   const balanced = buildBalanced(sorted)
 
   return (
-    <TopicShell slug="bst" title="Binary Search Tree">
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           A <b>Binary Search Tree</b> is a binary tree with an ordering
           invariant: for every node <code>x</code>, all values in the left
@@ -347,7 +345,6 @@ export default function BST() {
           red-black tree of runnable tasks, Java's <code>TreeMap</code>,
           C++ <code>std::map</code>, and Python's <code>sortedcontainers</code>.
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }

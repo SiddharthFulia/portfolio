@@ -12,8 +12,7 @@
 
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   MultiLangCode, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
@@ -185,8 +184,7 @@ export default function MST() {
   const totalFinal = algo === 'kruskal' ? kr.total : pr.total
 
   return (
-    <TopicShell slug="mst" title="Minimum Spanning Tree">
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           A <b>spanning tree</b> of a connected undirected graph is a subset
           of edges that connects every vertex with no cycles — exactly V - 1
@@ -275,7 +273,6 @@ export default function MST() {
           MSTs. And every Dungeons & Dragons dungeon generator that produces
           a "connected maze with corridors" is running a randomised MST.
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }

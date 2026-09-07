@@ -17,8 +17,7 @@
 
 import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   MultiLangCode, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
@@ -329,8 +328,7 @@ export default function HashTables() {
   }
 
   return (
-    <TopicShell slug="hash-tables" title="Hash Tables">
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           A <b>hash table</b> maps keys to values in expected O(1). It uses a
           hash function to compute a bucket index from the key, then stores the
@@ -438,8 +436,7 @@ export default function HashTables() {
           hash tables. Bloom filters and cuckoo hashing are hash-table
           variants tuned for space or worst-case guarantees.
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }
 

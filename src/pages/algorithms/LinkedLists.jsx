@@ -14,8 +14,7 @@
 //     next.prev; head/tail edges are handled explicitly.
 
 import { useMemo, useState } from 'react'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   MultiLangCode, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
@@ -260,8 +259,7 @@ export default function LinkedLists() {
   }
 
   return (
-    <TopicShell slug="linked-lists" title="Linked Lists">
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           A linked list stores each element in its own <b>node</b> along with a{' '}
           <b>pointer</b> to the next node. The nodes don't have to live next to
@@ -360,7 +358,6 @@ export default function LinkedLists() {
           Lisp/Scheme cons cells, functional immutable structures (linked
           "spines" over persistent trees), and hash-table separate chaining.
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }

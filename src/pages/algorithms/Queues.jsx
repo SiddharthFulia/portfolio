@@ -6,8 +6,7 @@
 
 import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   MultiLangCode, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
@@ -183,8 +182,7 @@ export default function Queues() {
   }
 
   return (
-    <TopicShell slug="queues" title="Queues">
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           A <b>queue</b> is a FIFO (First-In-First-Out) collection. The first
           element to go in is the first to come out — like a line at a coffee
@@ -271,7 +269,6 @@ export default function Queues() {
           queue enforces "process every node at depth k before any node at
           depth k+1."
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }

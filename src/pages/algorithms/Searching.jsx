@@ -6,8 +6,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { InputNumber, Segmented } from 'antd'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel,
   ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
@@ -151,8 +150,7 @@ export default function Searching() {
   const resetBoth = () => { lin.reset(); bin.reset() }
 
   return (
-    <TopicShell slug='searching' title='Searching' category='Algorithms'>
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           Linear search reads every element in turn — it works on any
           array. Binary search halves the search space every step but
@@ -298,7 +296,6 @@ export default function Searching() {
           scan), or when you also need to <i>process</i> each element
           (average, sum, first-match with side effects).
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }

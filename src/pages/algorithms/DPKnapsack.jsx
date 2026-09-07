@@ -10,8 +10,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { InputNumber } from 'antd'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel,
   ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
@@ -341,8 +340,7 @@ export default function DPKnapsack() {
   const f = frames[idx] || frames[0]
 
   return (
-    <TopicShell slug='dp-knapsack' title='0/1 Knapsack (DP)' category='Algorithms'>
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           Same setup as fractional knapsack, but items are indivisible —
           take or leave. The greedy trick breaks: an item with the best
@@ -473,7 +471,6 @@ export default function DPKnapsack() {
           and orders of various sizes, maximise the number of orders you
           fit — same recurrence.
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }

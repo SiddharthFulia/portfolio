@@ -11,8 +11,7 @@
 
 import { useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   MultiLangCode, ComplexityTable, RealWorldCard, Field, TextInput, Chip,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
@@ -177,8 +176,7 @@ export default function Graphs() {
   }
 
   return (
-    <TopicShell slug="graphs" title="Graphs">
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           A <b>graph</b> is a set of nodes (vertices) connected by edges. That's
           it — but graphs model an absurd amount of the real world: road maps,
@@ -282,7 +280,6 @@ export default function Graphs() {
           are graphs. And every real-world routing protocol (OSPF, BGP)
           runs shortest-path on a graph of network nodes.
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }

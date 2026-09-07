@@ -10,8 +10,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { InputNumber } from 'antd'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel,
   ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
@@ -229,8 +228,7 @@ export default function GreedyIntervals() {
   const rendered = f?.sorted || input
 
   return (
-    <TopicShell slug='greedy-intervals' title='Interval Scheduling (Greedy)' category='Algorithms'>
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           Given a set of intervals, pick the largest subset such that no
           two overlap. The greedy strategy: sort by <b>end time</b>, scan
@@ -345,7 +343,6 @@ export default function GreedyIntervals() {
           real-time tasks is the same shape of algorithm applied to
           preemptive jobs.
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }

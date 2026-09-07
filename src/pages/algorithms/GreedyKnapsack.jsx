@@ -11,8 +11,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { InputNumber } from 'antd'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel,
   ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
@@ -271,8 +270,7 @@ export default function GreedyKnapsack() {
   const rendered = f?.sorted || items
 
   return (
-    <TopicShell slug='greedy-knapsack' title='Fractional Knapsack' category='Algorithms'>
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           You have a knapsack of capacity <TeX tex='C' /> and a set of
           items each with weight and value. You may take fractions of
@@ -381,7 +379,6 @@ export default function GreedyKnapsack() {
           In competitive-programming, fractional knapsack is often the
           upper bound used to prune 0/1 branch-and-bound.
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }

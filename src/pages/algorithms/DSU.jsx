@@ -11,8 +11,7 @@
 
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   MultiLangCode, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
@@ -196,8 +195,7 @@ export default function DSU() {
   })).size, [current])
 
   return (
-    <TopicShell slug="dsu" title="Disjoint Set Union">
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           <b>Union-Find</b> (a.k.a. DSU) maintains a collection of disjoint sets
           with two operations: <code>find(x)</code> returns the "root" of x's
@@ -288,7 +286,6 @@ export default function DSU() {
           type inference (Hindley-Milner). Percolation simulations in
           physics use it.
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }

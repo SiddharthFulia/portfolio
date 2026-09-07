@@ -11,8 +11,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { InputNumber, Switch } from 'antd'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel,
   ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
@@ -254,8 +253,7 @@ export default function DijkstraBellman() {
     : false
 
   return (
-    <TopicShell slug='dijkstra-bellman' title='Dijkstra & Bellman–Ford' category='Algorithms'>
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           Both algorithms compute single-source shortest paths, but with
           different trade-offs.
@@ -360,7 +358,6 @@ export default function DijkstraBellman() {
           money), and any graph problem with negative "costs" (rewards,
           discounts).
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }

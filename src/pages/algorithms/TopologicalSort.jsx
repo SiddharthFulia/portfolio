@@ -10,8 +10,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { InputNumber, Switch } from 'antd'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel,
   ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
@@ -252,8 +251,7 @@ export default function TopologicalSort() {
   const dF = dfs.frames[dEng.i] || dfs.frames[0]
 
   return (
-    <TopicShell slug='topological-sort' title='Topological Sort' category='Algorithms'>
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           A topological sort of a directed acyclic graph orders the
           nodes so every edge points forward. Any DAG has at least one
@@ -364,7 +362,6 @@ export default function TopologicalSort() {
           that's almost always Kahn's failure mode (indegree never
           hits 0) or DFS's failure mode (back edge to a GRAY node).
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }

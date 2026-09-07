@@ -15,8 +15,7 @@
 
 import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   MultiLangCode, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
@@ -187,8 +186,7 @@ export default function Stacks() {
   }
 
   return (
-    <TopicShell slug="stacks" title="Stacks">
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           A <b>stack</b> is a LIFO (Last-In-First-Out) collection. Only two
           things happen: <code>push</code> puts something on top,{' '}
@@ -282,7 +280,6 @@ export default function Stacks() {
           value stack. DFS = a stack instead of a queue. And every compiler
           uses a symbol-table stack to track lexical scopes.
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }

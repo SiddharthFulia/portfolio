@@ -13,8 +13,7 @@
 
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import {
-  TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
+import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   MultiLangCode, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
@@ -209,8 +208,7 @@ export default function Heaps() {
   }
 
   return (
-    <TopicShell slug="heaps" title="Heaps">
-      <ExplanationBlock>
+    <><ExplanationBlock>
         <p>
           A <b>binary heap</b> is a complete binary tree that satisfies the
           heap property: in a <b>min-heap</b>, every node is &le; its children;
@@ -299,7 +297,6 @@ export default function Heaps() {
           next" is the semantic, there's a heap. Heapsort is a heap-based
           in-place O(n log n) sort with O(1) extra space.
         </p>
-      </RealWorldCard>
-    </TopicShell>
+      </RealWorldCard></>
   )
 }
