@@ -51,8 +51,18 @@ const ROUTE_TIMEOUT_MS = Number(process.env.ROUTE_TIMEOUT_MS || 25_000)
 const MAX_CLICKS_PER_PAGE = Number(process.env.MAX_CLICKS || 40)
 
 // ── Route list ─────────────────────────────────────────────────────
-// Every top-level route from src/App.jsx. Nested :module routes are
-// covered by picking one representative module per parent.
+// Every top-level route from src/App.jsx + every /algorithms/:slug
+// sub-route (30 total) since those are the highest crash-risk pages.
+// Nested :module routes covered by one representative per parent.
+const ALGORITHM_SLUGS = [
+  'arrays', 'linked-lists', 'stacks', 'queues', 'hash-tables',
+  'graphs', 'trees', 'bst', 'balanced-trees', 'heaps',
+  'tries', 'segment-trees', 'fenwick-trees', 'dsu', 'mst',
+  'divide-conquer', 'sorting', 'searching', 'sieve', 'kmp',
+  'greedy-intervals', 'greedy-knapsack', 'dp-knapsack', 'dp-lcs', 'dp-lis',
+  'convex-hull', 'graph-traversal', 'floyd-warshall', 'dijkstra-bellman', 'topological-sort',
+]
+
 const ROUTES = [
   { path: '/',              name: 'Home' },
   { path: '/about',         name: 'About' },
@@ -60,6 +70,13 @@ const ROUTES = [
   { path: '/contact',       name: 'Contact' },
   { path: '/lab',           name: 'Lab' },
   { path: '/learn',         name: 'Learn' },
+  { path: '/algorithms',    name: 'Algorithms' },
+  // 30 algorithm sub-routes — special sweep clicks StepControls.
+  ...ALGORITHM_SLUGS.map((slug) => ({
+    path: `/algorithms/${slug}`,
+    name: `Alg/${slug}`,
+    special: 'algorithm',
+  })),
   { path: '/creative',      name: 'Creative' },
   { path: '/chess',         name: 'Chess' },
   { path: '/chess-classic', name: 'ChessViz' },
@@ -73,19 +90,20 @@ const ROUTES = [
   { path: '/image-enhancer', name: 'ImageEnhancer' },
   { path: '/ai-studio',     name: 'AIStudio' },
   { path: '/3d',            name: 'Dragon3D' },
-  { path: '/deepfake',      name: 'Deepfake' },
-  { path: '/settings',      name: 'Settings' },
-  { path: '/settings?tab=agents', name: 'Settings/agents', skipClickSelector: 'textarea, input[type="text"]' },
+  // Vault-gated — skipped after vault-modal detection.
+  { path: '/deepfake',      name: 'Deepfake',       vaultGated: true },
+  { path: '/settings',      name: 'Settings',       vaultGated: true },
+  { path: '/settings?tab=agents', name: 'Settings/agents', vaultGated: true, skipClickSelector: 'textarea, input[type="text"]' },
   { path: '/runner',        name: 'Runner' },
   { path: '/simple-game',   name: 'SimpleGame' },
-  { path: '/physics',       name: 'PhysicsLab', special: 'physics' },
-  { path: '/pathfinding',   name: 'Pathfinding', special: 'pathfinding' },
-  { path: '/chernobyl',     name: 'Chernobyl', special: 'chernobyl' },
-  { path: '/atoms',         name: 'Atoms', special: 'atoms' },
+  { path: '/physics',       name: 'PhysicsLab',   special: 'physics' },
+  { path: '/pathfinding',   name: 'Pathfinding',  special: 'pathfinding' },
+  { path: '/chernobyl',     name: 'Chernobyl',    special: 'chernobyl' },
+  { path: '/atoms',         name: 'Atoms',        special: 'atoms' },
   { path: '/gesture-memes', name: 'GestureMemes' },
   { path: '/gesture-hammy', name: 'GestureHammy' },
-  { path: '/osint',         name: 'Osint', special: 'osint' },
-  { path: '/qr',            name: 'QRCompiler', special: 'qr' },
+  { path: '/osint',         name: 'Osint',        special: 'osint' },
+  { path: '/qr',            name: 'QRCompiler',   special: 'qr' },
   { path: '/summarizer',    name: 'Summarizer' },
   { path: '/yt-dl',         name: 'YoutubeDl' },
   { path: '/hand',          name: 'HandTracking' },
@@ -140,6 +158,15 @@ const IGNORED_ERROR_PATTERNS = [
   /tesseract/i,
   /vite:preloadError/i,                                  // Chunk preload — handled by lazyWithReload
   /Failed to fetch dynamically imported module/i,        // Same — chunk reload handles it
+  /Clipboard['"]?: Write permission denied/i,            // navigator.clipboard blocked in headless
+  /Failed to execute 'writeText' on 'Clipboard'/i,       // Same, different message
+  /Document is not focused/i,                            // Clipboard writeText also throws this
+  /permissions policy/i,                                 // iframe-blocked features
+  // 3rd-party iframe (OpenReel etc.) load noise. We don't control the
+  // upstream bundle's asset paths — a stale css/js hash there isn't
+  // our runtime crash.
+  /Refused to apply style from .* MIME type/i,
+  /Refused to execute script from/i,
 ]
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -242,6 +269,21 @@ async function collectControls(page) {
       tag(el, 'radios')
     })
     return out
+  })
+}
+
+// Detect the global VaultModal — when a vault-gated route mounts it
+// pops open (see VaultModal.jsx). We treat the presence of the modal
+// as "skip clicks, log as skipped: vault-gated". The modal's own
+// dismiss/close button is inside .ant-modal-close so we skip it too.
+async function detectVaultGate(page) {
+  return page.evaluate(() => {
+    // Look for the LockOutlined icon inside an open ant-modal.
+    const modal = document.querySelector('.ant-modal-root .ant-modal-content')
+    if (!modal) return false
+    const t = modal.textContent || ''
+    // Vault modal shows a lock + "Vault" text on the button/labels.
+    return /vault/i.test(t) || /\bunlock\b/i.test(t)
   })
 }
 
@@ -349,6 +391,44 @@ async function specialAtoms(page, errors) {
   }
 }
 
+async function specialAlgorithm(page, errors) {
+  // Every /algorithms/:slug page mounts StepControls (Play/Pause/Step/Reset)
+  // + typically one Segmented view-mode switch + parameter sliders.
+  // This is the highest-risk lane (30 brand-new pages). Sweep exercises:
+  //   1. Cycle every Segmented option (view modes, algo variants)
+  //   2. Click Play → Pause → Step forward → Step back → Reset
+  //   3. Move every Slider to 25% / 75% / midpoint via track click
+  const segs = page.locator('.ant-segmented-item-label')
+  const N = Math.min(await segs.count(), 12)
+  for (let i = 0; i < N; i++) { await safeClick(segs.nth(i)); await sleep(80) }
+  // Play → Pause → Step → Reset in that order.
+  for (const label of ['Play', 'Pause', 'Reset']) {
+    const b = page.locator(`button[aria-label="${label}"], button:has-text("${label}")`).first()
+    if (await b.count()) { await safeClick(b); await sleep(120) }
+  }
+  // Step buttons — aria-label matches StepControls' pattern.
+  for (const label of ['Step forward', 'Step back']) {
+    const b = page.locator(`button[aria-label="${label}"]`).first()
+    if (await b.count()) {
+      await safeClick(b); await sleep(80)
+      await safeClick(b); await sleep(80)
+    }
+  }
+  // Slider quick nudge — click 25% then 75% of first slider's track.
+  const slider = page.locator('.ant-slider').first()
+  if (await slider.count()) {
+    try {
+      const box = await slider.boundingBox()
+      if (box) {
+        await page.mouse.click(box.x + box.width * 0.25, box.y + box.height * 0.5)
+        await sleep(60)
+        await page.mouse.click(box.x + box.width * 0.75, box.y + box.height * 0.5)
+        await sleep(60)
+      }
+    } catch {}
+  }
+}
+
 async function specialOsint(page, errors) {
   // Just click the first ~15 tool cards. Each fires a fetch that will
   // fail locally (no BE) — that's ok, we're checking for JS crashes only.
@@ -447,8 +527,10 @@ async function main() {
   console.log('› chromium …')
   const browser = await chromium.launch({ headless: HEADLESS })
   const context = await browser.newContext({
-    // Deny camera/mic so getUserMedia rejects fast rather than hanging
-    permissions: [],
+    // Grant clipboard-* so "Copy to clipboard" buttons don't throw a
+    // permission-denied pageerror. Camera/mic left off so getUserMedia
+    // rejects fast rather than hanging.
+    permissions: ['clipboard-read', 'clipboard-write'],
     // Reasonable viewport
     viewport: { width: 1440, height: 900 },
     // Reduce animation noise
@@ -490,6 +572,13 @@ async function main() {
           if (boundary) {
             errors.push({ kind: 'errorBoundary', msg: boundary })
           }
+          // Vault-gated route → skip interactions. Log as SKIP.
+          stage = 'vault-check'
+          const gated = await detectVaultGate(page)
+          if (gated) {
+            route._skipped = 'vault-gated'
+            return
+          }
           // Do the special interactions FIRST for the crash-prone pages
           stage = 'special-interaction'
           if (route.special === 'qr')          await specialQR(page, errors)
@@ -498,6 +587,7 @@ async function main() {
           if (route.special === 'chernobyl')   await specialChernobyl(page, errors)
           if (route.special === 'atoms')       await specialAtoms(page, errors)
           if (route.special === 'osint')       await specialOsint(page, errors)
+          if (route.special === 'algorithm')   await specialAlgorithm(page, errors)
           // Then a generic sweep of remaining visible controls
           stage = 'generic-sweep'
           interactions = await sweepControls(page, errors)
@@ -517,12 +607,14 @@ async function main() {
       }
     }
     if (errors.length) status = 'FAIL'
+    if (route._skipped) status = 'SKIP'
     const ms = Date.now() - t0
-    results.push({ route: route.path, name: route.name, status, ms, interactions, errors })
+    results.push({ route: route.path, name: route.name, status, ms, interactions, errors, skipped: route._skipped })
     const pad = (s, n) => (s + ' '.repeat(n)).slice(0, n)
+    const tag = status === 'PASS' ? 'PASS' : status === 'SKIP' ? 'SKIP' : 'FAIL'
+    const extra = route._skipped ? `  · ${route._skipped}` : (errors.length ? `  · ${errors.length} error(s)` : '')
     console.log(
-      `  ${status === 'PASS' ? 'PASS' : 'FAIL'}  ${pad(route.path, 26)} ${pad(String(interactions) + ' clicks', 12)} ${ms}ms` +
-      (errors.length ? `  · ${errors.length} error(s)` : ''),
+      `  ${tag}  ${pad(route.path, 26)} ${pad(String(interactions) + ' clicks', 12)} ${ms}ms${extra}`,
     )
     if (errors.length && VERBOSE) {
       for (const e of errors) console.log(`         → [${e.kind}] ${e.msg.slice(0, 200)}`)
@@ -536,9 +628,10 @@ async function main() {
   // ── Report ──────────────────────────────────────────────────────
   const pass = results.filter((r) => r.status === 'PASS').length
   const fail = results.filter((r) => r.status === 'FAIL').length
+  const skip = results.filter((r) => r.status === 'SKIP').length
   console.log('\n─── Smoke report ───')
   console.log(`  Routes tested: ${results.length}`)
-  console.log(`  Pass: ${pass}    Fail: ${fail}`)
+  console.log(`  Pass: ${pass}    Fail: ${fail}    Skip: ${skip}`)
   console.log(`  Total interactions: ${results.reduce((s, r) => s + r.interactions, 0)}`)
   if (fail) {
     console.log('\n─── Failures ───')

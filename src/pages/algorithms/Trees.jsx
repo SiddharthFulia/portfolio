@@ -157,8 +157,17 @@ function TreeSVG({ root, visits, currentIdx }) {
         return (
           <motion.g key={p.id} initial={false} animate={{ x: p.x, y: p.y }} transition={{ type: 'spring', stiffness: 220, damping: 24 }}>
             {isCurrent && (
-              <motion.circle r={22} fill="none" stroke="#fbbf24" strokeWidth={2}
-                animate={{ r: [20, 28, 20], opacity: [0.7, 0, 0.7] }} transition={{ duration: 1.2, repeat: Infinity }} />
+              // framer-motion needs an initial `r` value to interpolate
+              // from — without it the very first frame sends r="undefined"
+              // to the SVG element, which triggers a console.error
+              // ("<circle> attribute r: Expected length, undefined").
+              // Same fix pattern used in the other node visualisers.
+              <motion.circle
+                fill="none" stroke="#fbbf24" strokeWidth={2}
+                initial={{ r: 20, opacity: 0.7 }}
+                animate={{ r: [20, 28, 20], opacity: [0.7, 0, 0.7] }}
+                transition={{ duration: 1.2, repeat: Infinity }}
+              />
             )}
             <circle r={18} fill={tone.fill} stroke={tone.stroke} strokeWidth={2} />
             <text y={5} textAnchor="middle" fontSize={13} fill={tone.text} fontFamily="ui-monospace">{p.v}</text>
