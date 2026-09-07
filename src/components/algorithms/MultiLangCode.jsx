@@ -192,10 +192,15 @@ export default function MultiLangCode({
           <button
             type="button"
             onClick={onCopy}
-            className="text-[10px] font-mono px-2 py-1 rounded border border-white/10 bg-white/[0.03] text-gray-300 hover:bg-white/[0.06] hover:text-white transition-colors"
+            data-success={copied ? 'true' : undefined}
+            className={`text-[10px] font-mono px-2 py-1 rounded border transition-colors ${
+              copied
+                ? 'border-emerald-400/60 bg-emerald-500/10 text-emerald-200'
+                : 'border-white/10 bg-white/[0.03] text-gray-300 hover:bg-white/[0.06] hover:text-white'
+            }`}
             aria-label="Copy code"
           >
-            {copied ? 'copied' : 'copy'}
+            {copied ? 'copied ✓' : 'copy'}
           </button>
         </div>
       </div>

@@ -90,6 +90,8 @@ export default function Button({
   className = '',
   htmlType,                                       // explicit override allowed
   type,                                           // antd `type` if caller insists
+  success = false,                                // emerald flash for 400ms (copy / save)
+  pending = false,                                // amber pulse for 200ms (fire / submit)
   children,
   ...rest
 }) {
@@ -104,12 +106,21 @@ export default function Button({
   // visibility" block in src/styles/luxe.css. It flips
   // `white-space: nowrap` off so long labels wrap to two lines
   // instead of ellipsing under a sibling element on mobile.
+  //
+  // `success` / `pending` map onto the data-success / data-pending
+  // attributes that luxe.css watches. Callers pass a stateful boolean
+  // that flips true briefly and back to false via setTimeout, e.g.:
+  //   const [flash, setFlash] = useState(false)
+  //   onClick={() => { copy(); setFlash(true); setTimeout(() => setFlash(false), 400) }}
+  //   <Button success={flash}>Copy</Button>
   return (
     <AntButton
       type={antType}
       danger={v.danger}
       ghost={v.ghost}
       htmlType={htmlType ?? 'button'}
+      data-success={success ? 'true' : undefined}
+      data-pending={pending ? 'true' : undefined}
       className={`sid-btn ${v.className || ''} ${className}`.trim()}
       {...rest}
     >

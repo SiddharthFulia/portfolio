@@ -81,8 +81,18 @@ function CodeBlock({ className, children }) {
     <div className="my-2 rounded-lg border border-gray-800 overflow-hidden bg-gray-950">
       <div className="flex items-center justify-between px-3 py-1.5 bg-gray-800/80 border-b border-gray-700">
         <span className="text-[10px] text-gray-500 font-mono">{lang || 'code'}</span>
-        <button onClick={copy} className="text-gray-500 hover:text-white transition-colors" aria-label="Copy code">
-          {copied ? <CheckOutlined style={{ fontSize: 12, color: '#4caf50' }} /> : <CopyOutlined style={{ fontSize: 12 }} />}
+        <button
+          type="button"
+          onClick={copy}
+          data-success={copied ? 'true' : undefined}
+          className={`rounded px-1.5 py-0.5 transition-colors ${
+            copied
+              ? 'text-emerald-300 bg-emerald-500/10 border border-emerald-400/40'
+              : 'text-gray-500 border border-transparent hover:text-white hover:bg-white/[0.04]'
+          }`}
+          aria-label="Copy code"
+        >
+          {copied ? <CheckOutlined style={{ fontSize: 12 }} /> : <CopyOutlined style={{ fontSize: 12 }} />}
         </button>
       </div>
       <pre className="p-3 bg-gray-950 overflow-x-auto text-xs leading-relaxed"><code>{code}</code></pre>

@@ -22,6 +22,7 @@
 // don't lose keystrokes.
 
 import { useEffect } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Button, Slider } from '../ui'
 import {
   CaretRightOutlined,
@@ -30,6 +31,17 @@ import {
   StepForwardOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
+
+// Play/Pause icon crossfade. AnimatePresence + mode="wait" swaps the two
+// icons over ~90ms of opacity + tiny scale — reads as a snappy transport
+// change without the wobble of a full spring. framer-motion is already
+// pulled in elsewhere on the site, so this adds no bundle weight.
+const iconVariants = {
+  initial: { opacity: 0, scale: 0.7 },
+  animate: { opacity: 1, scale: 1 },
+  exit:    { opacity: 0, scale: 0.7 },
+}
+const iconTransition = { duration: 0.09, ease: 'easeOut' }
 
 const isTypingTarget = (el) => {
   if (!el) return false
@@ -94,7 +106,21 @@ export default function StepControls({
           variant={playing ? 'danger' : 'primary'}
           onClick={togglePlay}
           disabled={disabled}
-          icon={playing ? <PauseOutlined /> : <CaretRightOutlined />}
+          icon={
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={playing ? 'pause' : 'play'}
+                variants={iconVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                transition={iconTransition}
+                style={{ display: 'inline-flex' }}
+              >
+                {playing ? <PauseOutlined /> : <CaretRightOutlined />}
+              </motion.span>
+            </AnimatePresence>
+          }
           title="Play / Pause (Space)"
           aria-label={playing ? 'Pause' : 'Play'}
         >

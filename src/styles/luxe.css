@@ -719,4 +719,172 @@ body.theme-light .gradient-text-cyan  { color: #0e7490 !important; }
   line-height: 1.2;
 }
 
+/* ===================================================================
+ * Micro-interactions — subtle click / state-change animations.
+ *
+ * Goals:
+ *   - Feel tactile (~100-200ms scale + colour transitions on active).
+ *   - No bounce, no springs. Ease-out linear-feeling curves only.
+ *   - Zero JS. CSS-only so we don't ship framer-motion for a scale.
+ *   - Respect prefers-reduced-motion (block at the bottom of this
+ *     block wipes every transition + transform we set here).
+ *
+ * Selectors deliberately cover:
+ *   .ant-btn        — every antd Button on the site
+ *   .sid-btn        — our local wrapper (components/ui/Button.jsx)
+ *   button[class*="rounded"] — hand-rolled Tailwind buttons that
+ *                    ignore both wrappers (there are ~100 across the
+ *                    codebase). Matching on the rounded utility is
+ *                    the cheapest way to catch them without touching
+ *                    every page.
+ * =================================================================== */
+
+.ant-btn,
+.sid-btn,
+button[class*="rounded"] {
+  transition: background-color 150ms ease-out,
+              border-color 150ms ease-out,
+              color 150ms ease-out,
+              transform 100ms ease-out,
+              box-shadow 200ms ease-out,
+              filter 150ms ease-out;
+}
+
+.ant-btn:active:not([disabled]),
+.sid-btn:active:not([disabled]),
+button[class*="rounded"]:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Slight brightening on hover for filled buttons — antd applies its
+   own colour swap for primary; the filter nudges it half a percent
+   further so the pointer-down state has somewhere to fall back to. */
+.ant-btn-primary:hover:not([disabled]),
+.ant-btn-solid:hover:not([disabled]) {
+  filter: brightness(1.06);
+}
+
+/* Amber outline on keyboard focus. Mouse clicks never trigger
+   :focus-visible, so this is invisible to pointer users. */
+.ant-btn:focus-visible,
+.sid-btn:focus-visible,
+button:focus-visible:not(:disabled) {
+  outline: 2px solid rgb(251 191 36 / 0.55);
+  outline-offset: 2px;
+}
+
+/* Segmented (antd Segmented tab bar) — used on Vision, AI Chat,
+   Explore module switchers. Match the button feel. */
+.ant-segmented-item {
+  transition: background-color 150ms ease-out, color 150ms ease-out;
+}
+.ant-segmented-item:active {
+  transform: scale(0.98);
+  transition: transform 60ms ease-out;
+}
+
+/* Slider handle — grows subtly when hovered / dragged so users see
+   the interactive affordance. antd's default is a static circle. */
+.ant-slider-handle {
+  transition: transform 120ms ease-out, box-shadow 180ms ease-out !important;
+}
+.ant-slider-handle:hover,
+.ant-slider-handle:focus {
+  transform: scale(1.15) !important;
+}
+.ant-slider-handle.ant-slider-handle-dragging {
+  transform: scale(1.25) !important;
+}
+
+/* Pills / chips — anything using rounded-full presses inward. Covers
+   filter chips, tag toggles, and share buttons across the site. */
+[class*="rounded-full"]:active {
+  transform: scale(0.96);
+  transition: transform 80ms ease-out;
+}
+
+/* Switch (antd Switch) — brief amber ring pulse when flipped ON.
+   Fires once via animation, not a transition, so the ring collapses
+   naturally after 260ms and doesn't persist as a shadow. */
+.ant-switch-checked {
+  animation: sid-switch-flash 260ms ease-out;
+}
+@keyframes sid-switch-flash {
+  from { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+  50%  { box-shadow: 0 0 0 6px rgba(251, 191, 36, 0.14); }
+  to   { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+}
+
+/* Loading state — amber border pulse behind the antd spinner so the
+   button breathes while a network call is in flight. Fires forever;
+   antd removes the .ant-btn-loading class as soon as loading flips
+   back to false. */
+.ant-btn.ant-btn-loading:not([disabled]) {
+  animation: sid-btn-loading-pulse 1200ms ease-in-out infinite;
+}
+@keyframes sid-btn-loading-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+  50%      { box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.22); }
+}
+
+/* Success flash — set data-success="true" on any button for 400ms
+   after a save / copy / apply action, and it briefly rings emerald.
+   MultiLangCode, QRCompiler, AgentsTab, and any future copy button
+   just toggles this attribute in a useState + setTimeout(clear, 400)
+   pattern. No JSX changes needed beyond the attribute. */
+[data-success="true"] {
+  animation: sid-btn-success-flash 400ms ease-out;
+  border-color: rgba(52, 211, 153, 0.7) !important;
+}
+@keyframes sid-btn-success-flash {
+  0%   { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+  40%  { box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.28); }
+  100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+}
+
+/* Pending flash — for CTAs like Run / Fire / AZ-5 where the network
+   call may take a second. Set data-pending="true" on mousedown, wipe
+   on response; a soft amber ring pulses once so the button "feels
+   heard" before the round-trip lands. */
+[data-pending="true"] {
+  animation: sid-btn-pending-flash 200ms ease-out;
+}
+@keyframes sid-btn-pending-flash {
+  0%   { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+  60%  { box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.32); }
+  100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+}
+
+/* Reduced motion — kill every transition, transform, and animation
+   defined in this block. Users who set OS-level "reduce motion" (or
+   the antd Themer reduced-motion toggle) get flat instant state
+   changes, no scale, no ring pulses. */
+@media (prefers-reduced-motion: reduce) {
+  .ant-btn,
+  .sid-btn,
+  button[class*="rounded"],
+  .ant-segmented-item,
+  .ant-slider-handle,
+  [class*="rounded-full"],
+  .ant-switch-checked,
+  [data-success="true"],
+  [data-pending="true"],
+  .ant-btn.ant-btn-loading {
+    transition: none !important;
+    animation: none !important;
+  }
+  .ant-btn:active,
+  .sid-btn:active,
+  button[class*="rounded"]:active,
+  .ant-segmented-item:active,
+  [class*="rounded-full"]:active {
+    transform: none !important;
+  }
+  .ant-slider-handle:hover,
+  .ant-slider-handle:focus,
+  .ant-slider-handle.ant-slider-handle-dragging {
+    transform: none !important;
+  }
+}
+
 /* End of luxe.css */
