@@ -65,8 +65,8 @@ export default function PseudocodeBlock({
 
   return (
     <div className={`luxe-card rounded-2xl border border-white/10 overflow-hidden ${className}`}>
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/10 bg-white/[0.02]">
-        <p className="text-[11px] uppercase tracking-[0.2em] font-bold text-white">{title}</p>
+      <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-white/[0.06] bg-white/[0.02]">
+        <p className="text-[11px] uppercase tracking-[0.18em] font-bold text-amber-300/90">{title}</p>
         <span className="text-[10px] font-mono text-gray-500">{language}</span>
       </div>
       <div className="bg-[#08080b]/80">

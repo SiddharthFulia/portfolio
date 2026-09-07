@@ -120,9 +120,9 @@ export default function StepControls({
           Reset
         </Button>
 
-        <div className="flex-1 min-w-[160px] flex items-center gap-3 pl-1 sm:pl-3">
-          <span className="text-[11px] font-mono uppercase tracking-wider text-gray-400 shrink-0">Speed</span>
-          <div className="flex-1">
+        <div className="flex-1 min-w-[140px] flex items-center gap-2 pl-1 sm:pl-2">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-gray-500 shrink-0">Speed</span>
+          <div className="flex-1 min-w-0">
             <Slider
               accent="amber"
               min={0.25}
@@ -134,7 +134,7 @@ export default function StepControls({
               tooltip={{ formatter: (v) => `${v}x` }}
             />
           </div>
-          <span className="text-[11px] font-mono text-amber-300 shrink-0 min-w-[38px] text-right">
+          <span className="text-[10.5px] font-mono text-amber-300 shrink-0 w-14 text-right">
             {speedLabel}
           </span>
         </div>
@@ -149,12 +149,16 @@ export default function StepControls({
       </div>
 
       {!compact && (
-        <p className="mt-2 text-[10px] text-gray-500 leading-snug">
-          Shortcuts — <kbd className="px-1 py-[1px] rounded bg-white/5 border border-white/10 text-gray-300">Space</kbd> play·pause · {' '}
-          <kbd className="px-1 py-[1px] rounded bg-white/5 border border-white/10 text-gray-300">←</kbd>{' '}
-          <kbd className="px-1 py-[1px] rounded bg-white/5 border border-white/10 text-gray-300">→</kbd> step · {' '}
-          <kbd className="px-1 py-[1px] rounded bg-white/5 border border-white/10 text-gray-300">R</kbd> reset
-        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] text-gray-500 leading-snug">
+          <span className="uppercase tracking-wider text-gray-600">Shortcuts</span>
+          <kbd className="px-1 py-[1px] rounded bg-white/[0.04] border border-white/10 text-gray-400">Space</kbd>
+          <span className="text-gray-600">play·pause</span>
+          <kbd className="px-1 py-[1px] rounded bg-white/[0.04] border border-white/10 text-gray-400">←</kbd>
+          <kbd className="px-1 py-[1px] rounded bg-white/[0.04] border border-white/10 text-gray-400">→</kbd>
+          <span className="text-gray-600">step</span>
+          <kbd className="px-1 py-[1px] rounded bg-white/[0.04] border border-white/10 text-gray-400">R</kbd>
+          <span className="text-gray-600">reset</span>
+        </div>
       )}
     </div>
   )

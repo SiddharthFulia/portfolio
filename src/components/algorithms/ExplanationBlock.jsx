@@ -91,12 +91,12 @@ export default function ExplanationBlock({ sections, children, title = 'How it w
 
   return (
     <section
-      className={`luxe-card rounded-2xl border border-white/10 bg-white/[0.02] p-5 sm:p-6 ${className}`}
+      className={`luxe-card rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-5 ${className}`}
       aria-label={title}
     >
-      <div className="flex items-baseline justify-between mb-4">
-        <h2 className="text-lg sm:text-xl font-bold text-white">{title}</h2>
-        <span className="text-[10px] uppercase tracking-[0.2em] text-gray-500">Explainer</span>
+      <div className="flex items-baseline justify-between mb-4 pb-2 border-b border-white/[0.06]">
+        <p className="text-[11px] uppercase tracking-[0.18em] font-bold text-amber-300/90">Explanation</p>
+        <span className="text-[10px] uppercase tracking-[0.2em] text-gray-500">{title}</span>
       </div>
 
       {children && (

@@ -21,7 +21,7 @@ export function VisualiserSection({ children, className = '' }) {
   return (
     <section
       aria-label="Interactive visualiser"
-      className={`grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4 sm:gap-5 my-6 ${className}`}
+      className={`grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4 sm:gap-5 my-6 ${className}`}
     >
       {children}
     </section>
@@ -32,8 +32,8 @@ export function VizPanel({ children, title, legend, className = '' }) {
   return (
     <div className={`luxe-card rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-5 min-w-0 ${className}`}>
       {(title || legend) && (
-        <div className="flex items-center justify-between mb-3">
-          {title && <p className="text-[11px] uppercase tracking-[0.2em] font-bold text-white">{title}</p>}
+        <div className="flex items-center justify-between mb-3 pb-2 border-b border-white/[0.06]">
+          {title && <p className="text-[11px] uppercase tracking-[0.18em] font-bold text-amber-300/90">{title}</p>}
           {legend && <div className="text-[10px] font-mono text-gray-500">{legend}</div>}
         </div>
       )}
@@ -45,8 +45,11 @@ export function VizPanel({ children, title, legend, className = '' }) {
 export function ControlsPanel({ children, title = 'Controls', className = '' }) {
   return (
     <aside className={`min-w-0 ${className}`}>
-      <div className="xl:sticky xl:top-24 luxe-card rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-5 space-y-3">
-        <p className="text-[11px] uppercase tracking-[0.2em] font-bold text-white">{title}</p>
+      <div className="lg:sticky lg:top-20 luxe-card rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-5 space-y-3">
+        <div className="flex items-baseline justify-between pb-2 mb-1 border-b border-white/[0.06]">
+          <p className="text-[11px] uppercase tracking-[0.18em] font-bold text-amber-300/90">{title}</p>
+          <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-gray-600">Panel</span>
+        </div>
         {children}
       </div>
     </aside>
@@ -59,13 +62,13 @@ export function Field({ label, helper, children, className = '' }) {
   return (
     <div className={`space-y-1.5 ${className}`}>
       {label && (
-        <label className="block text-[11px] font-bold text-gray-200 uppercase tracking-wider">
+        <label className="block text-[10.5px] font-bold text-gray-200 uppercase tracking-[0.14em]">
           {label}
         </label>
       )}
       {children}
       {helper && (
-        <p className="text-[10.5px] text-gray-500 leading-snug">{helper}</p>
+        <p className="text-[11px] text-gray-500 leading-snug mt-1">{helper}</p>
       )}
     </div>
   )
@@ -104,7 +107,7 @@ const CHIP_TONES = {
 export function Chip({ tone = 'gray', children, className = '' }) {
   const t = CHIP_TONES[tone] || CHIP_TONES.gray
   return (
-    <span className={`inline-flex items-center gap-1 text-[10.5px] font-mono font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border ${t} ${className}`}>
+    <span className={`inline-flex items-center gap-1 text-[10px] font-mono font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full border whitespace-nowrap ${t} ${className}`}>
       {children}
     </span>
   )

@@ -39,8 +39,8 @@ export default function ComplexityTable({ rows, caption, className = '' }) {
 
   return (
     <div className={`luxe-card rounded-2xl border border-white/10 overflow-hidden ${className}`}>
-      <div className="px-4 py-3 border-b border-white/10 bg-white/[0.02]">
-        <p className="text-[11px] uppercase tracking-[0.2em] font-bold text-amber-300">
+      <div className="px-4 sm:px-5 py-3 border-b border-white/[0.06] bg-white/[0.02]">
+        <p className="text-[11px] uppercase tracking-[0.18em] font-bold text-amber-300/90">
           Complexity
         </p>
         {caption && (

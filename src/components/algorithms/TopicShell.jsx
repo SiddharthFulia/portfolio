@@ -42,30 +42,38 @@ function SidebarLinks({ slug, onNavigate }) {
         const items = TOPICS.filter(t => t.category === cat)
         return (
           <div key={cat}>
-            <p className="text-[10px] uppercase tracking-[0.22em] font-bold text-amber-300 mb-2 px-2">
-              {cat}
-            </p>
+            <div className="flex items-center justify-between mb-2 px-2">
+              <p className="text-[10px] uppercase tracking-[0.22em] font-bold text-amber-300">
+                {cat}
+              </p>
+              <span className="text-[9.5px] font-mono font-bold text-amber-200/70 bg-amber-500/10 border border-amber-400/25 rounded-full px-1.5 py-[1px]">
+                {items.length}
+              </span>
+            </div>
             <ul className="space-y-0.5">
-              {items.map((t) => (
-                <li key={t.slug}>
-                  <NavLink
-                    to={`/algorithms/${t.slug}`}
-                    onClick={onNavigate}
-                    className={({ isActive }) =>
-                      `flex items-center gap-2 px-2 py-1.5 rounded-md text-[12.5px] transition-colors ${
-                        isActive || t.slug === slug
-                          ? 'bg-amber-500/15 text-amber-100 ring-1 ring-amber-400/40'
-                          : 'text-gray-400 hover:text-white hover:bg-white/[0.03]'
-                      }`
-                    }
-                  >
-                    <span className={`w-1 h-1 rounded-full ${
-                      t.slug === slug ? 'bg-amber-400' : 'bg-gray-600'
-                    }`} />
-                    <span className="truncate">{t.title}</span>
-                  </NavLink>
-                </li>
-              ))}
+              {items.map((t) => {
+                const isActive = t.slug === slug
+                return (
+                  <li key={t.slug}>
+                    <NavLink
+                      to={`/algorithms/${t.slug}`}
+                      onClick={onNavigate}
+                      className={({ isActive: navActive }) =>
+                        `flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-md text-[12.5px] transition-colors border-l-2 ${
+                          navActive || isActive
+                            ? 'bg-amber-500/15 text-amber-100 border-amber-400'
+                            : 'text-gray-400 hover:text-white hover:bg-white/[0.03] border-transparent'
+                        }`
+                      }
+                    >
+                      <span className={`w-1 h-1 rounded-full shrink-0 ${
+                        isActive ? 'bg-amber-400' : 'bg-gray-600'
+                      }`} />
+                      <span className="truncate">{t.title}</span>
+                    </NavLink>
+                  </li>
+                )
+              })}
             </ul>
           </div>
         )
@@ -146,11 +154,11 @@ export default function TopicShell({
 
   return (
     <div className="min-h-screen bg-[#0a0a0e] text-gray-100 pt-24 pb-16">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="flex items-start gap-8">
+      <div className="max-w-[88rem] mx-auto px-4 sm:px-6">
+        <div className="flex items-start gap-6 lg:gap-8">
 
           {/* ── Sidebar (desktop only) ── */}
-          <aside className="hidden lg:block w-64 shrink-0 sticky top-24 self-start max-h-[calc(100vh-6rem)] overflow-y-auto pr-2 pb-8">
+          <aside className="hidden lg:block w-60 shrink-0 sticky top-20 self-start max-h-[calc(100vh-5.5rem)] overflow-y-auto pr-2 pb-8">
             <Link
               to="/algorithms"
               className="inline-flex items-center gap-1.5 mb-5 text-[11px] font-mono uppercase tracking-[0.2em] text-gray-500 hover:text-amber-300 transition-colors"
@@ -213,12 +221,12 @@ export default function TopicShell({
             {hasSlottedViz && (
               <section
                 aria-label="Interactive visualiser"
-                className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4 sm:gap-5 mb-8"
+                className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4 sm:gap-5 mb-8"
               >
                 <div className="min-w-0">{visual}</div>
                 {controls && (
                   <aside className="min-w-0">
-                    <div className="xl:sticky xl:top-24">{controls}</div>
+                    <div className="lg:sticky lg:top-20">{controls}</div>
                   </aside>
                 )}
               </section>
@@ -305,7 +313,7 @@ export default function TopicShell({
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             >
               <div className="p-4 border-b border-white/10 flex items-center justify-between">
-                <p className="text-[11px] uppercase tracking-[0.2em] font-bold text-amber-300">Algorithms</p>
+                <p className="text-[11px] uppercase tracking-[0.2em] font-bold text-amber-300">All topics</p>
                 <button
                   type="button"
                   onClick={() => setDrawerOpen(false)}
