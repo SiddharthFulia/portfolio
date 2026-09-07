@@ -36,7 +36,7 @@
 // inspect exactly what jsQR is decoding.
 
 import { useEffect, useRef, useState } from 'react'
-import { Segmented, Switch, Tooltip } from 'antd'
+import { Segmented, Switch, Tooltip, Progress } from 'antd'
 import { Button } from '../ui'
 import {
   CheckCircleFilled, CloseCircleFilled, DownloadOutlined,
@@ -1059,16 +1059,36 @@ export default function QRScenes3D({ matrixData, ecc, payload }) {
   // View toggle → schedule a smooth easeInOutCubic camera transition.
   // Iso ↔ Top interpolates position + up over ~750ms. Auto-rotate is
   // implicitly suppressed by the loop while `transition` is non-null.
+  //
+  // Interruptible: if a transition is already in flight and the user
+  // toggles again, we snapshot the CURRENT interpolated camera pose +
+  // current artistic opacity as the new `from*` values, then re-target.
+  // No queueing, no waiting — feels immediate and stays consistent under
+  // rapid Iso ↔ Top ↔ Iso mashing.
   useEffect(() => {
     const s = stateRef.current
     if (!s.liveCam || !s.isoCam || !s.topCam) return
     if (s.currentMode === view && !s.transition) return
     const targetCam = view === 'Top' ? s.topCam : s.isoCam
+    // Sample the current artistic opacity so we crossfade from wherever
+    // we visually are, not from a hard 0 or 1. Fixes the "opacity jump"
+    // artefact when interrupting a mid-flight fade.
+    let fromOpacity = s.currentMode === 'Iso' ? 1 : 0
+    for (const key of Object.keys(s.meshes || {})) {
+      if (SCAN_KEYS.has(key)) continue
+      const mat = s.meshes[key]?.material
+      if (mat && typeof mat.opacity === 'number') {
+        fromOpacity = mat.opacity
+        break
+      }
+    }
     s.transition = {
       fromPos: s.liveCam.position.clone(),
       fromUp: s.liveCam.up.clone(),
       toPos: targetCam.position.clone(),
       toUp: targetCam.up.clone(),
+      fromOpacity,
+      toOpacity: view === 'Top' ? 0 : 1,
       targetMode: view,
       start: performance.now(),
       dur: 750,   // ms — comfortable easeInOutCubic in the 600-900 range
@@ -1153,7 +1173,7 @@ export default function QRScenes3D({ matrixData, ecc, payload }) {
 
     // Restore artistic meshes' materials to a fully-opaque state (used
     // when a transition settles at Iso — we don't want the tile grid to
-    // stay transparent forever).
+    // stay transparent forever). Idempotent — safe to call more than once.
     const resetArtisticOpacity = () => {
       for (const key of Object.keys(s.meshes)) {
         if (SCAN_KEYS.has(key)) continue
@@ -1171,7 +1191,33 @@ export default function QRScenes3D({ matrixData, ecc, payload }) {
         if (!overlay) continue
         for (const m of (overlay.userData?.fadeMaterials || [])) {
           m.opacity = 1
+          m.transparent = true   // keep transparent flag so next fade works
         }
+      }
+    }
+
+    // Invariant check — after every settle, artistic + scan meshes should
+    // be in a mutually exclusive visibility state. Warn (once per event
+    // loop) if we detect drift so future regressions surface loudly.
+    let lastInvariantWarn = 0
+    const assertConsistentVisibility = (mode) => {
+      const now = performance.now()
+      if (now - lastInvariantWarn < 500) return
+      let artisticVisible = 0, artisticHidden = 0, scanVisible = 0, scanHidden = 0
+      for (const key of Object.keys(s.meshes)) {
+        const v = s.meshes[key].visible
+        if (SCAN_KEYS.has(key)) { v ? scanVisible++ : scanHidden++ }
+        else                     { v ? artisticVisible++ : artisticHidden++ }
+      }
+      const bad = mode === 'iso'
+        ? (scanVisible > 0 || artisticHidden > 0)
+        : (artisticVisible > 0 || scanHidden > 0)
+      if (bad) {
+        lastInvariantWarn = now
+        // eslint-disable-next-line no-console
+        console.warn('[QRScenes3D] visibility invariant broken', {
+          mode, artisticVisible, artisticHidden, scanVisible, scanHidden,
+        })
       }
     }
 
@@ -1192,9 +1238,12 @@ export default function QRScenes3D({ matrixData, ecc, payload }) {
         cam.lookAt(0, 0, 0)
         cam.updateProjectionMatrix()
 
-        // Artistic opacity: 1 → 0 when moving to Top, 0 → 1 when back to Iso.
-        const toTop = s.transition.targetMode === 'Top'
-        const artisticOpacity = toTop ? (1 - k) : k
+        // Artistic opacity: lerp from wherever we started (captured when
+        // this transition began — may be mid-fade if we interrupted) to
+        // the target end-state (0 for Top, 1 for Iso).
+        const fromO = s.transition.fromOpacity ?? (s.transition.targetMode === 'Top' ? 1 : 0)
+        const toO   = s.transition.toOpacity   ?? (s.transition.targetMode === 'Top' ? 0 : 1)
+        const artisticOpacity = fromO + (toO - fromO) * k
         applyTransitionOpacity(artisticOpacity)
 
         // Keep the palette sky during Iso→Top so the artistic geometry
@@ -1209,8 +1258,13 @@ export default function QRScenes3D({ matrixData, ecc, payload }) {
           s.currentMode = s.transition.targetMode
           s.transition = null
           setTransitionPct(0)
-          if (s.currentMode === 'Iso') resetArtisticOpacity()
+          // Always reset material opacity to a clean state on settle,
+          // regardless of destination — that way the NEXT transition
+          // starts from a known-good baseline. settleMeshVisibility then
+          // hides whichever set of meshes shouldn't be seen.
+          resetArtisticOpacity()
           settleMeshVisibility(s.currentMode === 'Top' ? 'top' : 'iso')
+          assertConsistentVisibility(s.currentMode === 'Top' ? 'top' : 'iso')
         }
       } else {
         // Settled — sibling agent's mode logic controls the on-screen view.
