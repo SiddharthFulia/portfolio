@@ -1,13 +1,19 @@
 // Atoms — Nuclear Physics Playground.
 //
-// Engine: the sampling kernel from kavan010/Atoms
-// (E:/Github/Atoms/src/atom_raytracer.cpp) — CDF-sampled hydrogen-like
-// orbitals via associated Laguerre × associated Legendre polynomials.
-// Emscripten is not installed on this machine (checked at build time:
-// `emcc --version` returns "command not found"), so the C++ kernel is
-// ported verbatim into src/lib/atomsCore.js. The public sim API surface
-// (sampleOrbital, semiEmpiricalMass, alphaDecayQ, bohr*) mirrors what
-// the WASM export would have looked like.
+// Engine: the C++ physics kernel from kavan010/Atoms
+// (E:/Github/Atoms/src/atom_raytracer.cpp + nuclear.cpp) — CDF-sampled
+// hydrogen-like orbitals via associated Laguerre × associated Legendre
+// polynomials + Bethe-Weizsäcker semi-empirical mass + Bohr closed
+// forms. The C++ core is compiled to WebAssembly with Emscripten and
+// shipped as `public/wasm/atoms.{js,wasm}`. `src/lib/atomsWasm.js`
+// wraps the module with async factory-loader singletons + Float32Array
+// heap views for the sampler.
+//
+// Every entry point on the WASM side is async from JS (module
+// instantiation cost eaten once, then a cached promise), so the page
+// keeps a `wasmReady` state, boots a LuxeLoader overlay for the first
+// ~200 ms while the module streams in, and every effect that reads
+// Z/A goes through the WASM shim.
 //
 // Everything visual sits inside the same "luxe-glass" chrome as
 // PhysicsLab.jsx / Chernobyl.jsx — this page belongs in the Simulations
@@ -23,12 +29,13 @@ import {
 } from '@ant-design/icons'
 import katex from 'katex'
 import {
+  loadAtomsWasm,
   sampleOrbital,
   bohrRadius, bohrEnergy,
-  semiEmpiricalMass,
   alphaDecayQ, betaMinusQ, betaPlusQ,
   isotopeTelemetry,
-} from '../lib/atomsCore'
+  getWasmBinarySize,
+} from '../lib/atomsWasm'
 import {
   ELEMENTS, BY_Z, CAT_COLORS,
   ISOTOPES, CHAIN_ROOTS, buildChain, fmtHalfLife,
@@ -183,7 +190,71 @@ export default function Atoms() {
 
   // Nuclide element
   const element = BY_Z.get(Z) || BY_Z.get(1)
-  const telemetry = useMemo(() => isotopeTelemetry(Z, A), [Z, A])
+
+  // ── WASM boot state ────────────────────────────────────────
+  // Everything below reads WASM through async wrappers. We treat
+  // boot as its own React-visible state so the hero can show a
+  // LuxeLoader while the module streams in for the first paint.
+  const [wasmReady, setWasmReady] = useState(false)
+  const [wasmError, setWasmError] = useState(null)
+  const [wasmSizeKB, setWasmSizeKB] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        await loadAtomsWasm()
+        if (cancelled) return
+        setWasmReady(true)
+        const bytes = await getWasmBinarySize()
+        if (!cancelled && bytes) setWasmSizeKB(Math.round(bytes / 1024))
+      } catch (e) {
+        if (!cancelled) {
+          console.error('[atoms] failed to load WASM module', e)
+          setWasmError(e?.message || String(e))
+        }
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  // ── Live telemetry (async, tracks Z/A) ─────────────────────
+  // Old code was `useMemo(() => isotopeTelemetry(Z, A), [Z, A])`. That
+  // sync call now becomes an effect populating state. Default value is
+  // a shape-compatible zero-bundle so the UI renders on first paint.
+  const [telemetry, setTelemetry] = useState({
+    Z: 1, A: 1, N: 0,
+    B: 0, BperA: 0, delta: 0, NoverZ: 0,
+    Qalpha: -1, Qbeta: 0, Qpos: -1,
+    stability: 'stable',
+  })
+  useEffect(() => {
+    if (!wasmReady) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const t = await isotopeTelemetry(Z, A)
+        if (!cancelled) setTelemetry(t)
+      } catch (e) {
+        if (!cancelled) console.warn('[atoms] telemetry compute failed', e)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [Z, A, wasmReady])
+
+  // Bohr radius (pm) + energy (eV) for the ground-state row of the
+  // telemetry table. Also served by WASM.
+  const [bohrGround, setBohrGround] = useState({ r1pm: 52.9, E1eV: -13.6 })
+  useEffect(() => {
+    if (!wasmReady) return
+    let cancelled = false
+    ;(async () => {
+      const r1pm = await bohrRadius(Z, 1)
+      const E1eV = await bohrEnergy(Z, 1)
+      if (!cancelled) setBohrGround({ r1pm, E1eV })
+    })()
+    return () => { cancelled = true }
+  }, [Z, wasmReady])
 
   // Ensure ℓ, m are in-range whenever n changes.
   useEffect(() => {
@@ -202,16 +273,25 @@ export default function Atoms() {
 
   useEffect(() => {
     if (mode !== 'cloud') { cloudRef.current = null; setPC(nucleusRef.current.length); setIsSampling(false); return }
+    if (!wasmReady) return
     setIsSampling(true)
+    let cancelled = false
     // Defer to next frame so the loader overlay actually paints before the
     // main-thread-blocking sample kernel runs.
-    const raf = requestAnimationFrame(() => {
-      cloudRef.current = sampleOrbital({ n: nQ, l: lQ, m: mQ, N: cloudN })
-      setPC(cloudN + nucleusRef.current.length)
-      setIsSampling(false)
+    const raf = requestAnimationFrame(async () => {
+      try {
+        const samples = await sampleOrbital(nQ, lQ, mQ, cloudN)
+        if (cancelled) return
+        cloudRef.current = samples
+        setPC(cloudN + nucleusRef.current.length)
+      } catch (e) {
+        console.warn('[atoms] sample failed', e)
+      } finally {
+        if (!cancelled) setIsSampling(false)
+      }
     })
-    return () => cancelAnimationFrame(raf)
-  }, [mode, nQ, lQ, mQ, cloudN, A])
+    return () => { cancelled = true; cancelAnimationFrame(raf) }
+  }, [mode, nQ, lQ, mQ, cloudN, A, wasmReady])
 
   // ─── Element selection → sensible A + shell config guess ───
   const pickElement = useCallback((z) => {
@@ -229,7 +309,13 @@ export default function Atoms() {
   }, [pushEvent])
 
   // ─── Radiation buttons ─────────────────────────────────────
-  const emit = useCallback((kind) => {
+  // Q-values now come from the WASM kernel (async). We fire-and-let
+  // the promise settle: the emitted particle appears on the canvas
+  // immediately with an "…" energy label, then gets rewritten in place
+  // once the Q-value comes back. Sub-millisecond in practice — the
+  // module is already resident by the time any user clicks a decay
+  // button — but the code path handles the async cleanly either way.
+  const emit = useCallback(async (kind) => {
     const el = BY_Z.get(Z)
     const c = canvasRef.current
     if (!c) return
@@ -241,17 +327,17 @@ export default function Atoms() {
     let dZ = 0, dA = 0, wavy = false
 
     if (kind === 'alpha') {
-      const Q = alphaDecayQ(Z, A)
-      color = ALPHA_COLOR; label = `α · ⁴He²⁺`; energyMeV = Q
+      color = ALPHA_COLOR; label = `α · ⁴He²⁺`
       dZ = -2; dA = -4
+      energyMeV = wasmReady ? await alphaDecayQ(Z, A) : 0
     } else if (kind === 'beta-') {
-      const Q = betaMinusQ(Z, A)
-      color = ELECTRON_COLOR; label = `β⁻ · e⁻ + ν̄`; energyMeV = Q
+      color = ELECTRON_COLOR; label = `β⁻ · e⁻ + ν̄`
       dZ = +1; dA = 0
+      energyMeV = wasmReady ? await betaMinusQ(Z, A) : 0
     } else if (kind === 'beta+') {
-      const Q = betaPlusQ(Z, A)
-      color = '#f472b6'; label = `β⁺ · e⁺ + ν`; energyMeV = Q
+      color = '#f472b6'; label = `β⁺ · e⁺ + ν`
       dZ = -1; dA = 0
+      energyMeV = wasmReady ? await betaPlusQ(Z, A) : 0
     } else if (kind === 'gamma') {
       color = PHOTON_COLOR; label = 'γ photon'; energyMeV = 0.5 + Math.random() * 2
       wavy = true
@@ -277,7 +363,7 @@ export default function Atoms() {
     } else {
       pushEvent({ kind, severity: 'info', text: `${el?.symbol}-${A} emits ${label} — E ≈ ${energyMeV.toFixed(2)} MeV` })
     }
-  }, [Z, A, pushEvent])
+  }, [Z, A, pushEvent, wasmReady])
 
   // ─── U-235 fission ──────────────────────────────────────────
   // Thermal neutron capture → U-236* → daughters (Kr-92 + Ba-141 canonical),
@@ -575,7 +661,7 @@ export default function Atoms() {
           <p className='eyebrow-mono font-bold text-amber-300/80'>Nuclear Playground</p>
           <span className='text-fg-muted text-xs'>·</span>
           <span className='text-[10px] font-mono uppercase tracking-widest text-fg-muted'>
-            algorithm: C++ core ported to JS · Bethe-Weizsäcker · Bohr · Schrödinger
+            C++ core · compiled to WebAssembly with Emscripten · Bethe-Weizsäcker · Bohr · Schrödinger
           </span>
         </div>
         <h1 className='gradient-text-amber font-poppins font-black tracking-tight leading-[0.95] text-3xl sm:text-4xl md:text-5xl mb-2'>
@@ -590,11 +676,31 @@ export default function Atoms() {
         </p>
         <div className='flex flex-wrap items-center gap-2 mb-6'>
           <Badge label={`${fps} fps`}      color='emerald' />
+          <Badge
+            label={wasmReady
+              ? `WASM · ${wasmSizeKB ? wasmSizeKB.toLocaleString() + ' KB' : 'ready'}`
+              : (wasmError ? 'WASM · failed' : 'WASM · booting…')}
+            color={wasmReady ? 'emerald' : (wasmError ? 'rose' : 'amber')}
+          />
           <Badge label={`${particleCount.toLocaleString()} particles`} color='cyan' />
           <Badge label={`${element?.symbol}-${A}  ·  Z=${Z}, N=${A - Z}`} color='amber' />
           <Badge label={`stability · ${telemetry.stability}`} color={stabilityColor(telemetry.stability)} />
           <Badge label={`B/A · ${telemetry.BperA.toFixed(3)} MeV`} color='rose' />
         </div>
+        {wasmError && (
+          <div className='mb-6 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-100 font-mono'>
+            <b>WebAssembly module failed to load</b> — some visualisations disabled.
+            <span className='block text-rose-200/70 text-[11px] mt-0.5'>
+              /wasm/atoms.js couldn't be instantiated. Check the deploy and CORS/MIME headers.
+              Cloud sampling + Q-value updates are inert until the module is available.
+            </span>
+          </div>
+        )}
+        {!wasmReady && !wasmError && (
+          <div className='mb-6 flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2'>
+            <LuxeLoader variant='orbital' size='sm' label='Booting WebAssembly…' />
+          </div>
+        )}
       </div>
 
       {/* ── Main content grid ────────────────────────────── */}
@@ -844,8 +950,8 @@ export default function Atoms() {
               <TelRow k={<><Sym tex='Q_\alpha' help={HELP.Qalpha} /> · alpha · MeV</>} v={telemetry.Qalpha.toFixed(3)} tone='violet' />
               <TelRow k={<><Sym tex='Q_{\beta^-}' help={HELP.QbetaM} /> · β⁻ · MeV</>} v={telemetry.Qbeta.toFixed(3)} tone='cyan' />
               <TelRow k={<><Sym tex='Q_{\beta^+}' help={HELP.QbetaP} /> · β⁺ · MeV</>} v={telemetry.Qpos.toFixed(3)} tone='pink' />
-              <TelRow k={<>Bohr radius r_1 · pm</>} v={(bohrRadius(1, Z) * 1e12).toFixed(2)} tone='cyan' help={HELP.a0} />
-              <TelRow k={<>E_1 · eV</>} v={bohrEnergy(1, Z).toFixed(1)} tone='amber' help='Ground-state binding of a single electron in a hydrogen-like ion of nuclear charge Z.' />
+              <TelRow k={<>Bohr radius r_1 · pm</>} v={bohrGround.r1pm.toFixed(2)} tone='cyan' help={HELP.a0} />
+              <TelRow k={<>E_1 · eV</>} v={bohrGround.E1eV.toFixed(1)} tone='amber' help='Ground-state binding of a single electron in a hydrogen-like ion of nuclear charge Z.' />
               <TelRow
                 k={<>Half-life · <span className='text-fg-dim'>{element?.symbol}-{A}</span></>}
                 v={ISOTOPES[`${element?.symbol}-${A}`] ? fmtHalfLife(ISOTOPES[`${element?.symbol}-${A}`].halfLife) : '—'}
@@ -947,7 +1053,7 @@ export default function Atoms() {
         <div className='luxe-glass p-4 text-[12px] text-fg-muted leading-relaxed'>
           <p className='eyebrow-mono font-bold mb-2 text-fg-dim'>Sources & implementation notes</p>
           <p>
-            Sampling kernel: direct JS port of <b className='text-amber-300'>kavan010/Atoms</b> (E:/Github/Atoms/src/atom_raytracer.cpp) — CDF-sampled hydrogen-like orbitals via associated Laguerre × associated Legendre polynomials. Emscripten was not available on this machine so the C++ math kernel was rewritten in JS with identical recurrences; the public sim API mirrors what the WASM export would have been.
+            Sampling kernel: <b className='text-amber-300'>kavan010/Atoms</b> (E:/Github/Atoms/src/atom_raytracer.cpp) — CDF-sampled hydrogen-like orbitals via associated Laguerre × associated Legendre polynomials. The C++ physics core is compiled to WebAssembly with Emscripten (<code>public/wasm/atoms.wasm</code>{wasmSizeKB ? `, ${wasmSizeKB} KB` : ''}) and loaded through the ES-module factory in <code>public/wasm/atoms.js</code>. Every orbital sample + Q-value in this page comes from the actual C++ kernel running verbatim in the browser.
             &nbsp;·&nbsp;
             Isotope data & half-lives from <b>IAEA LiveChart of Nuclides</b> and <b>AME2020</b>. Semi-empirical mass coefficients from Rohlf (1994).
             &nbsp;·&nbsp;
