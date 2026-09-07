@@ -478,13 +478,12 @@ const Science = () => {
               Try the rest of the lab.
             </h3>
             <p className="text-gray-400 text-sm max-w-xl mx-auto mb-5">
-              17 interactive demos, 13 creative experiments, and 9 public-API modules.
+              30 interactive demos in the unified Lab, plus 9 public-API modules.
               Everything is browser-native.
             </p>
             <div className="flex items-center justify-center gap-2 flex-wrap">
               <Link to="/lab" className="luxe-btn luxe-btn-primary tap-44">Open Lab</Link>
               <Link to="/explore" className="luxe-btn luxe-btn-secondary tap-44">Public APIs</Link>
-              <Link to="/creative" className="luxe-btn luxe-btn-ghost tap-44">Creative UI</Link>
             </div>
           </div>
         </div>

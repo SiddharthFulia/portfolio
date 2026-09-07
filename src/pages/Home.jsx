@@ -89,8 +89,7 @@ const GROUPS = [
     title: "Toolbox",
     accent: "text-emerald-300",
     items: [
-      { to: "/lab",        label: "Interactive Lab", desc: "17 mini-demos · 7 categories" },
-      { to: "/creative",   label: "Creative UI",     desc: "13 UI experiments" },
+      { to: "/lab",        label: "Lab",             desc: "30 interactive demos · motion · shaders · games · data viz" },
       { to: "/learn",      label: "Learn DSA",       desc: "Algorithms · system design · CP" },
       { to: "/science",    label: "Explore Space",   desc: "11 NASA modules · APOD · Mars · Asteroids" },
       { to: "/explore",    label: "Web Playground",  desc: "9 APIs · Pokémon · Memes · Countries · Quotes" },

@@ -7,7 +7,7 @@ import 'katex/dist/katex.min.css'
 
 // Global auto-recover for Vite/Vercel chunk-hash mismatches. After a deploy,
 // any open tab holds an index.html that references chunks with old hashes;
-// nested lazy() imports inside pages (e.g. MorphingBlob inside Creative)
+// nested lazy() imports inside pages (e.g. MorphingBlob inside Lab)
 // also throw 'Failed to fetch dynamically imported module' when those hashes
 // 404. The App.jsx lazyWithReload wrapper handles top-level routes; this
 // catches everything else (sub-page lazy imports, dynamic component fetches).

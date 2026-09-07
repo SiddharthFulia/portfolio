@@ -59,7 +59,8 @@ const Projects = lazyWithReload(() => import("./pages/Projects"));
 const Contact = lazyWithReload(() => import("./pages/Contact"));
 const Lab = lazyWithReload(() => import("./pages/Lab"));
 const Learn = lazyWithReload(() => import("./pages/Learn"));
-const Creative = lazyWithReload(() => import("./pages/Creative"));
+// /creative was merged into /lab (30 demos, one page). Old URLs now
+// redirect via the route below — no more standalone Creative page.
 const ChessViz = lazyWithReload(() => import("./pages/ChessViz"));
 const ChessPage = lazyWithReload(() => import("./pages/Chess"));
 const ChessLive = lazyWithReload(() => import("./pages/ChessLive"));
@@ -255,7 +256,6 @@ const ROUTE_TITLES = {
   '/contact'       : 'Contact · Sid',
   '/lab'           : 'Interactive Lab · Sid',
   '/learn'         : 'Learn DSA · Sid',
-  '/creative'      : 'Creative UI · Sid',
   '/chess'         : 'Chess · Sid',
   '/chess-classic' : 'Chess (classic) · Sid',
   '/chess-viz'     : 'Chess Viz · Sid',
@@ -351,7 +351,8 @@ const App = () => {
           <Route path='/contact' element={<Suspense fallback={<PageBoot />}><Contact /></Suspense>} />
           <Route path='/lab' element={<Suspense fallback={<PageBoot />}><Lab /></Suspense>} />
           <Route path='/learn' element={<Suspense fallback={<PageBoot />}><Learn /></Suspense>} />
-          <Route path='/creative' element={<Suspense fallback={<PageBoot />}><Creative /></Suspense>} />
+          {/* /creative merged into /lab. Old links redirect to the unified Lab. */}
+          <Route path='/creative' element={<Navigate to='/lab' replace />} />
           {/* /chess — new Stockfish-backed page. Old custom-engine version
               still reachable at /chess-classic in case the new one needs
               triage during deploy. */}
