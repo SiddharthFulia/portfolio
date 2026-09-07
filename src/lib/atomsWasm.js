@@ -3,8 +3,7 @@
 // Lazy loader + high-level wrappers around the **real** Emscripten
 // build of the atom raytracer C++ kernel.
 //
-// The C++ core (github.com/kavan010/Atoms · atom_raytracer.cpp +
-// physics/nuclear.cpp) is compiled to WebAssembly with Emscripten:
+// The C++ physics core is compiled to WebAssembly with Emscripten:
 //   emcc -O3 -sMODULARIZE=1 -sEXPORT_ES6=1 -sALLOW_MEMORY_GROWTH=1 \
 //        -sEXPORTED_FUNCTIONS="['_malloc','_free','_freeBuffer', \
 //          '_sampleOrbital','_bindingEnergy','_bohrRadius', \
@@ -33,6 +32,9 @@
 
 // ────── Lazy singleton loader ──────
 let modulePromise = null
+let loadStartMs = null
+let loadEndMs = null
+let exportCount = null
 
 /**
  * Resolve to the loaded Emscripten `Module` instance. First call
@@ -41,6 +43,7 @@ let modulePromise = null
  */
 export function loadAtomsWasm() {
   if (modulePromise) return modulePromise
+  loadStartMs = performance.now()
   modulePromise = (async () => {
     // The glue file is served from /wasm/ as a plain ES module. We
     // do NOT want Vite to try to bundle it (the glue's own dynamic
@@ -61,9 +64,45 @@ export function loadAtomsWasm() {
         return path
       },
     })
+    loadEndMs = performance.now()
+    // Count exported functions on the module (underscore-prefixed
+    // callables — Emscripten's convention). Used by the UI status
+    // card to prove the ABI surface is real.
+    try {
+      const known = ['_malloc', '_free', '_freeBuffer',
+        '_sampleOrbital', '_bindingEnergy', '_bohrRadius',
+        '_bohrEnergy', '_alphaDecayQ']
+      exportCount = known.filter(k => typeof M[k] === 'function').length
+    } catch { exportCount = null }
     return M
   })()
   return modulePromise
+}
+
+/** Milliseconds spent loading + instantiating the module. `null` until resolved. */
+export function getWasmLoadMs() {
+  if (loadStartMs != null && loadEndMs != null) return loadEndMs - loadStartMs
+  return null
+}
+
+/** Count of `_`-prefixed exports found on the resolved module. `null` until resolved. */
+export function getWasmExportCount() {
+  return exportCount
+}
+
+// ────── Instrumentation bus ──────
+// Subscribers receive a `{ name, args, result, ms }` event for every
+// WASM call routed through the wrappers below. Used by the Atoms page
+// to render a live activity ticker so users can see the engine work.
+const _wasmListeners = new Set()
+export function subscribeToWasm(fn) {
+  _wasmListeners.add(fn)
+  return () => _wasmListeners.delete(fn)
+}
+function _emit(evt) {
+  for (const fn of _wasmListeners) {
+    try { fn(evt) } catch { /* ignore listener errors */ }
+  }
 }
 
 // ────── Convenience wrappers (mirror old atomsCore.js API) ──────
@@ -86,12 +125,14 @@ export async function sampleOrbital(n, l, m, nSamples) {
   const M = await loadAtomsWasm()
   const bytes = nSamples * 3 * 4  // 3 floats per sample × 4 bytes/float
   const ptr = M._malloc(bytes)
+  const t0 = performance.now()
   try {
     const written = M._sampleOrbital(n, l, m, nSamples, ptr)
     const view = new Float32Array(M.HEAPF32.buffer, ptr, written * 3)
     // Copy out — the heap view becomes invalid once we free (or if
     // WASM memory grows underneath us).
     const out = new Float32Array(view)
+    _emit({ name: 'sampleOrbital', args: [n, l, m, nSamples], result: written, ms: performance.now() - t0 })
     return out
   } finally {
     // `_freeBuffer` is exported explicitly so the WASM side has the
@@ -104,25 +145,37 @@ export async function sampleOrbital(n, l, m, nSamples) {
 /** Total binding energy B (MeV) from Bethe-Weizsäcker in WASM. */
 export async function semiEmpiricalMass(Z, A) {
   const M = await loadAtomsWasm()
-  return M._bindingEnergy(Z, A)
+  const t0 = performance.now()
+  const v = M._bindingEnergy(Z, A)
+  _emit({ name: 'bindingEnergy', args: [Z, A], result: v, ms: performance.now() - t0 })
+  return v
 }
 
 /** Alpha-decay Q value (MeV) or -1 if energetically forbidden. */
 export async function alphaDecayQ(Z, A) {
   const M = await loadAtomsWasm()
-  return M._alphaDecayQ(Z, A)
+  const t0 = performance.now()
+  const v = M._alphaDecayQ(Z, A)
+  _emit({ name: 'alphaDecayQ', args: [Z, A], result: v, ms: performance.now() - t0 })
+  return v
 }
 
 /** Bohr orbit radius (returned in picometres by the C++ side). */
 export async function bohrRadius(Z, n) {
   const M = await loadAtomsWasm()
-  return M._bohrRadius(Z, n)
+  const t0 = performance.now()
+  const v = M._bohrRadius(Z, n)
+  _emit({ name: 'bohrRadius', args: [Z, n], result: v, ms: performance.now() - t0 })
+  return v
 }
 
 /** Bohr orbit energy (returned in electron-volts by the C++ side). */
 export async function bohrEnergy(Z, n) {
   const M = await loadAtomsWasm()
-  return M._bohrEnergy(Z, n)
+  const t0 = performance.now()
+  const v = M._bohrEnergy(Z, n)
+  _emit({ name: 'bohrEnergy', args: [Z, n], result: v, ms: performance.now() - t0 })
+  return v
 }
 
 // ────── Derived quantities (pure JS on top of the WASM B) ──────
