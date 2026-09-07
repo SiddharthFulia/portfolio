@@ -234,8 +234,6 @@ const Lab = () => {
           {[
             [DEMOS.length,      'Demos',        'text-cyan-400'],
             [CATEGORIES.length, 'Categories',   'text-fuchsia-400'],
-            ['0',               'Backend hits', 'text-emerald-400'],
-            ['100%',            'Client-side',  'text-amber-400'],
           ].map(([n, l, c]) => (
             <div key={l} className='luxe-glass luxe-card-hover text-center px-5 py-3'>
               <div className={`text-3xl font-black tabular-nums ${c}`}>{n}</div>
