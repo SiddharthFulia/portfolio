@@ -524,8 +524,18 @@ async function main() {
   await sleep(500)
 
   // 3) Playwright
-  console.log('› chromium …')
-  const browser = await chromium.launch({ headless: HEADLESS })
+  //
+  // NOTE — this uses Playwright's bundled Chromium at
+  // ~/.cache/ms-playwright/chromium-*/chrome-*/chrome.exe. It NEVER
+  // touches the user's installed Google Chrome. If your Chrome closed
+  // during a smoke run it was unrelated (Chrome crash-recovery /
+  // update prompt). We pass --no-default-browser-check so Playwright's
+  // Chromium never queries system Chrome for anything either.
+  console.log('› chromium (bundled — not system Chrome) …')
+  const browser = await chromium.launch({
+    headless: HEADLESS,
+    args: ['--no-default-browser-check', '--no-first-run', '--disable-features=Translate'],
+  })
   const context = await browser.newContext({
     // Grant clipboard-* so "Copy to clipboard" buttons don't throw a
     // permission-denied pageerror. Camera/mic left off so getUserMedia
