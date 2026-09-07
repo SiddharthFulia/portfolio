@@ -216,6 +216,42 @@ export default function GreedyKnapsack() {
         { op: '0/1 Knapsack (DP)',                 best: 'O(nC)',        avg: 'O(nC)',        worst: 'O(nC)',        space: 'O(nC)' },
       ]} />
 
+      <section className='luxe-glass rounded-2xl p-5 sm:p-6'>
+        <h2 className='text-lg sm:text-xl font-bold text-amber-100 mb-3'>Why greedy is optimal here</h2>
+        <p className='text-sm text-gray-300 leading-relaxed mb-2'>
+          Exchange argument. Suppose in some optimal solution
+          <TeX tex='O' /> we take fraction <TeX tex='f_i' /> of item
+          <TeX tex='i' /> and fraction <TeX tex='f_j' /> of item
+          <TeX tex='j' /> with ratio<TeX tex='v_i / w_i > v_j / w_j' />{' '}
+          but <TeX tex='f_i < 1' />. We can move
+          <TeX tex='\\epsilon' /> weight from <TeX tex='j' /> to
+          <TeX tex='i' />; the gain per unit weight is strictly higher,
+          so <TeX tex='O' /> improves — contradiction. So any optimal
+          takes the higher ratios first.
+        </p>
+        <p className='text-sm text-gray-300 leading-relaxed'>
+          Formally: sorting maximises the LP relaxation. The trick fails
+          in 0/1 knapsack because we can't move weight continuously.
+        </p>
+      </section>
+
+      <section className='luxe-glass rounded-2xl p-5 sm:p-6'>
+        <h2 className='text-lg sm:text-xl font-bold text-amber-100 mb-3'>Faster: median-of-medians</h2>
+        <p className='text-sm text-gray-300 leading-relaxed mb-2'>
+          Sorting is <TeX tex='O(n \\log n)' />, but the answer only
+          cares about a single "cut" in the ratio order — the pivot
+          where we run out of capacity. A weighted median (
+          <TeX tex='O(n)' /> via median-of-medians) finds that pivot
+          without a full sort, giving <b>linear-time</b> fractional
+          knapsack.
+        </p>
+        <p className='text-sm text-gray-300 leading-relaxed'>
+          Practical impact: irrelevant for a handful of items, huge for
+          a billion — think ad-server bidding, real-time cargo
+          reallocation.
+        </p>
+      </section>
+
       <RealWorldCard>
         <p>
           Cargo planning, budget allocation, ad-slot fill (when

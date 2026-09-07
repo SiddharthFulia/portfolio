@@ -207,6 +207,41 @@ export default function FloydWarshall() {
         { op: 'BFS × V (unweighted)', best: 'O(V(V+E))', avg: 'O(V(V+E))', worst: 'O(V(V+E))', space: 'O(V+E)' },
       ]} />
 
+      <section className='luxe-glass rounded-2xl p-5 sm:p-6'>
+        <h2 className='text-lg sm:text-xl font-bold text-amber-100 mb-3'>Path reconstruction</h2>
+        <p className='text-sm text-gray-300 leading-relaxed mb-2'>
+          Distances alone aren't a route. To reconstruct the path, keep
+          a second matrix <TeX tex='next[i][j]' /> — the first node on
+          the shortest path from <TeX tex='i' /> to <TeX tex='j' />.
+          Update whenever <TeX tex='dist[i][j]' /> updates via
+          <TeX tex='next[i][j] = next[i][k]' />. Then to reconstruct,
+          keep following <TeX tex='next' /> pointers.
+        </p>
+      </section>
+
+      <section className='luxe-glass rounded-2xl p-5 sm:p-6'>
+        <h2 className='text-lg sm:text-xl font-bold text-amber-100 mb-3'>Related APSP algorithms</h2>
+        <ul className='text-sm text-gray-300 space-y-2 list-disc list-inside'>
+          <li>
+            <b>Johnson's algorithm</b> — <TeX tex='O(V^2 \\log V + VE)' />{' '}
+            on sparse graphs. Uses Bellman–Ford once to reweight
+            negative edges, then runs Dijkstra from each vertex on the
+            non-negative graph.
+          </li>
+          <li>
+            <b>Seidel's algorithm</b> — <TeX tex='O(V^\\omega \\log V)' />{' '}
+            on unweighted undirected graphs via matrix multiplication.
+            Theoretical breakthrough, rarely used in practice.
+          </li>
+          <li>
+            <b>Warshall's transitive closure</b> — replace
+            <TeX tex='+' /> and <TeX tex='\\min' /> with <TeX tex='\\lor' />{' '}
+            and <TeX tex='\\land' />. Same algorithm computes
+            "is there a path?" instead of "how short?".
+          </li>
+        </ul>
+      </section>
+
       <RealWorldCard>
         <p>
           Small dense networks: airline route tables, road-network

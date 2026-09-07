@@ -194,6 +194,47 @@ export default function GreedyIntervals() {
         { op: 'Brute force (2^n)', best: 'O(2^n)', avg: 'O(2^n)', worst: 'O(2^n)', space: 'O(n)' },
       ]} />
 
+      <section className='luxe-glass rounded-2xl p-5 sm:p-6'>
+        <h2 className='text-lg sm:text-xl font-bold text-amber-100 mb-3'>Why does "sort by end time" work?</h2>
+        <p className='text-sm text-gray-300 leading-relaxed mb-2'>
+          Exchange argument. Let <TeX tex='I_1' /> be the earliest-finishing
+          interval. Let <TeX tex='O' /> be an optimal solution. If <TeX tex='I_1 \\notin O' />,
+          take the first interval <TeX tex='I' /> in <TeX tex='O' /> and swap it for
+          <TeX tex='I_1' />. Because <TeX tex='I_1' /> ends no later than
+          <TeX tex='I' />, everything after in <TeX tex='O' /> is still
+          compatible, and the swap doesn't change |O|. Repeat: the
+          greedy solution is at least as good as any optimal one.
+        </p>
+      </section>
+
+      <section className='luxe-glass rounded-2xl p-5 sm:p-6'>
+        <h2 className='text-lg sm:text-xl font-bold text-amber-100 mb-3'>Failure modes</h2>
+        <ul className='text-sm text-gray-300 space-y-2 list-disc list-inside'>
+          <li>
+            <b>Sort by start time</b> — fails on
+            <TeX tex='\\{[0, 10), [1, 2), [3, 4)\\}' />: you'd take the
+            first, miss the two short intervals that fit.
+          </li>
+          <li>
+            <b>Sort by length ascending</b> — fails on
+            <TeX tex='\\{[0, 2), [1, 3), [2, 4)\\}' /> where two of the
+            three-length intervals fit but the middle two-length one
+            doesn't leave room.
+          </li>
+          <li>
+            <b>Weighted variant</b> — every interval has a weight;
+            maximise total weight of non-overlapping picks. Greedy
+            fails; needs DP with binary-search lookup of the previous
+            compatible interval.
+          </li>
+          <li>
+            <b>Minimum classrooms</b> (min number of rooms to schedule
+            all intervals) — different problem, solved by sorting
+            events and sweep-lining a counter; still greedy.
+          </li>
+        </ul>
+      </section>
+
       <RealWorldCard>
         <p>
           Room/resource booking systems, meeting-room schedulers, and

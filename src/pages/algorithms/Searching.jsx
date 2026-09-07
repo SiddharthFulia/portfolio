@@ -237,6 +237,52 @@ export default function Searching() {
         { op: 'Exponential (bounded)', best: 'O(1)',    avg: 'O(\\log n)',   worst: 'O(\\log n)',   space: 'O(1)' },
       ]} />
 
+      <section className='luxe-glass rounded-2xl p-5 sm:p-6'>
+        <h2 className='text-lg sm:text-xl font-bold text-amber-100 mb-3'>Binary search gotchas</h2>
+        <ul className='text-sm text-gray-300 space-y-2 list-disc list-inside'>
+          <li>
+            <b>Off-by-one</b> — the <TeX tex='lo <= hi' /> vs
+            <TeX tex='lo < hi' /> distinction depends on whether you
+            include <TeX tex='hi' /> as a valid index. Pick one
+            convention and stick with it.
+          </li>
+          <li>
+            <b>Overflow</b> — <TeX tex='(lo + hi) / 2' /> overflows in
+            C/Java when both are large. Use <TeX tex='lo + (hi - lo) / 2' />.
+            JS's Number handles it fine up to <TeX tex='2^{53}' />.
+          </li>
+          <li>
+            <b>Duplicates</b> — vanilla binary search returns
+            <i> some </i> index of the target if it exists. For "first"
+            or "last" occurrence you need <TeX tex='lower\\_bound' /> or
+            <TeX tex='upper\\_bound' /> (finding the boundary of the
+            equal range).
+          </li>
+          <li>
+            <b>Non-uniform data</b> — if values are roughly uniformly
+            distributed, interpolation search averages
+            <TeX tex='O(\\log\\log n)' />. Beats binary on huge sorted
+            files.
+          </li>
+        </ul>
+      </section>
+
+      <section className='luxe-glass rounded-2xl p-5 sm:p-6'>
+        <h2 className='text-lg sm:text-xl font-bold text-amber-100 mb-3'>Binary search on the answer</h2>
+        <p className='text-sm text-gray-300 leading-relaxed mb-2'>
+          A meta-pattern that shows up often in interviews: if the
+          predicate "can we finish in ≤ X time" is monotone in X, you
+          can binary-search on X even without a sorted array.
+        </p>
+        <p className='text-sm text-gray-300 leading-relaxed'>
+          Classic examples: "minimum capacity to ship packages within D
+          days", "smallest divisor with sum ≤ threshold", "aggressive
+          cows on a fence". All reduce to
+          <TeX tex='O(\\log R \\cdot n)' /> where <TeX tex='R' /> is the
+          range of answers.
+        </p>
+      </section>
+
       <RealWorldCard>
         <p>
           Every DB index resolves in log time via a B-tree, which is

@@ -262,6 +262,60 @@ export default function DPKnapsack() {
         { op: 'Branch & bound',        best: 'O(n)',    avg: 'O(2^n)',  worst: 'O(2^n)',  space: 'O(n)' },
       ]} />
 
+      <section className='luxe-glass rounded-2xl p-5 sm:p-6'>
+        <h2 className='text-lg sm:text-xl font-bold text-amber-100 mb-3'>Pseudo-polynomial vs polynomial</h2>
+        <p className='text-sm text-gray-300 leading-relaxed mb-2'>
+          The DP runs in <TeX tex='O(nC)' /> time. That looks polynomial —
+          and it is, in the numeric <i>value</i> of <TeX tex='C' />. But
+          the input size is <TeX tex='\\log C' /> bits, so this is
+          exponential in the input length. That's what "pseudo-
+          polynomial" means, and it's why 0/1 knapsack is NP-hard in
+          general even though our DP feels efficient.
+        </p>
+        <p className='text-sm text-gray-300 leading-relaxed'>
+          Once <TeX tex='C \\approx 10^9' /> the table doesn't fit. Then
+          you drop back to branch-and-bound with a fractional upper
+          bound, or a meet-in-the-middle attack for
+          <TeX tex='n \\leq 40' />.
+        </p>
+      </section>
+
+      <section className='luxe-glass rounded-2xl p-5 sm:p-6'>
+        <h2 className='text-lg sm:text-xl font-bold text-amber-100 mb-3'>Space optimisation</h2>
+        <p className='text-sm text-gray-300 leading-relaxed mb-2'>
+          Notice <TeX tex='dp[i][w]' /> only depends on
+          <TeX tex='dp[i-1][*]' />. Drop <TeX tex='O(n)' /> rows and keep
+          a 1-D array of size <TeX tex='C+1' />. Iterate
+          <TeX tex='w' /> from <TeX tex='C' /> <b>down</b> to
+          <TeX tex='w_i' /> so we don't accidentally reuse the current
+          item — that's the classic "0/1 vs unbounded" distinction.
+          Unbounded knapsack iterates <TeX tex='w' /> forward, which
+          allows re-taking.
+        </p>
+      </section>
+
+      <section className='luxe-glass rounded-2xl p-5 sm:p-6'>
+        <h2 className='text-lg sm:text-xl font-bold text-amber-100 mb-3'>Variants</h2>
+        <ul className='text-sm text-gray-300 space-y-2 list-disc list-inside'>
+          <li>
+            <b>Unbounded knapsack</b> — items can be taken infinitely.
+            Iterate <TeX tex='w' /> ascending in the rolled DP.
+          </li>
+          <li>
+            <b>Multi-dimensional knapsack</b> — capacity is a vector
+            (weight AND volume). Add another loop dimension.
+          </li>
+          <li>
+            <b>Subset sum</b> — special case with <TeX tex='v_i = w_i' />.
+            Question is "can we hit exactly a target sum?"
+          </li>
+          <li>
+            <b>Partition equal subset</b> — subset sum with target
+            <TeX tex='\\sum w_i / 2' />.
+          </li>
+        </ul>
+      </section>
+
       <RealWorldCard>
         <p>
           Container packing, ad-inventory allocation, resource budgeting

@@ -244,6 +244,62 @@ export default function KMP() {
         { op: 'Boyer–Moore',       best: 'O(n/m)',    avg: 'O(n)',    worst: 'O(nm)',   space: 'O(m + \\sigma)' },
       ]} />
 
+      <section className='luxe-glass rounded-2xl p-5 sm:p-6'>
+        <h2 className='text-lg sm:text-xl font-bold text-amber-100 mb-3'>Why π is what it is</h2>
+        <p className='text-sm text-gray-300 leading-relaxed mb-2'>
+          <TeX tex='\\pi[i]' /> = length of the longest proper prefix of
+          <TeX tex='pat[0..i]' /> that is also a suffix of it. When the
+          text pointer <TeX tex='i' /> and pattern pointer <TeX tex='j' />{' '}
+          disagree, we <i>know</i> that the last <TeX tex='j' /> chars of
+          text agree with the first <TeX tex='j' /> of pattern. The
+          longest matched prefix of those <TeX tex='j' /> is precisely
+          <TeX tex='\\pi[j-1]' /> — so we can shift the pattern so that
+          prefix aligns with the same suffix, and continue at
+          <TeX tex='j = \\pi[j-1]' />.
+        </p>
+        <p className='text-sm text-gray-300 leading-relaxed'>
+          Amortised cost: each character in the text is only ever
+          compared O(1) times per phase (any run of failed comparisons
+          decreases <TeX tex='j' /> monotonically, so total decreases ≤
+          total increases = n).
+        </p>
+      </section>
+
+      <section className='luxe-glass rounded-2xl p-5 sm:p-6'>
+        <h2 className='text-lg sm:text-xl font-bold text-amber-100 mb-3'>Related string algorithms</h2>
+        <ul className='text-sm text-gray-300 space-y-2 list-disc list-inside'>
+          <li>
+            <b>Z-algorithm</b> — computes the "Z-array" where
+            <TeX tex='Z[i]' /> is the length of the longest substring
+            starting at <TeX tex='i' /> that matches a prefix. Equivalent
+            in power to π, sometimes cleaner to reason about.
+          </li>
+          <li>
+            <b>Aho–Corasick</b> — multi-pattern generalisation. Build a
+            trie of patterns, add "failure edges" (KMP-style) so you
+            can search for many patterns in one pass. Used by tools like
+            <code>fgrep -f</code>, virus scanners, ad blockers.
+          </li>
+          <li>
+            <b>Boyer–Moore</b> — scan pattern right-to-left; use bad-
+            character and good-suffix shifts to skip. Sub-linear on
+            average, worst case <TeX tex='O(nm)' /> (or
+            <TeX tex='O(n)' /> with Galil's variant).
+          </li>
+          <li>
+            <b>Rabin–Karp</b> — rolling hash of length-m windows.
+            Great when you're searching multiple patterns of the same
+            length; O(1) hash update per shift.
+          </li>
+          <li>
+            <b>Suffix automaton</b> / <b>suffix array</b> — preprocess
+            the text once, then match any pattern in
+            <TeX tex='O(m)' />. Preprocessing is
+            <TeX tex='O(n)' /> / <TeX tex='O(n \\log n)' /> respectively.
+          </li>
+        </ul>
+      </section>
+
       <RealWorldCard>
         <p>
           KMP shows up in <code>grep</code>-like tools when the pattern is
