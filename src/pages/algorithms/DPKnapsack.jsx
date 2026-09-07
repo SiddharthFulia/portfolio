@@ -1,0 +1,279 @@
+// 0/1 Knapsack — DP table, cell-by-cell fill, then backtrack.
+//
+// dp[i][w] = max value using first i items with capacity w.
+// dp[i][w] = max(dp[i-1][w], dp[i-1][w - w_i] + v_i)   if w >= w_i
+//          = dp[i-1][w]                                  else
+//
+// Viz plays through every cell fill in row-major order, showing which
+// cell above-and-diagonally we're comparing. When done, we backtrack
+// from dp[n][C] to reconstruct which items were taken (glow amber).
+
+import { useEffect, useMemo, useState } from 'react'
+import { InputNumber } from 'antd'
+import {
+  TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
+  ControlsPanel, StepControls, useStepEngine, PseudocodeBlock,
+  ComplexityTable, RealWorldCard, Field, Chip, TeX,
+} from '../../components/algorithms'
+
+function mulberry32(seed) {
+  let a = (seed | 0) || 1
+  return () => {
+    a = (a + 0x6D2B79F5) | 0
+    let t = Math.imul(a ^ (a >>> 15), 1 | a)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+function genItems(n, seed, maxW = 8) {
+  const rng = mulberry32(seed)
+  const items = []
+  for (let i = 0; i < n; i++) {
+    items.push({
+      id: i,
+      w: Math.floor(rng() * maxW) + 1,
+      v: Math.floor(rng() * 25) + 5,
+    })
+  }
+  return items
+}
+
+// ─── Build DP + backtrack frames ────────────────────────
+function buildFrames(items, C) {
+  const n = items.length
+  const dp = Array.from({ length: n + 1 }, () => new Array(C + 1).fill(0))
+  const frames = []
+  frames.push({ dp: dp.map(r => r.slice()), i: 0, w: 0, msg: 'row 0 = base case: 0 items → 0 value', line: 0, phase: 'init' })
+  for (let i = 1; i <= n; i++) {
+    for (let w = 0; w <= C; w++) {
+      const it = items[i - 1]
+      let val = dp[i - 1][w]
+      let take = false
+      if (w >= it.w) {
+        const alt = dp[i - 1][w - it.w] + it.v
+        if (alt > val) { val = alt; take = true }
+      }
+      dp[i][w] = val
+      frames.push({
+        dp: dp.map(r => r.slice()),
+        i, w,
+        msg: take ? `take item ${i}: v=${it.v}` : `skip item ${i}`,
+        line: take ? 5 : 4,
+        phase: 'fill',
+        take, item: it,
+      })
+    }
+  }
+  // Backtrack
+  const taken = []
+  let ci = n, cw = C
+  while (ci > 0) {
+    if (dp[ci][cw] !== dp[ci - 1][cw]) {
+      taken.push(items[ci - 1].id)
+      frames.push({
+        dp: dp.map(r => r.slice()), i: ci, w: cw,
+        msg: `backtrack: took item ${ci}`,
+        line: 8,
+        phase: 'back',
+        taken: taken.slice(),
+      })
+      cw -= items[ci - 1].w
+    } else {
+      frames.push({
+        dp: dp.map(r => r.slice()), i: ci, w: cw,
+        msg: `backtrack: skipped item ${ci}`,
+        line: 9,
+        phase: 'back',
+        taken: taken.slice(),
+      })
+    }
+    ci--
+  }
+  frames.push({
+    dp: dp.map(r => r.slice()), i: 0, w: 0,
+    msg: `answer = ${dp[n][C]}, items taken = [${taken.join(', ')}]`,
+    line: 10, phase: 'done', taken: taken.slice(),
+  })
+  return { frames, dp, taken, answer: dp[n][C] }
+}
+
+const PSEUDO = [
+  'dp[0..n][0..C] = 0',
+  'for i = 1 .. n:',
+  '  for w = 0 .. C:',
+  '    if w < items[i].w:',
+  '      dp[i][w] = dp[i-1][w]',
+  '    else:',
+  '      dp[i][w] = max(dp[i-1][w],',
+  '                     dp[i-1][w - items[i].w] + items[i].v)',
+  '# backtrack from dp[n][C]:',
+  '#   if dp[i][w] != dp[i-1][w]: item i taken',
+  '#   else: item i skipped',
+]
+
+function DPGrid({ dp, cur, taken = [], phase }) {
+  const rows = dp.length
+  const cols = dp[0]?.length || 0
+  const cellW = 26
+  const cellH = 22
+  return (
+    <div className='overflow-x-auto rounded-lg border border-white/10 bg-black/30 p-2'>
+      <table className='text-[10px] sm:text-xs font-mono border-collapse'>
+        <thead>
+          <tr>
+            <th className='px-1.5 py-1 text-white/45'>i \ w</th>
+            {Array.from({ length: cols }, (_, w) => (
+              <th key={w} className='px-1.5 py-1 text-white/45 text-center' style={{ minWidth: cellW }}>{w}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {dp.map((row, i) => (
+            <tr key={i}>
+              <td className='px-1.5 py-1 text-white/45'>{i}</td>
+              {row.map((v, w) => {
+                const isCur = cur?.i === i && cur?.w === w
+                const isRef = cur?.phase === 'fill' && cur?.i - 1 === i && cur?.w === w
+                const isRefDiag = cur?.phase === 'fill' && cur?.item && cur?.i - 1 === i && cur?.w - cur.item.w === w
+                const isBack = phase === 'back' && cur?.i === i && cur?.w === w
+                let cls = 'bg-black/40 text-white/85 border border-white/5'
+                if (isCur) cls = 'bg-amber-400/40 text-amber-100 border-2 border-amber-300'
+                if (isRef) cls = 'bg-cyan-400/25 text-cyan-100 border border-cyan-400/60'
+                if (isRefDiag) cls = 'bg-fuchsia-400/25 text-fuchsia-100 border border-fuchsia-400/60'
+                if (isBack) cls = 'bg-rose-400/35 text-rose-100 border-2 border-rose-300'
+                return (
+                  <td
+                    key={w}
+                    className={`px-1.5 py-1 text-center ${cls}`}
+                    style={{ minWidth: cellW, height: cellH }}
+                  >
+                    {v}
+                  </td>
+                )
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function ItemsList({ items, taken }) {
+  return (
+    <div className='grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3'>
+      {items.map((it, i) => {
+        const isTaken = taken?.includes(it.id)
+        return (
+          <div
+            key={it.id}
+            className={`rounded-md border p-2 text-xs font-mono ${
+              isTaken ? 'bg-amber-400/15 border-amber-300/50 text-amber-100' : 'bg-white/[0.03] border-white/10 text-white/60'
+            }`}
+          >
+            <div>item {i + 1}</div>
+            <div className='text-[10px]'>w={it.w} · v={it.v}</div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+export default function DPKnapsack() {
+  const [n, setN] = useState(5)
+  const [seed, setSeed] = useState(3)
+  const [C, setC] = useState(10)
+  const items = useMemo(() => genItems(n, seed), [n, seed])
+  const { frames, answer } = useMemo(() => buildFrames(items, C), [items, C])
+  const [idx, setIdx] = useState(0)
+  const { i, playing, play, pause, step, reset, speed, setSpeed } = useStepEngine({
+    frameCount: frames.length,
+    onFrame: setIdx,
+  })
+  useEffect(() => { reset() /* eslint-disable-next-line */ }, [n, seed, C])
+  const f = frames[idx] || frames[0]
+
+  return (
+    <TopicShell slug='dp-knapsack' title='0/1 Knapsack (DP)' category='Algorithms'>
+      <ExplanationBlock>
+        <p>
+          Same setup as fractional knapsack, but items are indivisible —
+          take or leave. The greedy trick breaks: an item with the best
+          ratio might not fit whole, and skipping it in favour of a lower-
+          ratio item may leave less waste.
+        </p>
+        <p>
+          DP saves us. Define <TeX tex='dp[i][w]' /> = max value using
+          only the first <TeX tex='i' /> items and capacity <TeX tex='w' />.
+          For each item you either skip it (
+          <TeX tex='dp[i-1][w]' />) or take it (
+          <TeX tex='dp[i-1][w - w_i] + v_i' />). Take the max.
+        </p>
+        <p>
+          Time <TeX tex='O(nC)' />, space <TeX tex='O(nC)' /> (can be
+          reduced to <TeX tex='O(C)' /> by rolling rows). The
+          <TeX tex='C' /> factor is the number of distinct capacity
+          values — so this is <b>pseudo-polynomial</b>, not truly
+          polynomial in the input size.
+        </p>
+      </ExplanationBlock>
+
+      <VisualiserSection>
+        <VizPanel>
+          <DPGrid dp={f.dp} cur={f} taken={f.taken} phase={f.phase} />
+          <ItemsList items={items} taken={f.taken} />
+          <div className='mt-3 text-xs text-white/70 font-mono'>
+            step {i + 1}/{frames.length} · {f.msg}
+          </div>
+          <div className='mt-1 text-xs text-emerald-300 font-mono'>
+            optimal value = {answer}
+          </div>
+        </VizPanel>
+        <ControlsPanel>
+          <Field label='Items'>
+            <InputNumber min={2} max={9} value={n} onChange={v => setN(v || 2)} className='w-full' />
+          </Field>
+          <Field label='Capacity'>
+            <InputNumber min={3} max={20} value={C} onChange={v => setC(v || 3)} className='w-full' />
+          </Field>
+          <Field label='Seed'>
+            <InputNumber min={0} max={9999} value={seed} onChange={v => setSeed(v || 0)} className='w-full' />
+          </Field>
+          <StepControls
+            playing={playing} onPlay={play} onPause={pause} onStep={step} onReset={reset}
+            speed={speed} onSpeed={setSpeed}
+          />
+          <div className='pt-2 flex gap-1.5 flex-wrap'>
+            <Chip tone='amber'>current cell</Chip>
+            <Chip tone='cyan'>dp[i-1][w]</Chip>
+            <Chip tone='fuchsia'>dp[i-1][w-wᵢ]</Chip>
+            <Chip tone='rose'>backtrack</Chip>
+          </div>
+        </ControlsPanel>
+      </VisualiserSection>
+
+      <PseudocodeBlock lines={PSEUDO} activeLine={f?.line ?? -1} />
+
+      <ComplexityTable rows={[
+        { op: '0/1 Knapsack DP',       best: 'O(nC)',   avg: 'O(nC)',   worst: 'O(nC)',   space: 'O(nC)' },
+        { op: 'Rolling-row variant',   best: 'O(nC)',   avg: 'O(nC)',   worst: 'O(nC)',   space: 'O(C)' },
+        { op: 'Meet-in-the-middle',    best: 'O(2^{n/2})', avg: 'O(2^{n/2})', worst: 'O(2^{n/2})', space: 'O(2^{n/2})' },
+        { op: 'Branch & bound',        best: 'O(n)',    avg: 'O(2^n)',  worst: 'O(2^n)',  space: 'O(n)' },
+      ]} />
+
+      <RealWorldCard>
+        <p>
+          Container packing, ad-inventory allocation, resource budgeting
+          under an integer constraint, and every "pick a subset that
+          maximises value under a limit" problem you'll ever see.
+        </p>
+        <p>
+          A famous instance: cutting stock. Given a fixed-length board
+          and orders of various sizes, maximise the number of orders you
+          fit — same recurrence.
+        </p>
+      </RealWorldCard>
+    </TopicShell>
+  )
+}

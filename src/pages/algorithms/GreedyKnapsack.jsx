@@ -1,0 +1,233 @@
+// Fractional Knapsack — greedy by value/weight ratio.
+//
+// Sort items by value/weight descending; fill until you can't take a
+// whole item, then take a fraction of the next. This is where fractional
+// knapsack differs from 0/1: the fractional cut lets greedy be OPTIMAL.
+// In 0/1 knapsack you can't cut, and greedy stops working — see the
+// dp-knapsack page.
+//
+// UI: bar chart of item ratios (tallest = best ratio) with a running
+// "capacity used" bar.
+
+import { useEffect, useMemo, useState } from 'react'
+import { InputNumber } from 'antd'
+import {
+  TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
+  ControlsPanel, StepControls, useStepEngine, PseudocodeBlock,
+  ComplexityTable, RealWorldCard, Field, Chip, TeX,
+} from '../../components/algorithms'
+
+function mulberry32(seed) {
+  let a = (seed | 0) || 1
+  return () => {
+    a = (a + 0x6D2B79F5) | 0
+    let t = Math.imul(a ^ (a >>> 15), 1 | a)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+function genItems(n, seed) {
+  const rng = mulberry32(seed)
+  const items = []
+  for (let i = 0; i < n; i++) {
+    const weight = Math.floor(rng() * 8) + 1
+    const value = Math.floor(rng() * 40) + 5
+    items.push({ id: i, weight, value })
+  }
+  return items
+}
+
+// ─── Frames ───────────────────────────────────
+function buildFrames(items, capacity) {
+  const sorted = items.slice().sort((a, b) => (b.value / b.weight) - (a.value / a.weight))
+  const frames = [{ kind: 'sort', sorted: sorted.slice(), taken: {}, used: 0, gain: 0, line: 0 }]
+  const taken = {}
+  let used = 0, gain = 0
+  for (let i = 0; i < sorted.length; i++) {
+    const it = sorted[i]
+    if (used + it.weight <= capacity) {
+      taken[it.id] = 1
+      used += it.weight
+      gain += it.value
+      frames.push({ kind: 'whole', cur: i, taken: { ...taken }, used, gain, sorted, line: 4 })
+    } else {
+      const remaining = capacity - used
+      if (remaining > 0) {
+        const frac = remaining / it.weight
+        taken[it.id] = frac
+        gain += it.value * frac
+        used = capacity
+        frames.push({ kind: 'frac', cur: i, taken: { ...taken }, used, gain, sorted, frac, line: 6 })
+      }
+      break
+    }
+  }
+  frames.push({ kind: 'done', taken, used, gain, sorted, line: 7 })
+  return frames
+}
+
+const PSEUDO = [
+  'sort items by value/weight desc',
+  'used = 0; gain = 0',
+  'for it in items:',
+  '  if used + it.weight <= C:',
+  '    take it whole',
+  '  else:',
+  '    take fraction (C - used) / it.weight',
+  '    break',
+  'return gain',
+]
+
+// ─── Chart ───────────────────────────────────
+function RatioChart({ items, frame, capacity }) {
+  if (!items.length) return null
+  const W = 380
+  const H = 220
+  const pad = 20
+  const barW = (W - pad * 2) / items.length
+  const maxRatio = Math.max(...items.map(it => it.value / it.weight))
+  return (
+    <svg viewBox={`0 0 ${W} ${H + 60}`} className='w-full h-auto max-h-[420px]'>
+      {items.map((it, i) => {
+        const ratio = it.value / it.weight
+        const barH = (ratio / maxRatio) * (H - 20)
+        const takeFrac = frame?.taken?.[it.id] ?? 0
+        const isCur = frame?.cur === i
+        const takenH = barH * takeFrac
+        const fill = isCur ? '#fbbf24' : takeFrac > 0 ? '#34d399' : '#475569'
+        return (
+          <g key={it.id}>
+            <rect
+              x={pad + i * barW + 2}
+              y={H - barH}
+              width={barW - 4}
+              height={barH}
+              fill='#334155'
+              opacity={0.5}
+            />
+            <rect
+              x={pad + i * barW + 2}
+              y={H - takenH}
+              width={barW - 4}
+              height={takenH}
+              fill={fill}
+              stroke={isCur ? '#fef3c7' : 'none'}
+              strokeWidth={isCur ? 1.5 : 0}
+            />
+            <text x={pad + i * barW + barW / 2} y={H + 12} fontSize={7} textAnchor='middle' fill='#94a3b8' fontFamily='ui-monospace, monospace'>
+              v={it.value}
+            </text>
+            <text x={pad + i * barW + barW / 2} y={H + 22} fontSize={7} textAnchor='middle' fill='#94a3b8' fontFamily='ui-monospace, monospace'>
+              w={it.weight}
+            </text>
+            <text x={pad + i * barW + barW / 2} y={H + 32} fontSize={8} textAnchor='middle' fill='#fbbf24' fontFamily='ui-monospace, monospace'>
+              {ratio.toFixed(1)}
+            </text>
+          </g>
+        )
+      })}
+      {/* Capacity bar */}
+      <text x={pad} y={H + 50} fontSize={9} fill='#e5e7eb' fontFamily='ui-monospace, monospace'>
+        capacity: {frame?.used?.toFixed(1) || 0} / {capacity}
+      </text>
+      <rect x={pad + 90} y={H + 42} width={200} height={8} fill='#1f2937' rx={2} />
+      <rect x={pad + 90} y={H + 42} width={Math.min(200, (frame?.used || 0) / capacity * 200)} height={8} fill='#34d399' rx={2} />
+    </svg>
+  )
+}
+
+export default function GreedyKnapsack() {
+  const [n, setN] = useState(8)
+  const [seed, setSeed] = useState(4)
+  const [capacity, setCapacity] = useState(20)
+  const items = useMemo(() => genItems(n, seed), [n, seed])
+  const frames = useMemo(() => buildFrames(items, capacity), [items, capacity])
+  const [idx, setIdx] = useState(0)
+  const { i, playing, play, pause, step, reset, speed, setSpeed } = useStepEngine({
+    frameCount: frames.length,
+    onFrame: setIdx,
+  })
+  useEffect(() => { reset() /* eslint-disable-next-line */ }, [n, seed, capacity])
+  const f = frames[idx] || frames[0]
+  const rendered = f?.sorted || items
+
+  return (
+    <TopicShell slug='greedy-knapsack' title='Fractional Knapsack' category='Algorithms'>
+      <ExplanationBlock>
+        <p>
+          You have a knapsack of capacity <TeX tex='C' /> and a set of
+          items each with weight and value. You may take fractions of
+          items. Maximise total value.
+        </p>
+        <p>
+          Sort items by <TeX tex='v_i / w_i' /> descending. Take as many
+          whole high-ratio items as fit, then a fraction of the next one
+          to top up. Optimal because value is <i>linear</i> in the fraction
+          taken — no reason to prefer a lower ratio.
+        </p>
+        <p>
+          The trick evaporates if fractions aren't allowed (0/1
+          knapsack). Then a high-ratio item may be too heavy to fit,
+          forcing us to leave the sack partly empty — and DP takes over.
+        </p>
+      </ExplanationBlock>
+
+      <VisualiserSection>
+        <VizPanel>
+          <RatioChart items={rendered} frame={f} capacity={capacity} />
+          <div className='mt-2 text-xs text-white/70 font-mono'>
+            step {i + 1}/{frames.length} · gain
+            <span className='text-emerald-300 ml-1'>{f?.gain?.toFixed(2) || '0'}</span>
+          </div>
+          {f?.kind === 'frac' && (
+            <div className='text-xs text-amber-200 font-mono mt-1'>
+              taking fraction {f.frac.toFixed(2)} of item · v/w = {(f.sorted[f.cur].value / f.sorted[f.cur].weight).toFixed(2)}
+            </div>
+          )}
+        </VizPanel>
+        <ControlsPanel>
+          <Field label='Item count'>
+            <InputNumber min={3} max={15} value={n} onChange={v => setN(v || 3)} className='w-full' />
+          </Field>
+          <Field label='Seed'>
+            <InputNumber min={0} max={9999} value={seed} onChange={v => setSeed(v || 0)} className='w-full' />
+          </Field>
+          <Field label='Capacity' helper='Total weight the sack can hold.'>
+            <InputNumber min={5} max={50} value={capacity} onChange={v => setCapacity(v || 5)} className='w-full' />
+          </Field>
+          <StepControls
+            playing={playing} onPlay={play} onPause={pause} onStep={step} onReset={reset}
+            speed={speed} onSpeed={setSpeed}
+          />
+          <div className='flex gap-1.5 flex-wrap'>
+            <Chip tone='amber'>current</Chip>
+            <Chip tone='emerald'>taken</Chip>
+            <Chip tone='gray'>skipped</Chip>
+          </div>
+        </ControlsPanel>
+      </VisualiserSection>
+
+      <PseudocodeBlock lines={PSEUDO} activeLine={f?.line ?? -1} />
+
+      <ComplexityTable rows={[
+        { op: 'Fractional Knapsack (sort + scan)', best: 'O(n \\log n)', avg: 'O(n \\log n)', worst: 'O(n \\log n)', space: 'O(n)' },
+        { op: 'Median-of-medians pivot',           best: 'O(n)',         avg: 'O(n)',         worst: 'O(n)',         space: 'O(n)' },
+        { op: '0/1 Knapsack (DP)',                 best: 'O(nC)',        avg: 'O(nC)',        worst: 'O(nC)',        space: 'O(nC)' },
+      ]} />
+
+      <RealWorldCard>
+        <p>
+          Cargo planning, budget allocation, ad-slot fill (when
+          impressions are divisible), and portfolio construction under a
+          leverage cap. Any time the resource is continuous and the
+          objective is linear, fractional-knapsack greedy is optimal.
+        </p>
+        <p>
+          In competitive-programming, fractional knapsack is often the
+          upper bound used to prune 0/1 branch-and-bound.
+        </p>
+      </RealWorldCard>
+    </TopicShell>
+  )
+}

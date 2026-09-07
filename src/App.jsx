@@ -59,6 +59,43 @@ const Projects = lazyWithReload(() => import("./pages/Projects"));
 const Contact = lazyWithReload(() => import("./pages/Contact"));
 const Lab = lazyWithReload(() => import("./pages/Lab"));
 const Learn = lazyWithReload(() => import("./pages/Learn"));
+const Algorithms = lazyWithReload(() => import("./pages/Algorithms"));
+
+/* ── Algorithms topic pages (30 total). Every route lives at
+ *    /algorithms/:slug and mounts a page that composes shared
+ *    primitives from src/components/algorithms. Kept as separate
+ *    chunks so each visualiser is only fetched when its route is
+ *    hit — the hub page stays lean. */
+const AlgArrays          = lazyWithReload(() => import("./pages/algorithms/Arrays"));
+const AlgLinkedLists     = lazyWithReload(() => import("./pages/algorithms/LinkedLists"));
+const AlgStacks          = lazyWithReload(() => import("./pages/algorithms/Stacks"));
+const AlgQueues          = lazyWithReload(() => import("./pages/algorithms/Queues"));
+const AlgHashTables      = lazyWithReload(() => import("./pages/algorithms/HashTables"));
+const AlgGraphs          = lazyWithReload(() => import("./pages/algorithms/Graphs"));
+const AlgTrees           = lazyWithReload(() => import("./pages/algorithms/Trees"));
+const AlgBST             = lazyWithReload(() => import("./pages/algorithms/BST"));
+const AlgBalancedTrees   = lazyWithReload(() => import("./pages/algorithms/BalancedTrees"));
+const AlgHeaps           = lazyWithReload(() => import("./pages/algorithms/Heaps"));
+const AlgTries           = lazyWithReload(() => import("./pages/algorithms/Tries"));
+const AlgSegmentTrees    = lazyWithReload(() => import("./pages/algorithms/SegmentTrees"));
+const AlgFenwickTrees    = lazyWithReload(() => import("./pages/algorithms/FenwickTrees"));
+const AlgDSU             = lazyWithReload(() => import("./pages/algorithms/DSU"));
+const AlgMST             = lazyWithReload(() => import("./pages/algorithms/MST"));
+const AlgDivideConquer   = lazyWithReload(() => import("./pages/algorithms/DivideConquer"));
+const AlgSorting         = lazyWithReload(() => import("./pages/algorithms/Sorting"));
+const AlgSearching       = lazyWithReload(() => import("./pages/algorithms/Searching"));
+const AlgSieve           = lazyWithReload(() => import("./pages/algorithms/Sieve"));
+const AlgKMP             = lazyWithReload(() => import("./pages/algorithms/KMP"));
+const AlgGreedyIntervals = lazyWithReload(() => import("./pages/algorithms/GreedyIntervals"));
+const AlgGreedyKnapsack  = lazyWithReload(() => import("./pages/algorithms/GreedyKnapsack"));
+const AlgDPKnapsack      = lazyWithReload(() => import("./pages/algorithms/DPKnapsack"));
+const AlgDPLCS           = lazyWithReload(() => import("./pages/algorithms/DPLCS"));
+const AlgDPLIS           = lazyWithReload(() => import("./pages/algorithms/DPLIS"));
+const AlgConvexHull      = lazyWithReload(() => import("./pages/algorithms/ConvexHull"));
+const AlgGraphTraversal  = lazyWithReload(() => import("./pages/algorithms/GraphTraversal"));
+const AlgFloydWarshall   = lazyWithReload(() => import("./pages/algorithms/FloydWarshall"));
+const AlgDijkstraBellman = lazyWithReload(() => import("./pages/algorithms/DijkstraBellman"));
+const AlgTopologicalSort = lazyWithReload(() => import("./pages/algorithms/TopologicalSort"));
 // /creative was merged into /lab (30 demos, one page). Old URLs now
 // redirect via the route below — no more standalone Creative page.
 const ChessViz = lazyWithReload(() => import("./pages/ChessViz"));
@@ -255,7 +292,8 @@ const ROUTE_TITLES = {
   '/projects'      : 'Projects · Sid',
   '/contact'       : 'Contact · Sid',
   '/lab'           : 'Interactive Lab · Sid',
-  '/learn'         : 'Learn DSA · Sid',
+  '/learn'         : 'Algorithms · Sid',
+  '/algorithms'    : 'Algorithms · Sid',
   '/chess'         : 'Chess · Sid',
   '/chess-classic' : 'Chess (classic) · Sid',
   '/chess-viz'     : 'Chess Viz · Sid',
@@ -350,7 +388,42 @@ const App = () => {
           <Route path='/projects' element={<Suspense fallback={<PageBoot />}><Projects /></Suspense>} />
           <Route path='/contact' element={<Suspense fallback={<PageBoot />}><Contact /></Suspense>} />
           <Route path='/lab' element={<Suspense fallback={<PageBoot />}><Lab /></Suspense>} />
-          <Route path='/learn' element={<Suspense fallback={<PageBoot />}><Learn /></Suspense>} />
+          {/* /learn was renamed to /algorithms — DSA hub rebuilt from
+              markdown tutorials into 30 interactive visualisers with
+              scrubbable animation, KaTeX proofs, and a real-world use
+              case per topic. Old URL kept as a permanent redirect. */}
+          <Route path='/algorithms' element={<Suspense fallback={<PageBoot />}><Algorithms /></Suspense>} />
+          <Route path='/learn'      element={<Navigate to='/algorithms' replace />} />
+          <Route path='/algorithms/arrays'           element={<Suspense fallback={<PageBoot />}><AlgArrays          /></Suspense>} />
+          <Route path='/algorithms/linked-lists'     element={<Suspense fallback={<PageBoot />}><AlgLinkedLists     /></Suspense>} />
+          <Route path='/algorithms/stacks'           element={<Suspense fallback={<PageBoot />}><AlgStacks          /></Suspense>} />
+          <Route path='/algorithms/queues'           element={<Suspense fallback={<PageBoot />}><AlgQueues          /></Suspense>} />
+          <Route path='/algorithms/hash-tables'      element={<Suspense fallback={<PageBoot />}><AlgHashTables      /></Suspense>} />
+          <Route path='/algorithms/graphs'           element={<Suspense fallback={<PageBoot />}><AlgGraphs          /></Suspense>} />
+          <Route path='/algorithms/trees'            element={<Suspense fallback={<PageBoot />}><AlgTrees           /></Suspense>} />
+          <Route path='/algorithms/bst'              element={<Suspense fallback={<PageBoot />}><AlgBST             /></Suspense>} />
+          <Route path='/algorithms/balanced-trees'   element={<Suspense fallback={<PageBoot />}><AlgBalancedTrees   /></Suspense>} />
+          <Route path='/algorithms/heaps'            element={<Suspense fallback={<PageBoot />}><AlgHeaps           /></Suspense>} />
+          <Route path='/algorithms/tries'            element={<Suspense fallback={<PageBoot />}><AlgTries           /></Suspense>} />
+          <Route path='/algorithms/segment-trees'    element={<Suspense fallback={<PageBoot />}><AlgSegmentTrees    /></Suspense>} />
+          <Route path='/algorithms/fenwick-trees'    element={<Suspense fallback={<PageBoot />}><AlgFenwickTrees    /></Suspense>} />
+          <Route path='/algorithms/dsu'              element={<Suspense fallback={<PageBoot />}><AlgDSU             /></Suspense>} />
+          <Route path='/algorithms/mst'              element={<Suspense fallback={<PageBoot />}><AlgMST             /></Suspense>} />
+          <Route path='/algorithms/divide-conquer'   element={<Suspense fallback={<PageBoot />}><AlgDivideConquer   /></Suspense>} />
+          <Route path='/algorithms/sorting'          element={<Suspense fallback={<PageBoot />}><AlgSorting         /></Suspense>} />
+          <Route path='/algorithms/searching'        element={<Suspense fallback={<PageBoot />}><AlgSearching       /></Suspense>} />
+          <Route path='/algorithms/sieve'            element={<Suspense fallback={<PageBoot />}><AlgSieve           /></Suspense>} />
+          <Route path='/algorithms/kmp'              element={<Suspense fallback={<PageBoot />}><AlgKMP             /></Suspense>} />
+          <Route path='/algorithms/greedy-intervals' element={<Suspense fallback={<PageBoot />}><AlgGreedyIntervals /></Suspense>} />
+          <Route path='/algorithms/greedy-knapsack'  element={<Suspense fallback={<PageBoot />}><AlgGreedyKnapsack  /></Suspense>} />
+          <Route path='/algorithms/dp-knapsack'      element={<Suspense fallback={<PageBoot />}><AlgDPKnapsack      /></Suspense>} />
+          <Route path='/algorithms/dp-lcs'           element={<Suspense fallback={<PageBoot />}><AlgDPLCS           /></Suspense>} />
+          <Route path='/algorithms/dp-lis'           element={<Suspense fallback={<PageBoot />}><AlgDPLIS           /></Suspense>} />
+          <Route path='/algorithms/convex-hull'      element={<Suspense fallback={<PageBoot />}><AlgConvexHull      /></Suspense>} />
+          <Route path='/algorithms/graph-traversal'  element={<Suspense fallback={<PageBoot />}><AlgGraphTraversal  /></Suspense>} />
+          <Route path='/algorithms/floyd-warshall'   element={<Suspense fallback={<PageBoot />}><AlgFloydWarshall   /></Suspense>} />
+          <Route path='/algorithms/dijkstra-bellman' element={<Suspense fallback={<PageBoot />}><AlgDijkstraBellman /></Suspense>} />
+          <Route path='/algorithms/topological-sort' element={<Suspense fallback={<PageBoot />}><AlgTopologicalSort /></Suspense>} />
           {/* /creative merged into /lab. Old links redirect to the unified Lab. */}
           <Route path='/creative' element={<Navigate to='/lab' replace />} />
           {/* /chess — new Stockfish-backed page. Old custom-engine version

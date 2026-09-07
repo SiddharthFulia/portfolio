@@ -4,7 +4,7 @@ import { socialLinks } from "../constants";
 // Dark-route list mirrors Navbar's. Pages in this list opt the footer
 // into dark theming so the transition between page content and footer
 // reads as one continuous surface.
-const DARK_ROUTES = ['/lab', '/learn', '/chess', '/science', '/face', '/vision', '/explore', '/ai', '/studio', '/ai-video', '/image-enhancer', '/audio', '/deepfake', '/yt-dl', '/youtube', '/cinema', '/lipsync', '/runner', '/game', '/3d', '/settings', '/summarizer'];
+const DARK_ROUTES = ['/lab', '/learn', '/algorithms', '/chess', '/science', '/face', '/vision', '/explore', '/ai', '/studio', '/ai-video', '/image-enhancer', '/audio', '/deepfake', '/yt-dl', '/youtube', '/cinema', '/lipsync', '/runner', '/game', '/3d', '/settings', '/summarizer'];
 
 // Footer columns — kept short. The site's not a SaaS dashboard so
 // nobody is hunting for legal links; the goal is to make the bottom of
@@ -21,8 +21,8 @@ const COL_EXPLORE = [
   { to: '/about',     label: 'About' },
   { to: '/projects',  label: 'Projects' },
   { to: '/contact',   label: 'Contact' },
-  { to: '/lab',       label: 'Lab' },
-  { to: '/learn',     label: 'Learn' },
+  { to: '/lab',        label: 'Lab' },
+  { to: '/algorithms', label: 'Algorithms' },
 ];
 
 const Footer = () => {

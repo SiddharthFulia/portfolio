@@ -368,14 +368,14 @@ const Lab = () => {
           <div className='min-w-0 flex-1'>
             <p className='text-fg-primary font-bold text-sm'>Looking for DSA tutorials?</p>
             <p className='text-fg-muted text-xs mt-0.5'>
-              Step-by-step algorithm explanations with code and interactive demos live on the Learn page.
+              30 scrubbable algorithm visualisers with KaTeX-typeset proofs and a real-world use case live on the Algorithms hub.
             </p>
           </div>
           <Link
-            to='/learn'
+            to='/algorithms'
             className='luxe-btn luxe-btn-secondary tap-44 whitespace-nowrap'
           >
-            Open Learn
+            Open Algorithms
           </Link>
         </div>
       </div>

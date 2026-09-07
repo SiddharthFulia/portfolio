@@ -17,7 +17,7 @@ const Navbar = () => {
   // button render with `text-gray-700` (light-mode style) and
   // disappear against the obsidian backdrop. We match `/` exactly
   // because `pathname.startsWith('/')` would be true for everything.
-  const isDark = pathname === '/' || ['/lab', '/learn', '/chess', '/science', '/face', '/vision', '/explore', '/ai', '/studio', '/ai-studio', '/ai-video', '/video', '/image-enhancer', '/enhance', '/hand', '/hands', '/draw', '/lipsync', '/audio', '/cinema', '/about', '/projects', '/contact'].some(r => pathname.startsWith(r));
+  const isDark = pathname === '/' || ['/lab', '/learn', '/algorithms', '/chess', '/science', '/face', '/vision', '/explore', '/ai', '/studio', '/ai-studio', '/ai-video', '/video', '/image-enhancer', '/enhance', '/hand', '/hands', '/draw', '/lipsync', '/audio', '/cinema', '/about', '/projects', '/contact'].some(r => pathname.startsWith(r));
 
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
@@ -140,7 +140,7 @@ const Navbar = () => {
       accent: 'text-emerald-300',
       items: [
         { to: '/lab',        label: 'Lab',              desc: '30 interactive demos · motion · shaders · games · data viz' },
-        { to: '/learn',      label: 'Learn DSA',        desc: 'Algorithms · system design · CP' },
+        { to: '/algorithms', label: 'Algorithms',       desc: '30 interactive visualisers · sort · graphs · DP · trees' },
         { to: '/science',    label: 'Explore Space',    desc: '11 NASA modules · APOD · Mars · Asteroids' },
         { to: '/explore',    label: 'Web Playground',   desc: '9 APIs · Pokémon · Memes · Countries · Quotes' },
         { to: '/summarizer', label: 'Summarizer',       desc: 'Paste long text · get a tight summary' },
