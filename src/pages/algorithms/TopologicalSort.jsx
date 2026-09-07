@@ -12,9 +12,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { InputNumber, Switch } from 'antd'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
-  ControlsPanel, StepControls, useStepEngine, PseudocodeBlock,
+  ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
+import { CODE as TOPO_CODE } from './code/TopologicalSort'
 
 function mulberry32(seed) {
   let a = (seed | 0) || 1
@@ -340,8 +341,8 @@ export default function TopologicalSort() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <PseudocodeBlock lines={KAHN_PSEUDO} activeLine={kF?.line ?? -1} title='Kahn — pseudocode' />
-      <PseudocodeBlock lines={DFS_PSEUDO} activeLine={dF?.line ?? -1} title='DFS post-order — pseudocode' />
+      <MultiLangCode title="Kahn's algorithm (BFS on in-degree)" code={TOPO_CODE.kahn} />
+      <MultiLangCode title='DFS post-order topological sort' code={TOPO_CODE.dfs} />
 
       <ComplexityTable rows={[
         { op: "Kahn's algorithm", best: 'O(V+E)', avg: 'O(V+E)', worst: 'O(V+E)', space: 'O(V)' },

@@ -12,7 +12,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { InputNumber } from 'antd'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
-  ControlsPanel, StepControls, useStepEngine, PseudocodeBlock,
+  ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
 
@@ -69,14 +69,113 @@ function fwFrames(dist0) {
   return frames
 }
 
-const PSEUDO = [
-  'dist = adjacency matrix (INF for no edge, 0 on diagonal)',
-  'for k = 0 .. n-1:',
-  '  for i = 0 .. n-1:',
-  '    for j = 0 .. n-1:',
-  '      dist[i][j] = min(dist[i][j], dist[i][k] + dist[k][j])',
-  '# invariant: after iteration k, dist[i][j] uses only nodes 0..k',
-]
+const CODE = {
+  pseudo: `dist = adjacency matrix (INF for no edge, 0 on diagonal)
+for k = 0 .. n-1:
+  for i = 0 .. n-1:
+    for j = 0 .. n-1:
+      if dist[i][k] + dist[k][j] < dist[i][j]:
+        dist[i][j] = dist[i][k] + dist[k][j]
+# After iteration k, dist[i][j] uses only intermediates in {0..k}`,
+
+  c: `#include <limits.h>
+
+/* dist is n*n; INF is a large sentinel. Runs in O(n^3). */
+void floyd_warshall(int n, long dist[][n]) {
+    for (int k = 0; k < n; k++) {
+        for (int i = 0; i < n; i++) {
+            if (dist[i][k] == LONG_MAX) continue;   /* skip unreachable */
+            for (int j = 0; j < n; j++) {
+                if (dist[k][j] == LONG_MAX) continue;
+                long via = dist[i][k] + dist[k][j];
+                if (via < dist[i][j]) dist[i][j] = via;
+            }
+        }
+    }
+}`,
+
+  cpp: `#include <vector>
+#include <climits>
+
+void floyd_warshall(std::vector<std::vector<long long>>& dist) {
+    int n = (int)dist.size();
+    for (int k = 0; k < n; ++k) {
+        for (int i = 0; i < n; ++i) {
+            if (dist[i][k] == LLONG_MAX) continue;
+            for (int j = 0; j < n; ++j) {
+                if (dist[k][j] == LLONG_MAX) continue;
+                long long via = dist[i][k] + dist[k][j];
+                if (via < dist[i][j]) dist[i][j] = via;
+            }
+        }
+    }
+}`,
+
+  python: `from math import inf
+
+def floyd_warshall(dist):
+    """dist is an n*n matrix with inf for missing edges, 0 on the diagonal."""
+    n = len(dist)
+    for k in range(n):
+        # After this k, dist[i][j] uses only intermediates in {0..k}.
+        for i in range(n):
+            if dist[i][k] == inf:
+                continue
+            for j in range(n):
+                via = dist[i][k] + dist[k][j]
+                if via < dist[i][j]:
+                    dist[i][j] = via
+    return dist`,
+
+  java: `public static void floydWarshall(long[][] dist) {
+    int n = dist.length;
+    for (int k = 0; k < n; k++) {
+        for (int i = 0; i < n; i++) {
+            if (dist[i][k] == Long.MAX_VALUE) continue;
+            for (int j = 0; j < n; j++) {
+                if (dist[k][j] == Long.MAX_VALUE) continue;
+                long via = dist[i][k] + dist[k][j];
+                if (via < dist[i][j]) dist[i][j] = via;
+            }
+        }
+    }
+}`,
+
+  rust: `pub fn floyd_warshall(dist: &mut Vec<Vec<i64>>) {
+    let n = dist.len();
+    let inf = i64::MAX / 4;
+    for k in 0..n {
+        for i in 0..n {
+            if dist[i][k] >= inf { continue; }   // unreachable → skip row work
+            for j in 0..n {
+                if dist[k][j] >= inf { continue; }
+                let via = dist[i][k] + dist[k][j];
+                if via < dist[i][j] { dist[i][j] = via; }
+            }
+        }
+    }
+}`,
+}
+
+const ACTIVE_MAP = {
+  pseudo: { init: 0, fill: 5, done: 6 },
+  c:      { init: 3, fill: 9, done: 13 },
+  cpp:    { init: 4, fill: 10, done: 14 },
+  python: { init: 3, fill: 10, done: 12 },
+  java:   { init: 1, fill: 7, done: 11 },
+  rust:   { init: 1, fill: 9, done: 12 },
+}
+function activeLinesFor(frame) {
+  const kind = frame?.k == null || frame.k < 0
+    ? (frame?.msg === 'done' ? 'done' : 'init')
+    : 'fill'
+  const out = {}
+  for (const lang of Object.keys(ACTIVE_MAP)) {
+    const v = ACTIVE_MAP[lang][kind]
+    if (typeof v === 'number') out[lang] = v
+  }
+  return out
+}
 
 function Matrix({ dist, k, changed }) {
   const n = dist.length
@@ -198,7 +297,7 @@ export default function FloydWarshall() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <PseudocodeBlock lines={PSEUDO} activeLine={f?.line ?? -1} />
+      <MultiLangCode title='Floyd–Warshall — all-pairs shortest paths' code={CODE} activeLines={activeLinesFor(f)} />
 
       <ComplexityTable rows={[
         { op: 'Floyd–Warshall',    best: 'O(V^3)',      avg: 'O(V^3)',       worst: 'O(V^3)',       space: 'O(V^2)' },

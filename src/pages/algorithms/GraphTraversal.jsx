@@ -8,9 +8,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { InputNumber } from 'antd'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
-  ControlsPanel, StepControls, useStepEngine, PseudocodeBlock,
+  ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
+import { CODE as TRAVERSAL_CODE } from './code/GraphTraversal'
 
 function mulberry32(seed) {
   let a = (seed | 0) || 1
@@ -272,8 +273,8 @@ export default function GraphTraversal() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <PseudocodeBlock lines={BFS_PSEUDO} activeLine={bfsF?.line ?? -1} title='BFS — pseudocode' />
-      <PseudocodeBlock lines={DFS_PSEUDO} activeLine={dfsF?.line ?? -1} title='DFS — pseudocode' />
+      <MultiLangCode title='BFS' code={TRAVERSAL_CODE.bfs} />
+      <MultiLangCode title='DFS' code={TRAVERSAL_CODE.dfs} />
 
       <ComplexityTable rows={[
         { op: 'BFS',                   best: 'O(V+E)', avg: 'O(V+E)', worst: 'O(V+E)', space: 'O(V)' },

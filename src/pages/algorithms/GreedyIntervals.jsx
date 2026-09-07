@@ -12,7 +12,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { InputNumber } from 'antd'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
-  ControlsPanel, StepControls, useStepEngine, PseudocodeBlock,
+  ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
@@ -59,15 +59,113 @@ function buildFrames(input) {
   return frames
 }
 
-const PSEUDO = [
-  'sort intervals by end time',
-  'chosen = []',
-  'lastEnd = -inf',
-  'for iv in intervals:',
-  '  if iv.start >= lastEnd:',
-  '    chosen.push(iv); lastEnd = iv.end',
-  'return chosen',
-]
+const CODE = {
+  pseudo: `sort intervals by end time
+chosen = []
+lastEnd = -inf
+for iv in intervals:
+  if iv.start >= lastEnd:
+    chosen.push(iv)
+    lastEnd = iv.end
+return chosen`,
+
+  c: `#include <stdlib.h>
+
+typedef struct { int start, end; } Interval;
+
+static int cmp_end(const void* a, const void* b) {
+    return ((Interval*)a)->end - ((Interval*)b)->end;
+}
+
+/* Fills 'out' with chosen intervals and returns their count. */
+int max_intervals(Interval* iv, int n, Interval* out) {
+    qsort(iv, n, sizeof(Interval), cmp_end);
+    int last_end = -2147483648, k = 0;
+    for (int i = 0; i < n; i++) {
+        if (iv[i].start >= last_end) {
+            out[k++] = iv[i];
+            last_end = iv[i].end;
+        }
+    }
+    return k;
+}`,
+
+  cpp: `#include <vector>
+#include <algorithm>
+
+struct Interval { int start, end; };
+
+std::vector<Interval> max_intervals(std::vector<Interval> iv) {
+    std::sort(iv.begin(), iv.end(),
+              [](const Interval& a, const Interval& b) { return a.end < b.end; });
+    std::vector<Interval> chosen;
+    int last_end = INT32_MIN;
+    for (const auto& x : iv) {
+        if (x.start >= last_end) {   // no overlap with previous pick
+            chosen.push_back(x);
+            last_end = x.end;
+        }
+    }
+    return chosen;
+}`,
+
+  python: `def max_intervals(intervals):
+    # Sort by end time — the earliest-finishing choice leaves the most room.
+    intervals = sorted(intervals, key=lambda x: x[1])
+    chosen, last_end = [], float('-inf')
+    for start, end in intervals:
+        if start >= last_end:
+            chosen.append((start, end))
+            last_end = end
+    return chosen`,
+
+  java: `import java.util.*;
+
+public static int[][] maxIntervals(int[][] iv) {
+    // Sort by end time; scan left-to-right taking every compatible interval.
+    Arrays.sort(iv, (a, b) -> Integer.compare(a[1], b[1]));
+    List<int[]> chosen = new ArrayList<>();
+    int lastEnd = Integer.MIN_VALUE;
+    for (int[] x : iv) {
+        if (x[0] >= lastEnd) {
+            chosen.add(x);
+            lastEnd = x[1];
+        }
+    }
+    return chosen.toArray(new int[0][]);
+}`,
+
+  rust: `pub fn max_intervals(mut iv: Vec<(i32, i32)>) -> Vec<(i32, i32)> {
+    // Earliest-end first — leaves the most room for later picks.
+    iv.sort_by_key(|x| x.1);
+    let mut chosen = Vec::new();
+    let mut last_end = i32::MIN;
+    for x in iv {
+        if x.0 >= last_end {
+            chosen.push(x);
+            last_end = x.1;
+        }
+    }
+    chosen
+}`,
+}
+
+const ACTIVE_MAP = {
+  pseudo: { sort: 0, accept: 5, reject: 4, done: 7 },
+  c:      { sort: 10, accept: 14, reject: 12, done: 18 },
+  cpp:    { sort: 7, accept: 13, reject: 11, done: 16 },
+  python: { sort: 3, accept: 7, reject: 6, done: 8 },
+  java:   { sort: 5, accept: 9, reject: 8, done: 13 },
+  rust:   { sort: 3, accept: 7, reject: 6, done: 10 },
+}
+function activeLinesFor(kind) {
+  const out = {}
+  for (const lang of Object.keys(ACTIVE_MAP)) {
+    const v = ACTIVE_MAP[lang][kind]
+    if (typeof v === 'number') out[lang] = v
+  }
+  return out
+}
 
 function Timeline({ intervals, frame, span }) {
   if (!intervals.length) return null
@@ -185,7 +283,7 @@ export default function GreedyIntervals() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <PseudocodeBlock lines={PSEUDO} activeLine={f?.line ?? -1} />
+      <MultiLangCode title='Interval scheduling (greedy)' code={CODE} activeLines={activeLinesFor(f?.kind)} />
 
       <ComplexityTable rows={[
         { op: 'Greedy (end sort)', best: 'O(n \\log n)', avg: 'O(n \\log n)', worst: 'O(n \\log n)', space: 'O(n)' },

@@ -17,10 +17,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { InputNumber, Segmented, Progress } from 'antd'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
-  ControlsPanel, StepControls, useStepEngine, PseudocodeBlock,
+  ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
+import { CODE as SORTING_CODE } from './code/Sorting'
 
 // ─── RNG ──────────────────────────────────────────────────
 function mulberry32(seed) {
@@ -327,7 +328,7 @@ function DetailMode({ pick, base }) {
         />
       </div>
       <div className='mt-4'>
-        <PseudocodeBlock lines={ALGS[pick].pseudo} activeLine={cur.line ?? -1} title={`${ALGS[pick].name} — pseudocode`} />
+        <MultiLangCode title={`${ALGS[pick].name}`} code={SORTING_CODE[pick] || SORTING_CODE.bubble} />
       </div>
     </>
   )

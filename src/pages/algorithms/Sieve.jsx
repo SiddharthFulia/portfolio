@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { InputNumber } from 'antd'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
-  ControlsPanel, StepControls, useStepEngine, PseudocodeBlock,
+  ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
 
@@ -51,14 +51,107 @@ function buildSieve(n) {
   return frames
 }
 
-const SIEVE_PSEUDO = [
-  'let mark[2..N] = false',
-  'for p = 2 .. sqrt(N):',
-  '  if not mark[p]:',
-  '    for m = p*p, p*p+p, ... <= N:',
-  '      mark[m] = true',
-  'primes = { i : not mark[i] }',
-]
+const CODE = {
+  pseudo: `let mark[2..N] = false
+for p = 2 .. sqrt(N):
+  if not mark[p]:
+    for m = p*p, p*p+p, ... <= N:
+      mark[m] = true
+primes = { i : not mark[i] }`,
+
+  c: `#include <stdbool.h>
+#include <stdlib.h>
+
+/* Returns the count of primes in [2, N] and fills 'out' with them. */
+int sieve(int N, int* out) {
+    bool* mark = (bool*)calloc(N + 1, sizeof(bool));
+    for (int p = 2; (long)p * p <= N; p++) {
+        if (mark[p]) continue;
+        /* Start crossing at p*p — every smaller multiple has a smaller prime factor. */
+        for (long m = (long)p * p; m <= N; m += p) mark[m] = true;
+    }
+    int k = 0;
+    for (int i = 2; i <= N; i++) if (!mark[i]) out[k++] = i;
+    free(mark);
+    return k;
+}`,
+
+  cpp: `#include <vector>
+
+std::vector<int> sieve(int N) {
+    std::vector<bool> mark(N + 1, false);
+    for (int p = 2; (long long)p * p <= N; ++p) {
+        if (mark[p]) continue;
+        // Start at p*p — every smaller multiple of p was crossed by a smaller prime.
+        for (long long m = (long long)p * p; m <= N; m += p) mark[m] = true;
+    }
+    std::vector<int> primes;
+    for (int i = 2; i <= N; ++i) if (!mark[i]) primes.push_back(i);
+    return primes;
+}`,
+
+  python: `def sieve(N):
+    """Sieve of Eratosthenes — returns all primes in [2, N]."""
+    if N < 2:
+        return []
+    mark = [False] * (N + 1)
+    p = 2
+    while p * p <= N:
+        if not mark[p]:
+            # Composites below p*p were already crossed by a smaller prime.
+            for m in range(p * p, N + 1, p):
+                mark[m] = True
+        p += 1
+    return [i for i in range(2, N + 1) if not mark[i]]`,
+
+  java: `import java.util.*;
+
+public static List<Integer> sieve(int N) {
+    boolean[] mark = new boolean[N + 1];
+    for (int p = 2; (long) p * p <= N; p++) {
+        if (mark[p]) continue;
+        // Kick off from p*p — smaller multiples already have a smaller prime factor.
+        for (long m = (long) p * p; m <= N; m += p) mark[(int) m] = true;
+    }
+    List<Integer> primes = new ArrayList<>();
+    for (int i = 2; i <= N; i++) if (!mark[i]) primes.add(i);
+    return primes;
+}`,
+
+  rust: `pub fn sieve(n: usize) -> Vec<usize> {
+    if n < 2 { return Vec::new(); }
+    let mut mark = vec![false; n + 1];
+    let mut p = 2usize;
+    while p * p <= n {
+        if !mark[p] {
+            // Start at p*p — smaller multiples of p are already crossed off.
+            let mut m = p * p;
+            while m <= n { mark[m] = true; m += p; }
+        }
+        p += 1;
+    }
+    (2..=n).filter(|&i| !mark[i]).collect()
+}`,
+}
+
+const ACTIVE_MAP = {
+  pseudo: { init: 0, prime: 2, cross: 4, done: 5 },
+  c:      { init: 5, prime: 7, cross: 10, done: 13 },
+  cpp:    { init: 3, prime: 5, cross: 8, done: 11 },
+  python: { init: 4, prime: 7, cross: 10, done: 12 },
+  java:   { init: 3, prime: 5, cross: 8, done: 11 },
+  rust:   { init: 2, prime: 5, cross: 8, done: 12 },
+}
+function activeLinesFor(frame) {
+  const kind = !frame?.p ? (frame?.msg === 'complete' ? 'done' : 'init')
+              : frame?.mark ? 'cross' : 'prime'
+  const out = {}
+  for (const lang of Object.keys(ACTIVE_MAP)) {
+    const v = ACTIVE_MAP[lang][kind]
+    if (typeof v === 'number') out[lang] = v
+  }
+  return out
+}
 
 function Grid({ state, p, mark, n }) {
   const cols = n <= 100 ? 10 : n <= 400 ? 20 : 25
@@ -224,7 +317,7 @@ export default function Sieve() {
         </ul>
       </section>
 
-      <PseudocodeBlock lines={SIEVE_PSEUDO} activeLine={f.line ?? -1} />
+      <MultiLangCode title='Sieve of Eratosthenes' code={CODE} activeLines={activeLinesFor(f)} />
 
       <ComplexityTable rows={[
         { op: 'Sieve of Eratosthenes', best: 'O(N \\log \\log N)', avg: 'O(N \\log \\log N)', worst: 'O(N \\log \\log N)', space: 'O(N)' },

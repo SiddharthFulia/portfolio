@@ -12,7 +12,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { InputNumber } from 'antd'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
-  ControlsPanel, StepControls, useStepEngine, PseudocodeBlock,
+  ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
 
@@ -97,19 +97,165 @@ function buildFrames(items, C) {
   return { frames, dp, taken, answer: dp[n][C] }
 }
 
-const PSEUDO = [
-  'dp[0..n][0..C] = 0',
-  'for i = 1 .. n:',
-  '  for w = 0 .. C:',
-  '    if w < items[i].w:',
-  '      dp[i][w] = dp[i-1][w]',
-  '    else:',
-  '      dp[i][w] = max(dp[i-1][w],',
-  '                     dp[i-1][w - items[i].w] + items[i].v)',
-  '# backtrack from dp[n][C]:',
-  '#   if dp[i][w] != dp[i-1][w]: item i taken',
-  '#   else: item i skipped',
-]
+const CODE = {
+  pseudo: `dp[0..n][0..C] = 0
+for i = 1 .. n:
+  for w = 0 .. C:
+    if w < items[i].w:
+      dp[i][w] = dp[i-1][w]
+    else:
+      dp[i][w] = max(dp[i-1][w],
+                     dp[i-1][w - items[i].w] + items[i].v)
+
+# Backtrack for taken items
+i = n; w = C; taken = []
+while i > 0:
+  if dp[i][w] != dp[i-1][w]:
+    taken.push(i); w -= items[i].w
+  i -= 1`,
+
+  c: `#include <stdlib.h>
+
+typedef struct { int w, v; } Item;
+
+int knapsack01(Item* items, int n, int C, int* taken_out, int* taken_count) {
+    int (*dp)[C + 1] = malloc(sizeof(int[n + 1][C + 1]));
+    for (int w = 0; w <= C; w++) dp[0][w] = 0;
+    for (int i = 1; i <= n; i++) {
+        for (int w = 0; w <= C; w++) {
+            dp[i][w] = dp[i - 1][w];
+            if (w >= items[i - 1].w) {
+                int alt = dp[i - 1][w - items[i - 1].w] + items[i - 1].v;
+                if (alt > dp[i][w]) dp[i][w] = alt;
+            }
+        }
+    }
+    int ans = dp[n][C], k = 0, cw = C;
+    for (int i = n; i > 0; i--) {
+        /* If value changed, we must have taken item i to earn it. */
+        if (dp[i][cw] != dp[i - 1][cw]) {
+            taken_out[k++] = i - 1;
+            cw -= items[i - 1].w;
+        }
+    }
+    *taken_count = k;
+    free(dp);
+    return ans;
+}`,
+
+  cpp: `#include <vector>
+#include <algorithm>
+
+struct Item { int w, v; };
+
+int knapsack01(const std::vector<Item>& items, int C, std::vector<int>& taken) {
+    int n = (int)items.size();
+    std::vector<std::vector<int>> dp(n + 1, std::vector<int>(C + 1, 0));
+    for (int i = 1; i <= n; ++i) {
+        for (int w = 0; w <= C; ++w) {
+            dp[i][w] = dp[i - 1][w];
+            if (w >= items[i - 1].w)
+                dp[i][w] = std::max(dp[i][w],
+                                    dp[i - 1][w - items[i - 1].w] + items[i - 1].v);
+        }
+    }
+    int cw = C;
+    for (int i = n; i > 0; --i) {
+        if (dp[i][cw] != dp[i - 1][cw]) {   // item i was taken
+            taken.push_back(i - 1);
+            cw -= items[i - 1].w;
+        }
+    }
+    return dp[n][C];
+}`,
+
+  python: `def knapsack01(items, C):
+    """items = list of (weight, value). Returns (max_value, taken_indices)."""
+    n = len(items)
+    dp = [[0] * (C + 1) for _ in range(n + 1)]
+    for i in range(1, n + 1):
+        w, v = items[i - 1]
+        for cap in range(C + 1):
+            dp[i][cap] = dp[i - 1][cap]
+            if cap >= w:
+                dp[i][cap] = max(dp[i][cap], dp[i - 1][cap - w] + v)
+    # Backtrack — value change on row i means item i-1 was taken.
+    taken, cap = [], C
+    for i in range(n, 0, -1):
+        if dp[i][cap] != dp[i - 1][cap]:
+            taken.append(i - 1)
+            cap -= items[i - 1][0]
+    return dp[n][C], taken[::-1]`,
+
+  java: `import java.util.*;
+
+public static int knapsack01(int[][] items, int C, List<Integer> taken) {
+    // items[i] = { weight, value }
+    int n = items.length;
+    int[][] dp = new int[n + 1][C + 1];
+    for (int i = 1; i <= n; i++) {
+        int w = items[i - 1][0], v = items[i - 1][1];
+        for (int cap = 0; cap <= C; cap++) {
+            dp[i][cap] = dp[i - 1][cap];
+            if (cap >= w)
+                dp[i][cap] = Math.max(dp[i][cap], dp[i - 1][cap - w] + v);
+        }
+    }
+    int cw = C;
+    for (int i = n; i > 0; i--) {
+        if (dp[i][cw] != dp[i - 1][cw]) {
+            taken.add(i - 1);
+            cw -= items[i - 1][0];
+        }
+    }
+    Collections.reverse(taken);
+    return dp[n][C];
+}`,
+
+  rust: `pub fn knapsack01(items: &[(u32, u32)], capacity: usize) -> (u32, Vec<usize>) {
+    let n = items.len();
+    let mut dp = vec![vec![0u32; capacity + 1]; n + 1];
+    for i in 1..=n {
+        let (w, v) = items[i - 1];
+        let w = w as usize;
+        for cap in 0..=capacity {
+            dp[i][cap] = dp[i - 1][cap];
+            if cap >= w {
+                let alt = dp[i - 1][cap - w] + v;
+                if alt > dp[i][cap] { dp[i][cap] = alt; }
+            }
+        }
+    }
+    // Backtrack — any row where value changed means item i-1 was taken.
+    let mut taken = Vec::new();
+    let mut cw = capacity;
+    for i in (1..=n).rev() {
+        if dp[i][cw] != dp[i - 1][cw] {
+            taken.push(i - 1);
+            cw -= items[i - 1].0 as usize;
+        }
+    }
+    taken.reverse();
+    (dp[n][capacity], taken)
+}`,
+}
+
+const ACTIVE_MAP = {
+  pseudo: { init: 0, fill: 6, back: 12 },
+  c:      { init: 6, fill: 12, back: 21 },
+  cpp:    { init: 9, fill: 14, back: 21 },
+  python: { init: 4, fill: 9, back: 14 },
+  java:   { init: 5, fill: 10, back: 17 },
+  rust:   { init: 4, fill: 9, back: 20 },
+}
+function activeLinesFor(phase) {
+  const out = {}
+  for (const lang of Object.keys(ACTIVE_MAP)) {
+    const v = ACTIVE_MAP[lang][phase]
+    if (typeof v === 'number') out[lang] = v
+  }
+  return out
+}
 
 function DPGrid({ dp, cur, taken = [], phase }) {
   const rows = dp.length
@@ -253,7 +399,7 @@ export default function DPKnapsack() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <PseudocodeBlock lines={PSEUDO} activeLine={f?.line ?? -1} />
+      <MultiLangCode title='0/1 Knapsack — DP + backtrack' code={CODE} activeLines={activeLinesFor(f?.phase)} />
 
       <ComplexityTable rows={[
         { op: '0/1 Knapsack DP',       best: 'O(nC)',   avg: 'O(nC)',   worst: 'O(nC)',   space: 'O(nC)' },

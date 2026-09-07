@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { InputNumber } from 'antd'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
-  ControlsPanel, StepControls, useStepEngine, PseudocodeBlock,
+  ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
@@ -62,20 +62,159 @@ function hullFrames(points) {
   return { frames, hull }
 }
 
-const PSEUDO = [
-  'sort points by (x, y)',
-  'lower = []',
-  'for p in points:',
-  '  while |lower| >= 2 and cross(lower[-2], lower[-1], p) <= 0:',
-  '    lower.pop()',
-  '  lower.push(p)',
-  'upper = []',
-  'for p in reversed(points):',
-  '  while |upper| >= 2 and cross(upper[-2], upper[-1], p) <= 0:',
-  '    upper.pop()',
-  '  upper.push(p)',
-  'hull = lower[:-1] + upper[:-1]',
-]
+// Andrew's Monotone Chain in six languages.
+const CODE = {
+  pseudo: `sort points by (x, y)
+lower = []
+for p in points:
+  while |lower| >= 2 and cross(lower[-2], lower[-1], p) <= 0:
+    lower.pop()
+  lower.push(p)
+upper = []
+for p in reversed(points):
+  while |upper| >= 2 and cross(upper[-2], upper[-1], p) <= 0:
+    upper.pop()
+  upper.push(p)
+hull = lower[:-1] + upper[:-1]`,
+
+  c: `#include <stdlib.h>
+
+typedef struct { double x, y; } Pt;
+
+static double cross(Pt O, Pt A, Pt B) {
+    return (A.x - O.x) * (B.y - O.y) - (A.y - O.y) * (B.x - O.x);
+}
+static int cmp(const void* a, const void* b) {
+    Pt *p = (Pt*)a, *q = (Pt*)b;
+    if (p->x != q->x) return p->x < q->x ? -1 : 1;
+    return p->y < q->y ? -1 : p->y > q->y ? 1 : 0;
+}
+
+/* Writes hull to 'out', returns its vertex count. */
+int convex_hull(Pt* pts, int n, Pt* out) {
+    qsort(pts, n, sizeof(Pt), cmp);
+    int k = 0;
+    for (int i = 0; i < n; i++) {
+        while (k >= 2 && cross(out[k - 2], out[k - 1], pts[i]) <= 0) k--;
+        out[k++] = pts[i];
+    }
+    int lower = k + 1;
+    for (int i = n - 2; i >= 0; i--) {
+        while (k >= lower && cross(out[k - 2], out[k - 1], pts[i]) <= 0) k--;
+        out[k++] = pts[i];
+    }
+    return k - 1;   /* last point equals first, drop it */
+}`,
+
+  cpp: `#include <vector>
+#include <algorithm>
+
+struct Pt { double x, y; };
+static double cross(Pt O, Pt A, Pt B) {
+    return (A.x - O.x) * (B.y - O.y) - (A.y - O.y) * (B.x - O.x);
+}
+
+std::vector<Pt> convex_hull(std::vector<Pt> pts) {
+    std::sort(pts.begin(), pts.end(),
+              [](Pt a, Pt b) { return a.x != b.x ? a.x < b.x : a.y < b.y; });
+    int n = (int)pts.size(), k = 0;
+    std::vector<Pt> h(2 * n);
+    // Lower hull, left-to-right.
+    for (int i = 0; i < n; ++i) {
+        while (k >= 2 && cross(h[k - 2], h[k - 1], pts[i]) <= 0) --k;
+        h[k++] = pts[i];
+    }
+    // Upper hull, right-to-left.
+    for (int i = n - 2, t = k + 1; i >= 0; --i) {
+        while (k >= t && cross(h[k - 2], h[k - 1], pts[i]) <= 0) --k;
+        h[k++] = pts[i];
+    }
+    h.resize(k - 1);
+    return h;
+}`,
+
+  python: `def convex_hull(points):
+    pts = sorted(set(map(tuple, points)))
+    if len(pts) <= 1:
+        return pts
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+    # Lower hull.
+    lower = []
+    for p in pts:
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], p) <= 0:
+            lower.pop()
+        lower.append(p)
+    # Upper hull.
+    upper = []
+    for p in reversed(pts):
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], p) <= 0:
+            upper.pop()
+        upper.append(p)
+    return lower[:-1] + upper[:-1]`,
+
+  java: `import java.util.*;
+
+public static double[][] convexHull(double[][] pts) {
+    Arrays.sort(pts, (a, b) -> a[0] != b[0]
+        ? Double.compare(a[0], b[0]) : Double.compare(a[1], b[1]));
+    int n = pts.length, k = 0;
+    double[][] h = new double[2 * n][];
+    for (int i = 0; i < n; i++) {
+        while (k >= 2 && cross(h[k - 2], h[k - 1], pts[i]) <= 0) k--;
+        h[k++] = pts[i];
+    }
+    for (int i = n - 2, t = k + 1; i >= 0; i--) {
+        while (k >= t && cross(h[k - 2], h[k - 1], pts[i]) <= 0) k--;
+        h[k++] = pts[i];
+    }
+    return Arrays.copyOf(h, k - 1);
+}
+
+private static double cross(double[] o, double[] a, double[] b) {
+    return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+}`,
+
+  rust: `pub fn convex_hull(mut pts: Vec<(f64, f64)>) -> Vec<(f64, f64)> {
+    pts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap()
+        .then(a.1.partial_cmp(&b.1).unwrap()));
+    let cross = |o: (f64, f64), a: (f64, f64), b: (f64, f64)| -> f64 {
+        (a.0 - o.0) * (b.1 - o.1) - (a.1 - o.1) * (b.0 - o.0)
+    };
+    let n = pts.len();
+    let mut h: Vec<(f64, f64)> = Vec::with_capacity(2 * n);
+    // Lower hull.
+    for &p in &pts {
+        while h.len() >= 2 && cross(h[h.len() - 2], h[h.len() - 1], p) <= 0.0 { h.pop(); }
+        h.push(p);
+    }
+    // Upper hull.
+    let t = h.len() + 1;
+    for &p in pts.iter().rev().skip(1) {
+        while h.len() >= t && cross(h[h.len() - 2], h[h.len() - 1], p) <= 0.0 { h.pop(); }
+        h.push(p);
+    }
+    h.pop();   // last point equals the first
+    h
+}`,
+}
+
+const ACTIVE_MAP = {
+  pseudo: { 'lower-pop': 4, 'lower-push': 6, 'upper-pop': 9, 'upper-push': 11, done: 12 },
+  c:      { 'lower-pop': 18, 'lower-push': 19, 'upper-pop': 23, 'upper-push': 24, done: 26 },
+  cpp:    { 'lower-pop': 13, 'lower-push': 14, 'upper-pop': 18, 'upper-push': 19, done: 22 },
+  python: { 'lower-pop': 9, 'lower-push': 10, 'upper-pop': 14, 'upper-push': 15, done: 16 },
+  java:   { 'lower-pop': 7, 'lower-push': 8, 'upper-pop': 11, 'upper-push': 12, done: 14 },
+  rust:   { 'lower-pop': 11, 'lower-push': 12, 'upper-pop': 16, 'upper-push': 17, done: 19 },
+}
+function activeLinesFor(phase) {
+  const out = {}
+  for (const lang of Object.keys(ACTIVE_MAP)) {
+    const v = ACTIVE_MAP[lang][phase]
+    if (typeof v === 'number') out[lang] = v
+  }
+  return out
+}
 
 function Canvas({ points, frame, onClick }) {
   const W = 400, H = 320
@@ -199,7 +338,7 @@ export default function ConvexHull() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <PseudocodeBlock lines={PSEUDO} activeLine={f?.line ?? -1} />
+      <MultiLangCode title='Convex hull — Andrew monotone chain' code={CODE} activeLines={activeLinesFor(f?.phase)} />
 
       <ComplexityTable rows={[
         { op: 'Andrew monotone chain', best: 'O(n \\log n)', avg: 'O(n \\log n)', worst: 'O(n \\log n)', space: 'O(n)' },

@@ -13,7 +13,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { InputNumber } from 'antd'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
-  ControlsPanel, StepControls, useStepEngine, PseudocodeBlock,
+  ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
 
@@ -67,17 +67,135 @@ function buildFrames(items, capacity) {
   return frames
 }
 
-const PSEUDO = [
-  'sort items by value/weight desc',
-  'used = 0; gain = 0',
-  'for it in items:',
-  '  if used + it.weight <= C:',
-  '    take it whole',
-  '  else:',
-  '    take fraction (C - used) / it.weight',
-  '    break',
-  'return gain',
-]
+const CODE = {
+  pseudo: `sort items by value/weight desc
+used = 0
+gain = 0.0
+for it in items:
+  if used + it.weight <= C:
+    take whole
+    used += it.weight
+    gain += it.value
+  else:
+    frac = (C - used) / it.weight
+    gain += it.value * frac
+    break
+return gain`,
+
+  c: `#include <stdlib.h>
+
+typedef struct { double weight, value; } Item;
+
+static int cmp_ratio_desc(const void* a, const void* b) {
+    double ra = ((Item*)a)->value / ((Item*)a)->weight;
+    double rb = ((Item*)b)->value / ((Item*)b)->weight;
+    return (rb > ra) - (rb < ra);
+}
+
+double fractional_knapsack(Item* items, int n, double C) {
+    qsort(items, n, sizeof(Item), cmp_ratio_desc);
+    double used = 0, gain = 0;
+    for (int i = 0; i < n; i++) {
+        if (used + items[i].weight <= C) {
+            used += items[i].weight;
+            gain += items[i].value;
+        } else {
+            /* Top up with a slice of the current item. */
+            gain += items[i].value * (C - used) / items[i].weight;
+            break;
+        }
+    }
+    return gain;
+}`,
+
+  cpp: `#include <vector>
+#include <algorithm>
+
+struct Item { double weight, value; };
+
+double fractional_knapsack(std::vector<Item> items, double C) {
+    std::sort(items.begin(), items.end(),
+              [](const Item& a, const Item& b) {
+                  return a.value / a.weight > b.value / b.weight;
+              });
+    double used = 0, gain = 0;
+    for (const auto& it : items) {
+        if (used + it.weight <= C) {
+            used += it.weight;
+            gain += it.value;
+        } else {
+            gain += it.value * (C - used) / it.weight;   // partial slice
+            break;
+        }
+    }
+    return gain;
+}`,
+
+  python: `def fractional_knapsack(items, C):
+    """items = list of (weight, value). Returns max gain (float)."""
+    # Best ratio first — linear gain per unit weight.
+    items = sorted(items, key=lambda x: x[1] / x[0], reverse=True)
+    used, gain = 0.0, 0.0
+    for w, v in items:
+        if used + w <= C:
+            used += w
+            gain += v
+        else:
+            gain += v * (C - used) / w
+            break
+    return gain`,
+
+  java: `import java.util.*;
+
+public static double fractionalKnapsack(double[][] items, double C) {
+    // items[i] = { weight, value }. Sort by value/weight descending.
+    Arrays.sort(items, (a, b) -> Double.compare(b[1] / b[0], a[1] / a[0]));
+    double used = 0, gain = 0;
+    for (double[] it : items) {
+        if (used + it[0] <= C) {
+            used += it[0];
+            gain += it[1];
+        } else {
+            gain += it[1] * (C - used) / it[0];   // fractional top-up
+            break;
+        }
+    }
+    return gain;
+}`,
+
+  rust: `pub fn fractional_knapsack(mut items: Vec<(f64, f64)>, capacity: f64) -> f64 {
+    // items = (weight, value). Best value/weight ratio first.
+    items.sort_by(|a, b| (b.1 / b.0).partial_cmp(&(a.1 / a.0)).unwrap());
+    let (mut used, mut gain) = (0.0, 0.0);
+    for (w, v) in items {
+        if used + w <= capacity {
+            used += w;
+            gain += v;
+        } else {
+            gain += v * (capacity - used) / w;   // last fractional slice
+            break;
+        }
+    }
+    gain
+}`,
+}
+
+const ACTIVE_MAP = {
+  pseudo: { sort: 0, whole: 6, frac: 10, done: 12 },
+  c:      { sort: 10, whole: 14, frac: 19, done: 22 },
+  cpp:    { sort: 6, whole: 13, frac: 17, done: 20 },
+  python: { sort: 3, whole: 8, frac: 10, done: 12 },
+  java:   { sort: 4, whole: 8, frac: 12, done: 15 },
+  rust:   { sort: 2, whole: 7, frac: 10, done: 13 },
+}
+function activeLinesFor(kind) {
+  const out = {}
+  for (const lang of Object.keys(ACTIVE_MAP)) {
+    const v = ACTIVE_MAP[lang][kind]
+    if (typeof v === 'number') out[lang] = v
+  }
+  return out
+}
 
 // ─── Chart ───────────────────────────────────
 function RatioChart({ items, frame, capacity }) {
@@ -208,7 +326,7 @@ export default function GreedyKnapsack() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <PseudocodeBlock lines={PSEUDO} activeLine={f?.line ?? -1} />
+      <MultiLangCode title='Fractional knapsack' code={CODE} activeLines={activeLinesFor(f?.kind)} />
 
       <ComplexityTable rows={[
         { op: 'Fractional Knapsack (sort + scan)', best: 'O(n \\log n)', avg: 'O(n \\log n)', worst: 'O(n \\log n)', space: 'O(n)' },

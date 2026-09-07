@@ -19,7 +19,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { InputNumber } from 'antd'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
-  ControlsPanel, StepControls, useStepEngine, PseudocodeBlock,
+  ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
@@ -140,35 +140,226 @@ function layoutTree(treeNodes) {
   return { positions, width, height, children }
 }
 
-// ─── Pseudocode (lines highlighted by frame kind) ─────────────
-const PSEUDO = [
-  'closestPair(P):',
-  '  sort P by x',
-  '  return solve(0, |P|)',
-  '',
-  'solve(lo, hi):',
-  '  if hi - lo <= 3: return bruteForce(lo, hi)',
-  '  mid = (lo + hi) / 2',
-  '  left  = solve(lo, mid)',
-  '  right = solve(mid, hi)',
-  '  best  = min(left, right)',
-  '  strip = { p in P[lo..hi) : |p.x - midX| < best }',
-  '  sort strip by y',
-  '  for i in 0..|strip|:',
-  '    for j = i+1 while strip[j].y - strip[i].y < best:',
-  '      best = min(best, dist(strip[i], strip[j]))',
-  '  return best',
-]
-function lineForKind(kind) {
-  switch (kind) {
-    case 'divide': return 4
-    case 'brute': case 'leaf-done': return 5
-    case 'compare': return 9
-    case 'strip': return 10
-    case 'strip-check': return 14
-    case 'combine-done': return 15
-    default: return -1
+// ─── Code (6 languages) with per-frame active line indices ────────
+const CODE = {
+  pseudo: `closestPair(P):
+  sort P by x
+  return solve(0, |P|)
+
+solve(lo, hi):
+  if hi - lo <= 3: return bruteForce(lo, hi)
+  mid = (lo + hi) / 2
+  left  = solve(lo, mid)
+  right = solve(mid, hi)
+  best  = min(left, right)
+  strip = { p in P[lo..hi) : |p.x - midX| < best }
+  sort strip by y
+  for i in 0..|strip|:
+    for j = i+1 while strip[j].y - strip[i].y < best:
+      best = min(best, dist(strip[i], strip[j]))
+  return best`,
+
+  c: `#include <math.h>
+#include <stdlib.h>
+
+typedef struct { double x, y; } Point;
+
+static double dist(Point a, Point b) {
+    double dx = a.x - b.x, dy = a.y - b.y;
+    return sqrt(dx*dx + dy*dy);
+}
+static int cmp_x(const void* a, const void* b) {
+    double d = ((Point*)a)->x - ((Point*)b)->x;
+    return (d > 0) - (d < 0);
+}
+static int cmp_y(const void* a, const void* b) {
+    double d = ((Point*)a)->y - ((Point*)b)->y;
+    return (d > 0) - (d < 0);
+}
+
+/* pts must be pre-sorted by x. Solves in O(n log n). */
+double solve(Point* pts, int lo, int hi) {
+    int n = hi - lo;
+    if (n <= 3) {
+        double best = 1e18;
+        for (int i = lo; i < hi; i++)
+            for (int j = i + 1; j < hi; j++) {
+                double d = dist(pts[i], pts[j]);
+                if (d < best) best = d;
+            }
+        return best;
+    }
+    int mid = (lo + hi) / 2;
+    double midX = pts[mid].x;
+    double dL = solve(pts, lo, mid);
+    double dR = solve(pts, mid, hi);
+    double best = dL < dR ? dL : dR;
+
+    Point strip[256]; int sn = 0;
+    for (int i = lo; i < hi; i++)
+        if (fabs(pts[i].x - midX) < best) strip[sn++] = pts[i];
+    qsort(strip, sn, sizeof(Point), cmp_y);
+    for (int i = 0; i < sn; i++)
+        for (int j = i + 1; j < sn && strip[j].y - strip[i].y < best; j++) {
+            double d = dist(strip[i], strip[j]);
+            if (d < best) best = d;
+        }
+    return best;
+}`,
+
+  cpp: `#include <vector>
+#include <algorithm>
+#include <cmath>
+
+struct Point { double x, y; };
+static double dist(const Point& a, const Point& b) {
+    return std::hypot(a.x - b.x, a.y - b.y);
+}
+
+double solve(std::vector<Point>& pts, int lo, int hi) {
+    int n = hi - lo;
+    if (n <= 3) {
+        double best = 1e18;
+        for (int i = lo; i < hi; ++i)
+            for (int j = i + 1; j < hi; ++j)
+                best = std::min(best, dist(pts[i], pts[j]));
+        return best;
+    }
+    int mid = (lo + hi) / 2;
+    double midX = pts[mid].x;
+    double best = std::min(solve(pts, lo, mid), solve(pts, mid, hi));
+
+    // Combine: only points within 'best' of the split-line matter.
+    std::vector<Point> strip;
+    for (int i = lo; i < hi; ++i)
+        if (std::fabs(pts[i].x - midX) < best) strip.push_back(pts[i]);
+    std::sort(strip.begin(), strip.end(),
+              [](const Point& a, const Point& b) { return a.y < b.y; });
+    for (int i = 0; i < (int)strip.size(); ++i)
+        for (int j = i + 1; j < (int)strip.size() && strip[j].y - strip[i].y < best; ++j)
+            best = std::min(best, dist(strip[i], strip[j]));
+    return best;
+}
+
+double closest_pair(std::vector<Point> pts) {
+    std::sort(pts.begin(), pts.end(),
+              [](const Point& a, const Point& b) { return a.x < b.x; });
+    return solve(pts, 0, (int)pts.size());
+}`,
+
+  python: `from math import hypot, inf
+
+def closest_pair(points):
+    pts = sorted(points, key=lambda p: p[0])
+    def solve(lo, hi):
+        n = hi - lo
+        if n <= 3:
+            best = inf
+            for i in range(lo, hi):
+                for j in range(i + 1, hi):
+                    best = min(best, hypot(pts[i][0] - pts[j][0], pts[i][1] - pts[j][1]))
+            return best
+        mid = (lo + hi) // 2
+        midX = pts[mid][0]
+        best = min(solve(lo, mid), solve(mid, hi))
+        # Only points within 'best' of the median-x can possibly beat it.
+        strip = sorted((p for p in pts[lo:hi] if abs(p[0] - midX) < best),
+                       key=lambda p: p[1])
+        for i in range(len(strip)):
+            j = i + 1
+            # Shamos' bound: at most 7 points to check.
+            while j < len(strip) and strip[j][1] - strip[i][1] < best:
+                best = min(best, hypot(strip[i][0] - strip[j][0], strip[i][1] - strip[j][1]))
+                j += 1
+        return best
+    return solve(0, len(pts))`,
+
+  java: `import java.util.*;
+
+public class ClosestPair {
+    public static double solve(double[][] pts, int lo, int hi) {
+        int n = hi - lo;
+        if (n <= 3) {
+            double best = Double.POSITIVE_INFINITY;
+            for (int i = lo; i < hi; i++)
+                for (int j = i + 1; j < hi; j++)
+                    best = Math.min(best, Math.hypot(pts[i][0] - pts[j][0],
+                                                     pts[i][1] - pts[j][1]));
+            return best;
+        }
+        int mid = (lo + hi) / 2;
+        double midX = pts[mid][0];
+        double best = Math.min(solve(pts, lo, mid), solve(pts, mid, hi));
+
+        double[][] strip = new double[hi - lo][];
+        int sn = 0;
+        for (int i = lo; i < hi; i++)
+            if (Math.abs(pts[i][0] - midX) < best) strip[sn++] = pts[i];
+        Arrays.sort(strip, 0, sn, (a, b) -> Double.compare(a[1], b[1]));
+        for (int i = 0; i < sn; i++)
+            for (int j = i + 1; j < sn && strip[j][1] - strip[i][1] < best; j++)
+                best = Math.min(best, Math.hypot(strip[i][0] - strip[j][0],
+                                                  strip[i][1] - strip[j][1]));
+        return best;
+    }
+
+    public static double closestPair(double[][] pts) {
+        Arrays.sort(pts, (a, b) -> Double.compare(a[0], b[0]));
+        return solve(pts, 0, pts.length);
+    }
+}`,
+
+  rust: `pub fn closest_pair(mut pts: Vec<(f64, f64)>) -> f64 {
+    pts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    fn dist(a: (f64, f64), b: (f64, f64)) -> f64 {
+        ((a.0 - b.0).powi(2) + (a.1 - b.1).powi(2)).sqrt()
+    }
+    fn solve(pts: &[(f64, f64)]) -> f64 {
+        let n = pts.len();
+        if n <= 3 {
+            let mut best = f64::INFINITY;
+            for i in 0..n {
+                for j in i + 1..n { best = best.min(dist(pts[i], pts[j])); }
+            }
+            return best;
+        }
+        let mid = n / 2;
+        let mid_x = pts[mid].0;
+        let best = solve(&pts[..mid]).min(solve(&pts[mid..]));
+        // Combine: sort a narrow y-strip and check bounded pairs.
+        let mut strip: Vec<(f64, f64)> = pts.iter()
+            .copied().filter(|p| (p.0 - mid_x).abs() < best).collect();
+        strip.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        let mut cur = best;
+        for i in 0..strip.len() {
+            let mut j = i + 1;
+            while j < strip.len() && strip[j].1 - strip[i].1 < cur {
+                cur = cur.min(dist(strip[i], strip[j]));
+                j += 1;
+            }
+        }
+        cur
+    }
+    solve(&pts)
+}`,
+}
+
+// Map frame kind to active line index for each language body.
+const ACTIVE_MAP = {
+  pseudo:   { divide: 4, brute: 5, 'leaf-done': 5, compare: 9, strip: 10, 'strip-check': 14, 'combine-done': 15 },
+  c:        { divide: 22, brute: 24, 'leaf-done': 29, compare: 32, strip: 39, 'strip-check': 44, 'combine-done': 47 },
+  cpp:      { divide: 9, brute: 12, 'leaf-done': 15, compare: 19, strip: 22, 'strip-check': 27, 'combine-done': 29 },
+  python:   { divide: 5, brute: 8, 'leaf-done': 11, compare: 14, strip: 17, 'strip-check': 22, 'combine-done': 24 },
+  java:     { divide: 4, brute: 8, 'leaf-done': 11, compare: 15, strip: 19, 'strip-check': 24, 'combine-done': 27 },
+  rust:     { divide: 8, brute: 11, 'leaf-done': 13, compare: 17, strip: 20, 'strip-check': 26, 'combine-done': 29 },
+}
+function activeLinesForKind(kind) {
+  const out = {}
+  for (const lang of Object.keys(ACTIVE_MAP)) {
+    const v = ACTIVE_MAP[lang][kind]
+    if (typeof v === 'number') out[lang] = v
   }
+  return out
 }
 
 // ─── Point cloud viz ─────────────────────────────────────────
@@ -278,7 +469,7 @@ export default function DivideConquer() {
   useEffect(() => { reset() /* eslint-disable-next-line */ }, [n, seed])
 
   const frame = frames[frameIdx] || null
-  const activeLine = lineForKind(frame?.kind)
+  const activeLines = activeLinesForKind(frame?.kind)
 
   return (
     <TopicShell slug='divide-conquer' title='Divide & Conquer' category='Algorithms'>
@@ -348,7 +539,7 @@ export default function DivideConquer() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <PseudocodeBlock lines={PSEUDO} activeLine={activeLine} />
+      <MultiLangCode title='Closest pair — divide & conquer' code={CODE} activeLines={activeLines} />
 
       <ComplexityTable rows={[
         { op: 'Closest pair (D&C)',   best: 'O(n \\log n)', avg: 'O(n \\log n)', worst: 'O(n \\log n)', space: 'O(n)' },

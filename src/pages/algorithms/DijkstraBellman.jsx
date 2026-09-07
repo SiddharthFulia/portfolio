@@ -13,9 +13,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { InputNumber, Switch } from 'antd'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
-  ControlsPanel, StepControls, useStepEngine, PseudocodeBlock,
+  ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
+import { CODE as SP_CODE } from './code/DijkstraBellman'
 
 function mulberry32(seed) {
   let a = (seed | 0) || 1
@@ -336,8 +337,8 @@ export default function DijkstraBellman() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <PseudocodeBlock lines={DIJKSTRA_PSEUDO} activeLine={djF?.line ?? -1} title='Dijkstra — pseudocode' />
-      <PseudocodeBlock lines={BF_PSEUDO} activeLine={bfF?.line ?? -1} title='Bellman–Ford — pseudocode' />
+      <MultiLangCode title='Dijkstra (priority queue)' code={SP_CODE.dijkstra} />
+      <MultiLangCode title='Bellman–Ford (with negative-cycle detection)' code={SP_CODE.bellman} />
 
       <ComplexityTable rows={[
         { op: 'Dijkstra (binary heap)', best: 'O((V+E) \\log V)', avg: 'O((V+E) \\log V)', worst: 'O((V+E) \\log V)', space: 'O(V+E)' },

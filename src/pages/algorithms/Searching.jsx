@@ -8,10 +8,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { InputNumber, Segmented } from 'antd'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
-  ControlsPanel, StepControls, useStepEngine, PseudocodeBlock,
+  ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
+import { CODE as SEARCHING_CODE } from './code/Searching'
 
 function mulberry32(seed) {
   let a = (seed | 0) || 1
@@ -224,10 +225,10 @@ export default function Searching() {
       </VisualiserSection>
 
       {(mode === 'race' || mode === 'linear') && (
-        <PseudocodeBlock lines={LINEAR_PSEUDO} activeLine={linCur?.line ?? -1} title='Linear Search — pseudocode' />
+        <MultiLangCode title='Linear Search' code={SEARCHING_CODE.linear} />
       )}
       {(mode === 'race' || mode === 'binary') && (
-        <PseudocodeBlock lines={BINARY_PSEUDO} activeLine={binCur?.line ?? -1} title='Binary Search — pseudocode' />
+        <MultiLangCode title='Binary Search' code={SEARCHING_CODE.binary} />
       )}
 
       <ComplexityTable rows={[

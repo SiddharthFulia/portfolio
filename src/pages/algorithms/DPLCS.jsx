@@ -11,7 +11,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Input } from 'antd'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
-  ControlsPanel, StepControls, useStepEngine, PseudocodeBlock,
+  ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
 
@@ -51,22 +51,160 @@ function buildFrames(A, B) {
   return { frames, lcs, length: dp[m][n] }
 }
 
-const PSEUDO = [
-  'dp[0..m][0..n] = 0',
-  'for i = 1 .. m:',
-  '  for j = 1 .. n:',
-  '    if A[i-1] == B[j-1]:',
-  '      # match — extend diagonal LCS',
-  '      dp[i][j] = dp[i-1][j-1] + 1',
-  '    else:',
-  '      # skip one character in A or B',
-  '      dp[i][j] = max(dp[i-1][j], dp[i][j-1])',
-  '# backtrack from dp[m][n]:',
-  '#   if A[i-1] == B[j-1]: keep, i--, j--',
-  '#   else if dp[i-1][j] >= dp[i][j-1]: i--',
-  '#   else: j--',
-  '# reverse chosen to get LCS',
-]
+const CODE = {
+  pseudo: `dp[0..m][0..n] = 0
+for i = 1 .. m:
+  for j = 1 .. n:
+    if A[i-1] == B[j-1]:
+      dp[i][j] = dp[i-1][j-1] + 1
+    else:
+      dp[i][j] = max(dp[i-1][j], dp[i][j-1])
+
+# Backtrack from dp[m][n]
+i = m; j = n; out = []
+while i > 0 and j > 0:
+  if A[i-1] == B[j-1]:
+    out.push(A[i-1]); i -= 1; j -= 1
+  else if dp[i-1][j] >= dp[i][j-1]:
+    i -= 1
+  else:
+    j -= 1
+reverse out → LCS`,
+
+  c: `#include <string.h>
+#include <stdlib.h>
+
+/* Returns LCS length; writes the LCS string to 'out' (caller pre-allocates). */
+int lcs(const char* A, const char* B, char* out) {
+    int m = (int)strlen(A), n = (int)strlen(B);
+    int (*dp)[n + 1] = calloc(m + 1, sizeof(int[n + 1]));
+    for (int i = 1; i <= m; i++) {
+        for (int j = 1; j <= n; j++) {
+            if (A[i - 1] == B[j - 1]) dp[i][j] = dp[i - 1][j - 1] + 1;
+            else dp[i][j] = dp[i - 1][j] >= dp[i][j - 1] ? dp[i - 1][j] : dp[i][j - 1];
+        }
+    }
+    int len = dp[m][n], i = m, j = n, k = len;
+    out[len] = '\\0';
+    while (i > 0 && j > 0) {
+        if (A[i - 1] == B[j - 1]) { out[--k] = A[i - 1]; i--; j--; }
+        else if (dp[i - 1][j] >= dp[i][j - 1]) i--;
+        else j--;
+    }
+    free(dp);
+    return len;
+}`,
+
+  cpp: `#include <string>
+#include <vector>
+#include <algorithm>
+
+std::string lcs(const std::string& A, const std::string& B) {
+    int m = (int)A.size(), n = (int)B.size();
+    std::vector<std::vector<int>> dp(m + 1, std::vector<int>(n + 1, 0));
+    for (int i = 1; i <= m; ++i) {
+        for (int j = 1; j <= n; ++j) {
+            if (A[i - 1] == B[j - 1]) dp[i][j] = dp[i - 1][j - 1] + 1;
+            else dp[i][j] = std::max(dp[i - 1][j], dp[i][j - 1]);
+        }
+    }
+    std::string out;
+    int i = m, j = n;
+    while (i > 0 && j > 0) {
+        if (A[i - 1] == B[j - 1]) { out.push_back(A[i - 1]); --i; --j; }
+        else if (dp[i - 1][j] >= dp[i][j - 1]) --i;
+        else --j;
+    }
+    std::reverse(out.begin(), out.end());
+    return out;
+}`,
+
+  python: `def lcs(A, B):
+    m, n = len(A), len(B)
+    # dp[i][j] = LCS length of prefixes A[:i] and B[:j].
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if A[i - 1] == B[j - 1]:
+                dp[i][j] = dp[i - 1][j - 1] + 1
+            else:
+                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
+    # Backtrack from the corner — reveals the LCS in reverse.
+    out, i, j = [], m, n
+    while i > 0 and j > 0:
+        if A[i - 1] == B[j - 1]:
+            out.append(A[i - 1]); i -= 1; j -= 1
+        elif dp[i - 1][j] >= dp[i][j - 1]:
+            i -= 1
+        else:
+            j -= 1
+    return ''.join(reversed(out))`,
+
+  java: `public static String lcs(String A, String B) {
+    int m = A.length(), n = B.length();
+    int[][] dp = new int[m + 1][n + 1];
+    for (int i = 1; i <= m; i++) {
+        for (int j = 1; j <= n; j++) {
+            if (A.charAt(i - 1) == B.charAt(j - 1)) dp[i][j] = dp[i - 1][j - 1] + 1;
+            else dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+        }
+    }
+    StringBuilder sb = new StringBuilder();
+    int i = m, j = n;
+    while (i > 0 && j > 0) {
+        if (A.charAt(i - 1) == B.charAt(j - 1)) {
+            sb.append(A.charAt(i - 1)); i--; j--;
+        } else if (dp[i - 1][j] >= dp[i][j - 1]) i--;
+        else j--;
+    }
+    return sb.reverse().toString();
+}`,
+
+  rust: `pub fn lcs(a: &[u8], b: &[u8]) -> Vec<u8> {
+    let (m, n) = (a.len(), b.len());
+    let mut dp = vec![vec![0u32; n + 1]; m + 1];
+    for i in 1..=m {
+        for j in 1..=n {
+            dp[i][j] = if a[i - 1] == b[j - 1] {
+                dp[i - 1][j - 1] + 1
+            } else {
+                dp[i - 1][j].max(dp[i][j - 1])
+            };
+        }
+    }
+    // Backtrack along the winning direction at every cell.
+    let (mut i, mut j, mut out) = (m, n, Vec::new());
+    while i > 0 && j > 0 {
+        if a[i - 1] == b[j - 1] {
+            out.push(a[i - 1]);
+            i -= 1; j -= 1;
+        } else if dp[i - 1][j] >= dp[i][j - 1] {
+            i -= 1;
+        } else {
+            j -= 1;
+        }
+    }
+    out.reverse();
+    out
+}`,
+}
+
+const ACTIVE_MAP = {
+  pseudo: { init: 0, fill: 6, back: 13 },
+  c:      { init: 4, fill: 10, back: 15 },
+  cpp:    { init: 6, fill: 12, back: 17 },
+  python: { init: 3, fill: 9, back: 14 },
+  java:   { init: 3, fill: 9, back: 14 },
+  rust:   { init: 3, fill: 8, back: 15 },
+}
+function activeLinesFor(phase) {
+  const out = {}
+  for (const lang of Object.keys(ACTIVE_MAP)) {
+    const v = ACTIVE_MAP[lang][phase]
+    if (typeof v === 'number') out[lang] = v
+  }
+  return out
+}
 
 function DPGrid({ A, B, dp, cur }) {
   const m = A.length, n = B.length
@@ -181,7 +319,7 @@ export default function DPLCS() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <PseudocodeBlock lines={PSEUDO} activeLine={f?.line ?? -1} />
+      <MultiLangCode title='Longest Common Subsequence' code={CODE} activeLines={activeLinesFor(f?.phase)} />
 
       <ComplexityTable rows={[
         { op: 'LCS DP',                 best: 'O(mn)',        avg: 'O(mn)',        worst: 'O(mn)',        space: 'O(mn)' },

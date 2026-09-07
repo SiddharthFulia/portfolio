@@ -15,7 +15,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Input } from 'antd'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
-  ControlsPanel, StepControls, useStepEngine, PseudocodeBlock,
+  ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
 
@@ -65,18 +65,194 @@ function buildSearchFrames(text, pat, pi) {
   return { matches, frames }
 }
 
-const SEARCH_PSEUDO = [
-  'j = 0',
-  'for i = 0 .. |text| - 1:',
-  '  while j > 0 and text[i] ≠ pat[j]:',
-  '    j = π[j-1]         # jump using failure function',
-  '  if text[i] == pat[j]:',
-  '    j++',
-  '  # else j stays at 0',
-  '  if j == |pat|:',
-  '    report match at i - |pat| + 1',
-  '    j = π[j-1]',
-]
+// KMP — failure function + search loop, in six languages.
+const CODE = {
+  pseudo: `# Build π (failure function)
+pi[0] = 0
+k = 0
+for i = 1 .. m-1:
+  while k > 0 and pat[k] != pat[i]:
+    k = pi[k-1]
+  if pat[k] == pat[i]: k += 1
+  pi[i] = k
+
+# Search
+j = 0
+for i = 0 .. n-1:
+  while j > 0 and text[i] != pat[j]:
+    j = pi[j-1]
+  if text[i] == pat[j]:
+    j += 1
+  if j == m:
+    report match at i - m + 1
+    j = pi[j-1]`,
+
+  c: `#include <string.h>
+#include <stdlib.h>
+
+void build_pi(const char* pat, int m, int* pi) {
+    pi[0] = 0;
+    int k = 0;
+    for (int i = 1; i < m; i++) {
+        while (k > 0 && pat[k] != pat[i]) k = pi[k - 1];
+        if (pat[k] == pat[i]) k++;
+        pi[i] = k;
+    }
+}
+
+int kmp_search(const char* text, const char* pat, int* out) {
+    int n = (int)strlen(text), m = (int)strlen(pat);
+    if (m == 0) return 0;
+    int* pi = (int*)malloc(m * sizeof(int));
+    build_pi(pat, m, pi);
+    int j = 0, matches = 0;
+    for (int i = 0; i < n; i++) {
+        while (j > 0 && text[i] != pat[j]) j = pi[j - 1];
+        if (text[i] == pat[j]) j++;
+        if (j == m) {
+            out[matches++] = i - m + 1;
+            j = pi[j - 1];   /* keep going for overlapping matches */
+        }
+    }
+    free(pi);
+    return matches;
+}`,
+
+  cpp: `#include <string>
+#include <vector>
+
+std::vector<int> build_pi(const std::string& pat) {
+    int m = (int)pat.size();
+    std::vector<int> pi(m, 0);
+    int k = 0;
+    for (int i = 1; i < m; ++i) {
+        while (k > 0 && pat[k] != pat[i]) k = pi[k - 1];
+        if (pat[k] == pat[i]) k++;
+        pi[i] = k;
+    }
+    return pi;
+}
+
+std::vector<int> kmp_search(const std::string& text, const std::string& pat) {
+    std::vector<int> matches;
+    if (pat.empty()) return matches;
+    auto pi = build_pi(pat);
+    int j = 0, m = (int)pat.size();
+    for (int i = 0; i < (int)text.size(); ++i) {
+        while (j > 0 && text[i] != pat[j]) j = pi[j - 1];
+        if (text[i] == pat[j]) j++;
+        if (j == m) {
+            matches.push_back(i - m + 1);
+            j = pi[j - 1];              // allow overlapping matches
+        }
+    }
+    return matches;
+}`,
+
+  python: `def build_pi(pat):
+    m = len(pat)
+    pi = [0] * m
+    k = 0
+    for i in range(1, m):
+        # Roll back k using previous π values until we can extend or hit 0.
+        while k > 0 and pat[k] != pat[i]:
+            k = pi[k - 1]
+        if pat[k] == pat[i]:
+            k += 1
+        pi[i] = k
+    return pi
+
+def kmp_search(text, pat):
+    if not pat:
+        return []
+    pi = build_pi(pat)
+    matches = []
+    j = 0
+    for i, ch in enumerate(text):
+        while j > 0 and ch != pat[j]:
+            j = pi[j - 1]
+        if ch == pat[j]:
+            j += 1
+        if j == len(pat):
+            matches.append(i - len(pat) + 1)
+            j = pi[j - 1]     # continue for overlapping matches
+    return matches`,
+
+  java: `import java.util.*;
+
+public static int[] buildPi(String pat) {
+    int m = pat.length();
+    int[] pi = new int[m];
+    int k = 0;
+    for (int i = 1; i < m; i++) {
+        while (k > 0 && pat.charAt(k) != pat.charAt(i)) k = pi[k - 1];
+        if (pat.charAt(k) == pat.charAt(i)) k++;
+        pi[i] = k;
+    }
+    return pi;
+}
+
+public static List<Integer> kmpSearch(String text, String pat) {
+    List<Integer> matches = new ArrayList<>();
+    if (pat.isEmpty()) return matches;
+    int[] pi = buildPi(pat);
+    int j = 0, m = pat.length();
+    for (int i = 0; i < text.length(); i++) {
+        while (j > 0 && text.charAt(i) != pat.charAt(j)) j = pi[j - 1];
+        if (text.charAt(i) == pat.charAt(j)) j++;
+        if (j == m) {
+            matches.add(i - m + 1);
+            j = pi[j - 1];        // overlapping matches
+        }
+    }
+    return matches;
+}`,
+
+  rust: `pub fn build_pi(pat: &[u8]) -> Vec<usize> {
+    let m = pat.len();
+    let mut pi = vec![0usize; m];
+    let mut k = 0usize;
+    for i in 1..m {
+        while k > 0 && pat[k] != pat[i] { k = pi[k - 1]; }
+        if pat[k] == pat[i] { k += 1; }
+        pi[i] = k;
+    }
+    pi
+}
+
+pub fn kmp_search(text: &[u8], pat: &[u8]) -> Vec<usize> {
+    if pat.is_empty() { return Vec::new(); }
+    let pi = build_pi(pat);
+    let (mut j, mut matches) = (0usize, Vec::new());
+    for (i, &ch) in text.iter().enumerate() {
+        while j > 0 && pat[j] != ch { j = pi[j - 1]; }
+        if pat[j] == ch { j += 1; }
+        if j == pat.len() {
+            matches.push(i + 1 - pat.len());
+            j = pi[j - 1];    // continue for overlapping hits
+        }
+    }
+    matches
+}`,
+}
+
+// Map the current visualiser step to an active line per language.
+const ACTIVE_MAP = {
+  pseudo: { jump: 14, 'match-char': 16, compare: 15, match: 18 },
+  c:      { jump: 17, 'match-char': 18, compare: 17, match: 20 },
+  cpp:    { jump: 17, 'match-char': 18, compare: 17, match: 21 },
+  python: { jump: 22, 'match-char': 24, compare: 23, match: 26 },
+  java:   { jump: 20, 'match-char': 21, compare: 20, match: 23 },
+  rust:   { jump: 18, 'match-char': 19, compare: 18, match: 22 },
+}
+function activeLinesFor(kind) {
+  const out = {}
+  for (const lang of Object.keys(ACTIVE_MAP)) {
+    const v = ACTIVE_MAP[lang][kind]
+    if (typeof v === 'number') out[lang] = v
+  }
+  return out
+}
 
 // ─── Row renderer ────────────────────────────────
 function TextRow({ chars, active, matched = [], label, tone = 'gray' }) {
@@ -234,7 +410,7 @@ export default function KMP() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <PseudocodeBlock lines={SEARCH_PSEUDO} activeLine={f?.line ?? -1} title='KMP search — pseudocode' />
+      <MultiLangCode title='KMP — failure function + search' code={CODE} activeLines={activeLinesFor(f?.kind)} />
 
       <ComplexityTable rows={[
         { op: 'Naive search',      best: 'O(n)',      avg: 'O(nm)',   worst: 'O(nm)',   space: 'O(1)' },

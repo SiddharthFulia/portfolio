@@ -13,9 +13,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { InputNumber } from 'antd'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel,
-  ControlsPanel, StepControls, useStepEngine, PseudocodeBlock,
+  ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
+import { CODE as LIS_CODE } from './code/DPLIS'
 
 function mulberry32(seed) {
   let a = (seed | 0) || 1
@@ -284,8 +285,8 @@ export default function DPLIS() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <PseudocodeBlock lines={DP_PSEUDO} activeLine={-1} title='O(n²) DP — pseudocode' />
-      <PseudocodeBlock lines={PATIENCE_PSEUDO} activeLine={-1} title='Patience Sort O(n log n) — pseudocode' />
+      <MultiLangCode title='LIS — O(n²) DP' code={LIS_CODE.dp} />
+      <MultiLangCode title='LIS — Patience O(n log n)' code={LIS_CODE.patience} />
 
       <ComplexityTable rows={[
         { op: 'DP (n²)',                best: 'O(n)',      avg: 'O(n^2)',       worst: 'O(n^2)',       space: 'O(n)' },
