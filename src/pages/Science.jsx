@@ -19,6 +19,7 @@ import {
   fetchAPOD, fetchISS as fetchISSPosition, fetchAstros, fetchAsteroids,
   fetchFlares, fetchEPIC, todayStr, daysAgo, formatDistance,
 } from '../api/nasa'
+import { LuxeLoader } from '../components/loaders'
 
 /* ── Category chips ── */
 const CATEGORIES = [
@@ -136,7 +137,7 @@ const StatCard = ({ tone = 'amber', label, icon, value, ctx, loading, href }) =>
         <span className={`ml-auto w-1.5 h-1.5 rounded-full ${s.dot} animate-pulse`} title="live" />
       </div>
       {loading ? (
-        <div className="animate-pulse h-6 w-2/3 bg-gray-800 rounded" />
+        <div className='py-1'><LuxeLoader variant='cosmos' size='sm' /></div>
       ) : (
         <div className="text-white font-bold text-base sm:text-lg leading-tight truncate" title={typeof value === 'string' ? value : undefined}>{value ?? '—'}</div>
       )}

@@ -8,7 +8,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Skeleton, Switch, Tooltip } from 'antd';
+import { Switch, Tooltip } from 'antd';
+import { LuxeLoader } from '../components/loaders';
 import {
   ArrowLeftOutlined, CopyOutlined, DeleteOutlined,
   EditOutlined, LinkOutlined, EyeOutlined, WarningFilled,
@@ -144,8 +145,8 @@ export default function QRShare() {
         </div>
 
         {loading ? (
-          <div className='luxe-glass p-6 md:p-8'>
-            <Skeleton active paragraph={{ rows: 6 }} />
+          <div className='luxe-glass p-6 md:p-8 flex items-center justify-center min-h-[240px]'>
+            <LuxeLoader variant='qr' size='md' label='Fetching your QR…' />
           </div>
         ) : err ? (
           <div className='luxe-glass p-8 text-center'>

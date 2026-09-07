@@ -26,6 +26,7 @@ import {
   ExperimentOutlined,
 } from '@ant-design/icons'
 import { Button } from '../components/ui'
+import { LuxeLoader } from '../components/loaders'
 
 import catalog from '../constants/osintCatalog.json'
 
@@ -76,7 +77,7 @@ const StatCard = ({ icon, label, value, ctx, tone = 'amber', loading, updated })
         <span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">{label}</span>
       </div>
       {loading ? (
-        <Skeleton.Input active size="small" style={{ width: '90%' }} />
+        <div className='py-1'><LuxeLoader variant='osint' size='sm' /></div>
       ) : (
         <motion.div
           key={String(value)}

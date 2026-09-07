@@ -23,6 +23,7 @@ import {
   RadarChartOutlined, ExperimentOutlined,
 } from '@ant-design/icons'
 import katex from 'katex'
+import { LuxeLoader } from '../components/loaders'
 
 const BE_URL = import.meta.env.VITE_BE_URL || 'http://localhost:4001'
 
@@ -1466,13 +1467,20 @@ export default function Chernobyl() {
               </p>
               <span className='text-[10px] font-mono text-fg-muted'>{GRID_COLS} × {GRID_ROWS} channels</span>
             </div>
-            <RectangularReactorGrid
-              series={display}
-              rodPos={rod}
-              tIdx={display.length - 1}
-              az5Fired={az5Fired}
-              onEvent={onGridEvent}
-            />
+            <div className='relative'>
+              <RectangularReactorGrid
+                series={display}
+                rodPos={rod}
+                tIdx={display.length - 1}
+                az5Fired={az5Fired}
+                onEvent={onGridEvent}
+              />
+              {beLoading && (
+                <div className='absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm rounded'>
+                  <LuxeLoader variant='reactor' size='md' label='Warming the core…' />
+                </div>
+              )}
+            </div>
             <div className='mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-mono text-fg-muted'>
               <span className='inline-flex items-center gap-1'>
                 <span className='inline-block w-3 h-3 rounded' style={{ background: '#4a7dc9' }} /> fresh (U-235)

@@ -33,6 +33,7 @@ import {
   ELEMENTS, BY_Z, CAT_COLORS,
   ISOTOPES, CHAIN_ROOTS, buildChain, fmtHalfLife,
 } from '../lib/atomsData'
+import { LuxeLoader } from '../components/loaders'
 
 // ─── KaTeX helpers (identical shape to PhysicsLab / Chernobyl) ─
 function renderTex(src, opts = {}) {
@@ -162,6 +163,10 @@ export default function Atoms() {
   // ── Live perf badge ────────────────────────────────────────
   const [fps, setFps] = useState(0)
   const [particleCount, setPC] = useState(0)
+  // Brief "sampling" state — flips true whenever a new probability cloud
+  // is being (re-)computed. Large cloudN can take ~200 ms of main-thread
+  // work; showing the LuxeLoader on top of the canvas makes that visible.
+  const [isSampling, setIsSampling] = useState(false)
 
   // ── Refs (canvas + engine state) ───────────────────────────
   const canvasRef  = useRef(null)
@@ -196,9 +201,16 @@ export default function Atoms() {
   }, [A])
 
   useEffect(() => {
-    if (mode !== 'cloud') { cloudRef.current = null; setPC(nucleusRef.current.length); return }
-    cloudRef.current = sampleOrbital({ n: nQ, l: lQ, m: mQ, N: cloudN })
-    setPC(cloudN + nucleusRef.current.length)
+    if (mode !== 'cloud') { cloudRef.current = null; setPC(nucleusRef.current.length); setIsSampling(false); return }
+    setIsSampling(true)
+    // Defer to next frame so the loader overlay actually paints before the
+    // main-thread-blocking sample kernel runs.
+    const raf = requestAnimationFrame(() => {
+      cloudRef.current = sampleOrbital({ n: nQ, l: lQ, m: mQ, N: cloudN })
+      setPC(cloudN + nucleusRef.current.length)
+      setIsSampling(false)
+    })
+    return () => cancelAnimationFrame(raf)
   }, [mode, nQ, lQ, mQ, cloudN, A])
 
   // ─── Element selection → sensible A + shell config guess ───
@@ -644,7 +656,7 @@ export default function Atoms() {
                 </button>
               </span>
             </div>
-            <div style={{ aspectRatio: '1 / 1' }} className='w-full max-w-[720px] mx-auto'>
+            <div style={{ aspectRatio: '1 / 1' }} className='w-full max-w-[720px] mx-auto relative'>
               <canvas
                 ref={canvasRef}
                 onPointerDown={onPointerDown}
@@ -653,6 +665,11 @@ export default function Atoms() {
                 onPointerLeave={onPointerUp}
                 style={{ display: 'block', width: '100%', height: '100%', borderRadius: 12, cursor: mode === 'cloud' ? 'grab' : 'default' }}
               />
+              {isSampling && mode === 'cloud' && (
+                <div className='absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm' style={{ borderRadius: 12 }}>
+                  <LuxeLoader variant='orbital' size='md' label='Sampling |ψ|²…' />
+                </div>
+              )}
             </div>
             <p className='text-[11px] text-fg-muted mt-2'>
               {mode === 'cloud'

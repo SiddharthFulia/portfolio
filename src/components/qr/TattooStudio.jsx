@@ -39,6 +39,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { analyzeTattoo, checkTattooHealth } from '../../api/tattoo'
 import { createQrSave, listQrSaves, deleteQrSave } from '../../api/qrSaves'
 import { notice } from '../../lib/notice'
+import { LuxeLoader } from '../loaders'
 
 // FE-facing shape constants (mirror QRCompiler). Keep in sync manually if
 // they ever change on the editor side.
@@ -325,12 +326,12 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
         )}
       </div>
 
-      {/* Loading skeleton */}
+      {/* Loading state */}
       {analyzing && (
         <div className='luxe-glass p-6'>
-          <div className='flex items-center gap-3 mb-4'>
-            <div className='w-8 h-8 rounded-full border-2 border-amber-300 border-t-transparent animate-spin' />
-            <div>
+          <div className='flex items-center gap-4 mb-4'>
+            <LuxeLoader variant='tattoo' size='md' label='Reading the ink…' />
+            <div className='flex-1 min-w-0'>
               <div className='font-bold text-amber-200'>Reading the ink…</div>
               <FieldHelp>Identifying subject, style, motifs, palette, complexity.</FieldHelp>
             </div>

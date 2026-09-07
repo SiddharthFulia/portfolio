@@ -25,6 +25,7 @@ import katex from 'katex'
 import {
   simulatePendulum, phasePendulum, lyapunovPendulum,
 } from '../api/physics'
+import { LuxeLoader } from '../components/loaders'
 
 const DEG = Math.PI / 180
 
@@ -907,8 +908,13 @@ export default function PhysicsLab() {
                 <span className='text-cyan-300'>Server simulate (30 s)</span> — dt = 0.001 (server), decimated for wire.
                 {beSimulate?.series?.length && <> · <span className='text-emerald-300'>{beSimulate.series.length}</span> samples returned.</>}
               </div>
-              <div style={{ height: 280 }} className={beLoading ? 'animate-pulse opacity-70' : ''}>
+              <div style={{ height: 280 }} className='relative'>
                 <canvas ref={beSeriesRef} style={{ display: 'block', width: '100%', height: '100%' }} />
+                {beLoading && (
+                  <div className='absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm rounded'>
+                    <LuxeLoader variant='physics' size='md' label='Server compute (30s)…' />
+                  </div>
+                )}
               </div>
               <div className='flex items-center gap-3 text-[10px] font-mono mt-2'>
                 <span className='flex items-center gap-1'><span className='w-2.5 h-2.5 rounded-full bg-amber-400' /> K</span>
@@ -924,8 +930,13 @@ export default function PhysicsLab() {
                 <span className='text-cyan-300'>Server phase space</span> — 8 seeded trajectories, θ₁ wrapped to [−π, π].
                 {bePhase?.curves?.length && <> · <span className='text-emerald-300'>{bePhase.curves.length}</span> curves × <span className='text-emerald-300'>{bePhase.curves[0]?.t1?.length ?? 0}</span> pts.</>}
               </div>
-              <div style={{ height: 340 }} className={beLoading ? 'animate-pulse opacity-70' : ''}>
+              <div style={{ height: 340 }} className='relative'>
                 <canvas ref={bePhaseCanvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />
+                {beLoading && (
+                  <div className='absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm rounded'>
+                    <LuxeLoader variant='physics' size='md' label='Server compute (30s)…' />
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -952,8 +963,13 @@ export default function PhysicsLab() {
                   </div>
                 )}
               </div>
-              <div style={{ height: 260 }} className={beLoading ? 'animate-pulse opacity-70' : ''}>
+              <div style={{ height: 260 }} className='relative'>
                 <canvas ref={beLyapunovRef} style={{ display: 'block', width: '100%', height: '100%' }} />
+                {beLoading && (
+                  <div className='absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm rounded'>
+                    <LuxeLoader variant='physics' size='md' label='Server compute (30s)…' />
+                  </div>
+                )}
               </div>
               <div className='text-[10px] text-fg-muted mt-2'>
                 Slope of the log-separation curve = λ. A straight line for a large duration confirms exponential divergence.
