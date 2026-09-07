@@ -32,6 +32,7 @@ import {
 import { get as apiGet } from '../api/request'
 import { ENDPOINTS } from '../api/endpoints'
 import { notify } from '../utils/notify'
+import { LuxeLoader } from '../components/loaders'
 
 // ─── Haversine — meters between two lat/lng ────────────────────
 function haversine(a, b) {
@@ -1785,7 +1786,7 @@ export default function Pathfinding() {
             Pathfinding Lab · City Road Graphs
           </h1>
           <p className='text-sm text-fg-muted mt-1 max-w-3xl'>
-            Twelve algorithms racing through OpenStreetMap road data across 10 Indian metros. Pick a city,
+            Twelve algorithms racing through live road-network data across 10 Indian metros. Pick a city,
             drag to pan, wheel to zoom, click to set start/end, and watch how each algorithm thinks — or
             hit <span className='text-amber-300'>Run all</span> to race them side-by-side.
           </p>
@@ -1904,15 +1905,16 @@ export default function Pathfinding() {
               <div className='absolute inset-0 flex flex-col items-center justify-center gap-3 z-10 bg-black/40 backdrop-blur-sm'>
                 {status === 'error' ? (
                   <>
-                    <div className='text-rose-300 text-sm font-bold'>Failed to load road graph</div>
+                    <div className='text-rose-300 text-sm font-bold'>Couldn't load the city graph — try again</div>
                     <div className='text-[11px] font-mono text-fg-muted max-w-md text-center px-6'>{errMsg}</div>
                   </>
                 ) : (
                   <>
-                    <div className='w-10 h-10 border-2 border-amber-300 border-t-transparent rounded-full animate-spin' />
-                    <div className='text-sm text-amber-200'>
-                      {status === 'catalog' ? 'Loading city catalogue…' : 'Fetching road network…'}
-                    </div>
+                    <LuxeLoader
+                      variant='road'
+                      size='md'
+                      label={status === 'catalog' ? 'Loading city catalogue…' : 'Loading city graph…'}
+                    />
                     <div className='text-[11px] font-mono text-fg-muted'>
                       {status === 'fetching' ? 'Streaming from server cache · ~1-3 MB compressed' : ''}
                     </div>
@@ -2206,7 +2208,7 @@ export default function Pathfinding() {
             </div>
             <p className='text-[11px] text-fg-muted leading-snug mt-2'>
               Loaded from cache · shared server-side across every visitor, so nobody re-fetches the raw
-              OpenStreetMap payload after the first time this city is warmed.
+              city graph after the first time this city is warmed.
             </p>
           </div>
         )}

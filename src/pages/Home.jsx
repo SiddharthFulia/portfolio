@@ -47,7 +47,7 @@ const GROUPS = [
       { to: "/ai-video",       label: "AI Video Studio",    desc: "T2V · I2V · ZSky / LTX / Wan / Hunyuan" },
       { to: "/image-enhancer", label: "Image Studio",       desc: "Enhance · Fast Gen · T2I · Vision" },
       { to: "/audio",          label: "Audio Studio",       desc: "Music · TTS · STT · Voice clone · Lip sync" },
-      { to: "/ai",             label: "AI Chat",            desc: "Groq · Beast (Ollama 5090) · multimodal" },
+      { to: "/ai",             label: "AI Chat",            desc: "Groq · Beast (local 5090) · multimodal" },
       { to: "/3d",             label: "3D Studio",          desc: "Generate · Studio Pro · Library · Visualize · Island Fly" },
       { to: "/cinema",         label: "Cinema",             desc: "Multi-shot AI cinema with planner + render queue" },
       { to: "/showreel",       label: "Showreel",           desc: "Cinematic chapter reel of the live AI stack" },
@@ -70,7 +70,7 @@ const GROUPS = [
     accent: "text-rose-300",
     items: [
       { to: "/physics",     label: "Double Pendulum", desc: "Lagrangian chaos · phase portrait · Lyapunov · KaTeX equations" },
-      { to: "/pathfinding", label: "City Router",     desc: "Dijkstra · A* · BFS · DFS on live Bangalore OSM" },
+      { to: "/pathfinding", label: "City Router",     desc: "Dijkstra · A* · BFS · DFS on live Bangalore road graph" },
       { to: "/chernobyl",   label: "Chernobyl RBMK",  desc: "Point-kinetics · xenon poison · positive scram · AZ-5 button" },
       { to: "/atoms",       label: "Atom Playground", desc: "Bohr orbits · quantum clouds · α/β/γ decay · U-235 fission · C++ core" },
     ],

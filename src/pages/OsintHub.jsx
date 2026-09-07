@@ -500,7 +500,7 @@ const DNSPanel = () => {
       <div className="flex items-center gap-2 mb-3">
         <ApiOutlined className="text-emerald-400" />
         <span className="text-white font-bold text-sm">DNS Resolver</span>
-        <span className="text-[10px] uppercase tracking-widest text-gray-500 ml-auto">Cloudflare DoH · A records</span>
+        <span className="text-[10px] uppercase tracking-widest text-gray-500 ml-auto">DNS lookup · A records</span>
       </div>
       <Input.Search
         value={domain} onChange={(e) => setDomain(e.target.value)}
@@ -510,7 +510,7 @@ const DNSPanel = () => {
         loading={loading}
       />
       <p className="text-[11px] text-fg-muted leading-snug mt-1">
-        Bare domain · e.g. github.com. Resolves A records via Cloudflare DoH.
+        Bare domain · e.g. github.com. Resolves A records via public DNS resolver.
       </p>
       <div className="mt-3">
         {loading ? (
@@ -859,7 +859,7 @@ const AllToolsPanel = () => {
             allowClear
             size="middle"
             prefix={<SearchOutlined className="text-gray-500" />}
-            placeholder={`Search ${total} tools — try ipwho, coingecko, wikipedia…`}
+            placeholder={`Search ${total} tools — try ip, crypto, wikipedia…`}
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />

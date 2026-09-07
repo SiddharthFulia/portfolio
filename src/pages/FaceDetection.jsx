@@ -100,7 +100,7 @@ const FaceDetection = () => {
             Vision AI
           </h1>
           <p className="text-gray-400 text-sm sm:text-base max-w-xl">
-            Real-time face analysis, AI image editing, object detection & OCR — all running on your browser, MediaPipe and Cloudflare Workers AI.
+            Real-time face analysis, AI image editing, object detection & OCR — all running on your browser, MediaPipe, and server-side inference.
           </p>
         </div>
       </div>
