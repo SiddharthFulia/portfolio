@@ -14,7 +14,7 @@ import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
-  PseudocodeBlock, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
+  MultiLangCode, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
@@ -155,28 +155,7 @@ function GraphViz({ frame, algo }) {
   )
 }
 
-const PSEUDO_KRUSKAL = [
-  'function kruskal(V, E):',
-  '    sort E by weight ascending',
-  '    dsu = makeDSU(V)',
-  '    mst = []',
-  '    for (u, v, w) in E:',
-  '        if dsu.find(u) != dsu.find(v):',
-  '            dsu.union(u, v)',
-  '            mst.push((u, v, w))',
-  '        if mst.length == |V| - 1: break',
-  '    return mst',
-]
-const PSEUDO_PRIM = [
-  'function prim(V, E, start):',
-  '    inTree = {start}',
-  '    mst = []',
-  '    while inTree.size < |V|:',
-  '        pick cheapest edge (u, v, w) with u in inTree, v not in inTree',
-  '        inTree.add(v)',
-  '        mst.push((u, v, w))',
-  '    return mst',
-]
+import { MST_KRUSKAL_CODE, MST_PRIM_CODE } from './code/MST'
 
 export default function MST() {
   const [algo, setAlgo] = useState('kruskal')
@@ -274,10 +253,10 @@ export default function MST() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <PseudocodeBlock
-        title={algo === 'kruskal' ? 'Pseudocode — Kruskal' : 'Pseudocode — Prim'}
-        lines={algo === 'kruskal' ? PSEUDO_KRUSKAL : PSEUDO_PRIM}
-        activeLine={activeLine}
+      <MultiLangCode
+        title={algo === 'kruskal' ? 'Implementation — Kruskal' : 'Implementation — Prim'}
+        code={algo === 'kruskal' ? MST_KRUSKAL_CODE : MST_PRIM_CODE}
+        activeLines={{ pseudo: activeLine }}
       />
 
       <ComplexityTable rows={[

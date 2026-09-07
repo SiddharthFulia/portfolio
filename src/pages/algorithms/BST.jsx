@@ -17,7 +17,7 @@ import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
-  PseudocodeBlock, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
+  MultiLangCode, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
@@ -169,25 +169,7 @@ function TreeSVG({ root, current, path, title, tone = 'amber' }) {
   )
 }
 
-const PSEUDO_INSERT = [
-  'function insert(root, v):',
-  '    if root == null: return Node(v)',
-  '    if v < root.v: root.left  = insert(root.left, v)',
-  '    else if v > root.v: root.right = insert(root.right, v)',
-  '    return root',
-]
-const PSEUDO_DELETE = [
-  'function delete(root, v):',
-  '    if v < root.v: root.left  = delete(root.left, v)',
-  '    else if v > root.v: root.right = delete(root.right, v)',
-  '    else:',
-  '        if root.left  == null: return root.right       # case 1/2',
-  '        if root.right == null: return root.left        # case 1/2',
-  '        succ = min(root.right)                          # case 3',
-  '        root.v = succ.v',
-  '        root.right = delete(root.right, succ.v)',
-  '    return root',
-]
+import { BST_INSERT_CODE, BST_DELETE_CODE } from './code/BST'
 
 // Skewed shape: inserting in sorted order makes a right-leaning list.
 function buildSkewed(vals) {
@@ -343,10 +325,10 @@ export default function BST() {
         </VizPanel>
       </VisualiserSection>
 
-      <PseudocodeBlock
-        title={mode === 'delete' ? 'Pseudocode — delete' : 'Pseudocode — insert'}
-        lines={mode === 'delete' ? PSEUDO_DELETE : PSEUDO_INSERT}
-        activeLine={activeLine}
+      <MultiLangCode
+        title={mode === 'delete' ? 'Implementation — delete' : 'Implementation — insert'}
+        code={mode === 'delete' ? BST_DELETE_CODE : BST_INSERT_CODE}
+        activeLines={{ pseudo: activeLine }}
       />
 
       <ComplexityTable rows={[

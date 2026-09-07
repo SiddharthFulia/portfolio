@@ -16,7 +16,7 @@ import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
-  PseudocodeBlock, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
+  MultiLangCode, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
@@ -174,28 +174,7 @@ function ArrayStrip({ arr, hi }) {
   )
 }
 
-const PSEUDO_QUERY = [
-  'function query(node, lo, hi, ql, qh):',
-  '    if qh < lo or hi < ql:',
-  '        return identity          # disjoint',
-  '    if ql <= lo and hi <= qh:',
-  '        return seg[node]         # fully inside',
-  '    mid = (lo + hi) / 2',
-  '    L = query(node*2, lo, mid, ql, qh)',
-  '    R = query(node*2+1, mid+1, hi, ql, qh)',
-  '    return combine(L, R)',
-]
-
-const PSEUDO_UPDATE = [
-  'function update(node, lo, hi, idx, val):',
-  '    if lo == hi:',
-  '        seg[node] = val',
-  '        return',
-  '    mid = (lo + hi) / 2',
-  '    if idx <= mid: update(node*2, lo, mid, idx, val)',
-  '    else:          update(node*2+1, mid+1, hi, idx, val)',
-  '    seg[node] = combine(seg[node*2], seg[node*2+1])',
-]
+import { SEG_QUERY_CODE, SEG_UPDATE_CODE } from './code/SegmentTrees'
 
 const INITIAL = [1, 3, -2, 8, 7, 4, 6, 5]
 
@@ -342,10 +321,10 @@ export default function SegmentTrees() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <PseudocodeBlock
-        title={mode === 'update' ? 'Pseudocode — update' : 'Pseudocode — query'}
-        lines={mode === 'update' ? PSEUDO_UPDATE : PSEUDO_QUERY}
-        activeLine={activeLine}
+      <MultiLangCode
+        title={mode === 'update' ? 'Implementation — point update' : 'Implementation — range query'}
+        code={mode === 'update' ? SEG_UPDATE_CODE : SEG_QUERY_CODE}
+        activeLines={{ pseudo: activeLine }}
       />
 
       <ComplexityTable rows={[

@@ -19,7 +19,7 @@ import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
-  PseudocodeBlock, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
+  MultiLangCode, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button, Slider } from '../../components/ui'
@@ -249,20 +249,7 @@ function ProbeViz({ state, touch }) {
   )
 }
 
-const PSEUDO_CHAIN = [
-  'function insert(k, v):',
-  '    b = hash(k) mod capacity',
-  '    for entry in table[b]:',
-  '        if entry.k == k: entry.v = v; return',
-  '    table[b].append({k, v})',
-]
-const PSEUDO_PROBE = [
-  'function insert(k, v):',
-  '    i = hash(k) mod capacity',
-  '    while arr[i] is set and arr[i].k != k:',
-  '        i = (i + 1) mod capacity   # linear probe',
-  '    arr[i] = {k, v}',
-]
+import { HASH_CHAIN_CODE, HASH_PROBE_CODE } from './code/HashTables'
 
 export default function HashTables() {
   const [mode, setMode] = useState('chain') // chain | probe
@@ -429,10 +416,10 @@ export default function HashTables() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <PseudocodeBlock
-        title={mode === 'chain' ? 'Pseudocode — chaining insert' : 'Pseudocode — linear probe insert'}
-        lines={mode === 'chain' ? PSEUDO_CHAIN : PSEUDO_PROBE}
-        activeLine={activeLine}
+      <MultiLangCode
+        title={mode === 'chain' ? 'Implementation — chaining insert' : 'Implementation — linear-probe insert'}
+        code={mode === 'chain' ? HASH_CHAIN_CODE : HASH_PROBE_CODE}
+        activeLines={{ pseudo: activeLine }}
       />
 
       <ComplexityTable rows={[

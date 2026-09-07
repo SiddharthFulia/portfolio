@@ -15,7 +15,7 @@ import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
-  PseudocodeBlock, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
+  MultiLangCode, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
@@ -151,27 +151,7 @@ function HeapArrayStrip({ frame }) {
   )
 }
 
-const PSEUDO_INSERT = [
-  'function insert(a, v):',
-  '    a.push(v)',
-  '    i = a.length - 1',
-  '    while i > 0 and a[i] < a[(i-1)/2]:   # min-heap',
-  '        swap(a[i], a[(i-1)/2])',
-  '        i = (i - 1) / 2',
-]
-const PSEUDO_EXTRACT = [
-  'function extractMin(a):',
-  '    root = a[0]',
-  '    a[0] = a.pop()',
-  '    i = 0',
-  '    while true:',
-  '        l = 2*i + 1;  r = 2*i + 2;  best = i',
-  '        if l < len(a) and a[l] < a[best]: best = l',
-  '        if r < len(a) and a[r] < a[best]: best = r',
-  '        if best == i: break',
-  '        swap(a[i], a[best]);  i = best',
-  '    return root',
-]
+import { HEAP_INSERT_CODE, HEAP_EXTRACT_CODE } from './code/Heaps'
 
 export default function Heaps() {
   const [isMin, setIsMin] = useState(true)
@@ -297,10 +277,10 @@ export default function Heaps() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <PseudocodeBlock
-        title={mode === 'extract' ? 'Pseudocode — extract' : 'Pseudocode — insert (min-heap)'}
-        lines={mode === 'extract' ? PSEUDO_EXTRACT : PSEUDO_INSERT}
-        activeLine={activeLine}
+      <MultiLangCode
+        title={mode === 'extract' ? 'Implementation — extract min' : 'Implementation — insert (min-heap)'}
+        code={mode === 'extract' ? HEAP_EXTRACT_CODE : HEAP_INSERT_CODE}
+        activeLines={{ pseudo: activeLine }}
       />
 
       <ComplexityTable rows={[

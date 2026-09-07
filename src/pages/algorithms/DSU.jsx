@@ -13,7 +13,7 @@ import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
-  PseudocodeBlock, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
+  MultiLangCode, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
@@ -144,19 +144,7 @@ function ForestSVG({ parent, rank, touch }) {
   )
 }
 
-const PSEUDO = [
-  'function find(x):',
-  '    if parent[x] == x: return x',
-  '    parent[x] = find(parent[x])   # path compression',
-  '    return parent[x]',
-  '',
-  'function union(a, b):',
-  '    rA, rB = find(a), find(b)',
-  '    if rA == rB: return',
-  '    if rank[rA] < rank[rB]: swap(rA, rB)',
-  '    parent[rB] = rA               # union by rank',
-  '    if rank[rA] == rank[rB]: rank[rA] += 1',
-]
+import { DSU_CODE } from './code/DSU'
 
 const N = 10
 const SEED_EDGES = [[0, 1], [2, 3], [4, 5], [1, 2], [6, 7], [8, 9]]
@@ -277,7 +265,11 @@ export default function DSU() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <PseudocodeBlock lines={PSEUDO} activeLine={activeLine} />
+      <MultiLangCode
+        title="Implementation — find + union"
+        code={DSU_CODE}
+        activeLines={{ pseudo: activeLine }}
+      />
 
       <ComplexityTable rows={[
         { op: 'find (amortised)',   best: 'O(1)', avg: 'O(\\alpha(n))', worst: 'O(\\log n)', space: 'O(n)' },

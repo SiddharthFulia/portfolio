@@ -46,6 +46,7 @@ export { default as GridViz, GRID_STATE_COLORS } from './GridViz'
 export { default as ComplexityTable } from './ComplexityTable'
 export { default as ExplanationBlock, TeX } from './ExplanationBlock'
 export { default as PseudocodeBlock } from './PseudocodeBlock'
+export { default as MultiLangCode } from './MultiLangCode'
 export { default as RealWorldCard } from './RealWorldCard'
 
 /* Topic catalog (used by hub + sidebar) */

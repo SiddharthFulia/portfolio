@@ -22,9 +22,10 @@ import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
-  PseudocodeBlock, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
+  MultiLangCode, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
+import { AVL_CODE } from './code/BalancedTrees'
 import { Button } from '../../components/ui'
 
 /* ─────────── AVL ─────────── */
@@ -296,22 +297,9 @@ export default function BalancedTrees() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <PseudocodeBlock
-        title="AVL insert (representative — the other two are similar)"
-        lines={[
-          'function insert(n, v):',
-          '    if n == null: return Node(v)',
-          '    if v < n.v: n.left  = insert(n.left,  v)',
-          '    else if v > n.v: n.right = insert(n.right, v)',
-          '    else: return n',
-          '    updateHeight(n)',
-          '    bf = h(n.left) - h(n.right)',
-          '    if bf > 1 and v < n.left.v:  return rotR(n)          # LL',
-          '    if bf < -1 and v > n.right.v: return rotL(n)          # RR',
-          '    if bf > 1 and v > n.left.v:  n.left  = rotL(n.left);  return rotR(n)   # LR',
-          '    if bf < -1 and v < n.right.v: n.right = rotR(n.right); return rotL(n)   # RL',
-          '    return n',
-        ]}
+      <MultiLangCode
+        title="Implementation — AVL insert (representative)"
+        code={AVL_CODE}
       />
 
       <ComplexityTable rows={[

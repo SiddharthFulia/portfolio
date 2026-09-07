@@ -16,7 +16,7 @@
 import { useMemo, useState } from 'react'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
-  PseudocodeBlock, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
+  MultiLangCode, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
@@ -187,31 +187,7 @@ function ListViz({ frame, doubly }) {
 
 /* ---------- page ---------- */
 
-const PSEUDO_SINGLE = [
-  'function insertAt(head, idx, val):',
-  '    node = new Node(val)',
-  '    if idx == 0:',
-  '        node.next = head',
-  '        return node',
-  '    cur = head',
-  '    for i from 0 to idx - 2:',
-  '        cur = cur.next',
-  '    node.next = cur.next',
-  '    cur.next = node',
-  '    return head',
-]
-
-const PSEUDO_REVERSE = [
-  'function reverse(head):',
-  '    prev = null',
-  '    curr = head',
-  '    while curr != null:',
-  '        next = curr.next',
-  '        curr.next = prev',
-  '        prev = curr',
-  '        curr = next',
-  '    return prev',
-]
+import { LL_INSERT_CODE, LL_REVERSE_CODE } from './code/LinkedLists'
 
 export default function LinkedLists() {
   const [doubly, setDoubly] = useState(false)
@@ -361,10 +337,10 @@ export default function LinkedLists() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <PseudocodeBlock
-        title={mode === 'reverse' ? 'Pseudocode — reverse (singly)' : 'Pseudocode — insertAt (singly)'}
-        lines={mode === 'reverse' ? PSEUDO_REVERSE : PSEUDO_SINGLE}
-        activeLine={activeLine}
+      <MultiLangCode
+        title={mode === 'reverse' ? 'Implementation — reverse (singly)' : 'Implementation — insertAt (singly)'}
+        code={mode === 'reverse' ? LL_REVERSE_CODE : LL_INSERT_CODE}
+        activeLines={{ pseudo: activeLine }}
       />
 
       <ComplexityTable rows={[

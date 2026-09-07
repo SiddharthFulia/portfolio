@@ -10,7 +10,7 @@ import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
-  PseudocodeBlock, ComplexityTable, RealWorldCard,
+  MultiLangCode, ComplexityTable, RealWorldCard,
   Field, TextInput, Chip,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
@@ -146,22 +146,7 @@ function TrieSVG({ root, walkPath, activeIdx }) {
   )
 }
 
-const PSEUDO = [
-  'function insert(root, word):',
-  '    cur = root',
-  '    for ch in word:',
-  '        if not cur.children[ch]:',
-  '            cur.children[ch] = new Node',
-  '        cur = cur.children[ch]',
-  '    cur.terminal = true',
-  '',
-  'function search(root, word):',
-  '    cur = root',
-  '    for ch in word:',
-  '        if not cur.children[ch]: return false',
-  '        cur = cur.children[ch]',
-  '    return cur.terminal',
-]
+import { TRIES_CODE } from './code/Tries'
 
 const SEEDS = ['app', 'apple', 'apply', 'ape', 'bat', 'batch', 'bad', 'bar', 'cat', 'car', 'carbon']
 
@@ -248,7 +233,11 @@ export default function Tries() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <PseudocodeBlock lines={PSEUDO} activeLine={activeIdx > 0 ? 5 : -1} />
+      <MultiLangCode
+        title="Implementation — trie insert / search"
+        code={TRIES_CODE}
+        activeLines={{ pseudo: activeIdx > 0 ? 5 : -1 }}
+      />
 
       <ComplexityTable rows={[
         { op: 'insert word',   best: 'O(m)', avg: 'O(m)', worst: 'O(m)', space: 'O(m \\cdot \\Sigma)' },

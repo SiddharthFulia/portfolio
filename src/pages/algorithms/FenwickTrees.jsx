@@ -18,7 +18,7 @@ import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
-  PseudocodeBlock, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
+  MultiLangCode, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
@@ -113,19 +113,7 @@ function BitChart({ bit, arr, activeSet, takeSet }) {
   )
 }
 
-const PSEUDO = [
-  'function update(i, delta):',
-  '    while i <= n:',
-  '        bit[i] += delta',
-  '        i += i & -i     # low bit — climb to responsible parent',
-  '',
-  'function prefix(r):',
-  '    s = 0',
-  '    while r > 0:',
-  '        s += bit[r]',
-  '        r -= r & -r     # low bit — descend accumulating',
-  '    return s',
-]
+import { BIT_CODE } from './code/FenwickTrees'
 
 const INITIAL = [3, 5, 2, 7, 4, 1, 6, 8]
 
@@ -272,7 +260,11 @@ export default function FenwickTrees() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <PseudocodeBlock lines={PSEUDO} activeLine={activeLine} />
+      <MultiLangCode
+        title="Implementation — BIT update / prefix"
+        code={BIT_CODE}
+        activeLines={{ pseudo: activeLine }}
+      />
 
       <ComplexityTable rows={[
         { op: 'build',       best: 'O(n)',        avg: 'O(n)',        worst: 'O(n)',        space: 'O(n)' },

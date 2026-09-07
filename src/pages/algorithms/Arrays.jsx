@@ -20,7 +20,7 @@ import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
-  PseudocodeBlock, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
+  MultiLangCode, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
@@ -148,15 +148,7 @@ function ArrayViz({ frame }) {
 
 /* ---------- page ---------- */
 
-const PSEUDO = [
-  'function insert(arr, index, value):',
-  '    if length + 1 > capacity:',
-  '        arr = grow(arr, capacity * 2)',
-  '    for i from length down to index+1:',
-  '        arr[i] = arr[i - 1]     # shift right',
-  '    arr[index] = value',
-  '    length += 1',
-]
+import { ARRAYS_CODE } from './code/Arrays'
 
 export default function Arrays() {
   const [arr, setArr] = useState(INITIAL)
@@ -305,7 +297,11 @@ export default function Arrays() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <PseudocodeBlock lines={PSEUDO} activeLine={activeLine} />
+      <MultiLangCode
+        title="Implementation — insert at index"
+        code={ARRAYS_CODE}
+        activeLines={{ pseudo: activeLine }}
+      />
 
       <ComplexityTable rows={[
         { op: 'access',   best: 'O(1)', avg: 'O(1)', worst: 'O(1)', space: 'O(n)' },

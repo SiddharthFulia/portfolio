@@ -17,7 +17,7 @@ import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
-  PseudocodeBlock, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
+  MultiLangCode, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
@@ -135,24 +135,7 @@ function StackViz({ frame, input, mode }) {
   )
 }
 
-const PSEUDO_BRACKETS = [
-  'function isBalanced(s):',
-  '    stack = []',
-  '    for c in s:',
-  '        if c in "([{":',
-  '            stack.push(c)',
-  '        else if c in ")]}":',
-  '            if stack.isEmpty(): return false',
-  '            if match(stack.pop(), c) == false: return false',
-  '    return stack.isEmpty()',
-]
-
-const PSEUDO_STACK = [
-  'push(v): arr[++top] = v',
-  'pop(): return arr[top--]',
-  'peek(): return arr[top]',
-  'size(): return top + 1',
-]
+import { STACK_CORE_CODE, STACK_BRACKETS_CODE } from './code/Stacks'
 
 export default function Stacks() {
   const [stack, setStack] = useState([12, 34, 55])
@@ -277,10 +260,10 @@ export default function Stacks() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <PseudocodeBlock
-        title={mode === 'brackets' ? 'Pseudocode — bracket matcher' : 'Pseudocode — stack ops'}
-        lines={mode === 'brackets' ? PSEUDO_BRACKETS : PSEUDO_STACK}
-        activeLine={activeLine}
+      <MultiLangCode
+        title={mode === 'brackets' ? 'Implementation — bracket matcher' : 'Implementation — stack ops'}
+        code={mode === 'brackets' ? STACK_BRACKETS_CODE : STACK_CORE_CODE}
+        activeLines={{ pseudo: activeLine }}
       />
 
       <ComplexityTable rows={[

@@ -16,7 +16,7 @@ import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
-  PseudocodeBlock, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
+  MultiLangCode, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
@@ -178,12 +178,9 @@ function TreeSVG({ root, visits, currentIdx }) {
   )
 }
 
-const PSEUDO = {
-  pre:   ['preOrder(node):', '    visit(node)', '    for c in node.children:', '        preOrder(c)'],
-  in:    ['inOrder(node):     # N-ary variant', '    half = children.length / 2', '    for c in children[0..half]: inOrder(c)', '    visit(node)', '    for c in children[half..]: inOrder(c)'],
-  post:  ['postOrder(node):', '    for c in node.children:', '        postOrder(c)', '    visit(node)'],
-  level: ['levelOrder(root):', '    queue = [root]', '    while queue:', '        n = queue.dequeue()', '        visit(n)', '        for c in n.children: queue.enqueue(c)'],
-}
+import { TREES_PRE, TREES_IN, TREES_POST, TREES_LEVEL } from './code/Trees'
+
+const TRAVERSAL_CODE = { pre: TREES_PRE, in: TREES_IN, post: TREES_POST, level: TREES_LEVEL }
 
 export default function Trees() {
   const [root, setRoot] = useState(seedTree())
@@ -307,10 +304,10 @@ export default function Trees() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <PseudocodeBlock
-        title={`Pseudocode — ${order}-order`}
-        lines={PSEUDO[order]}
-        activeLine={currentIdx >= 0 ? 1 : -1}
+      <MultiLangCode
+        title={`Implementation — ${order}-order`}
+        code={TRAVERSAL_CODE[order]}
+        activeLines={{ pseudo: currentIdx >= 0 ? 1 : -1 }}
       />
 
       <ComplexityTable rows={[

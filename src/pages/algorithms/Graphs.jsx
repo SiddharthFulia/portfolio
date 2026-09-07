@@ -13,9 +13,10 @@ import { useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
-  PseudocodeBlock, ComplexityTable, RealWorldCard, Field, TextInput, Chip,
+  MultiLangCode, ComplexityTable, RealWorldCard, Field, TextInput, Chip,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
+import { GRAPH_CODE } from './code/Graphs'
 
 const INITIAL = {
   nodes: ['A', 'B', 'C', 'D', 'E'],
@@ -260,16 +261,9 @@ export default function Graphs() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <PseudocodeBlock
-        title="Representations"
-        lines={[
-          '# Adjacency list — dict from node to list of neighbours',
-          'adj = { u: [(v, w), ...] for u in V }',
-          '',
-          '# Adjacency matrix — V x V grid',
-          'M[u][v] = 1  (or w)   if edge exists',
-          '        = 0            otherwise',
-        ]}
+      <MultiLangCode
+        title="Implementation — representations"
+        code={GRAPH_CODE}
       />
 
       <ComplexityTable rows={[

@@ -8,7 +8,7 @@ import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   TopicShell, ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
-  PseudocodeBlock, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
+  MultiLangCode, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
@@ -145,20 +145,7 @@ function LinearViz({ frame }) {
   )
 }
 
-const PSEUDO = [
-  'function enqueue(v):',
-  '    if size == CAP: return FULL',
-  '    buf[tail] = v',
-  '    tail = (tail + 1) mod CAP',
-  '    size += 1',
-  '',
-  'function dequeue():',
-  '    if size == 0: return EMPTY',
-  '    v = buf[head]',
-  '    head = (head + 1) mod CAP',
-  '    size -= 1',
-  '    return v',
-]
+import { QUEUE_CODE } from './code/Queues'
 
 export default function Queues() {
   const [state, setState] = useState(() => ({
@@ -261,7 +248,11 @@ export default function Queues() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <PseudocodeBlock lines={PSEUDO} activeLine={activeLine} />
+      <MultiLangCode
+        title="Implementation — circular-buffer queue"
+        code={QUEUE_CODE}
+        activeLines={{ pseudo: activeLine }}
+      />
 
       <ComplexityTable rows={[
         { op: 'enqueue', best: 'O(1)', avg: 'O(1)', worst: 'O(1)', space: 'O(n)' },
