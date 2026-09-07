@@ -515,7 +515,13 @@ function buildForestTree(cx, cz, seed) {
 //
 // Returns { instances: { key: { color, transforms: [] } }, meta: { counts } }
 function buildSceneData(matrix, N, theme, season) {
-  const palette = PALETTES[theme][season]
+  // Defensive resolve — when the user switches theme, `season` may be stale
+  // for one render (e.g. Tree Garden's "Autumn" → Voxel City which only has
+  // Day/Sunset/Night). The season-sync useEffect corrects this on the next
+  // paint, but scene rebuild fires first. Fall back to the theme's first
+  // season if the pair is missing.
+  const themePalette = PALETTES[theme] || PALETTES[THEMES[0]]
+  const palette = themePalette[season] || themePalette[Object.keys(themePalette)[0]]
   const inst = {}
   const push = (key, mat, transform) => {
     if (!inst[key]) inst[key] = { material: mat, transforms: [] }
