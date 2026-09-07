@@ -1,7 +1,6 @@
 // AI Multi-Modal Generation — DEMO / showcase component.
 //
-// Ported from a TSX shadcn original (see E:\Siddharth\FE components\AI Gen.txt).
-// This is *not* a real generation lane — the three "Generate" buttons each
+// Presentational-only demo. The three "Generate" buttons each
 // route out to the existing real pages (/image-enhancer, /ai-video,
 // /ai-video?tab=cinema). The history items, loader, settings, etc. are all
 // presentational. A future iteration can wire actual gen by replacing the

@@ -8,10 +8,9 @@
 // We use that hook to wire our three pre-cached samples (bonsai /
 // truck / garden) into one-click chips.
 //
-// To re-build SuperSplat after upstream pulls:
-//   cd E:/Github/ai-video-ecosystem/supersplat
+// To re-build the embedded editor after upstream pulls:
 //   npm install && npm run build
-//   cp -r dist/* E:/Siddharth/portfolio/public/supersplat/
+//   copy dist/* into portfolio/public/supersplat/
 
 import { useEffect, useRef, useState } from "react";
 import {

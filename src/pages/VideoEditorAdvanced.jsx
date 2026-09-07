@@ -12,11 +12,9 @@
 // button on /edit/library then pushes that file up to your library
 // so the two editors share a single saved-videos collection.
 //
-// Re-build OpenReel after upstream pulls:
-//   cd E:/Github/openreel-video
+// Re-build the embedded editor after upstream pulls:
 //   pnpm install && pnpm build
-//   rm -rf E:/Siddharth/portfolio/public/video-editor-advanced/*
-//   cp -r apps/web/dist/* E:/Siddharth/portfolio/public/video-editor-advanced/
+//   replace portfolio/public/video-editor-advanced/* with apps/web/dist/*
 
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
