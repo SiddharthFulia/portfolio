@@ -774,11 +774,58 @@ button:focus-visible:not(:disabled) {
 }
 
 /* Segmented (antd Segmented tab bar) — used on Vision, AI Chat,
-   Explore module switchers. Match the button feel. */
-.ant-segmented-item {
-  transition: background-color 150ms ease-out, color 150ms ease-out;
+   Explore module switchers, Chernobyl scenario picker.
+
+   Antd draws all options butted-up in a single pill so they look
+   joined; the user wanted breathing room between each option, a
+   distinct hover colour, a distinct selected colour, and a smooth
+   transition between the three states. We disable the sliding thumb
+   and let each item paint its own background — that's what gives
+   the "spaced buttons" feel without a JS rewrite. */
+.ant-segmented {
+  background: transparent !important;
+  padding: 4px !important;
+  gap: 6px !important;
+  display: inline-flex;
+  flex-wrap: wrap;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
 }
-.ant-segmented-item:active {
+.ant-segmented.ant-segmented-block { display: flex; width: 100%; }
+
+.ant-segmented-item {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 9px !important;
+  margin: 0 !important;
+  transition: background-color 200ms ease-out,
+              border-color 200ms ease-out,
+              color 200ms ease-out,
+              box-shadow 200ms ease-out,
+              transform 120ms ease-out !important;
+}
+
+.ant-segmented-item:hover:not(.ant-segmented-item-selected):not(.ant-segmented-item-disabled) {
+  background: rgba(251, 191, 36, 0.06) !important;
+  border-color: rgba(251, 191, 36, 0.22) !important;
+  color: rgb(252, 211, 77) !important;
+}
+
+.ant-segmented-item-selected {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.22), rgba(244, 63, 94, 0.16)) !important;
+  border-color: rgba(251, 191, 36, 0.55) !important;
+  color: rgb(253, 224, 71) !important;
+  box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.25),
+              0 4px 14px -6px rgba(251, 191, 36, 0.4) !important;
+}
+
+/* Hide antd's sliding-pill thumb — with per-item paint we don't need
+   it and it would overlay our own selected background. */
+.ant-segmented-thumb {
+  display: none !important;
+}
+
+.ant-segmented-item:active:not(.ant-segmented-item-disabled) {
   transform: scale(0.98);
   transition: transform 60ms ease-out;
 }
@@ -885,6 +932,33 @@ button:focus-visible:not(:disabled) {
   .ant-slider-handle.ant-slider-handle-dragging {
     transform: none !important;
   }
+}
+
+/* ── Event log / comment list containers (site-wide) ─────────────
+   The user reported the Chernobyl event log rows stopping short of
+   the container's right edge. Root cause: some log rows lacked
+   `flex-1 min-w-0 break-words` on the text cell, so long strings
+   were left-hugged inside a naturally-shrinking span. This helper
+   class enforces full-width rows for any `<ul>` / `<ol>` marked as
+   a log — use `.sid-log` on the list, `.sid-log-row` on each row,
+   `.sid-log-text` on the text cell.
+
+   Existing usage patterns (Chernobyl, Atoms) already ship the full
+   `w-full flex items-start gap-… flex-1 min-w-0 break-words` chain
+   directly; this class is for future / hand-rolled log lists so
+   they don't repeat the bug. */
+.sid-log { width: 100%; list-style: none; padding: 0; margin: 0; }
+.sid-log-row {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+.sid-log-text {
+  flex: 1 1 0%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* End of luxe.css */

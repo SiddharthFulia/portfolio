@@ -1,23 +1,27 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
+import WebGLBoundary, { hasWebGL } from '../WebGLBoundary'
 
 /**
  * ShaderLines
  * Mosaic / scan-line raw shader rendered with three.js.
  * Sizes to its container — pass `className` to control width/height.
  */
-const ShaderLines = ({ className = 'w-full h-full absolute' }) => {
+const ShaderLinesInner = ({ className = 'w-full h-full absolute' }) => {
   const containerRef = useRef(null)
 
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
+    if (!hasWebGL()) return
 
-    const camera = new THREE.Camera()
+    let camera, scene, geometry, material, mesh, renderer, animationId, onWindowResize
+    try {
+    camera = new THREE.Camera()
     camera.position.z = 1
 
-    const scene = new THREE.Scene()
-    const geometry = new THREE.PlaneGeometry(2, 2)
+    scene = new THREE.Scene()
+    geometry = new THREE.PlaneGeometry(2, 2)
 
     const uniforms = {
       time: { value: 1.0 },
@@ -71,20 +75,20 @@ const ShaderLines = ({ className = 'w-full h-full absolute' }) => {
       }
     `
 
-    const material = new THREE.ShaderMaterial({
+    material = new THREE.ShaderMaterial({
       uniforms,
       vertexShader,
       fragmentShader,
     })
 
-    const mesh = new THREE.Mesh(geometry, material)
+    mesh = new THREE.Mesh(geometry, material)
     scene.add(mesh)
 
-    const renderer = new THREE.WebGLRenderer()
+    renderer = new THREE.WebGLRenderer()
     renderer.setPixelRatio(window.devicePixelRatio)
     container.appendChild(renderer.domElement)
 
-    const onWindowResize = () => {
+    onWindowResize = () => {
       const rect = container.getBoundingClientRect()
       renderer.setSize(rect.width, rect.height)
       uniforms.resolution.value.x = renderer.domElement.width
@@ -93,27 +97,43 @@ const ShaderLines = ({ className = 'w-full h-full absolute' }) => {
     onWindowResize()
     window.addEventListener('resize', onWindowResize, false)
 
-    let animationId = 0
     const animate = () => {
       animationId = requestAnimationFrame(animate)
       uniforms.time.value += 0.05
       renderer.render(scene, camera)
     }
     animate()
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn('[ShaderLines] WebGL init failed:', err?.message || err)
+      return
+    }
 
     return () => {
-      window.removeEventListener('resize', onWindowResize)
-      cancelAnimationFrame(animationId)
-      if (renderer.domElement && renderer.domElement.parentNode === container) {
+      if (onWindowResize) window.removeEventListener('resize', onWindowResize)
+      if (animationId) cancelAnimationFrame(animationId)
+      if (renderer?.domElement && renderer.domElement.parentNode === container) {
         container.removeChild(renderer.domElement)
       }
-      geometry.dispose()
-      material.dispose()
-      renderer.dispose()
+      try {
+        geometry?.dispose()
+        material?.dispose()
+        renderer?.dispose()
+        renderer?.forceContextLoss?.()
+        renderer?.getContext?.().getExtension?.('WEBGL_lose_context')?.loseContext?.()
+      } catch { /* teardown best-effort */ }
     }
   }, [])
 
   return <div ref={containerRef} className={className} />
 }
+
+// Wrap so a WebGL context failure renders the fallback instead of
+// crashing the parent route.
+const ShaderLines = (props) => (
+  <WebGLBoundary>
+    <ShaderLinesInner {...props} />
+  </WebGLBoundary>
+)
 
 export default ShaderLines

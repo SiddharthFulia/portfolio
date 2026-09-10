@@ -1,17 +1,22 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
+import WebGLBoundary, { hasWebGL } from '../WebGLBoundary'
 
 /**
  * ShaderAnimation
  * Full-bleed animated shader using three.js raw shaders.
  * Sizes to its container — pass `className` to control width/height.
  */
-const ShaderAnimation = ({ className = 'w-full h-screen' }) => {
+const ShaderAnimationInner = ({ className = 'w-full h-screen' }) => {
   const containerRef = useRef(null)
 
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
+    // Skip the entire Three.js setup if the browser has no WebGL —
+    // the boundary would swap us out anyway, but this avoids the
+    // synchronous throw + console.error noise.
+    if (!hasWebGL()) return
 
     // Vertex shader
     const vertexShader = `
@@ -96,7 +101,11 @@ const ShaderAnimation = ({ className = 'w-full h-screen' }) => {
       }
       geometry.dispose()
       material.dispose()
-      renderer.dispose()
+      try {
+        renderer.dispose()
+        renderer.forceContextLoss?.()
+        renderer.getContext?.().getExtension?.('WEBGL_lose_context')?.loseContext?.()
+      } catch { /* teardown best-effort */ }
     }
   }, [])
 
@@ -108,5 +117,13 @@ const ShaderAnimation = ({ className = 'w-full h-screen' }) => {
     />
   )
 }
+
+// Wrap in a boundary so a lost / exhausted WebGL context doesn't take
+// the whole page down — the shader is only decorative.
+const ShaderAnimation = (props) => (
+  <WebGLBoundary>
+    <ShaderAnimationInner {...props} />
+  </WebGLBoundary>
+)
 
 export default ShaderAnimation

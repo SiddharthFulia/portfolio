@@ -9,6 +9,7 @@
 
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
+import { hasWebGL } from '../WebGLBoundary'
 
 export default function AuroraShader({
   fixed = false,
@@ -21,15 +22,22 @@ export default function AuroraShader({
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
+    // Aurora is decorative — skip mounting entirely if WebGL is
+    // unavailable or already exhausted. Wrapping the `new
+    // WebGLRenderer` in try/catch is what prevents the prod
+    // "Error creating WebGL context" throw from taking the page down.
+    if (!hasWebGL()) return
 
-    const scene = new THREE.Scene()
-    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
+    let scene, camera, renderer, material, geometry, mesh, frameId, onResize
+    try {
+    scene = new THREE.Scene()
+    camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
     renderer.setSize(container.clientWidth || window.innerWidth, container.clientHeight || window.innerHeight)
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     container.appendChild(renderer.domElement)
 
-    const material = new THREE.ShaderMaterial({
+    material = new THREE.ShaderMaterial({
       uniforms: {
         iTime: { value: 0 },
         iIntensity: { value: intensity },
@@ -79,11 +87,10 @@ export default function AuroraShader({
         }`,
     })
 
-    const geometry = new THREE.PlaneGeometry(2, 2)
-    const mesh = new THREE.Mesh(geometry, material)
+    geometry = new THREE.PlaneGeometry(2, 2)
+    mesh = new THREE.Mesh(geometry, material)
     scene.add(mesh)
 
-    let frameId
     const animate = () => {
       material.uniforms.iTime.value += 0.016
       renderer.render(scene, camera)
@@ -91,21 +98,36 @@ export default function AuroraShader({
     }
     animate()
 
-    const onResize = () => {
+    onResize = () => {
       const w = container.clientWidth || window.innerWidth
       const h = container.clientHeight || window.innerHeight
       renderer.setSize(w, h)
       material.uniforms.iResolution.value.set(w, h)
     }
     window.addEventListener('resize', onResize)
+    } catch (err) {
+      // Fail soft — this shader is decorative. Chrome throws
+      // "Error creating WebGL context" once the per-tab live-context
+      // cap is hit; we swallow it here so the surrounding page still
+      // renders normally.
+      // eslint-disable-next-line no-console
+      console.warn('[AuroraShader] WebGL init failed:', err?.message || err)
+      return
+    }
 
     return () => {
-      cancelAnimationFrame(frameId)
-      window.removeEventListener('resize', onResize)
-      if (renderer.domElement && container.contains(renderer.domElement)) {
+      if (frameId) cancelAnimationFrame(frameId)
+      if (onResize) window.removeEventListener('resize', onResize)
+      if (renderer?.domElement && container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement)
       }
-      geometry.dispose(); material.dispose(); renderer.dispose()
+      try {
+        geometry?.dispose()
+        material?.dispose()
+        renderer?.dispose()
+        renderer?.forceContextLoss?.()
+        renderer?.getContext?.().getExtension?.('WEBGL_lose_context')?.loseContext?.()
+      } catch { /* teardown best-effort */ }
     }
   }, [intensity])
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
+import WebGLBoundary from '../WebGLBoundary'
 
 const PLANETS = [
   { name: 'Mercury', r: 0.3,  dist: 3,   speed: 4.7,  color: '#b5b5b5', emissive: '#333' },
@@ -143,8 +144,31 @@ const SolarSystem3D = () => {
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('touchmove', onMove)
       window.removeEventListener('resize', onResize)
-      mount.removeChild(renderer.domElement)
-      renderer.dispose()
+      // Full GPU teardown — geometry, material, texture, and the
+      // WebGL context itself. Without WEBGL_lose_context.loseContext(),
+      // Chrome sometimes leaks the underlying context for tens of
+      // seconds even after renderer.dispose(), which chews through the
+      // per-tab budget and eventually throws "Error creating WebGL
+      // context" on the next mount.
+      try {
+        scene.traverse(obj => {
+          if (obj.geometry) obj.geometry.dispose?.()
+          if (obj.material) {
+            const mats = Array.isArray(obj.material) ? obj.material : [obj.material]
+            mats.forEach(m => {
+              Object.values(m).forEach(v => v?.isTexture && v.dispose?.())
+              m.dispose?.()
+            })
+          }
+        })
+        renderer.dispose()
+        renderer.forceContextLoss?.()
+        const gl = renderer.getContext?.()
+        gl?.getExtension?.('WEBGL_lose_context')?.loseContext?.()
+      } catch { /* teardown best-effort */ }
+      if (renderer.domElement?.parentNode === mount) {
+        mount.removeChild(renderer.domElement)
+      }
     }
   }, [])
 
@@ -164,4 +188,13 @@ const SolarSystem3D = () => {
   )
 }
 
-export default SolarSystem3D
+// Default export wraps the raw scene in a WebGL boundary so a browser
+// that has run out of live contexts renders the fallback panel instead
+// of taking down the whole /lab route.
+const SolarSystem3DSafe = () => (
+  <WebGLBoundary>
+    <SolarSystem3D />
+  </WebGLBoundary>
+)
+
+export default SolarSystem3DSafe

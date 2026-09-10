@@ -1507,16 +1507,18 @@ export default function Chernobyl() {
               </span>
             </div>
             {gridEvents.length > 0 && (
-              <div className='mt-2 rounded border border-white/5 bg-black/40 px-2 py-1.5 max-h-24 overflow-hidden'>
-                <div className='text-[9px] font-mono text-fg-dim uppercase mb-0.5'>event log</div>
-                <div className='space-y-0.5'>
+              <div className='mt-2 w-full rounded border border-white/5 bg-black/40 px-2 py-1.5 max-h-40 overflow-y-auto'>
+                <div className='text-[9px] font-mono text-fg-dim uppercase mb-1'>event log</div>
+                <ul className='space-y-1 w-full'>
                   {gridEvents.map(e => (
-                    <div key={e.id} className='text-[10px] font-mono'>
-                      <span className='text-fg-muted'>Event {e.id}</span>
-                      <span className={`ml-2 ${e.kind === 'critical' ? 'text-rose-300' : 'text-cyan-300'}`}>{e.text}</span>
-                    </div>
+                    <li key={e.id} className='w-full flex items-start gap-2 text-[10px] font-mono'>
+                      <span className='shrink-0 text-fg-muted tabular-nums'>Event {e.id}</span>
+                      <span className={`flex-1 min-w-0 break-words ${e.kind === 'critical' ? 'text-rose-300' : 'text-cyan-300'}`}>
+                        {e.text}
+                      </span>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
             )}
           </div>

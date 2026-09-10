@@ -1189,11 +1189,11 @@ export default function Atoms() {
           {events.length === 0 ? (
             <p className='text-[11px] text-fg-muted italic'>No events yet. Pick an element or fire a decay button.</p>
           ) : (
-            <ol className='space-y-1.5'>
+            <ol className='space-y-1.5 w-full'>
               {events.map((e, i) => (
-                <li key={i} className='flex items-start gap-3 text-[12px]'>
+                <li key={i} className='w-full flex items-start gap-3 text-[12px]'>
                   <span className={`shrink-0 mt-1 w-2 h-2 rounded-full ${sevDot(e.severity)}`} />
-                  <span className='text-fg-primary/90'>{e.text}</span>
+                  <span className='flex-1 min-w-0 break-words text-fg-primary/90'>{e.text}</span>
                 </li>
               ))}
             </ol>
