@@ -1,7 +1,10 @@
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import PageLoader from '../components/PageLoader'
 
+// Slug → lazy component. `food` is the historical slug and stays as
+// the canonical; `foodish` is aliased for BC because the task brief
+// documents that URL.
 const COMPONENTS = {
   pokedex:   lazy(() => import('../components/explore/Pokedex')),
   rickmorty: lazy(() => import('../components/explore/RickMorty')),
@@ -9,48 +12,47 @@ const COMPONENTS = {
   mtg:       lazy(() => import('../components/explore/MTGCards')),
   memes:     lazy(() => import('../components/explore/MemeGenerator')),
   food:      lazy(() => import('../components/explore/FoodGallery')),
+  foodish:   lazy(() => import('../components/explore/FoodGallery')),
   dogs:      lazy(() => import('../components/explore/DogExplorer')),
   countries: lazy(() => import('../components/explore/CountryExplorer')),
   quotes:    lazy(() => import('../components/explore/QuoteWall')),
 }
 
 const META = {
-  pokedex:   { label: 'Pokedex',        accent: 'bg-red-500',
+  pokedex:   { label: 'Pokedex',        accent: 'bg-red-500', tone: 'from-red-500/25',
+    eyebrow: '386 species · Gen 1 – 3',
     info: 'Browse Pokemon across 3 generations. Click any card to see stats, types, abilities. Search by name or number.' },
-  rickmorty: { label: 'Rick & Morty',    accent: 'bg-emerald-500',
-    info: 'Browse all 826 characters. Search by name, filter by status (Alive/Dead/Unknown). Click for full details.' },
-  launches:  { label: 'Space Launches',  accent: 'bg-blue-500',
+  rickmorty: { label: 'Rick & Morty',    accent: 'bg-emerald-500', tone: 'from-emerald-500/25',
+    eyebrow: '826 characters · live status',
+    info: 'Browse all 826 characters. Search by name, filter by status (Alive/Dead/Unknown) or species. Click for full details.' },
+  launches:  { label: 'Space Launches',  accent: 'bg-blue-500', tone: 'from-blue-500/25',
+    eyebrow: 'Upcoming missions · live countdown',
     info: 'Upcoming rocket launches worldwide with live countdowns, rocket info, launch providers, pads, and mission details.' },
-  mtg:       { label: 'Magic Cards',     accent: 'bg-amber-500',
-    info: 'Browse Magic: The Gathering cards. Search by name or click Random for surprise cards. Download card images.' },
-  memes:     { label: 'Meme Templates',  accent: 'bg-yellow-500',
-    info: 'Browse popular meme templates. Search by name, click to see full size, download the template image.' },
-  food:      { label: 'Food Gallery',    accent: 'bg-orange-500',
-    info: 'Random food photos. Pick a category (pizza, burger, pasta, biryani, dessert) or shuffle for random. Download images.' },
-  dogs:      { label: 'Dog Explorer',    accent: 'bg-amber-500',
-    info: 'Random dog photos from 120+ breeds. Search breeds in the dropdown, click Shuffle for new photos. Download images.' },
-  countries: { label: 'World Countries', accent: 'bg-emerald-500',
-    info: '250 countries with flags, capitals, population, languages, currencies. Filter by region, sort by name/population/area.' },
-  quotes:    { label: 'Quote Wall',      accent: 'bg-cyan-500',
-    info: 'Random inspiring quotes in a masonry layout. Click Load More to add more quotes.' },
+  mtg:       { label: 'Magic Cards',     accent: 'bg-amber-500', tone: 'from-amber-500/25',
+    eyebrow: 'Full library · full-text search',
+    info: 'Search Magic: The Gathering cards by name, oracle text, type, or keyword. Click Random for a fresh hand. Downloads and clipboard-copy included.' },
+  memes:     { label: 'Meme Generator',  accent: 'bg-yellow-500', tone: 'from-yellow-500/25',
+    eyebrow: '100 templates · caption + download',
+    info: 'Pick any template, type top and bottom text, and download a captioned PNG. Text is rendered client-side — nothing leaves the browser.' },
+  food:      { label: 'Recipe Gallery',  accent: 'bg-orange-500', tone: 'from-orange-500/25',
+    eyebrow: 'Full recipes · ingredients + video',
+    info: 'Search recipes by name or category. Each card opens with the full ingredient list, step-by-step instructions, and a YouTube link where available.' },
+  foodish:   { label: 'Recipe Gallery',  accent: 'bg-orange-500', tone: 'from-orange-500/25',
+    eyebrow: 'Full recipes · ingredients + video',
+    info: 'Search recipes by name or category. Each card opens with the full ingredient list, step-by-step instructions, and a YouTube link where available.' },
+  dogs:      { label: 'Dog Explorer',    accent: 'bg-amber-500', tone: 'from-amber-500/25',
+    eyebrow: '120+ breeds · unlimited shuffle',
+    info: 'Random dog photos from 120+ breeds. Search breeds in the dropdown, click Shuffle for new photos. Sub-breeds listed with a dot.' },
+  countries: { label: 'World Countries', accent: 'bg-emerald-500', tone: 'from-emerald-500/25',
+    eyebrow: '250 countries · flags + neighbours',
+    info: '250 countries with flags, capitals, population, languages, currencies, and clickable neighbours. Filter by region, sort by population or area.' },
+  quotes:    { label: 'Quote Wall',      accent: 'bg-cyan-500', tone: 'from-cyan-500/25',
+    eyebrow: 'Fresh batches · favourites saved locally',
+    info: 'Inspiring quotes in a masonry layout. Load More pulls a fresh batch and dedupes; tap the heart to save favourites to this browser.' },
 }
 
 // PageLoader is the canonical Suspense fallback site-wide; keep the
 // shimmer feel consistent with the rest of the lazy routes.
-
-const ModuleInfo = ({ text }) => {
-  const [open, setOpen] = useState(false)
-  if (!text) return null
-  return (
-    <>
-      <button onClick={() => setOpen(o => !o)}
-        className={`w-7 h-7 rounded-full border flex items-center justify-center text-xs font-bold transition-colors ${
-          open ? 'border-amber-500 bg-amber-500/10 text-amber-400' : 'border-gray-700 bg-gray-800 text-gray-500 hover:text-amber-400'
-        }`}>i</button>
-      {open && <div className="mt-3 p-4 bg-gray-800/60 border border-gray-700 rounded-xl text-sm text-gray-300 leading-relaxed">{text}</div>}
-    </>
-  )
-}
 
 const ExploreModule = () => {
   const { module } = useParams()
@@ -66,23 +68,33 @@ const ExploreModule = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      <div className="max-w-6xl mx-auto px-6 pt-28 sm:pt-32 pb-6">
-        <Link to="/explore" className="inline-flex items-center gap-2 tap-44 -ml-2 px-2 text-gray-500 hover:text-white text-sm font-medium transition-colors mb-4">
+    <div className="min-h-screen bg-gray-950 text-white text-fg-primary">
+      <div className="relative max-w-6xl mx-auto px-6 pt-28 sm:pt-32 pb-6 overflow-hidden">
+        {/* Ambient orbs — same treatment as the Explore hub. */}
+        <div aria-hidden className="ambient-orb -top-40 -left-32 opacity-70" />
+        <div aria-hidden className="ambient-orb ambient-orb-cool -top-20 right-0 opacity-50" />
+
+        <Link to="/explore" className="relative inline-flex items-center gap-2 tap-44 -ml-2 px-2 text-gray-500 hover:text-white text-sm font-medium transition-colors mb-4">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
           </svg>
-          All Modules
+          All modules
         </Link>
-        <div className="eyebrow-mono mb-3">// Public API module</div>
-        <div className="flex items-center gap-3 mb-1 flex-wrap">
-          <div className={`h-1 w-12 rounded-lg ${meta.accent}`} />
-          <h1 className="font-poppins font-black text-3xl md:text-4xl gradient-text-amber">
-            {meta.label}
-          </h1>
-          <ModuleInfo text={meta.info} />
+
+        <div className="relative">
+          <div className="eyebrow-mono mb-3">// {meta.eyebrow || 'Public API module'}</div>
+          <div className="flex items-start gap-4 mb-1 flex-wrap">
+            <div className={`h-1.5 w-14 rounded-full mt-3 ${meta.accent}`} />
+            <div className="flex-1 min-w-0">
+              <h1 className="font-poppins font-black text-4xl md:text-5xl leading-tight">
+                <span className="gradient-text-amber">{meta.label}</span>
+              </h1>
+            </div>
+          </div>
+          <p className="text-gray-400 mt-3 text-sm max-w-2xl leading-relaxed">{meta.info}</p>
         </div>
-        <div className="mt-4 h-px bg-gray-800" />
+
+        <div className="mt-6 h-px bg-white/5" />
       </div>
       <div className="max-w-6xl mx-auto px-6 pb-24">
         <Suspense fallback={<PageLoader />}><Component /></Suspense>

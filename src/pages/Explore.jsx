@@ -3,15 +3,15 @@ import { Link } from 'react-router-dom'
 import AnimatedCard from '../components/explore/AnimatedCard'
 
 const MODULES = [
-  { id: 'pokedex',   label: 'Pokedex',           accent: 'bg-red-500',     desc: 'Browse 386 Pokemon with stats, types, abilities' },
-  { id: 'rickmorty', label: 'Rick & Morty',       accent: 'bg-emerald-500', desc: 'Character browser with search, filters, episodes' },
-  { id: 'launches',  label: 'Space Launches',     accent: 'bg-blue-500',    desc: 'Upcoming rocket launches with live countdowns' },
-  { id: 'mtg',       label: 'Magic Cards',        accent: 'bg-amber-500',   desc: 'MTG card browser — search, random, card details' },
-  { id: 'memes',     label: 'Meme Templates',     accent: 'bg-yellow-500',  desc: 'Browse & download popular meme templates' },
-  { id: 'food',      label: 'Food Gallery',       accent: 'bg-orange-500',  desc: 'Random food photos by category — pizza, burger, dessert' },
-  { id: 'dogs',      label: 'Dog Explorer',       accent: 'bg-amber-500',   desc: 'Random dog photos — filter by 120+ breeds' },
-  { id: 'countries', label: 'World Countries',    accent: 'bg-emerald-500', desc: '250 countries with flags, population, languages' },
-  { id: 'quotes',    label: 'Quote Wall',         accent: 'bg-cyan-500',    desc: 'Inspiring quotes in a masonry layout' },
+  { id: 'pokedex',   label: 'Pokedex',           accent: 'bg-red-500',     desc: '386 Pokemon across three generations, with stats, types, and abilities.' },
+  { id: 'rickmorty', label: 'Rick & Morty',       accent: 'bg-emerald-500', desc: '826 characters, filtered by status, species, or free-text search.' },
+  { id: 'launches',  label: 'Space Launches',     accent: 'bg-blue-500',    desc: 'Upcoming rocket launches with live T-minus countdowns and mission details.' },
+  { id: 'mtg',       label: 'Magic Cards',        accent: 'bg-amber-500',   desc: 'Search Scryfall by name, oracle text, or type. Random hands on demand.' },
+  { id: 'memes',     label: 'Meme Generator',     accent: 'bg-yellow-500',  desc: 'Pick a template, add top and bottom captions, download the PNG.' },
+  { id: 'food',      label: 'Recipe Gallery',     accent: 'bg-orange-500',  desc: 'Real recipes with ingredients, instructions, and video guides.' },
+  { id: 'dogs',      label: 'Dog Explorer',       accent: 'bg-amber-500',   desc: '120+ breeds and sub-breeds, shuffled or filtered.' },
+  { id: 'countries', label: 'World Countries',    accent: 'bg-emerald-500', desc: '250 countries with flags, population, languages, and clickable neighbours.' },
+  { id: 'quotes',    label: 'Quote Wall',         accent: 'bg-cyan-500',    desc: 'Endless quote batches with copy, favourite, and search.' },
 ]
 
 const ICONS = {
