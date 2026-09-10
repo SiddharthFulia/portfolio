@@ -483,7 +483,7 @@ const Science = () => {
             </p>
             <div className="flex items-center justify-center gap-2 flex-wrap">
               <Link to="/lab" className="luxe-btn luxe-btn-primary tap-44">Open Lab</Link>
-              <Link to="/explore" className="luxe-btn luxe-btn-secondary tap-44">Public APIs</Link>
+              <Link to="/explore" className="luxe-btn luxe-btn-secondary tap-44">Explore</Link>
             </div>
           </div>
         </div>

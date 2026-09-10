@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import PageLoader from '../components/PageLoader'
+import { LuxeLoader } from '../components/loaders'
 
 // Slug → lazy component. `food` is the historical slug and stays as
 // the canonical; `foodish` is aliased for BC because the task brief
@@ -51,8 +51,7 @@ const META = {
     info: 'Inspiring quotes in a masonry layout. Load More pulls a fresh batch and dedupes; tap the heart to save favourites to this browser.' },
 }
 
-// PageLoader is the canonical Suspense fallback site-wide; keep the
-// shimmer feel consistent with the rest of the lazy routes.
+// LuxeLoader is the canonical Suspense fallback site-wide.
 
 const ExploreModule = () => {
   const { module } = useParams()
@@ -82,7 +81,7 @@ const ExploreModule = () => {
         </Link>
 
         <div className="relative">
-          <div className="eyebrow-mono mb-3">// {meta.eyebrow || 'Public API module'}</div>
+          <div className="eyebrow-mono mb-3">// {meta.eyebrow || 'Interactive module'}</div>
           <div className="flex items-start gap-4 mb-1 flex-wrap">
             <div className={`h-1.5 w-14 rounded-full mt-3 ${meta.accent}`} />
             <div className="flex-1 min-w-0">
@@ -97,7 +96,7 @@ const ExploreModule = () => {
         <div className="mt-6 h-px bg-white/5" />
       </div>
       <div className="max-w-6xl mx-auto px-6 pb-24">
-        <Suspense fallback={<PageLoader />}><Component /></Suspense>
+        <Suspense fallback={<div className='py-16 flex justify-center'><LuxeLoader variant='osint' size='md' label='Loading module…' /></div>}><Component /></Suspense>
       </div>
     </div>
   )

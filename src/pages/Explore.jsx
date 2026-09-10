@@ -47,7 +47,7 @@ const Explore = () => (
       </FadeIn>
       <FadeIn delay={0.1}>
         <p className="text-gray-400 mt-3 text-base max-w-2xl">
-          Interactive modules powered by public APIs — Pokemon, rockets, food, memes, card games, and more.
+          Interactive live modules — Pokemon, rockets, food, memes, card games, and more.
         </p>
       </FadeIn>
       <FadeIn delay={0.15}>
