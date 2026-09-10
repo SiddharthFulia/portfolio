@@ -38,9 +38,9 @@ const MODEL_KEY   = 'sid-oracle-model-v1'
 // The 3 Groq models we expose. Value strings mirror the /api/groq shape
 // the BE already accepts, so the agent route can forward them through.
 const MODELS = [
-  { value: 'llama-3.3-70b-versatile', label: '70B versatile',   hint: 'Best quality · default' },
-  { value: 'openai/gpt-oss-120b',      label: 'GPT-OSS 120B',   hint: 'Most powerful' },
-  { value: 'llama-3.1-8b-instant',     label: '8B instant',     hint: 'Fastest' },
+  { value: 'openai/gpt-oss-120b',   label: 'GPT-OSS 120B', hint: 'Most powerful · default' },
+  { value: 'openai/gpt-oss-20b',    label: 'GPT-OSS 20B',  hint: 'Balanced' },
+  { value: 'llama-3.1-8b-instant',  label: '8B instant',   hint: 'Fastest' },
 ]
 
 const SUGGESTED = [
