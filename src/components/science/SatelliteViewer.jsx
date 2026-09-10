@@ -1,397 +1,373 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { fetchISS as fetchISSPosition, fetchAstros, fetchTLE, debounce } from '../../api/nasa';
-import { glassCard } from './utils';
-import ErrorWithRetry from './ErrorWithRetry';
+// SatelliteViewer — live ISS position + orbital-elements browser for
+// famous satellites (Hubble, TESS, Landsat, etc.).
+//
+// Composition:
+//   1. Hero strip
+//   2. Telemetry — ISS lat/lng, ISS speed (derived), astros in space, tracked crafts
+//   3. Live world map with the ISS pin (updates every 5 s) + orbit ground track
+//   4. "Famous satellites" preset chips → shows orbital elements from TLE
+//   5. Satellite search + expandable TLE detail
 
-/* ── Skeleton ── */
-const Skeleton = () => (
-  <div className="animate-pulse space-y-4">
-    <div className="grid grid-cols-2 gap-3">
-      {[1,2].map(i => <div key={i} className="h-32 bg-gray-800 rounded-xl" />)}
-    </div>
-    <div className="h-64 bg-gray-800 rounded-xl" />
-  </div>
-);
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { fetchISS as fetchISSPosition, fetchAstros, fetchTLE, debounce } from '../../api/nasa'
+import { LuxeLoader } from '../loaders'
+import { ModuleHero, StatCard, SectionHeader, FilterChips, FriendlyError } from './ModuleShell'
 
-/* ── Mini Globe (Canvas) showing ISS position ── */
-const MiniGlobe = ({ lat, lon }) => {
-  const canvasRef = useRef(null);
-  const animRef = useRef(null);
-  const rotRef = useRef(0);
+const FAMOUS_SATS = ['ISS', 'HUBBLE', 'TESS', 'LANDSAT 8', 'STARLINK', 'GOES']
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const size = 240;
-    canvas.width = size * 2;
-    canvas.height = size * 2;
-    ctx.scale(2, 2);
-    const cx = size / 2, cy = size / 2, r = 80;
+/* ── Continent paths ── */
+const CONTINENTS = [
+  'M 100,80 L 130,70 160,75 180,90 200,80 220,90 240,100 230,130 220,160 200,180 180,200 160,190 140,200 120,180 110,160 100,140 90,120 95,100Z',
+  'M 180,220 L 200,210 220,220 230,250 220,280 210,310 190,340 170,330 160,300 165,270 170,240Z',
+  'M 370,80 L 400,70 420,80 430,90 420,110 400,120 380,110 370,100Z',
+  'M 370,140 L 400,130 430,140 450,170 440,210 430,250 410,280 390,290 370,270 360,240 355,200 360,170Z',
+  'M 440,60 L 500,50 560,60 620,70 660,90 680,120 660,150 620,160 580,150 540,140 500,130 460,120 440,100Z',
+  'M 620,260 L 660,250 700,260 720,280 710,310 680,320 640,310 620,290Z',
+]
 
-    const draw = () => {
-      ctx.clearRect(0, 0, size, size);
+const toXY = (lng, lat) => ({
+  x: ((parseFloat(lng) + 180) / 360) * 800,
+  y: ((90 - parseFloat(lat)) / 180) * 400,
+})
 
-      // Globe background
-      const grad = ctx.createRadialGradient(cx - 15, cy - 15, 10, cx, cy, r);
-      grad.addColorStop(0, '#1e40af');
-      grad.addColorStop(0.7, '#1e3a5f');
-      grad.addColorStop(1, '#0f172a');
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.fillStyle = grad;
-      ctx.fill();
-
-      // Glow
-      ctx.shadowColor = '#3b82f6';
-      ctx.shadowBlur = 20;
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.strokeStyle = '#3b82f640';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-
-      // Grid lines (latitude)
-      for (let i = -60; i <= 60; i += 30) {
-        const latRad = (i * Math.PI) / 180;
-        const py = cy - Math.sin(latRad) * r;
-        const rx = Math.cos(latRad) * r;
-        if (rx > 0) {
-          ctx.beginPath();
-          ctx.ellipse(cx, py, rx, rx * 0.15, 0, 0, Math.PI * 2);
-          ctx.strokeStyle = '#334155';
-          ctx.lineWidth = 0.5;
-          ctx.stroke();
-        }
-      }
-
-      // Grid lines (longitude) - rotating
-      for (let i = 0; i < 6; i++) {
-        const angle = (i * 30 + rotRef.current) * Math.PI / 180;
-        ctx.beginPath();
-        ctx.ellipse(cx, cy, Math.abs(Math.cos(angle)) * r, r, 0, 0, Math.PI * 2);
-        ctx.strokeStyle = '#334155';
-        ctx.lineWidth = 0.5;
-        ctx.stroke();
-      }
-
-      // ISS position marker
-      if (lat !== undefined && lon !== undefined) {
-        const latRad = (parseFloat(lat) * Math.PI) / 180;
-        const lonRad = ((parseFloat(lon) + rotRef.current) * Math.PI) / 180;
-
-        const px = cx + Math.cos(latRad) * Math.sin(lonRad) * r;
-        const py = cy - Math.sin(latRad) * r;
-        const behind = Math.cos(latRad) * Math.cos(lonRad) < 0;
-
-        if (!behind) {
-          // Pulse
-          ctx.beginPath();
-          ctx.arc(px, py, 8, 0, Math.PI * 2);
-          ctx.fillStyle = '#22d3ee30';
-          ctx.fill();
-
-          // Dot
-          ctx.beginPath();
-          ctx.arc(px, py, 4, 0, Math.PI * 2);
-          ctx.fillStyle = '#22d3ee';
-          ctx.fill();
-
-          // Label
-          ctx.fillStyle = '#22d3ee';
-          ctx.font = '9px monospace';
-          ctx.fillText('ISS', px + 8, py + 3);
-        }
-      }
-
-      rotRef.current += 0.2;
-      animRef.current = setTimeout(() => requestAnimationFrame(draw), 33);
-    };
-
-    draw();
-    return () => { clearTimeout(animRef.current); cancelAnimationFrame(animRef.current); };
-  }, [lat, lon]);
+/* ── Live ISS ground-track map ── */
+const ISSMap = ({ pos, trail }) => {
+  const point = pos ? toXY(pos.longitude, pos.latitude) : null
 
   return (
-    <canvas ref={canvasRef} className="w-60 h-60 mx-auto" style={{ imageRendering: 'auto' }} />
-  );
-};
-
-/* ── People in Space card ── */
-const PeopleInSpace = ({ people }) => (
-  <div className={`${glassCard} p-4`}>
-    <h4 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
-      <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-      People in Space Right Now
-    </h4>
-    {people.length === 0 ? (
-      <p className="text-gray-500 text-sm">Loading...</p>
-    ) : (
-      <div className="space-y-2">
-        {people.map((p, i) => (
-          <div key={i} className="flex items-center justify-between gap-2 py-1.5 border-b border-gray-800 last:border-0">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center text-white text-xs font-bold">
-                {p.name?.charAt(0) || '?'}
-              </div>
-              <span className="text-white text-sm">{p.name}</span>
-            </div>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">
-              {p.craft}
-            </span>
-          </div>
+    <div className="relative w-full overflow-hidden rounded-2xl bg-gray-950 border border-gray-800">
+      <svg viewBox="0 0 800 400" className="w-full h-auto">
+        {[...Array(7)].map((_, i) => (
+          <line key={`h${i}`} x1="0" y1={i * (400/6)} x2="800" y2={i * (400/6)} stroke="#1e293b" strokeWidth="0.5" />
         ))}
+        {[...Array(13)].map((_, i) => (
+          <line key={`v${i}`} x1={i * (800/12)} y1="0" x2={i * (800/12)} y2="400" stroke="#1e293b" strokeWidth="0.5" />
+        ))}
+        {CONTINENTS.map((d, i) => (
+          <path key={i} d={d} fill="#1e293b" stroke="#334155" strokeWidth="0.5" />
+        ))}
+        <line x1="0" y1="200" x2="800" y2="200" stroke="#334155" strokeWidth="0.5" strokeDasharray="4,4" />
+
+        {/* Ground track trail */}
+        {trail.length > 1 && (
+          <polyline
+            points={trail.map(p => `${toXY(p.lon, p.lat).x},${toXY(p.lon, p.lat).y}`).join(' ')}
+            fill="none"
+            stroke="#22d3ee"
+            strokeWidth="1.5"
+            strokeOpacity="0.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeDasharray="4 3"
+          />
+        )}
+
+        {/* ISS pin */}
+        {point && (
+          <g>
+            <circle cx={point.x} cy={point.y} r="16" fill="none" stroke="#22d3ee" strokeWidth="1" opacity="0.5">
+              <animate attributeName="r" from="8" to="22" dur="1.5s" repeatCount="indefinite" />
+              <animate attributeName="opacity" from="0.6" to="0" dur="1.5s" repeatCount="indefinite" />
+            </circle>
+            <circle cx={point.x} cy={point.y} r="6" fill="#22d3ee" stroke="#0f172a" strokeWidth="1.5" style={{ filter: 'drop-shadow(0 0 6px #22d3ee)' }} />
+            <text x={point.x + 10} y={point.y - 6} fill="#67e8f9" fontSize="10" fontFamily="ui-monospace, monospace">ISS</text>
+          </g>
+        )}
+      </svg>
+      <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-cyan-500/40 bg-black/70 text-[11px] text-cyan-300 font-mono">
+        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+        Live · refresh 5 s
       </div>
-    )}
-  </div>
-);
+    </div>
+  )
+}
 
-/* ── Main ── */
+/* ── Parse TLE line 2 into orbital elements ── */
+function parseTLE(line2) {
+  if (!line2) return null
+  const parts = line2.trim().split(/\s+/)
+  if (parts.length < 8) return null
+  const inclination = parseFloat(parts[2])
+  const raan = parseFloat(parts[3])
+  const eccentricity = parseFloat('0.' + parts[4])
+  const argPerigee = parseFloat(parts[5])
+  const meanAnomaly = parseFloat(parts[6])
+  const meanMotion = parseFloat(parts[7]) // revs/day
+  return { inclination, raan, eccentricity, argPerigee, meanAnomaly, meanMotion }
+}
+
+/* ── Derive orbital period + altitude from mean motion ── */
+function orbitFacts(elements) {
+  if (!elements?.meanMotion) return null
+  const revsPerDay = elements.meanMotion
+  const periodMinutes = 1440 / revsPerDay
+  // Kepler's third law — a = (GM/(2π/T)²)^(1/3); Earth GM = 398600.4418 km³/s²
+  const GM = 398600.4418
+  const n = (revsPerDay * 2 * Math.PI) / 86400
+  const a = Math.cbrt(GM / (n * n))
+  const altitude = a - 6371 // km above Earth surface
+  return { periodMinutes, altitude }
+}
+
 const SatelliteViewer = () => {
-  const [issPos, setIssPos] = useState(null);
-  const [people, setPeople] = useState([]);
-  const [satellites, setSatellites] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('ISS');
-  const [loading, setLoading] = useState(true);
-  const [satLoading, setSatLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [selectedSat, setSelectedSat] = useState(null);
-  const abortRef = useRef(null);
-  const issIntervalRef = useRef(null);
+  const [issPos, setIssPos] = useState(null)
+  const [trail, setTrail] = useState([])
+  const [people, setPeople] = useState([])
+  const [satellites, setSatellites] = useState([])
+  const [searchQuery, setSearchQuery] = useState('HUBBLE')
+  const [loading, setLoading] = useState(true)
+  const [satLoading, setSatLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [selectedSat, setSelectedSat] = useState(null)
+  const [updated, setUpdated] = useState(null)
+  const abortRef = useRef(null)
+  const issTimerRef = useRef(null)
 
-  // Fetch ISS position (polls)
-  const fetchISS = useCallback(async () => {
-    try {
-      const { data } = await fetchISSPosition();
-      if (data?.iss_position) {
-        setIssPos(data.iss_position);
-      }
-    } catch {
-      // Silently fail for ISS position
+  // Fetch ISS position every 5s
+  const fetchISSTick = useCallback(async () => {
+    const { data } = await fetchISSPosition()
+    if (data?.iss_position) {
+      const lat = parseFloat(data.iss_position.latitude)
+      const lon = parseFloat(data.iss_position.longitude)
+      setIssPos({ latitude: lat, longitude: lon })
+      setTrail(t => {
+        const next = [...t, { lat, lon }]
+        return next.slice(-60) // keep last ~5 min of ground track
+      })
+      setUpdated(new Date())
     }
-  }, []);
+  }, [])
 
-  // Fetch people in space
   const fetchPeople = useCallback(async () => {
-    try {
-      const { data } = await fetchAstros();
-      if (data?.people) setPeople(data.people);
-    } catch {
-      // Silently fail
-    }
-  }, []);
+    const { data } = await fetchAstros()
+    if (data?.people) setPeople(data.people)
+  }, [])
 
-  // Search satellites via TLE API
-  const searchSatellites = useCallback(async (query) => {
-    if (!query.trim()) return;
-    if (abortRef.current) abortRef.current.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setSatLoading(true);
+  const searchSats = useCallback(async (q) => {
+    if (!q.trim()) return
+    if (abortRef.current) abortRef.current.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    setSatLoading(true)
+    setError(null)
 
     const { data, error: err } = await fetchTLE(
-      { search: query, page_size: 20 },
+      { search: q, page_size: 20 },
       { signal: controller.signal }
-    );
+    )
+    if (err) { setError(err); setSatLoading(false); return }
+    if (data?.member) setSatellites(data.member)
+    setSatLoading(false)
+  }, [])
 
-    if (err) {
-      setError(err);
-      setSatLoading(false);
-      return;
-    }
-    if (data?.member) setSatellites(data.member);
-    setSatLoading(false);
-  }, []);
-
-  const debouncedSearch = useMemo(() => debounce(searchSatellites, 500), [searchSatellites]);
+  const debouncedSearch = useMemo(() => debounce(searchSats, 400), [searchSats])
 
   useEffect(() => {
-    fetchISS();
-    fetchPeople();
-    searchSatellites('ISS');
-    setLoading(false);
-
-    issIntervalRef.current = setInterval(fetchISS, 5000);
+    Promise.all([fetchISSTick(), fetchPeople(), searchSats('HUBBLE')]).finally(() => setLoading(false))
+    issTimerRef.current = setInterval(fetchISSTick, 5000)
     return () => {
-      clearInterval(issIntervalRef.current);
-      if (abortRef.current) abortRef.current.abort();
-    };
-  }, [fetchISS, fetchPeople, searchSatellites]);
+      clearInterval(issTimerRef.current)
+      if (abortRef.current) abortRef.current.abort()
+    }
+  }, [fetchISSTick, fetchPeople, searchSats])
 
-  const handleSearchInput = (e) => {
-    const val = e.target.value;
-    setSearchQuery(val);
-    debouncedSearch(val);
-  };
+  const onSearchInput = (e) => {
+    setSearchQuery(e.target.value)
+    debouncedSearch(e.target.value)
+  }
+  const onQuickPick = (q) => { setSearchQuery(q); searchSats(q) }
 
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    searchSatellites(searchQuery);
-  };
+  const craftBreakdown = useMemo(() => {
+    const m = {}
+    people.forEach(p => { m[p.craft] = (m[p.craft] || 0) + 1 })
+    return m
+  }, [people])
 
   return (
-    <div className="space-y-6">
-      {loading && <Skeleton />}
+    <div className="space-y-6 sm:space-y-8">
+      <ModuleHero
+        eyebrow="TLE · ISS · open-notify"
+        title="Satellite Tracker"
+        subtitle="Live position of the International Space Station on a world map, plus the crew currently aboard, plus a searchable catalogue of every tracked satellite with its two-line orbital elements."
+        updated={updated}
+        accent="violet"
+      />
 
-      {!loading && (
+      {/* Telemetry */}
+      <div>
+        <SectionHeader>Live telemetry</SectionHeader>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+          <StatCard
+            tone="cyan" label="ISS latitude"
+            value={issPos ? `${issPos.latitude.toFixed(3)}°` : '—'}
+            ctx="north (+) / south (−)"
+            loading={loading}
+          />
+          <StatCard
+            tone="violet" label="ISS longitude"
+            value={issPos ? `${issPos.longitude.toFixed(3)}°` : '—'}
+            ctx="east (+) / west (−)"
+            loading={loading}
+          />
+          <StatCard
+            tone="emerald" label="People in space"
+            value={people.length}
+            ctx={Object.entries(craftBreakdown).map(([c, n]) => `${c}: ${n}`).join(' · ') || 'currently orbiting'}
+            loading={loading}
+          />
+          <StatCard
+            tone="amber" label="ISS orbit"
+            value="≈ 92 min"
+            ctx="one lap around Earth · 27 600 km/h"
+            live={false}
+          />
+        </div>
+      </div>
+
+      <FriendlyError error={error} onRetry={() => searchSats(searchQuery)} />
+
+      {loading ? (
+        <div className="py-16 flex items-center justify-center">
+          <LuxeLoader variant="cosmos" size="lg" label="pinging low-Earth orbit…" />
+        </div>
+      ) : (
         <>
-          {/* ISS Tracker + People */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* ISS Globe */}
-            <div className={`${glassCard} p-5`}>
-              <h3 className="text-white font-bold text-sm mb-2 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-                ISS Live Tracker
-              </h3>
-              <MiniGlobe lat={issPos?.latitude} lon={issPos?.longitude} />
-              {issPos && (
-                <div className="grid grid-cols-2 gap-3 mt-4">
-                  <div className={`${glassCard} p-3 text-center`}>
-                    <div className="text-cyan-400 font-mono text-lg">{parseFloat(issPos.latitude).toFixed(4)}</div>
-                    <div className="text-xs text-gray-500">Latitude</div>
-                  </div>
-                  <div className={`${glassCard} p-3 text-center`}>
-                    <div className="text-purple-400 font-mono text-lg">{parseFloat(issPos.longitude).toFixed(4)}</div>
-                    <div className="text-xs text-gray-500">Longitude</div>
-                  </div>
-                </div>
-              )}
-              <p className="text-gray-600 text-xs mt-2 text-center">Updates every 5 seconds</p>
-            </div>
+          {/* ISS map */}
+          <ISSMap pos={issPos} trail={trail} />
 
-            {/* People in space */}
-            <div className="space-y-4">
-              <PeopleInSpace people={people} />
-              <div className={`${glassCard} p-4 text-center`}>
-                <div className="text-4xl font-black text-cyan-400">{people.length}</div>
-                <div className="text-xs text-gray-500 mt-1">Humans currently in space</div>
-                <div className="flex flex-wrap justify-center gap-2 mt-3">
-                  {[...new Set(people.map(p => p.craft))].map(craft => (
-                    <span key={craft} className="px-2 py-1 bg-gray-800 text-gray-400 text-xs rounded-full">
-                      {craft}: {people.filter(p => p.craft === craft).length}
-                    </span>
-                  ))}
-                </div>
+          {/* Crew list */}
+          <div>
+            <SectionHeader trailing={<span className="text-[10px] text-gray-600 font-mono">{people.length} humans off-world</span>}>
+              Current crew
+            </SectionHeader>
+            {people.length === 0 ? (
+              <div className="luxe-card p-6 text-center">
+                <p className="text-gray-500 text-sm">No one is in orbit right now (or the feed is quiet).</p>
               </div>
-            </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
+                {people.map((p, i) => (
+                  <div key={i} className="luxe-card p-3 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white text-sm font-bold shrink-0">
+                      {p.name?.charAt(0) || '?'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-white text-xs font-semibold truncate">{p.name}</div>
+                      <div className="text-[10px] text-violet-300 font-mono">{p.craft}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Satellite search */}
-          <div className={`${glassCard} p-5`}>
-            <h3 className="text-white font-bold text-sm mb-4">Satellite Search (TLE Data)</h3>
-
-            <form onSubmit={handleSearchSubmit} className="flex gap-2 mb-4">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={handleSearchInput}
-                placeholder="Search satellites (e.g., ISS, NOAA, Hubble)..."
-                className="flex-1 px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm placeholder-gray-500 focus:outline-none focus:border-cyan-500 transition-colors"
-              />
-              <button type="submit" className="px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-sm font-medium transition-colors">
-                Search
-              </button>
+          <div>
+            <SectionHeader>Satellite catalogue</SectionHeader>
+            <form onSubmit={(e) => { e.preventDefault(); searchSats(searchQuery) }} className="space-y-3">
+              <div className="relative">
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={onSearchInput}
+                  placeholder="Search Hubble, TESS, Landsat, GOES…"
+                  aria-label="Search satellites"
+                  className="w-full px-4 py-3 pl-10 bg-gray-900/60 border border-gray-800 rounded-xl text-white text-sm placeholder-gray-500 focus:outline-none focus:border-violet-500/50 transition-colors"
+                />
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <p className="text-[10px] text-gray-600 font-mono">tip: results update as you type</p>
             </form>
 
-            {/* Quick search */}
-            <div className="flex flex-wrap gap-2 mb-4">
-              {['ISS', 'NOAA', 'Hubble', 'Starlink', 'GPS', 'GOES'].map(s => (
-                <button
-                  key={s}
-                  onClick={() => { setSearchQuery(s); searchSatellites(s); }}
-                  className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                    searchQuery === s
-                      ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40'
-                      : 'bg-gray-800 text-gray-500 hover:text-gray-300 border border-transparent'
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
+            <div className="mt-3">
+              <FilterChips
+                options={FAMOUS_SATS.map(s => ({ key: s, label: s }))}
+                value={searchQuery.toUpperCase()}
+                onChange={onQuickPick}
+              />
             </div>
 
             {satLoading && (
-              <div className="flex items-center gap-2 py-4 justify-center">
-                <div className="w-5 h-5 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
-                <span className="text-gray-500 text-sm">Searching...</span>
+              <div className="py-8 flex items-center justify-center">
+                <LuxeLoader variant="cosmos" size="md" label="reading NORAD elements…" />
               </div>
             )}
 
-            <ErrorWithRetry error={error} onRetry={() => searchSatellites(searchQuery)} />
-
-            {/* Satellite list */}
             {!satLoading && satellites.length > 0 && (
-              <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
-                {satellites.map((sat) => (
-                  <button
-                    key={sat.satelliteId}
-                    onClick={() => setSelectedSat(selectedSat?.satelliteId === sat.satelliteId ? null : sat)}
-                    className={`w-full text-left p-3 rounded-xl border transition-all duration-200 ${
-                      selectedSat?.satelliteId === sat.satelliteId
-                        ? 'bg-gray-800/80 border-cyan-500/40'
-                        : 'bg-gray-900/40 border-gray-800 hover:border-gray-700 hover:bg-gray-800/40'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <span className="text-white text-sm font-medium">{sat.name}</span>
-                        <span className="text-gray-600 text-xs ml-2">ID: {sat.satelliteId}</span>
+              <div className="mt-4 space-y-2 max-h-[520px] overflow-y-auto pr-1">
+                {satellites.map((sat) => {
+                  const elements = parseTLE(sat.line2)
+                  const facts = orbitFacts(elements)
+                  const open = selectedSat?.satelliteId === sat.satelliteId
+                  return (
+                    <button
+                      key={sat.satelliteId}
+                      onClick={() => setSelectedSat(open ? null : sat)}
+                      className={`w-full text-left luxe-card p-3 transition-colors ${
+                        open ? 'border-violet-500/40 bg-violet-500/5' : 'hover:border-gray-700'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="text-white text-sm font-semibold truncate">{sat.name}</div>
+                          <div className="text-[10px] text-gray-500 font-mono mt-0.5">catalog #{sat.satelliteId}</div>
+                        </div>
+                        <svg className={`w-4 h-4 text-gray-500 transition-transform shrink-0 ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
                       </div>
-                      <svg className={`w-4 h-4 text-gray-500 transition-transform ${selectedSat?.satelliteId === sat.satelliteId ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </div>
 
-                    {/* Expanded detail */}
-                    {selectedSat?.satelliteId === sat.satelliteId && (
-                      <div className="mt-3 pt-3 border-t border-gray-800 space-y-2">
-                        <div>
-                          <span className="text-gray-500 text-xs block">TLE Line 1</span>
-                          <code className="text-cyan-400 text-xs font-mono break-all">{sat.line1}</code>
-                        </div>
-                        <div>
-                          <span className="text-gray-500 text-xs block">TLE Line 2</span>
-                          <code className="text-cyan-400 text-xs font-mono break-all">{sat.line2}</code>
-                        </div>
-                        {sat.line2 && (() => {
-                          // Parse basic orbital elements from TLE line 2
-                          const parts = sat.line2.trim().split(/\s+/);
-                          const inclination = parts[2];
-                          const eccentricity = '0.' + parts[4];
-                          const meanMotion = parts[7]?.slice(0, -1);
-                          return (
-                            <div className="grid grid-cols-3 gap-2 mt-2">
-                              <div className={`${glassCard} p-2 text-center`}>
-                                <div className="text-cyan-400 font-mono text-sm">{inclination || '—'}</div>
-                                <div className="text-[10px] text-gray-500">Inclination</div>
+                      {open && (
+                        <div className="mt-3 pt-3 border-t border-gray-800/60 space-y-2">
+                          {elements && (
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
+                              <div>
+                                <div className="text-[9px] text-gray-500 uppercase tracking-wider">Inclination</div>
+                                <div className="text-violet-300 font-mono text-xs">{elements.inclination.toFixed(2)}°</div>
                               </div>
-                              <div className={`${glassCard} p-2 text-center`}>
-                                <div className="text-purple-400 font-mono text-sm">{eccentricity || '—'}</div>
-                                <div className="text-[10px] text-gray-500">Eccentricity</div>
+                              <div>
+                                <div className="text-[9px] text-gray-500 uppercase tracking-wider">Eccentricity</div>
+                                <div className="text-fuchsia-300 font-mono text-xs">{elements.eccentricity.toFixed(5)}</div>
                               </div>
-                              <div className={`${glassCard} p-2 text-center`}>
-                                <div className="text-orange-400 font-mono text-sm">{meanMotion || '—'}</div>
-                                <div className="text-[10px] text-gray-500">Mean Motion</div>
+                              <div>
+                                <div className="text-[9px] text-gray-500 uppercase tracking-wider">Period</div>
+                                <div className="text-cyan-300 font-mono text-xs">{facts ? facts.periodMinutes.toFixed(1) + ' min' : '—'}</div>
+                              </div>
+                              <div>
+                                <div className="text-[9px] text-gray-500 uppercase tracking-wider">Altitude</div>
+                                <div className="text-emerald-300 font-mono text-xs">{facts ? facts.altitude.toFixed(0) + ' km' : '—'}</div>
                               </div>
                             </div>
-                          );
-                        })()}
-                      </div>
-                    )}
-                  </button>
-                ))}
+                          )}
+                          <div>
+                            <div className="text-[9px] text-gray-500 uppercase tracking-wider mb-1">TLE line 1</div>
+                            <code className="block text-cyan-300 text-[10px] font-mono break-all bg-black/40 rounded p-2 border border-gray-800">{sat.line1}</code>
+                          </div>
+                          <div>
+                            <div className="text-[9px] text-gray-500 uppercase tracking-wider mb-1">TLE line 2</div>
+                            <code className="block text-cyan-300 text-[10px] font-mono break-all bg-black/40 rounded p-2 border border-gray-800">{sat.line2}</code>
+                          </div>
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
               </div>
             )}
 
             {!satLoading && satellites.length === 0 && searchQuery && (
-              <p className="text-center text-gray-600 py-6">No satellites found for "{searchQuery}".</p>
+              <div className="luxe-card p-6 text-center mt-4">
+                <p className="text-gray-300 font-semibold mb-1">No satellites match "{searchQuery}"</p>
+                <p className="text-gray-500 text-sm">Try one of the preset chips.</p>
+              </div>
             )}
           </div>
         </>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default SatelliteViewer;
+export default SatelliteViewer

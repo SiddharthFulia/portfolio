@@ -1,264 +1,268 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { fetchFlares, fetchStorms, fetchCMEs, daysAgo, todayStr } from '../../api/nasa';
-import { glassCard } from './utils';
-import ErrorWithRetry from './ErrorWithRetry';
+// SpaceWeather — DONKI solar activity feeds for the last 30 days.
+//
+// Composition:
+//   1. Hero strip
+//   2. Telemetry — flare / storm / CME counts + strongest event
+//   3. Tabs — Solar Flares · Geomagnetic Storms · Coronal Mass Ejections
+//   4. SVG timeline chart under the active tab (30-day density)
+//   5. Card list of the top events for the active tab
 
-/* ── Severity color mapping ── */
-const severityColor = (level) => {
-  if (!level) return { bg: 'bg-gray-500/20', text: 'text-gray-400', border: 'border-gray-500/30', bar: 'bg-gray-500' };
-  const l = String(level).toUpperCase();
-  if (l.includes('X') || l.includes('G5') || l.includes('G4')) return { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/30', bar: 'bg-red-500' };
-  if (l.includes('M') || l.includes('G3') || l.includes('G2')) return { bg: 'bg-orange-500/20', text: 'text-orange-400', border: 'border-orange-500/30', bar: 'bg-orange-500' };
-  if (l.includes('C') || l.includes('G1')) return { bg: 'bg-yellow-500/20', text: 'text-yellow-400', border: 'border-yellow-500/30', bar: 'bg-yellow-500' };
-  return { bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-500/30', bar: 'bg-green-500' };
-};
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { fetchFlares, fetchStorms, fetchCMEs, daysAgo, todayStr } from '../../api/nasa'
+import { LuxeLoader } from '../loaders'
+import { ModuleHero, StatCard, SectionHeader, FilterChips, FriendlyError } from './ModuleShell'
 
-/* ── Activity Gauge ── */
-const ActivityGauge = ({ value, max, label, color }) => {
-  const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0;
-  const angle = (pct / 100) * 180;
+/* ── Severity buckets ── */
+const severityFromFlare = (c = '') => {
+  const u = c.toUpperCase()
+  if (u.startsWith('X')) return { level: 3, label: 'Severe',  color: '#ef4444' }
+  if (u.startsWith('M')) return { level: 2, label: 'Strong',  color: '#f97316' }
+  if (u.startsWith('C')) return { level: 1, label: 'Moderate', color: '#eab308' }
+  return { level: 0, label: 'Minor', color: '#22d3ee' }
+}
+const severityFromKp = (kp) => {
+  const n = parseFloat(kp) || 0
+  if (n >= 8) return { level: 3, label: 'G4/G5', color: '#ef4444' }
+  if (n >= 6) return { level: 2, label: 'G2/G3', color: '#f97316' }
+  if (n >= 5) return { level: 1, label: 'G1',    color: '#eab308' }
+  return { level: 0, label: 'Quiet', color: '#22d3ee' }
+}
+const severityFromCmeSpeed = (spd) => {
+  const s = parseFloat(spd) || 0
+  if (s >= 1500) return { level: 3, label: 'Fast', color: '#ef4444' }
+  if (s >= 800)  return { level: 2, label: 'Moderate', color: '#f97316' }
+  if (s >= 400)  return { level: 1, label: 'Slow', color: '#eab308' }
+  return { level: 0, label: 'Gentle', color: '#22d3ee' }
+}
+
+/* ── 30-day timeline chart (SVG) ── */
+const Timeline = ({ events, accent }) => {
+  const days = 30
+  const now = Date.now()
+
+  // Bucket events by day-index (0 = 30 days ago, 29 = today)
+  const buckets = useMemo(() => {
+    const b = Array(days).fill(0)
+    events.forEach(ev => {
+      const t = new Date(ev.date).getTime()
+      const idx = days - 1 - Math.floor((now - t) / 86_400_000)
+      if (idx >= 0 && idx < days) b[idx]++
+    })
+    return b
+  }, [events, now])
+
+  const max = Math.max(...buckets, 1)
+  const W = 800, H = 120, PAD = 12
+  const barW = (W - PAD * 2) / days
+
   return (
-    <div className="flex flex-col items-center">
-      <div className="relative w-32 h-16 overflow-hidden">
-        {/* Background arc */}
-        <svg viewBox="0 0 120 60" className="w-full h-full">
-          <path d="M 10 55 A 50 50 0 0 1 110 55" fill="none" stroke="#1f2937" strokeWidth="8" strokeLinecap="round" />
-          <path
-            d="M 10 55 A 50 50 0 0 1 110 55"
-            fill="none"
-            stroke={color || '#22d3ee'}
-            strokeWidth="8"
-            strokeLinecap="round"
-            strokeDasharray={`${(angle / 180) * 157} 157`}
-            className="transition-all duration-1000"
-            style={{ filter: `drop-shadow(0 0 4px ${color || '#22d3ee'})` }}
-          />
-        </svg>
-        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-center">
-          <span className="text-xl font-black text-white">{value}</span>
-        </div>
+    <div className="luxe-card p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-[11px] text-gray-500 uppercase tracking-widest font-bold">30-day cadence</div>
+        <div className="text-[10px] text-gray-600 font-mono">{events.length} events</div>
       </div>
-      <span className="text-xs text-gray-500 mt-1">{label}</span>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-24 sm:h-32">
+        {/* Baseline */}
+        <line x1={PAD} y1={H - PAD} x2={W - PAD} y2={H - PAD} stroke="#1f2937" strokeWidth="1" />
+        {/* Bars */}
+        {buckets.map((count, i) => {
+          const barH = (count / max) * (H - PAD * 2)
+          const x = PAD + i * barW
+          const y = H - PAD - barH
+          return (
+            <rect
+              key={i}
+              x={x + 1} y={y}
+              width={Math.max(1, barW - 2)}
+              height={barH}
+              fill={accent}
+              opacity={count > 0 ? 0.85 : 0.15}
+              rx={1}
+            />
+          )
+        })}
+        {/* Today marker */}
+        <line x1={W - PAD - barW / 2} y1={PAD} x2={W - PAD - barW / 2} y2={H - PAD} stroke={accent} strokeWidth="0.5" strokeDasharray="2 2" opacity="0.5" />
+      </svg>
+      <div className="flex items-center justify-between mt-1 text-[10px] text-gray-600 font-mono">
+        <span>30 d ago</span>
+        <span>today</span>
+      </div>
     </div>
-  );
-};
+  )
+}
 
-/* ── Timeline event ── */
-const TimelineEvent = ({ event, type }) => {
-  const dateStr = event.beginTime || event.startTime || event.activityID?.slice(0, 19) || '';
-  const date = dateStr ? new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '?';
-  const time = dateStr ? new Date(dateStr).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
-
-  let severity = '';
-  let description = '';
+/* ── Event card ── */
+const EventCard = ({ event, type }) => {
+  let title, meta, sev, timeStr
+  const rawDate = event.beginTime || event.startTime || event.startDate || event.date
+  timeStr = rawDate ? new Date(rawDate).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
 
   if (type === 'flare') {
-    severity = event.classType || '';
-    description = `Solar Flare ${severity} — Source: ${event.sourceLocation || 'Unknown'}`;
+    title = `Solar flare ${event.classType || ''}`.trim()
+    meta = `Source region: ${event.sourceLocation || 'unknown'}`
+    sev = severityFromFlare(event.classType)
   } else if (type === 'storm') {
-    severity = event.allKpIndex?.[0]?.kpIndex ? `G${Math.min(5, Math.max(1, Math.round(event.allKpIndex[0].kpIndex - 4)))}` : '';
-    description = `Geomagnetic Storm — Kp Index: ${event.allKpIndex?.[0]?.kpIndex || '?'}`;
+    const kp = event.allKpIndex?.[0]?.kpIndex
+    title = 'Geomagnetic storm'
+    meta = `Kp index ${kp ?? '?'}`
+    sev = severityFromKp(kp)
   } else {
-    severity = event.type || '';
-    description = `CME — Speed: ${event.cmeAnalyses?.[0]?.speed || '?'} km/s`;
+    const spd = event.cmeAnalyses?.[0]?.speed
+    title = 'Coronal mass ejection'
+    meta = `Speed ${spd ? Math.round(spd) + ' km/s' : 'unknown'}`
+    sev = severityFromCmeSpeed(spd)
   }
 
-  const sc = severityColor(severity);
-
   return (
-    <div className="flex gap-3 group">
-      {/* Timeline dot */}
-      <div className="flex flex-col items-center pt-1">
-        <div className={`w-3 h-3 rounded-full ${sc.bar} ring-2 ring-gray-900 shadow-[0_0_6px] group-hover:scale-125 transition-transform`}
-          style={{ boxShadow: `0 0 8px ${sc.bar === 'bg-red-500' ? '#ef4444' : sc.bar === 'bg-orange-500' ? '#f97316' : '#22d3ee'}` }}
-        />
-        <div className="w-px flex-1 bg-gray-800 mt-1" />
-      </div>
-
-      {/* Content */}
-      <div className={`flex-1 ${glassCard} p-3 mb-3 hover:border-cyan-500/20 transition-all`}>
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <p className="text-white text-sm font-medium">{description}</p>
-            <p className="text-gray-500 text-xs mt-1">{date} {time}</p>
+    <div className="luxe-card p-4 hover:border-cyan-500/30 transition-colors">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: sev.color, boxShadow: `0 0 6px ${sev.color}` }} />
+            <p className="text-white text-sm font-semibold truncate">{title}</p>
           </div>
-          {severity && (
-            <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-bold ${sc.bg} ${sc.text} border ${sc.border}`}>
-              {severity}
-            </span>
-          )}
+          <p className="text-gray-500 text-xs mt-0.5">{meta}</p>
+          <p className="text-gray-600 text-[10px] font-mono mt-1">{timeStr}</p>
         </div>
+        <span
+          className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border"
+          style={{ color: sev.color, backgroundColor: sev.color + '20', borderColor: sev.color + '60' }}
+        >
+          {sev.label}
+        </span>
       </div>
     </div>
-  );
-};
+  )
+}
 
-/* ── Skeleton ── */
-const Skeleton = () => (
-  <div className="animate-pulse space-y-4">
-    <div className="grid grid-cols-3 gap-3">
-      {[1,2,3].map(i => <div key={i} className="h-32 bg-gray-800 rounded-xl" />)}
-    </div>
-    <div className="h-64 bg-gray-800 rounded-xl" />
-  </div>
-);
-
-/* ── Main ── */
 const SpaceWeather = () => {
-  const [flares, setFlares] = useState([]);
-  const [storms, setStorms] = useState([]);
-  const [cmes, setCmes] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('all');
-  const abortRef = useRef(null);
+  const [flares, setFlares] = useState([])
+  const [storms, setStorms] = useState([])
+  const [cmes, setCmes] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [tab, setTab] = useState('flares')
+  const [updated, setUpdated] = useState(null)
+  const abortRef = useRef(null)
 
   const fetchAll = useCallback(async () => {
-    if (abortRef.current) abortRef.current.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setLoading(true);
-    setError(null);
+    if (abortRef.current) abortRef.current.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    setLoading(true)
+    setError(null)
 
-    const startDate = daysAgo(30);
-    const endDate = todayStr();
-    const opts = { signal: controller.signal };
+    const startDate = daysAgo(30)
+    const endDate = todayStr()
+    const opts = { signal: controller.signal }
 
-    // Fire all 3 independently — show data as each arrives
-    fetchFlares({ startDate, endDate }, opts)
-      .then(({ data, error: e }) => {
-        if (e) setError(prev => prev || e);
-        else if (Array.isArray(data)) setFlares(data);
-      });
+    const [f, s, c] = await Promise.all([
+      fetchFlares({ startDate, endDate }, opts),
+      fetchStorms({ startDate, endDate }, opts),
+      fetchCMEs({ startDate, endDate }, opts),
+    ])
 
-    fetchStorms({ startDate, endDate }, opts)
-      .then(({ data, error: e }) => {
-        if (e) setError(prev => prev || e);
-        else if (Array.isArray(data)) setStorms(data);
-      });
-
-    fetchCMEs({ startDate, endDate }, opts)
-      .then(({ data, error: e }) => {
-        if (e) setError(prev => prev || e);
-        else if (Array.isArray(data)) setCmes(data);
-        setLoading(false); // last one turns off loading
-      });
-  }, []);
+    if (f.error && s.error && c.error) {
+      setError(f.error || s.error || c.error)
+    } else {
+      if (Array.isArray(f.data)) setFlares(f.data)
+      if (Array.isArray(s.data)) setStorms(s.data)
+      if (Array.isArray(c.data)) setCmes(c.data)
+    }
+    setUpdated(new Date())
+    setLoading(false)
+  }, [])
 
   useEffect(() => {
-    fetchAll();
-    return () => { if (abortRef.current) abortRef.current.abort(); };
-  }, [fetchAll]);
+    fetchAll()
+    return () => { if (abortRef.current) abortRef.current.abort() }
+  }, [fetchAll])
 
-  const allEvents = useMemo(() => {
-    const events = [
-      ...flares.map(e => ({ ...e, _type: 'flare', _date: e.beginTime || '' })),
-      ...storms.map(e => ({ ...e, _type: 'storm', _date: e.startTime || '' })),
-      ...cmes.map(e => ({ ...e, _type: 'cme', _date: e.activityID?.slice(0, 19) || '' })),
-    ];
-    events.sort((a, b) => new Date(b._date) - new Date(a._date));
-    return events;
-  }, [flares, storms, cmes]);
+  // Normalise each event set to have a `date` field
+  const flaresD = useMemo(() => flares.map(f => ({ ...f, date: f.beginTime })), [flares])
+  const stormsD = useMemo(() => storms.map(s => ({ ...s, date: s.startTime })), [storms])
+  const cmesD   = useMemo(() => cmes.map(c => ({ ...c, date: c.startTime || (c.activityID?.slice(0, 19)) })), [cmes])
 
-  const filteredEvents = useMemo(() => {
-    if (activeTab === 'all') return allEvents;
-    return allEvents.filter(e => e._type === activeTab);
-  }, [allEvents, activeTab]);
+  const severeFlares = useMemo(
+    () => flares.filter(f => /^[MX]/i.test(f.classType || '')).length,
+    [flares]
+  )
 
-  const severeFlares = useMemo(() => flares.filter(f => {
-    const c = (f.classType || '').toUpperCase();
-    return c.startsWith('M') || c.startsWith('X');
-  }).length, [flares]);
+  const activeEvents = tab === 'flares' ? flaresD : tab === 'storms' ? stormsD : cmesD
+  const activeAccent = tab === 'flares' ? '#f97316' : tab === 'storms' ? '#a855f7' : '#22d3ee'
+
+  const sortedEvents = useMemo(() => {
+    return [...activeEvents].sort((a, b) => new Date(b.date) - new Date(a.date))
+  }, [activeEvents])
 
   return (
-    <div className="space-y-6">
-      <ErrorWithRetry error={error} onRetry={fetchAll} />
+    <div className="space-y-6 sm:space-y-8">
+      <ModuleHero
+        eyebrow="DONKI · NASA feed"
+        title="Space Weather"
+        subtitle="Thirty days of the Sun-Earth interaction — solar flares, geomagnetic storms, and coronal mass ejections. Sourced from NASA's DONKI notification database."
+        updated={updated}
+        accent="yellow"
+      />
 
-      {loading && <Skeleton />}
+      {/* Telemetry */}
+      <div>
+        <SectionHeader>Live telemetry</SectionHeader>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+          <StatCard tone="orange" label="Solar flares" value={flares.length} ctx={`${severeFlares} severe (M/X)`} loading={loading} />
+          <StatCard tone="violet" label="Geomag storms" value={storms.length} ctx="last 30 days" loading={loading} />
+          <StatCard tone="cyan"   label="CMEs"          value={cmes.length}   ctx="Sun ejecta detected" loading={loading} />
+          <StatCard tone="yellow" label="Total events"  value={flares.length + storms.length + cmes.length} ctx="all three feeds" loading={loading} />
+        </div>
+      </div>
 
-      {!loading && !error && (
+      <FriendlyError error={error} onRetry={fetchAll} />
+
+      {loading ? (
+        <div className="py-16 flex items-center justify-center">
+          <LuxeLoader variant="cosmos" size="lg" label="reading the Sun…" />
+        </div>
+      ) : (
         <>
-          {/* Dashboard cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className={`${glassCard} p-5 text-center hover:border-orange-500/30 transition-all`}>
-              <div className="flex items-center justify-center gap-2 mb-3">
-                <svg className="w-5 h-5 text-orange-400" fill="currentColor" viewBox="0 0 20 20">
-                  <circle cx="10" cy="10" r="5" />
-                  <path d="M10 1v3M10 16v3M1 10h3M16 10h3M3.5 3.5l2 2M14.5 14.5l2 2M3.5 16.5l2-2M14.5 5.5l2-2" stroke="currentColor" strokeWidth="1.5" fill="none" />
-                </svg>
-                <h3 className="text-white font-bold text-sm">Solar Flares</h3>
-              </div>
-              <div className="text-3xl font-black text-orange-400">{flares.length}</div>
-              <p className="text-xs text-gray-500 mt-1">Last 30 days</p>
-              <p className="text-xs text-orange-400/70 mt-1">{severeFlares} severe (M/X class)</p>
-              <ActivityGauge value={flares.length} max={50} label="Activity" color="#f97316" />
-            </div>
-
-            <div className={`${glassCard} p-5 text-center hover:border-purple-500/30 transition-all`}>
-              <div className="flex items-center justify-center gap-2 mb-3">
-                <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                <h3 className="text-white font-bold text-sm">Geomagnetic Storms</h3>
-              </div>
-              <div className="text-3xl font-black text-purple-400">{storms.length}</div>
-              <p className="text-xs text-gray-500 mt-1">Last 30 days</p>
-              <ActivityGauge value={storms.length} max={15} label="Activity" color="#a855f7" />
-            </div>
-
-            <div className={`${glassCard} p-5 text-center hover:border-cyan-500/30 transition-all`}>
-              <div className="flex items-center justify-center gap-2 mb-3">
-                <svg className="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <circle cx="12" cy="12" r="3" strokeWidth={2} />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41" />
-                </svg>
-                <h3 className="text-white font-bold text-sm">CMEs</h3>
-              </div>
-              <div className="text-3xl font-black text-cyan-400">{cmes.length}</div>
-              <p className="text-xs text-gray-500 mt-1">Last 30 days</p>
-              <ActivityGauge value={cmes.length} max={40} label="Activity" color="#22d3ee" />
-            </div>
-          </div>
-
-          {/* Filter tabs */}
-          <div className="flex flex-wrap gap-2">
-            {[
-              { id: 'all', label: 'All Events', count: allEvents.length },
-              { id: 'flare', label: 'Flares', count: flares.length },
-              { id: 'storm', label: 'Storms', count: storms.length },
-              { id: 'cme', label: 'CMEs', count: cmes.length },
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  activeTab === tab.id
-                    ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700 border border-transparent'
-                }`}
-              >
-                {tab.label}
-                <span className="ml-2 text-xs opacity-60">{tab.count}</span>
-              </button>
-            ))}
+          {/* Tabs */}
+          <div>
+            <SectionHeader>Feed selector</SectionHeader>
+            <FilterChips
+              options={[
+                { key: 'flares', label: 'Solar Flares',        count: flares.length },
+                { key: 'storms', label: 'Geomagnetic Storms',  count: storms.length },
+                { key: 'cmes',   label: 'Coronal Mass Ejections', count: cmes.length },
+              ]}
+              value={tab}
+              onChange={setTab}
+            />
+            <p className="text-[10px] text-gray-600 mt-2 font-mono">tip: pick a feed to see its 30-day cadence and top events</p>
           </div>
 
           {/* Timeline */}
-          <div className={`${glassCard} p-5`}>
-            <h3 className="text-white font-bold text-sm mb-4">Event Timeline (Last 30 Days)</h3>
-            <div className="max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-              {filteredEvents.length === 0 && (
-                <p className="text-gray-600 text-center py-8">No events recorded for this period.</p>
-              )}
-              {filteredEvents.slice(0, 50).map((event, i) => (
-                <TimelineEvent key={`${event._type}-${i}`} event={event} type={event._type} />
-              ))}
-            </div>
+          <Timeline events={activeEvents} accent={activeAccent} />
+
+          {/* Event list */}
+          <div>
+            <SectionHeader>Latest events</SectionHeader>
+            {sortedEvents.length === 0 ? (
+              <div className="luxe-card p-6 text-center">
+                <p className="text-gray-300 font-semibold mb-1">Quiet Sun</p>
+                <p className="text-gray-500 text-sm">No {tab === 'flares' ? 'flares' : tab === 'storms' ? 'storms' : 'CMEs'} recorded in the last 30 days.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {sortedEvents.slice(0, 30).map((ev, i) => (
+                  <EventCard key={`${tab}-${i}`} event={ev} type={tab === 'flares' ? 'flare' : tab === 'storms' ? 'storm' : 'cme'} />
+                ))}
+              </div>
+            )}
           </div>
         </>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default SpaceWeather;
+export default SpaceWeather
