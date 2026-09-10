@@ -192,6 +192,22 @@ export default function DbExplorer() {
   const askResultRef = useRef(null)
   const sqlResultRef = useRef(null)
 
+  // ── Auto-populate SQL + clear stale state on table switch ────
+  // When the user clicks a table in the sidebar we want the SQL editor
+  // to snap to `SELECT * FROM <table> LIMIT 100` (that's what people
+  // want 95% of the time). We also flush the previous table's ask/SQL
+  // results so the results pane below doesn't lie about which table
+  // it belongs to. Skips the first render (initial auto-select) so the
+  // opening state of the tab doesn't clobber the default SQL.
+  const isFirstTableRef = useRef(true)
+  useEffect(() => {
+    if (!selected) return
+    if (isFirstTableRef.current) { isFirstTableRef.current = false; return }
+    setSql(`SELECT * FROM ${selected} LIMIT 100`)
+    setSqlResult(null); setSqlError(null)
+    setAskResult(null); setAskError(null); setQuestion('')
+  }, [selected])
+
   const runAsk = async () => {
     const q = question.trim()
     if (!q) return
