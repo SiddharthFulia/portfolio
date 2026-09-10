@@ -3022,68 +3022,223 @@ export default function Pathfinding() {
         <div className='luxe-glass p-3 mb-3'>
           <div className='flex items-center justify-between mb-2 gap-2 flex-wrap'>
             <p className='eyebrow-mono text-fuchsia-300/80 font-bold'>Area search</p>
-            <Button
-              variant='subtle'
-              size='small'
-              icon={showLabels ? <EyeOutlined /> : <EyeInvisibleOutlined />}
-              onClick={() => setShowLabels((s) => !s)}
-            >
-              {showLabels ? 'Hide labels' : 'Show labels'}
-            </Button>
+            <div className='flex items-center gap-1.5 flex-wrap'>
+              <Button
+                variant='accent'
+                size='small'
+                icon={<BulbOutlined />}
+                onClick={() => setAiOpen((s) => !s)}
+                disabled={status !== 'ready'}
+                title='Ask AI for real place suggestions'
+              >
+                Ask AI
+              </Button>
+              <Button
+                variant='subtle'
+                size='small'
+                icon={showLabels ? <EyeOutlined /> : <EyeInvisibleOutlined />}
+                onClick={() => setShowLabels((s) => !s)}
+              >
+                {showLabels ? 'Hide labels' : 'Show labels'}
+              </Button>
+            </div>
           </div>
+
+          {/* Ask AI popover — inline card, works as a bottom-sheet on mobile */}
+          <AnimatePresence>
+            {aiOpen && (
+              <motion.div
+                key='pf-ai-popover'
+                initial={REDUCE_MOTION ? false : { opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={REDUCE_MOTION ? { opacity: 0 } : { opacity: 0, y: -6, transition: { duration: 0.2 } }}
+                transition={{ duration: 0.24 }}
+                className='mb-3 rounded-lg border border-violet-500/30 bg-violet-950/20 p-3'
+              >
+                <div className='flex items-center justify-between mb-2 gap-2'>
+                  <p className='text-[12px] font-bold text-violet-200 flex items-center gap-1.5'>
+                    <BulbOutlined /> What are you looking for?
+                  </p>
+                  <button
+                    type='button'
+                    onClick={() => { setAiOpen(false); setAiRecs([]); }}
+                    className='text-fg-muted hover:text-white p-1 rounded'
+                    title='Close'
+                  >
+                    <CloseOutlined />
+                  </button>
+                </div>
+                <div className='flex flex-col sm:flex-row gap-2 items-stretch sm:items-start'>
+                  <Input.TextArea
+                    value={aiQuery}
+                    onChange={(e) => setAiQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if ((e.key === 'Enter' && (e.metaKey || e.ctrlKey))
+                          || (e.key === 'Enter' && !e.shiftKey)) {
+                        e.preventDefault()
+                        if (!aiLoading) runAiSuggest()
+                      }
+                    }}
+                    autoSize={{ minRows: 2, maxRows: 4 }}
+                    placeholder={`e.g. "good italian restaurants near ${currentCityLabel || 'Bandra'}", "quiet cafe with wifi", "big park to walk in"`}
+                    disabled={aiLoading}
+                    className='!text-sm flex-1'
+                    maxLength={300}
+                  />
+                  <Button
+                    variant='primary'
+                    size='small'
+                    onClick={runAiSuggest}
+                    loading={aiLoading}
+                    icon={aiLoading ? <LoadingOutlined /> : <ThunderboltFilled />}
+                    className='shrink-0 self-stretch sm:self-start'
+                  >
+                    {aiLoading ? 'Thinking…' : 'Suggest'}
+                  </Button>
+                </div>
+
+                {aiRecs.length > 0 && (
+                  <div className='grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3'>
+                    {aiRecs.map((r, i) => (
+                      <div
+                        key={`${r.name}-${i}`}
+                        className='rounded-lg border border-line/70 bg-black/25 p-2.5 flex flex-col gap-1.5'
+                      >
+                        <div className='flex items-start gap-2 min-w-0'>
+                          <span className='text-lg leading-none'>{KIND_ICON[r.kind] || '📍'}</span>
+                          <div className='min-w-0 flex-1'>
+                            <div className='text-[13px] font-bold text-white truncate' title={r.name}>{r.name}</div>
+                            <div className='text-[10.5px] text-fg-muted uppercase tracking-wide font-mono flex items-center gap-1.5'>
+                              <span>{r.kind || 'place'}</span>
+                              {r.area && <span className='text-fuchsia-300 normal-case'>· {r.area}</span>}
+                            </div>
+                          </div>
+                        </div>
+                        {r.reason && (
+                          <p className='text-[11.5px] text-fg-muted leading-snug' title={r.reason}>
+                            {r.reason}
+                          </p>
+                        )}
+                        <div className='flex items-center gap-1.5 pt-1'>
+                          <Button
+                            variant='secondary'
+                            size='small'
+                            onClick={() => pickAiRec(r, 'from')}
+                            loading={!!aiPickBusy[`${r.name}_from`]}
+                            className='flex-1'
+                          >
+                            <span className='inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 align-middle' />
+                            Set as From
+                          </Button>
+                          <Button
+                            variant='secondary'
+                            size='small'
+                            onClick={() => pickAiRec(r, 'to')}
+                            loading={!!aiPickBusy[`${r.name}_to`]}
+                            className='flex-1'
+                          >
+                            <span className='inline-block w-1.5 h-1.5 rounded-full bg-rose-500 mr-1.5 align-middle' />
+                            Set as To
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p className='text-[10.5px] text-violet-200/70 leading-snug mt-2 font-mono'>
+                  Recommendations are AI hints — we then match each name against real neighbourhood places for accurate coordinates. Enter to submit · 10 requests/min.
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Stacked composer — From on top, To below, Swap on the right */}
           <div className='flex flex-col sm:flex-row gap-2 items-stretch sm:items-start'>
             <div className='flex-1 space-y-2 min-w-0'>
               {/* From */}
-              <ComposerRow
-                id='pf-composer-from'
-                which='from'
-                iconDot='bg-emerald-400'
-                iconRing='ring-emerald-400/30'
-                placeholder='From: type a landmark, area or suburb'
-                value={fromQuery}
-                onChange={(v) => onPlaceInput('from', v)}
-                onFocus={() => setFromOpen(true)}
-                onBlur={() => setTimeout(() => setFromOpen(false), 120)}
-                onKeyDown={(e) => onComposerKeyDown('from', e)}
-                open={fromOpen}
-                suggestions={fromSuggestions}
-                recents={fromRecents}
-                highlight={fromHighlight}
-                setHighlight={setFromHighlight}
-                onPick={(p) => onPickSuggestion('from', p)}
-                query={fromQuery}
-                srcNodeLatLng={null}
-                disabled={status !== 'ready'}
-                helper='Type any landmark, area or suburb across every state.'
-              />
+              <div className='flex items-start gap-1.5'>
+                <div className='flex-1 min-w-0'>
+                  <ComposerRow
+                    id='pf-composer-from'
+                    which='from'
+                    iconDot='bg-emerald-400'
+                    iconRing='ring-emerald-400/30'
+                    placeholder='From: type a landmark, area or suburb'
+                    value={fromQuery}
+                    onChange={(v) => onPlaceInput('from', v)}
+                    onFocus={() => setFromOpen(true)}
+                    onBlur={() => setTimeout(() => setFromOpen(false), 120)}
+                    onKeyDown={(e) => onComposerKeyDown('from', e)}
+                    open={fromOpen}
+                    suggestions={fromSuggestions}
+                    recents={fromRecents}
+                    highlight={fromHighlight}
+                    setHighlight={setFromHighlight}
+                    onPick={(p) => onPickSuggestion('from', p)}
+                    query={fromQuery}
+                    srcNodeLatLng={null}
+                    disabled={status !== 'ready'}
+                    helper='Type any landmark, area or suburb across every state.'
+                  />
+                </div>
+                <Button
+                  variant='subtle'
+                  size='small'
+                  onClick={() => useMyLocation('from')}
+                  disabled={status !== 'ready' || geoBusy.from}
+                  loading={geoBusy.from}
+                  icon={geoBusy.from ? <LoadingOutlined /> : <AimOutlined />}
+                  className='shrink-0 min-w-[44px] min-h-[44px] mt-0.5'
+                  title='Use my current location'
+                  aria-label='Use my location for From'
+                >
+                  <span className='sr-only'>Use my location</span>
+                </Button>
+              </div>
               {/* To */}
-              <ComposerRow
-                id='pf-composer-to'
-                which='to'
-                iconDot='bg-rose-500'
-                iconRing='ring-rose-400/30'
-                placeholder='To: type a landmark, area or suburb'
-                value={toQuery}
-                onChange={(v) => onPlaceInput('to', v)}
-                onFocus={() => setToOpen(true)}
-                onBlur={() => setTimeout(() => setToOpen(false), 120)}
-                onKeyDown={(e) => onComposerKeyDown('to', e)}
-                open={toOpen}
-                suggestions={toSuggestions}
-                recents={toRecents}
-                highlight={toHighlight}
-                setHighlight={setToHighlight}
-                onPick={(p) => onPickSuggestion('to', p)}
-                query={toQuery}
-                srcNodeLatLng={
-                  src != null && graphRef.current?.nodes.get(src)
-                    ? graphRef.current.nodes.get(src)
-                    : null
-                }
-                disabled={status !== 'ready'}
-                helper='Type any landmark, area or suburb across every state.'
-              />
+              <div className='flex items-start gap-1.5'>
+                <div className='flex-1 min-w-0'>
+                  <ComposerRow
+                    id='pf-composer-to'
+                    which='to'
+                    iconDot='bg-rose-500'
+                    iconRing='ring-rose-400/30'
+                    placeholder='To: type a landmark, area or suburb'
+                    value={toQuery}
+                    onChange={(v) => onPlaceInput('to', v)}
+                    onFocus={() => setToOpen(true)}
+                    onBlur={() => setTimeout(() => setToOpen(false), 120)}
+                    onKeyDown={(e) => onComposerKeyDown('to', e)}
+                    open={toOpen}
+                    suggestions={toSuggestions}
+                    recents={toRecents}
+                    highlight={toHighlight}
+                    setHighlight={setToHighlight}
+                    onPick={(p) => onPickSuggestion('to', p)}
+                    query={toQuery}
+                    srcNodeLatLng={
+                      src != null && graphRef.current?.nodes.get(src)
+                        ? graphRef.current.nodes.get(src)
+                        : null
+                    }
+                    disabled={status !== 'ready'}
+                    helper='Type any landmark, area or suburb across every state.'
+                  />
+                </div>
+                <Button
+                  variant='subtle'
+                  size='small'
+                  onClick={() => useMyLocation('to')}
+                  disabled={status !== 'ready' || geoBusy.to}
+                  loading={geoBusy.to}
+                  icon={geoBusy.to ? <LoadingOutlined /> : <AimOutlined />}
+                  className='shrink-0 min-w-[44px] min-h-[44px] mt-0.5'
+                  title='Use my current location'
+                  aria-label='Use my location for To'
+                >
+                  <span className='sr-only'>Use my location</span>
+                </Button>
+              </div>
             </div>
             <Button
               variant='secondary'
@@ -3614,6 +3769,40 @@ export default function Pathfinding() {
                   </span>
                 )}
               </div>
+
+              {/* Export & navigation — appears once a path has been found. */}
+              {tele.found && pathRef.current && (
+                <div className='mt-3 pt-3 border-t border-line/60'>
+                  <p className='eyebrow-mono text-cyan-300/80 font-bold mb-2 text-[10.5px]'>
+                    Take this route with you
+                  </p>
+                  <div className='flex flex-col sm:flex-row gap-1.5'>
+                    <Button
+                      variant='primary'
+                      size='small'
+                      icon={<CompassOutlined />}
+                      onClick={openInGoogleMaps}
+                      className='flex-1'
+                      title='Open turn-by-turn directions in a new tab'
+                    >
+                      Open in Google Maps
+                    </Button>
+                    <Button
+                      variant='secondary'
+                      size='small'
+                      icon={<DownloadOutlined />}
+                      onClick={exportPathAsJson}
+                      className='flex-1'
+                      title='Download the full path as JSON'
+                    >
+                      Export as JSON
+                    </Button>
+                  </div>
+                  <p className='text-[10.5px] text-fg-muted leading-snug mt-1.5 font-mono'>
+                    Maps opens origin → destination for driving directions. JSON contains every coordinate along the computed path.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>

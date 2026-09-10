@@ -189,4 +189,10 @@ export const ENDPOINTS = {
   CITY_GRAPHS:            '/api/city-graphs',
   CITY_GRAPHS_PLACES:     '/api/city-graphs',   // /:slug/places appended at call site
   CITY_GRAPHS_PLACES_ALL: '/api/city-graphs/places',
+
+  // Pathfinding Lab — natural-language place recommender. FE sends the
+  // user's plain-English query + the current city slug, BE calls Groq
+  // and returns 3-5 real place hints. FE then fuzzy-matches each name
+  // against city_places for real coordinates, or geocodes as a fallback.
+  PATHFINDING_RECOMMEND: '/api/pathfinding/recommend',
 };
