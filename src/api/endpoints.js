@@ -189,6 +189,10 @@ export const ENDPOINTS = {
   CITY_GRAPHS:            '/api/city-graphs',
   CITY_GRAPHS_PLACES:     '/api/city-graphs',   // /:slug/places appended at call site
   CITY_GRAPHS_PLACES_ALL: '/api/city-graphs/places',
+  // Viewport-bounded label bundle for the canvas overlay. Appended
+  // /:slug/labels at the call site. Debounced pan/zoom fetches share the
+  // same in-memory cache in the FE request layer.
+  CITY_GRAPHS_LABELS:     '/api/city-graphs',   // /:slug/labels appended at call site
 
   // Pathfinding Lab — natural-language place recommender. FE sends the
   // user's plain-English query + the current city slug, BE calls Groq

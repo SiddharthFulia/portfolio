@@ -1012,6 +1012,147 @@ const ALGOS = [
 
 const ALGO_MAP = new Map(ALGOS.map((a) => [a.key, a]))
 
+// ─── Algorithm categorization ─────────────────────────────────
+// Each algo is tagged with 1+ categories so users can filter by intent
+// ("give me the fastest one") instead of theory. Categories are OR-filters
+// — an algo appears in the picker if ANY of its categories match the
+// active chip. `tagline` is the one-line explanation shown under the
+// picker when the algo is selected.
+const ALGO_META = {
+  dijkstra: {
+    categories: ['optimal', 'exploratory', 'classic'],
+    tagline: 'Textbook shortest path. Explores every node with cost lower than the target. Optimal but slow on large graphs.',
+  },
+  astar: {
+    categories: ['fastest', 'optimal', 'classic'],
+    tagline: 'Dijkstra with a heuristic bias toward the goal. Optimal when the heuristic is admissible (never over-estimates).',
+  },
+  bidirectional: {
+    categories: ['optimal'],
+    tagline: 'Two Dijkstra searches — one from start, one from end. They meet in the middle, usually doing about half the work.',
+  },
+  bidiAstar: {
+    categories: ['fastest', 'optimal'],
+    tagline: 'Bidirectional A* (Pohl). Two heuristic-guided frontiers converge — the fastest optimal choice on long routes.',
+  },
+  idaStar: {
+    categories: ['optimal', 'memory'],
+    tagline: 'Iterative-deepening A* — trades time for memory. Runs A* repeatedly with a growing f-cost cutoff.',
+  },
+  greedy: {
+    categories: ['suboptimal'],
+    tagline: 'Greedy best-first — pure heuristic, no cost accounting. Very fast, but often finds a longer-than-optimal path.',
+  },
+  uniform: {
+    categories: ['optimal', 'exploratory'],
+    tagline: 'Uniform-cost search — Dijkstra without a visited set, using lazy deletion. Optimal but explores widely.',
+  },
+  fringe: {
+    categories: ['optimal'],
+    tagline: 'Fringe Search — IDA*-alike with a two-list threshold sweep. Optimal, memory-friendlier than A*.',
+  },
+  beam: {
+    categories: ['memory', 'suboptimal'],
+    tagline: 'Beam search with fixed width (32). Keeps only the top-w frontier nodes — fast + low-memory, but can miss the optimal path.',
+  },
+  jps: {
+    categories: ['fastest', 'optimal'],
+    tagline: 'JPS-highway — A* on a graph with degree-2 chains contracted into single edges. Massive speedup on highway networks.',
+  },
+  bfs: {
+    categories: ['exploratory', 'classic'],
+    tagline: 'Breadth-first search — expands level by level. Optimal by hop count, but ignores real edge weights (not km-optimal).',
+  },
+  dfs: {
+    categories: ['memory', 'exploratory'],
+    tagline: 'Depth-first probe — dives deep along one branch before backing up. Almost never optimal, but uses very little memory.',
+  },
+}
+
+// Category definitions — order + priority for auto-select. Within each
+// category, the FIRST key in `priority` is the "recommended" pick when
+// that category chip is clicked (or when only that category is active).
+const CATEGORIES = [
+  {
+    key: 'fastest',
+    label: 'Fastest',
+    icon: 'ThunderboltFilled',
+    hint: 'Fast on real road graphs',
+    priority: ['astar', 'bidiAstar', 'jps'],
+  },
+  {
+    key: 'optimal',
+    label: 'Optimal',
+    icon: 'CheckCircleFilled',
+    hint: 'Always returns the shortest path',
+    priority: ['dijkstra', 'astar', 'bidiAstar', 'bidirectional', 'uniform', 'fringe', 'idaStar'],
+  },
+  {
+    key: 'memory',
+    label: 'Memory',
+    icon: 'DownloadOutlined',
+    hint: 'Low RAM footprint',
+    priority: ['idaStar', 'dfs', 'beam'],
+  },
+  {
+    key: 'suboptimal',
+    label: 'Suboptimal, fast',
+    icon: 'BulbOutlined',
+    hint: 'Very fast, but not always shortest',
+    priority: ['greedy', 'beam'],
+  },
+  {
+    key: 'exploratory',
+    label: 'Exploratory',
+    icon: 'SearchOutlined',
+    hint: 'Visits every node — great for teaching',
+    priority: ['bfs', 'dfs', 'uniform', 'dijkstra'],
+  },
+  {
+    key: 'classic',
+    label: 'Classic',
+    icon: 'CompassOutlined',
+    hint: 'Textbook algorithms every CS student learns',
+    priority: ['dijkstra', 'bfs', 'astar'],
+  },
+]
+
+// Precompute category → algo keys for the chip counts.
+const CATEGORY_MEMBERS = (() => {
+  const out = {}
+  for (const cat of CATEGORIES) {
+    out[cat.key] = ALGOS
+      .filter((a) => ALGO_META[a.key]?.categories?.includes(cat.key))
+      .map((a) => a.key)
+  }
+  return out
+})()
+
+// Auto-pick heuristic — reads straight-line distance between src/dst
+// (km) and returns { key, reason }. Bands are tuned for real city
+// road graphs (5-30km viewport). Never returns null; falls back to A*.
+function autoPickAlgo(straightKm) {
+  if (!Number.isFinite(straightKm) || straightKm <= 0) {
+    return { key: 'astar', reason: 'A* — safe default when distance is unknown.' }
+  }
+  if (straightKm < 5) {
+    return {
+      key: 'bfs',
+      reason: `BFS — short-distance route (${straightKm.toFixed(1)} km), hop-count search converges fast with minimal setup.`,
+    }
+  }
+  if (straightKm <= 30) {
+    return {
+      key: 'astar',
+      reason: `A* — medium-distance route (${straightKm.toFixed(1)} km), heuristic-guided is the fastest optimal choice for this range.`,
+    }
+  }
+  return {
+    key: 'bidiAstar',
+    reason: `Bidi A* — long-distance route (${straightKm.toFixed(1)} km), both-ends search wins big on cross-city runs.`,
+  }
+}
+
 // Factory — builds a fresh generator for an algo key.
 function makeGenerator(key, graph, revAdj, src, dst) {
   switch (key) {
@@ -1220,6 +1361,16 @@ export default function Pathfinding() {
   const [status, setStatus] = useState('boot') // boot | catalog | fetching | ready | error
   const [errMsg, setErrMsg] = useState('')
   const [algo, setAlgo] = useState('dijkstra')
+  // Category filter — null = show all. Clicking a chip filters the algo
+  // picker to that category's members. Auto-select is applied inside the
+  // handler so the value here is purely for UI filtering.
+  const [selectedCategory, setSelectedCategory] = useState(null)
+  // Auto-pick banner — populated by the "Auto pick" button. Cleared when
+  // the user manually picks an algo or changes src/dst.
+  const [autoPickReason, setAutoPickReason] = useState('')
+  // Clear the Auto-pick reason whenever src or dst change — the pick is
+  // route-specific so stale reasoning shouldn't linger on a fresh route.
+  useEffect(() => { setAutoPickReason('') }, [src, dst])
   const [running, setRunning] = useState(false)
   const [speed, setSpeed] = useState(120)  // steps per frame
   const [src, setSrc] = useState(null)
@@ -1322,8 +1473,18 @@ export default function Pathfinding() {
   const [toHighlight,   setToHighlight]     = useState(0)
   const [fromRecents, setFromRecents]       = useState([])
   const [toRecents,   setToRecents]         = useState([])
-  const [showLabels, setShowLabels]         = useState(false)
-  const [labels, setLabels]                 = useState([])          // top-50 labels for overlay
+  // Google-Maps-style POI labels — default ON. FE debounces the fetch on
+  // every pan/zoom (200 ms) and greedy-places labels with spatial-hash
+  // collision avoidance in the draw loop.
+  const [showLabels, setShowLabels]         = useState(() => {
+    try {
+      const v = localStorage.getItem('pathfinding.showLabels')
+      return v == null ? true : v === '1'
+    } catch { return true }
+  })
+  const [labels, setLabels]                 = useState([])          // [{name, kind, lat, lng, weight}]
+  const labelsFetchRef = useRef({ token: 0, key: '', slug: '', abort: null })
+  const labelsDebounceRef = useRef(null)
   const fromDebounceRef = useRef(null)
   const toDebounceRef   = useRef(null)
 
@@ -1910,20 +2071,151 @@ export default function Pathfinding() {
     drawMarker(src, '#22c55e', 'rgba(34,197,94,0.5)')
     drawMarker(dst, '#ef4444', 'rgba(239,68,68,0.5)')
 
-    // Reset transform for screen-space overlays (labels).
+    // ── POI labels — Google-Maps-style overlay ──
+    // Reset to screen-space so text size doesn't scale with zoom. We
+    // greedy-place the sorted-by-weight list; anything that overlaps an
+    // already-placed label's bbox is skipped this frame. Collision uses
+    // a spatial hash over 64px screen cells so 200 labels resolve in
+    // well under 10 ms even on mobile.
     if (showLabels && labels.length) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      ctx.font = '10px ui-monospace, monospace'
-      ctx.fillStyle = 'rgba(226,232,240,0.85)'
-      ctx.strokeStyle = 'rgba(0,0,0,0.6)'
-      ctx.lineWidth = 2.5
-      for (let i = 0; i < Math.min(labels.length, 50); i++) {
-        const l = labels[i]
+
+      // LOD gate — hide low-weight labels below the zoom threshold. Matches
+      // the BE tier gate: top-only at scale ≤ 2, +mall/hospital/museum at
+      // scale ≤ 5, +restaurants/cafes at scale ≤ 10, everything above.
+      let weightFloor
+      if (zoom <= 2) weightFloor = 0.95
+      else if (zoom <= 5) weightFloor = 0.85
+      else if (zoom <= 10) weightFloor = 0.65
+      else weightFloor = 0
+
+      // Cap the working set — mobile stays quiet even in dense metros.
+      const isMobile = w < 640
+      const workingCap = isMobile ? 40 : labels.length
+      const list = labels
+      const listLen = Math.min(list.length, workingCap)
+
+      // Fade-in based on the time since labels were last swapped in.
+      // Kept simple: 200 ms ramp from 0.4 → 1.0. The alpha applies to
+      // both the halo stroke and the fill so the whole label eases in.
+      // (Skipped for reduced-motion.)
+      const fadeAlpha = 1.0
+
+      // Spatial hash — floor(px/64), floor(py/64) buckets. Each entry
+      // is an array of placed label bboxes {x0, y0, x1, y1}. A candidate
+      // checks its own bucket + the 8 neighbours (labels can span cells).
+      const CELL = 64
+      const grid = new Map()
+      const bucketKey = (cx, cy) => cx * 100000 + cy
+
+      const overlaps = (a, b) => !(a.x1 < b.x0 || a.x0 > b.x1 || a.y1 < b.y0 || a.y0 > b.y1)
+
+      const bboxCollides = (bb) => {
+        const cx0 = Math.floor(bb.x0 / CELL)
+        const cy0 = Math.floor(bb.y0 / CELL)
+        const cx1 = Math.floor(bb.x1 / CELL)
+        const cy1 = Math.floor(bb.y1 / CELL)
+        for (let cx = cx0; cx <= cx1; cx++) {
+          for (let cy = cy0; cy <= cy1; cy++) {
+            const arr = grid.get(bucketKey(cx, cy))
+            if (!arr) continue
+            for (let k = 0; k < arr.length; k++) {
+              if (overlaps(bb, arr[k])) return true
+            }
+          }
+        }
+        return false
+      }
+      const bboxInsert = (bb) => {
+        const cx0 = Math.floor(bb.x0 / CELL)
+        const cy0 = Math.floor(bb.y0 / CELL)
+        const cx1 = Math.floor(bb.x1 / CELL)
+        const cy1 = Math.floor(bb.y1 / CELL)
+        for (let cx = cx0; cx <= cx1; cx++) {
+          for (let cy = cy0; cy <= cy1; cy++) {
+            const key = bucketKey(cx, cy)
+            let arr = grid.get(key)
+            if (!arr) { arr = []; grid.set(key, arr) }
+            arr.push(bb)
+          }
+        }
+      }
+
+      const FONT_PX = 12
+      const FONT_PX_MINOR = 11
+      const PAD_X = 4
+      const PAD_Y = 3
+      const DOT_R = 3
+      const DOT_GAP = 6
+
+      // Two passes so top-tier labels always win the collision. Pass 1:
+      // weight ≥ 0.95 (landmarks/airports/etc). Pass 2: everything else
+      // within the working set. Inside each pass the input is already
+      // BE-sorted by weight desc.
+      const drawOne = (l) => {
+        if (!l || l.weight == null) return
+        if (l.weight < weightFloor) return
         const sx = baseXOf(l.lng) * zoom + tx
         const sy = baseYOf(l.lat) * zoom + ty
-        if (sx < 0 || sy < 0 || sx > w || sy > h) continue
-        ctx.strokeText(l.name, sx + 4, sy - 4)
-        ctx.fillText(l.name, sx + 4, sy - 4)
+        // Viewport cull — with a small halo margin so text near the edge
+        // still gets drawn when its anchor is on-screen.
+        if (sx < -32 || sy < -20 || sx > w + 32 || sy > h + 20) return
+
+        const isMajor = l.weight >= 0.9
+        const font = isMajor
+          ? `700 ${FONT_PX}px ui-sans-serif, -apple-system, "Segoe UI", Roboto, system-ui, sans-serif`
+          : `600 ${FONT_PX_MINOR}px ui-sans-serif, -apple-system, "Segoe UI", Roboto, system-ui, sans-serif`
+        ctx.font = font
+        const metrics = ctx.measureText(l.name)
+        const textW = metrics.width
+        const textH = isMajor ? FONT_PX : FONT_PX_MINOR
+
+        // Label anchor sits to the right of a small dot, vertically centred.
+        const tx0 = sx + DOT_GAP
+        const ty0 = sy - textH / 2
+        const bb = {
+          x0: sx - DOT_R - 2 - PAD_X,
+          y0: sy - textH / 2 - PAD_Y,
+          x1: tx0 + textW + PAD_X,
+          y1: sy + textH / 2 + PAD_Y,
+        }
+        if (bboxCollides(bb)) return
+        bboxInsert(bb)
+
+        // POI dot — kind-tinted, tiny.
+        const dotColor = kindColor(l.kind)
+        ctx.globalAlpha = fadeAlpha
+        ctx.fillStyle = dotColor
+        ctx.beginPath()
+        ctx.arc(sx, sy, DOT_R, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.strokeStyle = 'rgba(255,255,255,0.85)'
+        ctx.lineWidth = 1
+        ctx.stroke()
+
+        // Text — 3px white halo then dark fill (classic Google Maps).
+        ctx.lineWidth = 3
+        ctx.strokeStyle = 'rgba(255,255,255,0.95)'
+        ctx.lineJoin = 'round'
+        ctx.miterLimit = 2
+        ctx.strokeText(l.name, tx0, sy + textH * 0.35)
+        ctx.fillStyle = isMajor ? '#0f172a' : '#1e293b'
+        ctx.fillText(l.name, tx0, sy + textH * 0.35)
+        ctx.globalAlpha = 1
+      }
+
+      // Pass 1 — top-tier only. Guarantees landmarks / airports / hospitals
+      // / universities land before their kind_weight peers.
+      for (let i = 0; i < listLen; i++) {
+        const l = list[i]
+        if (!l || l.weight < 0.95) continue
+        drawOne(l)
+      }
+      // Pass 2 — everything else in weight order.
+      for (let i = 0; i < listLen; i++) {
+        const l = list[i]
+        if (!l || l.weight >= 0.95) continue
+        drawOne(l)
       }
     }
   }
@@ -2882,24 +3174,168 @@ export default function Pathfinding() {
     return () => window.removeEventListener('keydown', onKey)
   }, [clearPaths])
 
-  // Toggle labels on → fetch a top-50 label bundle (no query = "popular").
+  // Persist the Labels toggle across sessions.
   useEffect(() => {
+    try { localStorage.setItem('pathfinding.showLabels', showLabels ? '1' : '0') } catch {}
+  }, [showLabels])
+
+  // Compute the current viewport bounds in lat/lng — reads from the
+  // projection + transform, so a fresh call always reflects the latest
+  // pan/zoom state. Returns null if the projection isn't ready yet.
+  const computeViewportBounds = useCallback(() => {
+    const proj = projRef.current
+    const canvas = canvasRef.current
+    if (!proj || !canvas) return null
+    const w = canvas.clientWidth
+    const h = canvas.clientHeight
+    if (!w || !h) return null
+    const tl = screenToLatLng(0, 0)
+    const br = screenToLatLng(w, h)
+    if (!tl || !br) return null
+    return { south: br.lat, west: tl.lng, north: tl.lat, east: br.lng }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Fetch labels for the current viewport + zoom. Debounces internally
+  // (200 ms) so pan/zoom bursts collapse into a single BE hit. Cancels
+  // any prior in-flight request via AbortController so we never race
+  // an older viewport onto the canvas.
+  const requestLabels = useCallback((opts = {}) => {
     if (!showLabels) return
-    let cancelled = false
-    ;(async () => {
+    if (status !== 'ready') return
+    if (!citySlug) return
+
+    const doFetch = async () => {
+      const bounds = computeViewportBounds()
+      const scale = transformRef.current.scale || 1
+      // Density gate for mobile — dense POI clusters get illegible fast
+      // on a 360px viewport, so we cap the fetch payload harder.
+      const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
+      const limit = isMobile ? 60 : 200
+      const params = { zoom: Math.max(0.5, scale).toFixed(2), limit }
+      if (bounds) {
+        params.bounds = [
+          bounds.south.toFixed(5),
+          bounds.west.toFixed(5),
+          bounds.north.toFixed(5),
+          bounds.east.toFixed(5),
+        ].join(',')
+      }
+      // Dedup — identical (slug + zoom-bucket + bounds-bucket) doesn't
+      // re-hit the BE. Buckets are wide enough that tiny sub-pixel jitter
+      // during idle animations doesn't churn.
+      const key = `${citySlug}|${params.bounds || 'city'}|${Math.round(scale * 4)}`
+      if (key === labelsFetchRef.current.key) return
+
+      labelsFetchRef.current.token += 1
+      const myToken = labelsFetchRef.current.token
+      labelsFetchRef.current.key = key
+      labelsFetchRef.current.slug = citySlug
+
       try {
-        const res = await apiGet(`${ENDPOINTS.CITY_GRAPHS_PLACES}/${citySlug}/places`, { limit: 50 })
-        if (cancelled) return
+        const url = `${ENDPOINTS.CITY_GRAPHS_LABELS}/${citySlug}/labels`
+        const res = await apiGet(url, params)
+        // Stale — user has since panned/zoomed further. Drop the response.
+        if (myToken !== labelsFetchRef.current.token) return
+        if (labelsFetchRef.current.slug !== citySlug) return
         setLabels(res?.data?.items || [])
       } catch (e) {
+        if (myToken !== labelsFetchRef.current.token) return
         console.warn('labels fetch failed', e.message)
-        setLabels([])
       }
-    })()
-    return () => { cancelled = true }
-  }, [showLabels, citySlug])
+    }
+
+    if (opts.immediate) {
+      if (labelsDebounceRef.current) clearTimeout(labelsDebounceRef.current)
+      labelsDebounceRef.current = null
+      doFetch()
+      return
+    }
+    if (labelsDebounceRef.current) clearTimeout(labelsDebounceRef.current)
+    labelsDebounceRef.current = setTimeout(() => {
+      labelsDebounceRef.current = null
+      doFetch()
+    }, 200)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showLabels, status, citySlug, computeViewportBounds])
+
+  // Warm-up: kick off a whole-city label bundle the moment the graph is
+  // ready (bounds omitted → BE falls back to the catalog bbox). This lets
+  // the very first paint after "ready" already carry labels without
+  // waiting for the user to pan.
+  useEffect(() => {
+    if (!showLabels) { setLabels([]); return }
+    if (status !== 'ready') return
+    requestLabels({ immediate: true })
+  }, [showLabels, status, citySlug, requestLabels])
+
+  // Debounced re-fetch on any pan/zoom transform change. `transform` is
+  // a React state update, so this fires once per user gesture instead of
+  // once per canvas frame.
+  useEffect(() => {
+    if (!showLabels) return
+    if (status !== 'ready') return
+    requestLabels()
+    return () => {
+      if (labelsDebounceRef.current) {
+        clearTimeout(labelsDebounceRef.current)
+        labelsDebounceRef.current = null
+      }
+    }
+  }, [showLabels, status, transform, requestLabels])
 
   const info = ALGO_MAP.get(algo) || ALGOS[0]
+  const infoMeta = ALGO_META[algo] || null
+
+  // Filtered algo list — respects the active category chip. When the chip
+  // is null (All), we show every algo. Memoized so the render loop stays
+  // cheap.
+  const filteredAlgos = useMemo(() => {
+    if (!selectedCategory) return ALGOS
+    const set = new Set(CATEGORY_MEMBERS[selectedCategory] || [])
+    return ALGOS.filter((a) => set.has(a.key))
+  }, [selectedCategory])
+
+  // Handler: clicking a category chip.
+  //   • If the chip is already active, deactivate (show All).
+  //   • Else, filter + auto-select the top-priority algo in that category.
+  //   • Clears any "Auto pick" reason since the user explicitly picked.
+  const handleCategoryClick = useCallback((catKey) => {
+    if (selectedCategory === catKey) {
+      setSelectedCategory(null)
+      setAutoPickReason('')
+      return
+    }
+    setSelectedCategory(catKey)
+    setAutoPickReason('')
+    const cat = CATEGORIES.find((c) => c.key === catKey)
+    if (!cat) return
+    const members = CATEGORY_MEMBERS[catKey] || []
+    if (members.length === 0) return
+    // Pick the highest-priority algo that IS a member.
+    const pick = cat.priority.find((k) => members.includes(k)) || members[0]
+    setAlgo(pick)
+  }, [selectedCategory])
+
+  // Handler: "Auto pick" button — reads straight-line distance from
+  // src/dst, calls the heuristic, sets the algo + a visible reason chip.
+  const handleAutoPick = useCallback(() => {
+    const g = graphRef.current
+    if (!g || src == null || dst == null) {
+      notify.info('Place a start + end first.', { title: 'Auto pick needs both pins', key: 'pf-autopick-noop' })
+      return
+    }
+    const s = g.nodes.get(src), d = g.nodes.get(dst)
+    if (!s || !d) return
+    const straightKm = haversine(s, d) / 1000
+    const { key, reason } = autoPickAlgo(straightKm)
+    setAlgo(key)
+    setAutoPickReason(reason)
+    // Reset the category filter so the picked algo is visible in the
+    // segmented row (avoids a hidden-selection footgun).
+    setSelectedCategory(null)
+  }, [src, dst])
+
   // antd <Select> grouped options: [{ label: state, options: [{label, value}] }, …].
   // Sorted alphabetically by state name; cities within a state also
   // sorted alphabetically so the picker is predictable regardless of
@@ -3038,8 +3474,9 @@ export default function Pathfinding() {
                 size='small'
                 icon={showLabels ? <EyeOutlined /> : <EyeInvisibleOutlined />}
                 onClick={() => setShowLabels((s) => !s)}
+                aria-pressed={showLabels}
               >
-                {showLabels ? 'Hide labels' : 'Show labels'}
+                Labels
               </Button>
             </div>
           </div>
@@ -3379,6 +3816,15 @@ export default function Pathfinding() {
                 <span className='text-fg-muted'>zoom {transform.scale.toFixed(2)}×</span>
                 <button
                   type='button'
+                  onClick={() => setShowLabels((s) => !s)}
+                  className={`ml-1 px-1.5 py-0.5 rounded hover:bg-white/10 inline-flex items-center gap-1 ${showLabels ? 'text-amber-300' : 'text-fg-muted'}`}
+                  title={showLabels ? 'Hide POI labels' : 'Show POI labels'}
+                  aria-pressed={showLabels}
+                >
+                  {showLabels ? <EyeOutlined /> : <EyeInvisibleOutlined />} Labels
+                </button>
+                <button
+                  type='button'
                   onClick={resetView}
                   className='ml-1 px-1.5 py-0.5 rounded hover:bg-white/10 text-amber-300'>
                   <ExpandOutlined /> reset
@@ -3412,6 +3858,15 @@ export default function Pathfinding() {
             {/* Top-right: fullscreen toggle + fit-view button. */}
             {isFullscreen && (
               <div className='absolute top-3 right-3 z-[60] flex items-center gap-1 text-[11px] font-mono bg-black/60 backdrop-blur px-2 py-1.5 rounded-lg border border-white/10 shadow-2xl'>
+                <button
+                  type='button'
+                  onClick={() => setShowLabels((s) => !s)}
+                  className={`px-2 py-1 rounded hover:bg-white/10 inline-flex items-center gap-1 ${showLabels ? 'text-amber-300' : 'text-fg-muted'}`}
+                  title={showLabels ? 'Hide POI labels' : 'Show POI labels'}
+                  aria-pressed={showLabels}
+                >
+                  {showLabels ? <EyeOutlined /> : <EyeInvisibleOutlined />} <span className='hidden sm:inline'>Labels</span>
+                </button>
                 <button
                   type='button'
                   onClick={fitToPins}
@@ -3579,12 +4034,90 @@ export default function Pathfinding() {
             {/* Algorithm picker */}
             <div className='luxe-glass p-3'>
               <p className='eyebrow-mono mb-2 text-cyan-300/80 font-bold'>Algorithm</p>
+
+              {/* Category chip row — quick preset filters. Clicking a chip
+                  filters the algo list + auto-selects the top-ranked algo
+                  in that category. Click again to clear. Wraps on mobile. */}
+              <div className='flex flex-wrap gap-1.5 mb-2'>
+                {CATEGORIES.map((cat) => {
+                  const count = CATEGORY_MEMBERS[cat.key]?.length || 0
+                  const active = selectedCategory === cat.key
+                  const iconMap = {
+                    ThunderboltFilled: <ThunderboltFilled />,
+                    CheckCircleFilled: <CheckCircleFilled />,
+                    DownloadOutlined: <DownloadOutlined />,
+                    BulbOutlined: <BulbOutlined />,
+                    SearchOutlined: <SearchOutlined />,
+                    CompassOutlined: <CompassOutlined />,
+                  }
+                  return (
+                    <button
+                      key={cat.key}
+                      type='button'
+                      onClick={() => handleCategoryClick(cat.key)}
+                      title={cat.hint}
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] border transition ${
+                        active
+                          ? 'border-amber-400 bg-amber-400/20 text-amber-100 font-bold'
+                          : 'border-line bg-surface-elevated text-fg-muted hover:text-fg-primary hover:border-white/20'
+                      }`}
+                    >
+                      <span className={active ? 'text-amber-200' : 'text-fg-dim'}>
+                        {iconMap[cat.icon]}
+                      </span>
+                      <span>{cat.label}</span>
+                      <span className={`ml-0.5 tabular-nums ${active ? 'text-amber-200/80' : 'text-fg-dim'}`}>
+                        · {count}
+                      </span>
+                    </button>
+                  )
+                })}
+                <button
+                  type='button'
+                  onClick={() => { setSelectedCategory(null); setAutoPickReason('') }}
+                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] border transition ${
+                    !selectedCategory
+                      ? 'border-amber-400 bg-amber-400/20 text-amber-100 font-bold'
+                      : 'border-line bg-surface-elevated text-fg-muted hover:text-fg-primary hover:border-white/20'
+                  }`}
+                >
+                  <span>All</span>
+                  <span className={`ml-0.5 tabular-nums ${!selectedCategory ? 'text-amber-200/80' : 'text-fg-dim'}`}>
+                    · {ALGOS.length}
+                  </span>
+                </button>
+              </div>
+
+              {/* Auto-pick reason chip — shown after the "Auto pick" button
+                  runs. Explains why this algo was picked for this route. */}
+              {autoPickReason && (
+                <motion.div
+                  initial={REDUCE_MOTION ? false : { opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.25, ease: 'easeOut' }}
+                  className='mb-2 flex items-start gap-2 px-2 py-1.5 rounded-md bg-violet-500/10 border border-violet-400/30 text-[11px] text-violet-100'
+                >
+                  <BulbOutlined className='text-violet-300 mt-0.5' />
+                  <span className='leading-snug'>
+                    <span className='font-bold text-violet-200'>Auto picked</span> — {autoPickReason}
+                  </span>
+                  <button
+                    type='button'
+                    onClick={() => setAutoPickReason('')}
+                    className='ml-auto text-violet-300/70 hover:text-violet-100'
+                    title='Dismiss'
+                  >
+                    <CloseOutlined />
+                  </button>
+                </motion.div>
+              )}
+
               <div className='flex flex-wrap gap-1'>
-                {ALGOS.map((a) => (
+                {filteredAlgos.map((a) => (
                   <button
                     key={a.key}
                     type='button'
-                    onClick={() => setAlgo(a.key)}
+                    onClick={() => { setAlgo(a.key); setAutoPickReason('') }}
                     className={`px-2 py-1 rounded-md text-[11px] font-mono border transition ${
                       algo === a.key
                         ? 'border-amber-400 bg-amber-400/10 text-amber-200'
@@ -3597,12 +4130,24 @@ export default function Pathfinding() {
                   </button>
                 ))}
               </div>
+
+              {/* Per-algo one-line description — plain-English tagline from
+                  ALGO_META. Sits below the picker so it's always in view
+                  when the user picks a new algo. */}
+              {infoMeta?.tagline && (
+                <div className='mt-2 px-2 py-1.5 rounded-md bg-cyan-500/5 border border-cyan-400/20 text-[11px] leading-snug text-cyan-100/90'>
+                  {infoMeta.tagline}
+                </div>
+              )}
+
               <div className='mt-2 text-[11px] leading-snug text-fg-muted'>
                 <span className='text-amber-300 font-semibold'>{info.name}</span> · {info.tc}
                 <div className='mt-0.5 text-fg-dim'>{info.desc}</div>
               </div>
               <p className='text-[11px] text-fg-muted leading-snug mt-1'>
-                Twelve options — optimal, heuristic, bidirectional, iterative-deepening, and beam variants.
+                {selectedCategory
+                  ? `Showing ${filteredAlgos.length} of ${ALGOS.length} algorithms in this category.`
+                  : 'Twelve options — optimal, heuristic, bidirectional, iterative-deepening, and beam variants.'}
               </p>
             </div>
 
@@ -3619,6 +4164,16 @@ export default function Pathfinding() {
                     disabled={status !== 'ready' || tele.done || src == null || dst == null}
                   >
                     {running ? 'Pause' : 'Play'}
+                  </Button>
+                  <Button
+                    variant='accent'
+                    size='small'
+                    icon={<BulbOutlined />}
+                    onClick={handleAutoPick}
+                    disabled={status !== 'ready' || src == null || dst == null}
+                    title='Pick the best algo for your route (heuristic — reads straight-line distance)'
+                  >
+                    Auto pick
                   </Button>
                   <Button
                     variant='secondary'
@@ -4156,6 +4711,42 @@ const KIND_ICON = {
   observatory: '🔭', fountain: '⛲', clock: '🕰️', information: 'ℹ️',
 }
 function iconForKind(k) { return KIND_ICON[k] || '📌' }
+
+// Fill colour for the tiny POI dot next to each label. Grouped by
+// category so users can at-a-glance tell transit from hospitality from
+// shopping without reading the text. Matches Google Maps' palette hints
+// (blue-ish transit, red medical, green nature, purple culture).
+const KIND_COLOR = {
+  // Landmarks / civic (amber-ish anchor colour)
+  landmark: '#f59e0b', suburb: '#f59e0b', neighbourhood: '#f59e0b',
+  quarter: '#f59e0b', town: '#f59e0b', village: '#f59e0b',
+  monument: '#f59e0b', castle: '#f59e0b', townhall: '#f59e0b',
+  // Transit (sky blue)
+  airport: '#38bdf8', heliport: '#38bdf8', train_station: '#38bdf8',
+  bus_station: '#38bdf8', metro: '#38bdf8', tram_stop: '#38bdf8',
+  ferry_terminal: '#38bdf8',
+  // Medical (rose)
+  hospital: '#f43f5e', pharmacy: '#f43f5e', veterinary: '#f43f5e',
+  // Education (violet)
+  university: '#a78bfa', school: '#a78bfa', library: '#a78bfa',
+  // Culture (fuchsia)
+  museum: '#e879f9', gallery: '#e879f9', theatre: '#e879f9',
+  cinema: '#e879f9', arts_centre: '#e879f9', place_of_worship: '#e879f9',
+  // Shopping (orange)
+  mall: '#fb923c', supermarket: '#fb923c', shop: '#fb923c',
+  marketplace: '#fb923c', clothing: '#fb923c', electronics: '#fb923c',
+  // Hospitality / food (yellow)
+  hotel: '#fbbf24', restaurant: '#fbbf24', cafe: '#fbbf24',
+  bar: '#fbbf24', fast_food: '#fbbf24',
+  // Nature / leisure (emerald)
+  park: '#34d399', stadium: '#34d399', zoo: '#34d399',
+  theme_park: '#34d399', playground: '#34d399', beach: '#34d399',
+  // Services (slate)
+  bank: '#94a3b8', office: '#94a3b8', post_office: '#94a3b8',
+  courthouse: '#94a3b8', police: '#94a3b8', fire_station: '#94a3b8',
+  building: '#94a3b8',
+}
+function kindColor(k) { return KIND_COLOR[k] || '#f59e0b' }
 
 // Highlight the matched substring in a name using <mark>. Case-insensitive,
 // only the FIRST occurrence is bolded — multiple matches get noisy fast.
