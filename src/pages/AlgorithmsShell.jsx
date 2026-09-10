@@ -15,7 +15,7 @@
 
 import { Suspense } from 'react'
 import { Outlet, useLocation, useMatch } from 'react-router-dom'
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import TopicShell from '../components/algorithms/TopicShell'
 import { TOPICS_BY_SLUG } from '../components/algorithms/topics'
 import { PageBoot } from '../components/loaders'
@@ -32,6 +32,20 @@ export default function AlgorithmsShell() {
 
   const topic = slug ? TOPICS_BY_SLUG[slug] : null
 
+  // We deliberately DO NOT use <AnimatePresence mode='wait'> here.
+  //
+  // The combination of AnimatePresence + Suspense + lazy <Outlet /> is a
+  // known framer-motion footgun: navigating from one lazy topic route to
+  // another cancels the exit animation mid-flight (because Suspense
+  // throws while the exit is still tweening), and the newly-mounted
+  // motion.div gets stuck at `opacity: 0` — the exact "blank page until
+  // hard refresh" symptom the user reported.
+  //
+  // Instead we render a plain keyed `motion.div` that only runs an
+  // `initial → animate` transition on mount. Each new pathname yields a
+  // new key, which unmounts the previous body and mounts a fresh one
+  // that fades in from opacity 0 → 1. No exit animation to interrupt,
+  // no Suspense race. Snappy, resilient.
   return (
     <TopicShell
       slug={slug}
@@ -40,25 +54,20 @@ export default function AlgorithmsShell() {
       intro={topic?.summary}
       complexityChip={topic?.complexity}
     >
-      {reduce ? (
-        <Suspense fallback={<PageBoot />}>
+      <Suspense fallback={<PageBoot />}>
+        {reduce ? (
           <Outlet />
-        </Suspense>
-      ) : (
-        <AnimatePresence mode='wait'>
+        ) : (
           <motion.div
             key={location.pathname}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.18, ease: 'easeOut' }}
           >
-            <Suspense fallback={<PageBoot />}>
-              <Outlet />
-            </Suspense>
+            <Outlet />
           </motion.div>
-        </AnimatePresence>
-      )}
+        )}
+      </Suspense>
     </TopicShell>
   )
 }
