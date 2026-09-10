@@ -21,7 +21,7 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Segmented, InputNumber, Input, Tag, Progress } from 'antd'
+import { Segmented, InputNumber, Input, Tag, Progress, Select } from 'antd'
 import { Slider, Button } from '../components/ui'
 import {
   PlayCircleFilled, PauseCircleFilled, ReloadOutlined,
@@ -29,6 +29,7 @@ import {
   AimOutlined, SwapOutlined, ExpandOutlined,
   EyeOutlined, EyeInvisibleOutlined,
   ExperimentOutlined, ClearOutlined, HistoryOutlined,
+  StopFilled, ClockCircleOutlined, GlobalOutlined,
 } from '@ant-design/icons'
 import { get as apiGet } from '../api/request'
 import { ENDPOINTS } from '../api/endpoints'
@@ -952,9 +953,16 @@ function runAlgoSync(key, graph, revAdj, src, dst, timeBudgetMs = 6000) {
 // Async runner — same shape as runAlgoSync but chunks work across
 // microtasks so it can be raced against Promise.race([...timeout]).
 // Yields every `chunk` iterations via setTimeout(0) so the UI stays
-// responsive and a wall-clock 30s cap can win the race even for an
-// algorithm that would otherwise burn a whole thread.
-function runAlgoAsync(key, graph, revAdj, src, dst, timeBudgetMs = 30000) {
+// responsive and a wall-clock cap can win the race even for an algorithm
+// that would otherwise burn a whole thread.
+//
+// timeBudgetMs = 0 (or Infinity) means "no timeout" — only the abort
+// signal or algorithm completion breaks the loop.
+//
+// signal is an optional AbortSignal — when aborted, the runner resolves
+// with { stopped: true, ... } on the next chunk boundary instead of
+// continuing to burn CPU. Cheaper than tearing the microtask loop down.
+function runAlgoAsync(key, graph, revAdj, src, dst, timeBudgetMs = 30000, signal = null) {
   return new Promise((resolve) => {
     const meta = ALGO_MAP.get(key)
     const t0 = performance.now()
@@ -963,7 +971,16 @@ function runAlgoAsync(key, graph, revAdj, src, dst, timeBudgetMs = 30000) {
     let visited = 0, iterations = 0, edgesRelaxed = 0
     let last = null
     const chunk = 20_000    // iters per macrotask
+    const noLimit = !timeBudgetMs || timeBudgetMs === Infinity
     const step = () => {
+      // Abort-first — cheaper than doing chunk work then discarding it.
+      if (signal && signal.aborted) {
+        resolve({
+          key, name: meta.name, path: null, visited, iterations, edgesRelaxed,
+          ms: performance.now() - t0, pathKm: 0, found: false, stopped: true,
+        })
+        return
+      }
       let n = chunk
       while (n-- > 0) {
         const r = gen.next()
@@ -973,7 +990,7 @@ function runAlgoAsync(key, graph, revAdj, src, dst, timeBudgetMs = 30000) {
         if (r.value && typeof r.value.edgesRelaxed === 'number') edgesRelaxed = r.value.edgesRelaxed
       }
       const elapsed = performance.now() - t0
-      if (last === null && elapsed > timeBudgetMs) {
+      if (last === null && !noLimit && elapsed > timeBudgetMs) {
         resolve({
           key, name: meta.name, path: null, visited, iterations, edgesRelaxed,
           ms: elapsed, pathKm: 0, found: false, timedOut: true,
@@ -1081,7 +1098,24 @@ export default function Pathfinding() {
   const [sortDir, setSortDir] = useState('asc')
   // Progress state for the batched Run-all. Displayed as an antd Progress
   // bar while the batch is in flight. Table stays hidden until batch ends.
-  const [batchProgress, setBatchProgress] = useState(null) // null | { current, total, elapsedSec, currentName }
+  const [batchProgress, setBatchProgress] = useState(null) // null | { current, total, elapsedSec, currentName, capMs }
+  // Per-algorithm timeout budget for Run-all. 0 = no limit. Persisted in
+  // localStorage so returning users keep their preference.
+  const [algoTimeoutMs, setAlgoTimeoutMs] = useState(() => {
+    if (typeof window === 'undefined') return 10000
+    const raw = Number(window.localStorage?.getItem('pathfinding.algoTimeoutMs'))
+    if (Number.isFinite(raw) && raw >= 0) return raw
+    return 10000
+  })
+  useEffect(() => {
+    try { window.localStorage?.setItem('pathfinding.algoTimeoutMs', String(algoTimeoutMs)) } catch (_) {}
+  }, [algoTimeoutMs])
+  // Abort plumbing for the Stop button. `abortRef` holds the current
+  // algorithm's AbortController (rotated per-algo). `cancelledRef` is a
+  // one-shot flag flipped by the Stop button — the runAll loop reads it
+  // between algorithms and breaks out entirely.
+  const abortRef = useRef(null)
+  const cancelledRef = useRef(false)
 
   // Google-Maps-style dual composer — one autocomplete per pin. Each has
   // its own debounce timer, suggestion list, highlight cursor, and open
@@ -1690,20 +1724,35 @@ export default function Pathfinding() {
   }
 
   // ── Run All ──
-  // Race each algorithm against a 30s wall-clock cap; collect results
-  // into a local array and only publish to the comparison table AFTER
-  // every algorithm has settled. During the run a global Progress bar
-  // shows current/total + elapsed seconds; the table stays hidden.
+  // Race each algorithm against a configurable per-algo wall-clock cap
+  // (0 = no limit); collect results into a local array and only publish
+  // to the comparison table AFTER every algorithm has settled — or the
+  // user hits Stop, in which case remaining rows are marked `stopped`.
+  //
+  // Stop mechanics:
+  //   • cancelledRef.current — flipped by the Stop button. Read at the
+  //     top of every loop iteration to break out entirely.
+  //   • abortRef.current      — the current algo's AbortController.
+  //     Stop calls .abort() so runAlgoAsync exits at the next chunk
+  //     boundary with { stopped: true, ... } — no CPU is wasted
+  //     completing an algorithm the user already abandoned.
+  //
+  // The setTimeout race is preserved as a safety net — if the algorithm
+  // stops yielding for any reason, the outer timer still wins the race.
+  // We pass Infinity into that timer when the user picks "no limit" so
+  // only the abort signal or the algorithm's own completion can end it.
   async function runAll() {
     const g = graphRef.current
     if (!g || src == null || dst == null) return
     setRunAllBusy(true)
     setComparisonRows([])   // hide table until batch completes
     setHidden({})
+    cancelledRef.current = false
     const rows = []
     const total = ALGOS.length
     const batchT0 = performance.now()
-    setBatchProgress({ current: 0, total, elapsedSec: 0, currentName: '' })
+    const capMs = algoTimeoutMs || 0
+    setBatchProgress({ current: 0, total, elapsedSec: 0, currentName: '', capMs })
 
     // Tick a per-second elapsed counter so the Progress bar keeps
     // ticking even while a single algorithm is grinding.
@@ -1715,31 +1764,55 @@ export default function Pathfinding() {
 
     for (let i = 0; i < total; i++) {
       const meta = ALGOS[i]
+      if (cancelledRef.current) {
+        // User pressed Stop before this algo started — record every
+        // remaining algorithm as stopped so the table still reflects
+        // the aborted set instead of dropping the tail entirely.
+        for (let j = i; j < total; j++) {
+          const m = ALGOS[j]
+          rows.push({
+            key: m.key, name: m.name, path: null,
+            visited: 0, iterations: 0, edgesRelaxed: 0,
+            ms: 0, pathKm: 0, found: false, stopped: true,
+          })
+        }
+        break
+      }
       setBatchProgress({
         current: i,
         total,
         elapsedSec: Math.round((performance.now() - batchT0) / 1000),
         currentName: meta.name,
+        capMs,
       })
       // Yield to the event loop so the Progress bar can paint.
       await new Promise((r) => setTimeout(r, 0))
       let result
+      const controller = new AbortController()
+      abortRef.current = controller
       try {
         const t0 = performance.now()
-        // Race the async runner against a hard 30s timeout. On timeout
-        // the runner's own budget will also fire — whichever wins,
-        // verdict = 'timeout' at that row.
+        const budget = capMs || Infinity
+        // Race the async runner against a hard per-algo timeout (or an
+        // infinite timer if the user picked "no limit"). On timeout the
+        // runner's own budget will also fire — whichever wins, verdict
+        // = 'timeout' at that row.
+        const timeoutPromise = capMs > 0
+          ? new Promise((resolve) => setTimeout(() => resolve({
+              key: meta.key, name: meta.name, path: null,
+              visited: 0, iterations: 0, edgesRelaxed: 0,
+              ms: performance.now() - t0, pathKm: 0,
+              found: false, timedOut: true,
+            }), capMs))
+          : new Promise(() => {}) // never resolves — only abort or completion wins
         result = await Promise.race([
-          runAlgoAsync(meta.key, g, revAdjRef.current, src, dst, 30000),
-          new Promise((resolve) => setTimeout(() => resolve({
-            key: meta.key, name: meta.name, path: null,
-            visited: 0, iterations: 0, edgesRelaxed: 0,
-            ms: performance.now() - t0, pathKm: 0,
-            found: false, timedOut: true,
-          }), 30000)),
+          runAlgoAsync(meta.key, g, revAdjRef.current, src, dst, budget, controller.signal),
+          timeoutPromise,
         ])
       } catch (err) {
         result = { key: meta.key, name: meta.name, path: null, visited: 0, iterations: 0, edgesRelaxed: 0, ms: 0, pathKm: 0, found: false, error: err.message }
+      } finally {
+        abortRef.current = null
       }
       rows.push(result)
     }
@@ -1749,6 +1822,15 @@ export default function Pathfinding() {
     // Batched publish — one setState at the end, not per-algo.
     setComparisonRows(rows)
     setRunAllBusy(false)
+    cancelledRef.current = false
+  }
+
+  // Stop the Run-all batch. Aborts the currently-executing algorithm at
+  // its next chunk boundary and flips cancelledRef so the outer loop
+  // marks every remaining algorithm as `stopped` and exits.
+  function stopRunAll() {
+    cancelledRef.current = true
+    try { abortRef.current?.abort() } catch (_) {}
   }
 
   // ── Enrich comparison rows with vs-Optimal ratio ──
@@ -1759,7 +1841,9 @@ export default function Pathfinding() {
     return comparisonRows.map((r) => {
       const ratio = r.found && opt > 0 ? opt / r.pathKm : null
       const info = ALGO_MAP.get(r.key)
-      let verdict = r.timedOut ? 'timeout' : 'failed'
+      // Stop wins over timeout wins over generic failure — the row's
+      // verdict tag downstream reads this string directly.
+      let verdict = r.stopped ? 'stopped' : (r.timedOut ? 'timeout' : 'failed')
       if (r.found) {
         if (info?.optimal || (ratio !== null && Math.abs(1 - ratio) < 0.001)) verdict = 'optimal'
         else if (ratio !== null && ratio >= 0.95) verdict = 'near-optimal'
@@ -1995,14 +2079,53 @@ export default function Pathfinding() {
   }, [showLabels, citySlug])
 
   const info = ALGO_MAP.get(algo) || ALGOS[0]
-  const cityOptions = useMemo(
-    () => (cities.length ? cities : []).map((c) => ({ label: c.name, value: c.slug })),
-    [cities],
-  )
+  // antd <Select> grouped options: [{ label: state, options: [{label, value}] }, …].
+  // Sorted alphabetically by state name; cities within a state also
+  // sorted alphabetically so the picker is predictable regardless of
+  // BE catalogue order. The whole memo also produces a flat lookup for
+  // the currently-loaded city so the "loaded" pill above the map can
+  // render the state name without a second Map lookup.
+  const { cityOptions, currentCityLabel, currentCityState, statesCount, citiesCount } = useMemo(() => {
+    const list = cities || []
+    const byState = new Map()
+    for (const c of list) {
+      const st = c.state || 'Other'
+      if (!byState.has(st)) byState.set(st, [])
+      byState.get(st).push(c)
+    }
+    const groups = [...byState.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([state, items]) => ({
+        label: state,
+        options: items
+          .slice()
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map((c) => ({ label: c.name, value: c.slug, state })),
+      }))
+    const current = list.find((c) => c.slug === citySlug)
+    return {
+      cityOptions: groups,
+      currentCityLabel: current?.name || null,
+      currentCityState: current?.state || null,
+      statesCount: byState.size,
+      citiesCount: list.length,
+    }
+  }, [cities, citySlug])
   const fetchedIso = cityMeta?.fetched_at ? new Date(cityMeta.fetched_at).toISOString() : null
   const currentCenterLabel = cityMeta?.center
     ? `${cityMeta.center.lat.toFixed(4)}°N · ${cityMeta.center.lng.toFixed(4)}°E`
     : '—'
+
+  // Timeout slider steps — labelled preset marks. Value 0 = "no limit".
+  // Store in ms; display in seconds. Slider is stepwise (marks-only) so
+  // the label reads exactly what the user picked.
+  const TIMEOUT_MARKS = [
+    { ms: 5000,  label: '5s' },
+    { ms: 10000, label: '10s' },
+    { ms: 30000, label: '30s' },
+    { ms: 60000, label: '60s' },
+    { ms: 0,     label: '∞' },
+  ]
 
   // ─── Render ────────────────────────────────────────────────
   return (
@@ -2017,25 +2140,56 @@ export default function Pathfinding() {
             Pathfinding Lab · City Road Graphs
           </h1>
           <p className='text-sm text-fg-muted mt-1 max-w-3xl'>
-            Twelve algorithms racing through live road-network data across 10 Indian metros. Pick a city,
-            drag to pan, wheel to zoom, click to set start/end, and watch how each algorithm thinks — or
-            hit <span className='text-amber-300'>Run all</span> to race them side-by-side.
+            Twelve algorithms racing through live road-network data across <span className='text-amber-300'>{citiesCount || 50}+</span> cities
+            in <span className='text-amber-300'>{statesCount || 35}+</span> states &amp; UTs of India. Pick a city, drag to pan, wheel to zoom, click to set start/end —
+            or hit <span className='text-amber-300'>Run all</span> to race them side-by-side.
           </p>
         </header>
 
-        {/* City picker */}
+        {/* City picker — searchable Select grouped by state */}
         <div className='luxe-glass p-3 mb-3'>
-          <p className='eyebrow-mono mb-2 text-amber-300/80 font-bold'>City</p>
-          <div className='overflow-x-auto -mx-1 px-1'>
-            <Segmented
-              size='small'
-              value={citySlug}
-              onChange={onPickCity}
-              options={cityOptions}
-              disabled={status === 'catalog' || status === 'fetching' || !cityOptions.length}
-            />
+          <div className='flex items-center justify-between mb-2 gap-2 flex-wrap'>
+            <p className='eyebrow-mono text-amber-300/80 font-bold flex items-center gap-2'>
+              <GlobalOutlined /> City
+            </p>
+            {currentCityLabel && (
+              <span
+                className='inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border border-amber-400/40 bg-amber-400/10 text-amber-200'
+                title='Currently loaded city'
+              >
+                <span className='w-1.5 h-1.5 rounded-full bg-amber-300' />
+                {currentCityLabel}
+                {currentCityState && (
+                  <span className='text-amber-100/70 font-mono font-normal'>· {currentCityState}</span>
+                )}
+              </span>
+            )}
           </div>
+          <Select
+            showSearch
+            value={citySlug || undefined}
+            onChange={onPickCity}
+            options={cityOptions}
+            disabled={status === 'catalog' || status === 'fetching' || !cityOptions.length}
+            placeholder='Search a city (try "mum", "pun", "war"…)'
+            className='w-full'
+            size='middle'
+            optionFilterProp='label'
+            filterOption={(input, option) => {
+              // Match against city name AND its parent state so typing
+              // "kerala" surfaces both Kerala cities. Options nested under
+              // a group carry a `state` field we added upstream.
+              const q = (input || '').toLowerCase().trim()
+              if (!q) return true
+              const label = (option?.label || '').toLowerCase()
+              const state = (option?.state || '').toLowerCase()
+              return label.includes(q) || state.includes(q)
+            }}
+            listHeight={360}
+            popupMatchSelectWidth
+          />
           <p className='text-[11px] text-fg-muted mt-2 leading-snug'>
+            Type any city or state — grouped by state, {citiesCount || 50}+ options.
             Graphs are cached server-side so first-time picks may take a moment, then load instantly on return.
           </p>
         </div>
@@ -2077,7 +2231,7 @@ export default function Pathfinding() {
                 query={fromQuery}
                 srcNodeLatLng={null}
                 disabled={status !== 'ready'}
-                helper='Type any landmark, area or suburb across our 10 metros.'
+                helper='Type any landmark, area or suburb across every state.'
               />
               {/* To */}
               <ComposerRow
@@ -2104,7 +2258,7 @@ export default function Pathfinding() {
                     : null
                 }
                 disabled={status !== 'ready'}
-                helper='Type any landmark, area or suburb across our 10 metros.'
+                helper='Type any landmark, area or suburb across every state.'
               />
             </div>
             <Button
@@ -2195,16 +2349,58 @@ export default function Pathfinding() {
             {/* Run All */}
             <div className='luxe-glass p-3'>
               <p className='eyebrow-mono mb-2 text-fuchsia-300/80 font-bold'>Race the field</p>
-              <Button
-                variant='primary'
-                block
-                loading={runAllBusy}
-                onClick={runAll}
-                disabled={status !== 'ready' || src == null || dst == null}
-                icon={<ExperimentOutlined />}
-              >
-                {runAllBusy ? 'Racing algorithms…' : 'Run all algorithms'}
-              </Button>
+
+              {/* Per-algorithm timeout picker — 5s / 10s / 30s / 60s / ∞. */}
+              <div className='mb-3'>
+                <div className='flex items-center justify-between text-[11px] font-mono mb-1.5'>
+                  <span className='text-fg-muted flex items-center gap-1.5'>
+                    <ClockCircleOutlined /> Per-algorithm timeout
+                  </span>
+                  <span className='text-amber-300 font-bold'>
+                    {algoTimeoutMs === 0 ? 'No limit' : `${algoTimeoutMs / 1000}s`}
+                  </span>
+                </div>
+                <div className='flex flex-wrap gap-1'>
+                  {TIMEOUT_MARKS.map((m) => (
+                    <button
+                      key={m.ms}
+                      type='button'
+                      onClick={() => setAlgoTimeoutMs(m.ms)}
+                      disabled={runAllBusy}
+                      className={`px-2 py-1 rounded-md text-[11px] font-mono border transition ${
+                        algoTimeoutMs === m.ms
+                          ? 'border-amber-400 bg-amber-400/10 text-amber-200'
+                          : 'border-line bg-surface-elevated text-fg-muted hover:text-fg-primary hover:border-white/20'
+                      } disabled:opacity-40 disabled:cursor-not-allowed`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Primary action — swap to Stop while a batch is in flight. */}
+              {runAllBusy ? (
+                <Button
+                  variant='danger'
+                  block
+                  onClick={stopRunAll}
+                  icon={<StopFilled />}
+                >
+                  Stop — abort remaining algorithms
+                </Button>
+              ) : (
+                <Button
+                  variant='primary'
+                  block
+                  onClick={runAll}
+                  disabled={status !== 'ready' || src == null || dst == null}
+                  icon={<ExperimentOutlined />}
+                >
+                  Run all algorithms
+                </Button>
+              )}
+
               {batchProgress && (
                 <div className='mt-2'>
                   <div className='flex items-center justify-between text-[11px] font-mono text-fg-muted mb-1'>
@@ -2214,7 +2410,14 @@ export default function Pathfinding() {
                         <> · <span className='text-fuchsia-300'>{batchProgress.currentName}</span></>
                       )}
                     </span>
-                    <span>elapsed {batchProgress.elapsedSec}s</span>
+                    <span>
+                      elapsed <span className='text-amber-300'>{batchProgress.elapsedSec}s</span>
+                      {batchProgress.capMs ? (
+                        <> / {batchProgress.capMs / 1000}s cap</>
+                      ) : (
+                        <> · no limit</>
+                      )}
+                    </span>
                   </div>
                   <Progress
                     percent={Math.round((batchProgress.current / batchProgress.total) * 100)}
@@ -2226,7 +2429,8 @@ export default function Pathfinding() {
                 </div>
               )}
               <p className='text-[11px] text-fg-muted leading-snug mt-2'>
-                Runs every algorithm with a 30 s per-algorithm hard cap. Table + coloured overlays appear once every algorithm has settled.
+                Runs every algorithm with the per-algorithm cap you pick above (∞ = no cap — only Stop breaks it).
+                Table + coloured overlays appear once every algorithm has settled or been stopped.
               </p>
             </div>
 
@@ -2432,7 +2636,7 @@ export default function Pathfinding() {
                         <td className='px-2 py-1.5 text-right text-emerald-200'>{r.ms.toFixed(0)}</td>
                         <td className='px-2 py-1.5 text-right'>{r.ratio ? r.ratio.toFixed(3) : '—'}</td>
                         <td className='px-2 py-1.5'>
-                          <VerdictBadge v={r.verdict} timedOut={r.timedOut} />
+                          <VerdictBadge v={r.verdict} timedOut={r.timedOut} stopped={r.stopped} />
                         </td>
                       </tr>
                     )
@@ -2490,7 +2694,11 @@ function ThHeader({ label, k, sortKey, sortDir, onClick }) {
   )
 }
 
-function VerdictBadge({ v, timedOut }) {
+function VerdictBadge({ v, timedOut, stopped }) {
+  // `stopped` beats `timedOut` — a user-initiated abort is a stronger
+  // signal than the hitting the wall-clock cap. Rose ("magenta") tag
+  // is distinct from volcano (timeout) and red (failed).
+  if (stopped || v === 'stopped') return <Tag color='magenta' className='!m-0'>stopped</Tag>
   if (timedOut) return <Tag color='volcano' className='!m-0'>timeout</Tag>
   if (v === 'optimal') return <Tag color='green' className='!m-0'>optimal</Tag>
   if (v === 'near-optimal') return <Tag color='gold' className='!m-0'>near-opt</Tag>
