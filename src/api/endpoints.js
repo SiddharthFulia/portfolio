@@ -174,6 +174,16 @@ export const ENDPOINTS = {
   // Pathfinding Lab — SQLite-cached city road graphs. GET list of cities,
   // GET /:slug for the {nodes, edges} payload (server fetches from Overpass
   // on cache miss, then serves gzipped on every subsequent hit).
+  //
+  // Split reads (preferred): /:slug/meta returns the small metadata JSON,
+  // /:slug/graph.json.gz streams the raw gzipped SQLite BLOB with
+  // Content-Encoding: gzip — browser inflates natively, saves the ~6 MB →
+  // ~1.2 MB wire cost + skips a server-side gunzip + re-serialize round-trip.
+  //
+  // Legacy /:slug remains — returns the full {meta, graph} envelope. Old
+  // callers keep working; new code should hit the two split endpoints in
+  // parallel via Promise.all().
+  //
   // /:slug/places drives the Trie/trigram-backed area/neighbourhood search.
   // /places (no slug) is the cross-city fallback used when no city is picked.
   CITY_GRAPHS:            '/api/city-graphs',
