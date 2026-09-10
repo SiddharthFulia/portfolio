@@ -21,7 +21,8 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Segmented, InputNumber, Input, Tag, Progress, Select } from 'antd'
+import { InputNumber, Input, Tag, Progress } from 'antd'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Slider, Button } from '../components/ui'
 import {
   PlayCircleFilled, PauseCircleFilled, ReloadOutlined,
@@ -31,11 +32,56 @@ import {
   ExperimentOutlined, ClearOutlined, HistoryOutlined,
   StopFilled, ClockCircleOutlined, GlobalOutlined,
   FullscreenOutlined, FullscreenExitOutlined,
+  SearchOutlined, CheckCircleFilled, LoadingOutlined,
+  CompassOutlined, CarOutlined, BranchesOutlined,
+  BulbOutlined, DownloadOutlined, CloseOutlined,
 } from '@ant-design/icons'
-import { get as apiGet } from '../api/request'
+import { get as apiGet, post as apiPost } from '../api/request'
 import { ENDPOINTS } from '../api/endpoints'
 import { notify } from '../utils/notify'
 import { LuxeLoader } from '../components/loaders'
+
+// Reduced-motion — evaluated once at module load. Every fancy animation
+// gates on this so we never fire vestibular/seizure-risky motion on
+// users who've opted out at the OS level.
+const REDUCE_MOTION = typeof window !== 'undefined'
+  && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+// Rough drive-time estimate for the "N km · X min drive" ambient detail.
+// Uses a blanket 28 km/h average city speed — the number is on-purpose a
+// ballpark, not a routing engine, so we don't mislead anyone.
+function estimateDriveMinutes(km) {
+  if (!km || km <= 0) return 0
+  const AVG_SPEED_KMH = 28
+  return Math.max(1, Math.round((km / AVG_SPEED_KMH) * 60))
+}
+
+// Sharp direction changes along the path. Each interior node's bearing
+// delta is compared against a threshold (30°) — anything above counts as
+// a turn. Straight-through nodes don't inflate the number.
+function countTurns(path, nodes) {
+  if (!path || path.length < 3) return 0
+  const bearing = (a, b) => {
+    const φ1 = a.lat * Math.PI / 180, φ2 = b.lat * Math.PI / 180
+    const λ1 = a.lng * Math.PI / 180, λ2 = b.lng * Math.PI / 180
+    const y = Math.sin(λ2 - λ1) * Math.cos(φ2)
+    const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(λ2 - λ1)
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360
+  }
+  let turns = 0
+  const TURN_THRESHOLD_DEG = 30
+  for (let i = 1; i < path.length - 1; i++) {
+    const a = nodes.get(path[i - 1])
+    const b = nodes.get(path[i])
+    const c = nodes.get(path[i + 1])
+    if (!a || !b || !c) continue
+    const b1 = bearing(a, b), b2 = bearing(b, c)
+    let d = Math.abs(b2 - b1)
+    if (d > 180) d = 360 - d
+    if (d >= TURN_THRESHOLD_DEG) turns++
+  }
+  return turns
+}
 
 // ─── Haversine — meters between two lat/lng ────────────────────
 function haversine(a, b) {
@@ -850,6 +896,90 @@ function pathKm(path, nodes) {
   return m / 1000
 }
 
+// ─── Alternate routes via edge-blocking Dijkstra ─────────────
+// Cheap K-shortest — for each edge in the primary path we remove that
+// edge, re-run Dijkstra, and keep the K best distinct paths. This is
+// nowhere near a true Yen's algorithm, but it produces visibly-distinct
+// ghost routes fast enough to run inside a setTimeout(0) tick.
+//
+// Caps at O(P * V log V) where P = path length. On the 6k-node metro
+// graphs that's typically well under 200 ms even for long routes.
+function computeAlternateRoutes(graph, revAdj, src, dst, mainPath, k = 2) {
+  if (!graph || !mainPath || mainPath.length < 3) return []
+  const { adj, nodes } = graph
+  const seen = new Set([mainPath.join(',')])
+  const results = []
+  // Cap the number of blocking probes so an enormous path doesn't stall
+  // the browser — sample edges at even intervals.
+  const probes = Math.min(mainPath.length - 1, 24)
+  const stride = Math.max(1, Math.floor((mainPath.length - 1) / probes))
+  for (let i = 0; i < mainPath.length - 1; i += stride) {
+    const u = mainPath[i], v = mainPath[i + 1]
+    const originalEdges = adj.get(u) || []
+    const filtered = originalEdges.filter((e) => e.to !== v)
+    if (filtered.length === originalEdges.length) continue
+    adj.set(u, filtered)
+    try {
+      const alt = dijkstraShortest(adj, src, dst)
+      if (alt) {
+        const sig = alt.join(',')
+        if (!seen.has(sig)) {
+          seen.add(sig)
+          const km = pathKm(alt, nodes)
+          results.push({ path: alt, km })
+        }
+      }
+    } finally {
+      adj.set(u, originalEdges)
+    }
+    if (results.length >= k * 2) break   // over-collect so we can filter
+  }
+  // Rank by length, prefer routes that don't share too many nodes with
+  // the primary — otherwise the ghost lines look identical.
+  const mainSet = new Set(mainPath)
+  results.sort((a, b) => {
+    const overlapA = a.path.filter((n) => mainSet.has(n)).length / a.path.length
+    const overlapB = b.path.filter((n) => mainSet.has(n)).length / b.path.length
+    if (Math.abs(overlapA - overlapB) > 0.15) return overlapA - overlapB
+    return a.km - b.km
+  })
+  return results.slice(0, k)
+}
+
+// Sync Dijkstra returning just the path (or null). Used by
+// computeAlternateRoutes — the animated generator variant is overkill
+// when we just want the shortest edge-removed result.
+function dijkstraShortest(adj, src, dst) {
+  const dist = new Map([[src, 0]])
+  const prev = new Map()
+  const visited = new Set()
+  const heap = new MinHeap()
+  heap.push({ id: src, key: 0 })
+  while (heap.size) {
+    const { id: u, key: d } = heap.pop()
+    if (visited.has(u)) continue
+    visited.add(u)
+    if (u === dst) {
+      const path = [u]
+      let cur = u
+      while (prev.has(cur)) { cur = prev.get(cur); path.push(cur) }
+      return path.reverse()
+    }
+    const edges = adj.get(u) || []
+    for (const { to: v, w } of edges) {
+      if (visited.has(v)) continue
+      const nd = d + w
+      const cur = dist.get(v)
+      if (cur === undefined || nd < cur) {
+        dist.set(v, nd)
+        prev.set(v, u)
+        heap.push({ id: v, key: nd })
+      }
+    }
+  }
+  return null
+}
+
 // ─── Nearest node to a lat/lng click ───────────────────────────
 function nearestNode(nodes, lat, lng) {
   let bestId = null, best = Infinity
@@ -1032,6 +1162,22 @@ function runAlgoAsync(key, graph, revAdj, src, dst, timeBudgetMs = 30000, signal
 // Default city — first metro in the catalogue.
 const DEFAULT_CITY = 'bangalore'
 
+// Trending cities — surfaced at the top of the command palette when the
+// user hasn't typed anything yet. These are the 5 metros with the
+// heaviest road graphs; picked because they're what most first-time
+// visitors want to explore.
+const TRENDING_SLUGS = ['mumbai', 'delhi', 'bangalore', 'chennai', 'kolkata']
+
+// Progressive loader stages. Each entry maps a stage index to a label +
+// icon shown in the on-canvas skeleton overlay. The last stage ('ready')
+// is decorative — the overlay unmounts once it's reached.
+const LOAD_STAGES = [
+  { key: 'fetch',     label: 'Fetching graph',      hint: 'streaming from server cache' },
+  { key: 'decode',    label: 'Decoding',            hint: 'gunzip + JSON parse' },
+  { key: 'project',   label: 'Projecting',          hint: 'plate carrée + batched Path2D' },
+  { key: 'ready',     label: 'Ready',               hint: '' },
+]
+
 // ─── SliderRow — Physics-style typed slider + numeric input ────
 function SliderRow({ label, value, min, max, step = 1, unit = '', onChange, help }) {
   const clamp = (v) => {
@@ -1085,6 +1231,43 @@ export default function Pathfinding() {
   const [citySlug, setCitySlug] = useState(DEFAULT_CITY)
   const [cityMeta, setCityMeta] = useState(null)
   const cityCacheRef = useRef(new Map())
+
+  // Progressive load stages — each ticks on as the pipeline advances so
+  // the loader panel reads like a Google-Maps hand-off: fetch → decode
+  // → project → ready. `loadStage` is a numeric index into LOAD_STAGES.
+  const [loadStage, setLoadStage] = useState(0)
+
+  // Command palette — Cmd+K style city switcher. Replaces the flat grouped
+  // <Select> which forced users to scan 150+ options. Opens on click or
+  // ⌘K / Ctrl+K.
+  const [paletteOpen, setPaletteOpen] = useState(false)
+
+  // Recent cities — persisted in localStorage. Trims to last 5, dedups by
+  // slug, and never overwrites without the currently loaded city being
+  // added at the head.
+  const [recentCities, setRecentCities] = useState(() => {
+    if (typeof window === 'undefined') return []
+    try {
+      const raw = localStorage.getItem('pathfinding.recentCities')
+      return raw ? JSON.parse(raw).slice(0, 5) : []
+    } catch { return [] }
+  })
+
+  // Alternate routes — 2nd + 3rd best paths shown as dashed ghost lines
+  // underneath the primary amber path. Computed alongside the main route
+  // whenever a Run finishes (see the tick() done branch below).
+  const [altPaths, setAltPaths] = useState([])   // [{ path, km }, …]
+
+  // Path trace animation — once a route is found we animate a bright
+  // amber "trace" along the path from src → dst. `traceStart` = ts when
+  // the animation began; the canvas draw loop reads it to render a
+  // moving highlighted segment on top of the static path.
+  const traceStartRef = useRef(0)
+  const traceRafRef = useRef(null)
+  // Alt-route generation is async and can race — this ID is bumped every
+  // time we start a new alt-route job so a slow prior job won't
+  // clobber the current one when it finishes.
+  const altRunIdRef = useRef(0)
 
   // Zoom + pan
   const [transform, setTransform] = useState({ tx: 0, ty: 0, scale: 1 })
@@ -1143,6 +1326,21 @@ export default function Pathfinding() {
   const [labels, setLabels]                 = useState([])          // top-50 labels for overlay
   const fromDebounceRef = useRef(null)
   const toDebounceRef   = useRef(null)
+
+  // ── AI recommendation popup ──
+  // User types a natural-language brief ("italian near bandra") →
+  // BE calls Groq → we render 3-5 cards, each with a "Set as From" /
+  // "Set as To" pair. Clicking a card resolves the recommended name
+  // against the city's places table via the existing fuzzy search.
+  const [aiOpen, setAiOpen]             = useState(false)
+  const [aiQuery, setAiQuery]           = useState('')
+  const [aiLoading, setAiLoading]       = useState(false)
+  const [aiRecs, setAiRecs]             = useState([])          // [{name, kind, reason, area}]
+  const [aiPickBusy, setAiPickBusy]     = useState({})          // { [idx_which]: true }
+
+  // ── Live location (browser geolocation) ──
+  // Cached in sessionStorage so a second click doesn't re-prompt.
+  const [geoBusy, setGeoBusy]           = useState({ from: false, to: false })
 
   const graphRef        = useRef(null)
   const revAdjRef       = useRef(null)
@@ -1205,11 +1403,13 @@ export default function Pathfinding() {
     const isCancelled = () => opts.cancelled?.() === true
     const cached = cityCacheRef.current.get(slug)
     if (cached) {
+      // Cache hit — skip the overlay entirely; installCity sets stage=3.
       installCity(slug, cached)
       return
     }
     try {
       setStatus('fetching')
+      setLoadStage(0)   // fetch
       const t0 = Date.now()
       const BE = import.meta.env.VITE_BE_URL || 'http://localhost:4001'
       const [metaRes, graph] = await Promise.all([
@@ -1224,12 +1424,18 @@ export default function Pathfinding() {
         }),
       ])
       if (isCancelled()) return
+      // Stage advance: fetch → decode. Both requests are back so we've
+      // moved past the network wait and are now inflating the payload.
+      setLoadStage(1)   // decode
       const meta = metaRes?.data
       if (!meta) throw new Error('Empty meta payload')
       if (!graph || !graph.nodes || !graph.edges) throw new Error('Empty graph payload')
       const { nodes, adj } = inflateGraph(graph)
       const revAdj = buildReverseAdj(adj)
       const bbox = parseBbox(meta.bbox)
+      // Stage advance: decode → project. From here the resizeAndProject
+      // effect will build the base Path2D and repaint the canvas.
+      setLoadStage(2)   // project
       const entry = {
         nodes, adj, revAdj, bbox,
         meta: {
@@ -1272,6 +1478,7 @@ export default function Pathfinding() {
     }
     basePathRef.current = null
     setComparisonRows([])
+    setAltPaths([])
     setTransform({ tx: 0, ty: 0, scale: 1 })
     setLabels([])
     setFromSuggestions([])
@@ -1281,6 +1488,21 @@ export default function Pathfinding() {
     setFromOpen(false)
     setToOpen(false)
     setStatus('ready')
+    setLoadStage(3)   // ready — overlay unmounts
+
+    // Persist this pick to the recents list. Trim to 5, dedup by slug, put
+    // the freshly loaded city at the head so returning users see it first
+    // in the palette.
+    setRecentCities((prev) => {
+      // Prefer the catalogue row (has state); fall back to the graph meta
+      // which always has a name.
+      const fromCatalog = (cities || []).find((c) => c.slug === slug)
+      const name = fromCatalog?.name || entry?.meta?.name || slug
+      const state = fromCatalog?.state || ''
+      const next = [{ slug, name, state }, ...prev.filter((r) => r.slug !== slug)].slice(0, 5)
+      try { localStorage.setItem('pathfinding.recentCities', JSON.stringify(next)) } catch {}
+      return next
+    })
   }
 
   // ── Build the projection + base Path2D once a city is ready ──
@@ -1365,6 +1587,8 @@ export default function Pathfinding() {
     pathRef.current = null
     bidiSideRef.current = new Map()
     startTsRef.current = 0
+    traceStartRef.current = 0
+    setAltPaths([])
     setTele({ visited: 0, ms: 0, pathKm: 0, pathN: 0, done: false, found: false })
 
     genRef.current = makeGenerator(algo, g, revAdjRef.current, src, dst)
@@ -1435,14 +1659,38 @@ export default function Pathfinding() {
       runningRef.current = false
       setRunning(false)
       const ms = ts - startTsRef.current
+      const km = path ? pathKm(path, graphRef.current.nodes) : 0
+      const turns = path ? countTurns(path, graphRef.current.nodes) : 0
       setTele({
         visited: visitedListRef.current.length,
         ms: Math.round(ms),
-        pathKm: path ? pathKm(path, graphRef.current.nodes) : 0,
+        pathKm: km,
         pathN: path ? path.length : 0,
+        turns,
+        minutes: estimateDriveMinutes(km),
         done: true,
         found: !!path,
       })
+      // Kick off the trace animation clock so the moving highlight begins
+      // sliding immediately once the route resolves.
+      traceStartRef.current = 0
+      // Fire alt-route computation as a low-priority async task so it
+      // doesn't block the primary route reveal. Wrapped in a check so
+      // rapid re-runs don't overwrite each other.
+      if (path && !REDUCE_MOTION) {
+        const g = graphRef.current
+        const revAdj = revAdjRef.current
+        const runId = ++altRunIdRef.current
+        setAltPaths([])
+        setTimeout(() => {
+          if (runId !== altRunIdRef.current) return
+          const alts = computeAlternateRoutes(g, revAdj, src, dst, path, 2)
+          if (runId !== altRunIdRef.current) return
+          setAltPaths(alts)
+        }, 40)
+      } else {
+        setAltPaths([])
+      }
       draw()
       return
     }
@@ -1470,6 +1718,10 @@ export default function Pathfinding() {
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current)
         rafRef.current = null
+      }
+      if (traceRafRef.current) {
+        cancelAnimationFrame(traceRafRef.current)
+        traceRafRef.current = null
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1550,12 +1802,46 @@ export default function Pathfinding() {
       ctx.globalAlpha = 1
     }
 
-    // Final path — amber, thick, drawn on top of comparisons.
+    // Alternate routes (2nd + 3rd best) — dashed muted ghost lines under
+    // the primary path so users can see there's more than one way home.
+    // Only drawn once the primary route has resolved.
+    if (pathRef.current && altPaths.length) {
+      ctx.save()
+      ctx.setLineDash([6 / zoom, 6 / zoom])
+      const ALT_COLORS = ['rgba(148,163,184,0.55)', 'rgba(148,163,184,0.35)']
+      for (let idx = 0; idx < altPaths.length; idx++) {
+        const alt = altPaths[idx]
+        if (!alt?.path?.length) continue
+        ctx.strokeStyle = ALT_COLORS[idx] || ALT_COLORS[1]
+        ctx.lineWidth = 1.6 / zoom
+        ctx.beginPath()
+        for (let i = 0; i < alt.path.length; i++) {
+          const n = g.nodes.get(alt.path[i])
+          if (!n) continue
+          const x = baseXOf(n.lng), y = baseYOf(n.lat)
+          if (i === 0) ctx.moveTo(x, y)
+          else ctx.lineTo(x, y)
+        }
+        ctx.stroke()
+      }
+      ctx.restore()
+    }
+
+    // Final path — amber, thick, drawn on top of comparisons. Once the
+    // route resolves we add a soft glow and animate a bright trace along
+    // it (unless reduced-motion). The trace is a subset of the path
+    // between two moving parametric endpoints.
     if (pathRef.current) {
+      const p = pathRef.current
+      // Base line — amber with a soft glow underneath for depth.
+      ctx.save()
+      ctx.shadowColor = 'rgba(251,191,36,0.55)'
+      ctx.shadowBlur = 8
       ctx.strokeStyle = 'rgba(251,191,36,0.95)'
       ctx.lineWidth = 2.8 / zoom
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
       ctx.beginPath()
-      const p = pathRef.current
       for (let i = 0; i < p.length; i++) {
         const n = g.nodes.get(p[i])
         if (!n) continue
@@ -1564,6 +1850,49 @@ export default function Pathfinding() {
         else ctx.lineTo(x, y)
       }
       ctx.stroke()
+      ctx.restore()
+
+      // Trace animation — a moving bright segment that races src → dst,
+      // loops with a small gap. Skipped for reduced-motion users.
+      if (!REDUCE_MOTION && tele.done && tele.found) {
+        const now = performance.now()
+        if (!traceStartRef.current) traceStartRef.current = now
+        const TRACE_MS = 2200
+        const t = ((now - traceStartRef.current) % TRACE_MS) / TRACE_MS
+        const segFrac = 0.18   // 18% of the path is bright at any time
+        const head = t
+        const tail = Math.max(0, t - segFrac)
+        const n = p.length
+        const startIdx = Math.floor(tail * (n - 1))
+        const endIdx   = Math.min(n - 1, Math.ceil(head * (n - 1)))
+        if (endIdx > startIdx) {
+          ctx.save()
+          ctx.shadowColor = 'rgba(253,224,71,0.9)'
+          ctx.shadowBlur = 14
+          ctx.strokeStyle = 'rgba(253,224,71,1)'
+          ctx.lineWidth = 3.4 / zoom
+          ctx.lineCap = 'round'
+          ctx.lineJoin = 'round'
+          ctx.beginPath()
+          for (let i = startIdx; i <= endIdx; i++) {
+            const node = g.nodes.get(p[i])
+            if (!node) continue
+            const x = baseXOf(node.lng), y = baseYOf(node.lat)
+            if (i === startIdx) ctx.moveTo(x, y)
+            else ctx.lineTo(x, y)
+          }
+          ctx.stroke()
+          ctx.restore()
+        }
+        // Schedule the next trace frame directly — bypasses the tick()
+        // loop (which only runs while `running` is true) so the trace can
+        // keep sliding after the algorithm has finished.
+        if (traceRafRef.current) cancelAnimationFrame(traceRafRef.current)
+        traceRafRef.current = requestAnimationFrame(() => {
+          traceRafRef.current = null
+          draw()
+        })
+      }
     }
 
     // Source + destination markers — screen-fixed size, so scale down.
@@ -1928,6 +2257,20 @@ export default function Pathfinding() {
     return () => window.removeEventListener('keydown', onKey)
   }, [toggleFullscreen])
 
+  // Command palette shortcut: ⌘K / Ctrl+K. Works even while a form
+  // field is focused — this is a global "search cities" invocation, not
+  // an in-field command, so we intentionally don't suppress on input.
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault()
+        setPaletteOpen((p) => !p)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   function randomize() {
     const g = graphRef.current
     if (!g) return
@@ -2212,6 +2555,259 @@ export default function Pathfinding() {
     setSrc(d); setDst(s)
   }
 
+  // ─── AI recommendations ─────────────────────────────────────────
+  // Send the user's brief to the BE recommender, render the returned
+  // cards. Each card's "Set as From" / "Set as To" then re-runs the
+  // existing fuzzy places search against the AI-suggested name — that
+  // way we still snap to a real graph node with real coordinates
+  // instead of trusting a hallucinated lat/lng.
+  async function runAiSuggest() {
+    const q = aiQuery.trim()
+    if (!q) {
+      notify.info('Type a brief first — try "italian near Bandra"', { title: 'Empty', key: 'pf-ai-empty' })
+      return
+    }
+    if (q.length < 3) {
+      notify.info('A little more detail helps — try a full phrase', { title: 'Too short', key: 'pf-ai-short' })
+      return
+    }
+    setAiLoading(true)
+    setAiRecs([])
+    try {
+      const cityName = currentCityLabel || citySlug || 'city'
+      const res = await apiPost(ENDPOINTS.PATHFINDING_RECOMMEND, { city: cityName, query: q })
+      const list = res?.data?.recommendations || []
+      if (!list.length) {
+        notify.info('The recommender came back empty — try rephrasing.', { title: 'No matches', key: 'pf-ai-empty2' })
+      }
+      setAiRecs(list)
+    } catch (e) {
+      if (e?.status === 429) {
+        notify.error('Too many requests — try again in a minute.', { title: 'Rate limited', key: 'pf-ai-429' })
+      } else {
+        notify.error(e?.message || 'AI recommender is unavailable right now.', { title: 'AI offline', key: 'pf-ai-err' })
+      }
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
+  // Take a recommended place name, hit the per-city fuzzy /places
+  // search, and pick the top match. Falls back to Nominatim geocoding
+  // if nothing above a minimum score. Once a lat/lng is chosen, snap
+  // to the nearest graph node and set src/dst.
+  async function pickAiRec(rec, which) {
+    if (!rec || !rec.name) return
+    if (status !== 'ready') {
+      notify.info('Graph still loading — try again in a moment.', { title: 'Not ready', key: 'pf-ai-notready' })
+      return
+    }
+    const key = `${rec.name}_${which}`
+    setAiPickBusy((s) => ({ ...s, [key]: true }))
+    try {
+      // 1) Try the per-city fuzzy match first.
+      let picked = null
+      try {
+        const searchTerm = rec.area ? `${rec.name} ${rec.area}` : rec.name
+        const url = `${ENDPOINTS.CITY_GRAPHS_PLACES}/${citySlug}/places`
+        const r = await apiGet(url, { q: searchTerm, limit: 5 })
+        const items = r?.data?.items || []
+        // Prefer results whose area matches the recommendation's area.
+        if (items.length) {
+          const areaLc = (rec.area || '').toLowerCase()
+          picked = items.find((it) => areaLc && (it.name || '').toLowerCase().includes(areaLc)) || items[0]
+        }
+      } catch { /* fall through to geocoder */ }
+
+      // 2) Fallback — Nominatim geocode with the city name pinned so the
+      //    result stays in-city. Uses the public endpoint at 1 rps.
+      if (!picked) {
+        try {
+          const cityName = currentCityLabel || citySlug || ''
+          const q = `${rec.name}${rec.area ? ', ' + rec.area : ''}${cityName ? ', ' + cityName : ''}, India`
+          const nomUrl = new URL('https://nominatim.openstreetmap.org/search')
+          nomUrl.searchParams.set('q', q)
+          nomUrl.searchParams.set('format', 'json')
+          nomUrl.searchParams.set('limit', '1')
+          const nomRes = await fetch(nomUrl.toString(), {
+            headers: { 'Accept-Language': 'en' },
+          })
+          if (nomRes.ok) {
+            const arr = await nomRes.json()
+            if (Array.isArray(arr) && arr.length) {
+              const hit = arr[0]
+              picked = {
+                name: hit.display_name?.split(',')[0] || rec.name,
+                lat: parseFloat(hit.lat),
+                lng: parseFloat(hit.lon),
+                kind: rec.kind || 'place',
+              }
+            }
+          }
+        } catch { /* silent — handled below */ }
+      }
+
+      if (!picked || picked.lat == null || picked.lng == null) {
+        notify.error(`Couldn't find "${rec.name}" on the map — try the manual search.`,
+          { title: 'Not found', key: 'pf-ai-miss' })
+        return
+      }
+
+      const g = graphRef.current
+      if (!g) return
+      const id = nearestNode(g.nodes, picked.lat, picked.lng)
+      if (id == null) {
+        notify.error('No nearby graph node — try another pick.', { title: 'Off-graph', key: 'pf-ai-offgraph' })
+        return
+      }
+      if (which === 'from') { setSrc(id); setFromQuery(rec.name); setFromOpen(false) }
+      else                  { setDst(id); setToQuery(rec.name);   setToOpen(false)   }
+      persistRecent(which, { name: rec.name, kind: picked.kind || rec.kind || 'place', lat: picked.lat, lng: picked.lng })
+      notify.success(`${rec.name} pinned as ${which === 'from' ? 'start' : 'end'}.`,
+        { title: 'Pinned', key: 'pf-ai-pinned' })
+    } finally {
+      setAiPickBusy((s) => {
+        const next = { ...s }; delete next[key]; return next
+      })
+    }
+  }
+
+  // ─── Live location (browser geolocation) ────────────────────────
+  // Cache the last-known position in sessionStorage so a second click
+  // in the same tab session skips the permission prompt latency.
+  const SESSION_GEO_KEY = 'pathfinding.geoloc'
+  function cachedGeo() {
+    try {
+      const raw = sessionStorage.getItem(SESSION_GEO_KEY)
+      if (!raw) return null
+      const parsed = JSON.parse(raw)
+      // 10-minute freshness cap — a moving user shouldn't see stale coords.
+      if (!parsed?.ts || Date.now() - parsed.ts > 10 * 60 * 1000) return null
+      return parsed
+    } catch { return null }
+  }
+  function persistGeo(latitude, longitude) {
+    try {
+      sessionStorage.setItem(SESSION_GEO_KEY, JSON.stringify({ latitude, longitude, ts: Date.now() }))
+    } catch { /* private mode */ }
+  }
+
+  async function useMyLocation(which) {
+    if (status !== 'ready') {
+      notify.info('Graph still loading — try again in a moment.', { title: 'Not ready', key: 'pf-geo-notready' })
+      return
+    }
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      notify.error('Geolocation not supported in this browser.', { title: 'Unavailable', key: 'pf-geo-nosupp' })
+      return
+    }
+    setGeoBusy((s) => ({ ...s, [which]: true }))
+
+    // Try the session cache first — same-session repeats skip the prompt.
+    const cached = cachedGeo()
+    const apply = (latitude, longitude) => {
+      const g = graphRef.current
+      if (!g) { setGeoBusy((s) => ({ ...s, [which]: false })); return }
+      const id = nearestNode(g.nodes, latitude, longitude)
+      if (id == null) {
+        notify.error("You're outside this city's road graph.", { title: 'Off-graph', key: 'pf-geo-off' })
+        setGeoBusy((s) => ({ ...s, [which]: false }))
+        return
+      }
+      const label = 'My location'
+      if (which === 'from') { setSrc(id); setFromQuery(label); setFromOpen(false) }
+      else                  { setDst(id); setToQuery(label);   setToOpen(false)   }
+      // Fit into view so the user sees where they landed.
+      requestAnimationFrame(() => { try { fitToPins() } catch {} })
+      setGeoBusy((s) => ({ ...s, [which]: false }))
+      notify.success(`Location set as ${which === 'from' ? 'start' : 'end'}.`,
+        { title: 'Pinned', key: 'pf-geo-ok' })
+    }
+
+    if (cached) {
+      apply(cached.latitude, cached.longitude)
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords
+        persistGeo(latitude, longitude)
+        apply(latitude, longitude)
+      },
+      (err) => {
+        setGeoBusy((s) => ({ ...s, [which]: false }))
+        if (err.code === err.PERMISSION_DENIED) {
+          notify.error('Location permission required.', { title: 'Blocked', key: 'pf-geo-deny' })
+        } else if (err.code === err.POSITION_UNAVAILABLE) {
+          notify.error('Position unavailable — try again outdoors.', { title: 'Unavailable', key: 'pf-geo-una' })
+        } else if (err.code === err.TIMEOUT) {
+          notify.error('Location timed out — try again.', { title: 'Timeout', key: 'pf-geo-to' })
+        } else {
+          notify.error('Location permission required.', { title: 'Blocked', key: 'pf-geo-deny2' })
+        }
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60_000 },
+    )
+  }
+
+  // ─── Export helpers ─────────────────────────────────────────────
+  // Open the computed src → dst in Google Maps' turn-by-turn directions
+  // in a new tab. `?api=1` is the stable directions deep-link contract.
+  function openInGoogleMaps() {
+    const g = graphRef.current
+    if (!g || src == null || dst == null) {
+      notify.info('Set From and To first.', { title: 'Nothing to open', key: 'pf-gm-nopin' })
+      return
+    }
+    const s = g.nodes.get(src), d = g.nodes.get(dst)
+    if (!s || !d) return
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${s.lat},${s.lng}&destination=${d.lat},${d.lng}&travelmode=driving`
+    try { window.open(url, '_blank', 'noopener,noreferrer') } catch {
+      notify.error('Could not open a new tab — check your pop-up blocker.',
+        { title: 'Blocked', key: 'pf-gm-blk' })
+    }
+  }
+
+  // Download the current computed path as JSON — useful for testing,
+  // for feeding into another routing tool, or for showing off on a blog.
+  function exportPathAsJson() {
+    const g = graphRef.current
+    const path = pathRef.current
+    if (!g || !path || !path.length) {
+      notify.info('Run an algorithm first — no path to export.', { title: 'Nothing to export', key: 'pf-json-noop' })
+      return
+    }
+    const s = g.nodes.get(src), d = g.nodes.get(dst)
+    const coords = path
+      .map((id) => g.nodes.get(id))
+      .filter(Boolean)
+      .map((n) => ({ lat: n.lat, lng: n.lng }))
+    const doc = {
+      start:      s ? { lat: s.lat, lng: s.lng } : null,
+      end:        d ? { lat: d.lat, lng: d.lng } : null,
+      path:       coords,
+      distanceKm: Number(tele.pathKm?.toFixed?.(3) || 0),
+      algorithm:  algo,
+      city:       currentCityLabel || citySlug || null,
+      exportedAt: new Date().toISOString(),
+    }
+    try {
+      const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `pathfinding_${citySlug || 'city'}_${algo}_${Date.now()}.json`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 5000)
+      notify.success('Path JSON downloaded.', { title: 'Exported', key: 'pf-json-ok' })
+    } catch (e) {
+      notify.error(e?.message || 'Export failed.', { title: 'Export failed', key: 'pf-json-err' })
+    }
+  }
+
   // Keyboard: ↑/↓ on the highlighted composer.
   function onComposerKeyDown(which, e) {
     const sug = which === 'from' ? fromSuggestions : toSuggestions
@@ -2371,51 +2967,54 @@ export default function Pathfinding() {
           </p>
         </header>
 
-        {/* City picker — searchable Select grouped by state */}
+        {/* City picker — command palette (Cmd+K). The old flat grouped
+            Select forced users to scan 150+ options; the palette pulls
+            recents + trending to the top, does fuzzy state + city
+            matching, and closes on Escape / outside click. */}
         <div className='luxe-glass p-3 mb-3'>
           <div className='flex items-center justify-between mb-2 gap-2 flex-wrap'>
             <p className='eyebrow-mono text-amber-300/80 font-bold flex items-center gap-2'>
               <GlobalOutlined /> City
             </p>
             {currentCityLabel && (
-              <span
+              <motion.span
+                key={citySlug || 'none'}
+                initial={REDUCE_MOTION ? false : { opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.25, ease: 'easeOut' }}
                 className='inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border border-amber-400/40 bg-amber-400/10 text-amber-200'
                 title='Currently loaded city'
               >
-                <span className='w-1.5 h-1.5 rounded-full bg-amber-300' />
+                <motion.span
+                  className='w-1.5 h-1.5 rounded-full bg-amber-300'
+                  animate={REDUCE_MOTION ? undefined : { opacity: [0.4, 1, 0.4] }}
+                  transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+                />
                 {currentCityLabel}
                 {currentCityState && (
                   <span className='text-amber-100/70 font-mono font-normal'>· {currentCityState}</span>
                 )}
-              </span>
+              </motion.span>
             )}
           </div>
-          <Select
-            showSearch
-            value={citySlug || undefined}
-            onChange={onPickCity}
-            options={cityOptions}
-            disabled={status === 'catalog' || status === 'fetching' || !cityOptions.length}
-            placeholder='Search a city (try "mum", "pun", "war"…)'
-            className='w-full'
-            size='middle'
-            optionFilterProp='label'
-            filterOption={(input, option) => {
-              // Match against city name AND its parent state so typing
-              // "kerala" surfaces both Kerala cities. Options nested under
-              // a group carry a `state` field we added upstream.
-              const q = (input || '').toLowerCase().trim()
-              if (!q) return true
-              const label = (option?.label || '').toLowerCase()
-              const state = (option?.state || '').toLowerCase()
-              return label.includes(q) || state.includes(q)
-            }}
-            listHeight={360}
-            popupMatchSelectWidth
-          />
+          <button
+            type='button'
+            onClick={() => setPaletteOpen(true)}
+            disabled={status === 'catalog' || !cityOptions.length}
+            className='w-full flex items-center gap-3 px-4 py-2.5 rounded-lg border border-line bg-surface-elevated hover:border-amber-400/60 hover:bg-white/[0.04] transition text-left disabled:opacity-40 disabled:cursor-not-allowed group'
+          >
+            <SearchOutlined className='text-fg-muted group-hover:text-amber-300 transition' />
+            <span className='flex-1 text-sm text-fg-muted'>
+              Search city or state<span className='hidden sm:inline'>… try "kera", "koch", "mum"</span>
+            </span>
+            <kbd className='hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-line bg-black/40 text-[10px] font-mono text-fg-muted'>
+              <span>⌘</span>K
+            </kbd>
+          </button>
           <p className='text-[11px] text-fg-muted mt-2 leading-snug'>
-            Type any city or state — grouped by state, {citiesCount || 50}+ options.
-            Graphs are cached server-side so first-time picks may take a moment, then load instantly on return.
+            {citiesCount || 50}+ cities across {statesCount || 35}+ states &amp; UTs · press
+            <kbd className='mx-1 px-1 py-0.5 rounded border border-line bg-black/30 text-[10px] font-mono text-amber-300'>⌘K</kbd>
+            or click above · recent + trending pinned to the top.
           </p>
         </div>
 
@@ -2518,29 +3117,57 @@ export default function Pathfinding() {
           <div
             ref={canvasWrapRef}
             className={`pf-canvas-wrap luxe-glass overflow-hidden relative ${isFullscreen ? 'pf-canvas-fs' : ''}`}
-            style={isFullscreen ? undefined : { height: 'min(72vh, 640px)' }}
+            style={isFullscreen ? undefined : { height: 'min(72vh, 640px)', minHeight: '360px' }}
           >
-            {(status === 'catalog' || status === 'fetching' || status === 'boot' || status === 'error') && (
-              <div className='absolute inset-0 flex flex-col items-center justify-center gap-3 z-10 bg-black/40 backdrop-blur-sm'>
-                {status === 'error' ? (
-                  <>
-                    <div className='text-rose-300 text-sm font-bold'>Couldn't load the city graph — try again</div>
-                    <div className='text-[11px] font-mono text-fg-muted max-w-md text-center px-6'>{errMsg}</div>
-                  </>
-                ) : (
-                  <>
-                    <LuxeLoader
-                      variant='road'
-                      size='md'
-                      label={status === 'catalog' ? 'Loading city catalogue…' : 'Loading city graph…'}
-                    />
-                    <div className='text-[11px] font-mono text-fg-muted'>
-                      {status === 'fetching' ? 'Streaming from server cache · ~1-3 MB compressed' : ''}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
+            <AnimatePresence>
+              {(status === 'catalog' || status === 'fetching' || status === 'boot' || status === 'error') && (
+                <motion.div
+                  key='pf-load-overlay'
+                  initial={REDUCE_MOTION ? false : { opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={REDUCE_MOTION ? { opacity: 0 } : { opacity: 0, transition: { duration: 0.4 } }}
+                  className='absolute inset-0 flex flex-col items-center justify-center gap-4 z-10 bg-black/40 backdrop-blur-sm'
+                >
+                  {status === 'error' ? (
+                    <>
+                      <div className='text-rose-300 text-sm font-bold'>Couldn't load the city graph — try again</div>
+                      <div className='text-[11px] font-mono text-fg-muted max-w-md text-center px-6'>{errMsg}</div>
+                    </>
+                  ) : (
+                    <>
+                      {/* City-name pill — renders INSTANTLY on switch so the
+                          user sees they've picked the right city before the
+                          graph decode finishes. */}
+                      {currentCityLabel && (
+                        <motion.div
+                          initial={REDUCE_MOTION ? false : { y: -8, opacity: 0 }}
+                          animate={{ y: 0, opacity: 1 }}
+                          transition={{ duration: 0.25 }}
+                          className='inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border border-amber-400/40 bg-amber-400/10 text-amber-100'
+                        >
+                          <CompassOutlined />
+                          {currentCityLabel}
+                          {currentCityState && (
+                            <span className='text-amber-100/60 font-mono font-normal'>· {currentCityState}</span>
+                          )}
+                        </motion.div>
+                      )}
+                      <LuxeLoader
+                        variant='city'
+                        size='md'
+                        label={status === 'catalog' ? 'Loading city catalogue…' : 'Loading city graph…'}
+                      />
+                      {/* Progressive stages — 4-dot ladder that ticks on as
+                          each pipeline step completes. Skipped if we're
+                          still bootstrapping the catalogue. */}
+                      {status === 'fetching' && (
+                        <ProgressStages stage={loadStage} />
+                      )}
+                    </>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
             <canvas
               ref={canvasRef}
               onMouseDown={onCanvasMouseDown}
@@ -2557,6 +3184,31 @@ export default function Pathfinding() {
                 touchAction: 'none',
               }}
             />
+            {/* Pulse rings at src + dst while computing — screen-space
+                overlays so we don't churn the canvas draw path just for
+                a decorative flourish. Positions come from the current
+                projection + transform. Hidden if reduced-motion. */}
+            {running && !tele.done && !REDUCE_MOTION && (() => {
+              const g = graphRef.current
+              const proj = projRef.current
+              if (!g || !proj) return null
+              const { baseXOf, baseYOf } = proj
+              const { tx, ty, scale } = transform
+              const pinPos = (id) => {
+                if (id == null) return null
+                const n = g.nodes.get(id)
+                if (!n) return null
+                return { x: baseXOf(n.lng) * scale + tx, y: baseYOf(n.lat) * scale + ty }
+              }
+              const srcP = pinPos(src)
+              const dstP = pinPos(dst)
+              return (
+                <div className='absolute inset-0 pointer-events-none overflow-hidden'>
+                  {srcP && <PulseRing x={srcP.x} y={srcP.y} color='#22c55e' />}
+                  {dstP && <PulseRing x={dstP.x} y={dstP.y} color='#ef4444' />}
+                </div>
+              )
+            })()}
             {/* Legend — hidden in fullscreen to reclaim real estate. */}
             {!isFullscreen && (
               <div className='absolute top-2 left-2 flex flex-wrap gap-2 text-[10px] font-mono px-3 py-1.5 rounded-lg bg-black/50 backdrop-blur border border-white/10'>
@@ -2915,6 +3567,34 @@ export default function Pathfinding() {
                 <Metric label='Path length' value={tele.pathKm ? `${tele.pathKm.toFixed(2)} km` : '—'} color='text-amber-200' />
                 <Metric label='Path nodes' value={tele.pathN ? tele.pathN.toLocaleString() : '—'} color='text-white' />
               </div>
+              {/* Ambient details — surface only once a route is found. Gives
+                  the map a "Google-Maps card" feel: est. drive minutes,
+                  turn count, alternate route notice. */}
+              {tele.found && tele.pathKm > 0 && (
+                <motion.div
+                  initial={REDUCE_MOTION ? false : { opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.35, ease: 'easeOut' }}
+                  className='mt-3 flex flex-wrap items-center gap-2 text-[11px] font-mono'
+                >
+                  <span className='inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-400/10 border border-amber-400/30 text-amber-200'>
+                    <CarOutlined />
+                    <span className='font-bold'>{tele.pathKm.toFixed(1)} km</span>
+                    <span className='text-amber-100/60'>·</span>
+                    <span>~{tele.minutes || estimateDriveMinutes(tele.pathKm)} min drive</span>
+                  </span>
+                  <span className='inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-cyan-400/10 border border-cyan-400/30 text-cyan-200'>
+                    <BranchesOutlined />
+                    <span>{tele.turns || 0} turns</span>
+                  </span>
+                  {altPaths.length > 0 && (
+                    <span className='inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-400/10 border border-slate-400/30 text-slate-300'>
+                      <span className='w-2 h-2 rounded-full bg-slate-400/60' style={{ boxShadow: 'inset 0 0 0 1px rgba(148,163,184,0.9)' }} />
+                      <span>{altPaths.length} alternate {altPaths.length === 1 ? 'route' : 'routes'}</span>
+                    </span>
+                  )}
+                </motion.div>
+              )}
               <div className='mt-2 text-[10px] font-mono text-fg-muted'>
                 Graph:&nbsp;
                 {graphRef.current
@@ -3023,6 +3703,20 @@ export default function Pathfinding() {
         )}
       </div>
 
+      {/* Cmd+K command palette — rendered outside the max-w-7xl wrapper so
+          the backdrop can span the full viewport. */}
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        cities={cities}
+        recentCities={recentCities}
+        currentSlug={citySlug}
+        onPick={(slug) => {
+          onPickCity(slug)
+          setPaletteOpen(false)
+        }}
+      />
+
       {/*
         Fullscreen styling — the wrapper is the :fullscreen element (via
         requestFullscreen on canvasWrapRef). We force 100vw × 100vh + a
@@ -3058,6 +3752,37 @@ function Metric({ label, value, color, mono }) {
     <div className='rounded-lg border border-line bg-surface-elevated px-3 py-2'>
       <div className='text-[10px] uppercase tracking-widest text-fg-muted'>{label}</div>
       <div className={`text-sm ${mono ? 'font-mono' : 'font-mono font-semibold'} ${color} tabular-nums truncate`}>{value}</div>
+    </div>
+  )
+}
+
+// Absolute-positioned pulsing ring — sits over the canvas at (x, y) and
+// emits an outward wave every ~1.4s. Uses framer-motion for the
+// keyframe animation; the two nested rings phase-offset so there's
+// always one starting as the other fades.
+function PulseRing({ x, y, color }) {
+  return (
+    <div style={{ position: 'absolute', left: x, top: y, transform: 'translate(-50%, -50%)' }}>
+      {[0, 0.7].map((delay, i) => (
+        <motion.span
+          key={i}
+          initial={{ scale: 0.4, opacity: 0.6 }}
+          animate={{ scale: 3, opacity: 0 }}
+          transition={{ duration: 1.4, ease: 'easeOut', repeat: Infinity, delay }}
+          style={{
+            position: 'absolute',
+            left: '50%',
+            top: '50%',
+            width: 24,
+            height: 24,
+            marginLeft: -12,
+            marginTop: -12,
+            borderRadius: '50%',
+            border: `2px solid ${color}`,
+            pointerEvents: 'none',
+          }}
+        />
+      ))}
     </div>
   )
 }
@@ -3303,5 +4028,286 @@ function SuggestionRow({ p, q, active, onMouseEnter, onMouseDown, srcNodeLatLng 
         </span>
       )}
     </button>
+  )
+}
+
+// ─── ProgressStages ─────────────────────────────────────────────
+// Google-Maps-style progressive loader: a 4-step ladder that ticks on
+// as fetch → decode → project → ready completes. The active step
+// pulses; completed steps lock into a solid check; upcoming steps are
+// muted.
+function ProgressStages({ stage }) {
+  return (
+    <div className='flex items-center gap-2 text-[11px] font-mono'>
+      {LOAD_STAGES.slice(0, 3).map((s, i) => {
+        const done = stage > i
+        const active = stage === i
+        return (
+          <div key={s.key} className='flex items-center gap-2'>
+            <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md border transition ${
+              done ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-200'
+                : active ? 'border-amber-400/60 bg-amber-400/10 text-amber-200'
+                : 'border-line bg-surface-elevated text-fg-muted'
+            }`}>
+              {done ? (
+                <CheckCircleFilled className='text-emerald-300' />
+              ) : active ? (
+                <motion.span
+                  animate={REDUCE_MOTION ? undefined : { rotate: 360 }}
+                  transition={{ duration: 1, ease: 'linear', repeat: Infinity }}
+                  className='inline-flex'
+                >
+                  <LoadingOutlined />
+                </motion.span>
+              ) : (
+                <span className='w-2.5 h-2.5 rounded-full bg-white/10' />
+              )}
+              <span className='font-bold'>{s.label}</span>
+            </div>
+            {i < 2 && (
+              <span className={`h-px w-4 ${done ? 'bg-emerald-400/40' : 'bg-white/10'}`} />
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── CommandPalette ─────────────────────────────────────────────
+// Cmd+K style city switcher. Big search input, recent + trending
+// pinned at the top when empty, fuzzy state+city search when typing,
+// keyboard nav (↑/↓ + Enter), Escape to close, click-outside to
+// close. Portalled to body so nothing behind stacks over it.
+function CommandPalette({ open, onClose, cities, recentCities, currentSlug, onPick }) {
+  const [q, setQ] = useState('')
+  const [hi, setHi] = useState(0)
+  const inputRef = useRef(null)
+
+  // Reset the input + highlight every time the palette opens so a stale
+  // query from a prior session doesn't leak in.
+  useEffect(() => {
+    if (open) {
+      setQ('')
+      setHi(0)
+      // Focus after paint so the input actually accepts keystrokes.
+      setTimeout(() => inputRef.current?.focus(), 20)
+    }
+  }, [open])
+
+  // Build the sectioned result list. Three sections when empty (recent,
+  // trending, all-cities); a single flat "results" section when the
+  // user starts typing. Sections are only visible for display — the
+  // flat `items` array underneath is what we index with ↑/↓ + Enter.
+  const { sections, items } = useMemo(() => {
+    const trimmed = (q || '').toLowerCase().trim()
+    const all = cities || []
+    if (!trimmed) {
+      const recentSlugs = new Set(recentCities.map((r) => r.slug))
+      const recentList = recentCities
+        .map((r) => all.find((c) => c.slug === r.slug))
+        .filter(Boolean)
+      const trending = TRENDING_SLUGS
+        .map((s) => all.find((c) => c.slug === s))
+        .filter((c) => c && !recentSlugs.has(c.slug))
+      // Group everything else by state so scrolling still feels
+      // structured even without a query.
+      const remainderSlugs = new Set([
+        ...recentList.map((c) => c.slug),
+        ...trending.map((c) => c.slug),
+      ])
+      const byState = new Map()
+      for (const c of all) {
+        if (remainderSlugs.has(c.slug)) continue
+        const st = c.state || 'Other'
+        if (!byState.has(st)) byState.set(st, [])
+        byState.get(st).push(c)
+      }
+      const groupedSections = [...byState.entries()]
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([state, cs]) => ({
+          label: state,
+          items: cs.slice().sort((a, b) => a.name.localeCompare(b.name)),
+        }))
+      const outSections = []
+      if (recentList.length) outSections.push({ label: 'Recent', icon: <HistoryOutlined />, items: recentList })
+      if (trending.length)   outSections.push({ label: 'Trending', icon: <ThunderboltFilled />, items: trending })
+      for (const g of groupedSections) outSections.push(g)
+      const flat = outSections.flatMap((s) => s.items)
+      return { sections: outSections, items: flat }
+    }
+    // Query mode — match on city name + state. State-name matches
+    // surface every city under that state as suggestions. Otherwise
+    // simple case-insensitive substring on the city name.
+    const cityMatches = []
+    const stateMatches = new Map()   // state → cities in that state
+    for (const c of all) {
+      const cName = (c.name || '').toLowerCase()
+      const sName = (c.state || '').toLowerCase()
+      if (cName.includes(trimmed)) cityMatches.push(c)
+      else if (sName.includes(trimmed)) {
+        if (!stateMatches.has(c.state)) stateMatches.set(c.state, [])
+        stateMatches.get(c.state).push(c)
+      }
+    }
+    const outSections = []
+    if (cityMatches.length) {
+      outSections.push({
+        label: `Cities matching "${q}"`,
+        items: cityMatches.slice(0, 20),
+      })
+    }
+    for (const [state, cs] of stateMatches.entries()) {
+      outSections.push({
+        label: state,
+        icon: <CompassOutlined />,
+        items: cs.slice().sort((a, b) => a.name.localeCompare(b.name)),
+      })
+    }
+    const flat = outSections.flatMap((s) => s.items)
+    return { sections: outSections, items: flat }
+  }, [q, cities, recentCities])
+
+  // Clamp the highlight cursor whenever the item list changes so
+  // deleting characters can't leave hi pointing past the end.
+  useEffect(() => {
+    if (hi >= items.length) setHi(Math.max(0, items.length - 1))
+  }, [items, hi])
+
+  const onKeyDown = (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); onClose(); return }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setHi((h) => Math.min(items.length - 1, h + 1)); return }
+    if (e.key === 'ArrowUp')   { e.preventDefault(); setHi((h) => Math.max(0, h - 1)); return }
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      const pick = items[hi]
+      if (pick) onPick(pick.slug)
+    }
+  }
+
+  if (!open || typeof document === 'undefined') return null
+
+  return createPortal(
+    <AnimatePresence>
+      <motion.div
+        key='pf-palette-backdrop'
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.18 }}
+        className='fixed inset-0 z-[3000] flex items-start sm:items-center justify-center px-3 pt-20 sm:pt-0 bg-black/70 backdrop-blur-md'
+        onClick={onClose}
+      >
+        <motion.div
+          initial={REDUCE_MOTION ? false : { opacity: 0, y: -12, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={REDUCE_MOTION ? { opacity: 0 } : { opacity: 0, y: -8, scale: 0.98 }}
+          transition={{ duration: 0.22, ease: 'easeOut' }}
+          onClick={(e) => e.stopPropagation()}
+          className='w-full max-w-xl rounded-xl border border-line bg-[#0a0a0e]/95 backdrop-blur shadow-2xl overflow-hidden'
+        >
+          {/* Search row */}
+          <div className='flex items-center gap-3 px-4 py-3 border-b border-line/60'>
+            <SearchOutlined className='text-amber-300 text-lg' />
+            <input
+              ref={inputRef}
+              value={q}
+              onChange={(e) => { setQ(e.target.value); setHi(0) }}
+              onKeyDown={onKeyDown}
+              placeholder='Search city or state…'
+              className='flex-1 bg-transparent border-none outline-none text-fg-primary text-base placeholder-fg-muted'
+            />
+            <kbd className='hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-line bg-black/40 text-[10px] font-mono text-fg-muted'>
+              esc
+            </kbd>
+          </div>
+          {/* Results list */}
+          <div className='max-h-[60vh] overflow-y-auto py-1'>
+            {items.length === 0 ? (
+              <div className='px-4 py-6 text-center text-[11px] font-mono text-fg-muted'>
+                No cities match "{q}".
+              </div>
+            ) : (
+              <PaletteSections
+                sections={sections}
+                hi={hi}
+                setHi={setHi}
+                onPick={onPick}
+                currentSlug={currentSlug}
+              />
+            )}
+          </div>
+          {/* Footer */}
+          <div className='flex items-center justify-between gap-2 px-4 py-2 border-t border-line/60 text-[10px] font-mono text-fg-muted bg-black/20'>
+            <span className='flex items-center gap-2'>
+              <span><kbd className='px-1 py-0.5 rounded border border-line bg-black/40 text-amber-300'>↑↓</kbd> navigate</span>
+              <span><kbd className='px-1 py-0.5 rounded border border-line bg-black/40 text-amber-300'>↵</kbd> select</span>
+              <span className='hidden sm:inline'><kbd className='px-1 py-0.5 rounded border border-line bg-black/40 text-amber-300'>esc</kbd> close</span>
+            </span>
+            <span>{items.length} {items.length === 1 ? 'match' : 'matches'}</span>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>,
+    document.body,
+  )
+}
+
+// Sub-component so we can walk sections while maintaining a single flat
+// `hi` index across every visible item.
+function PaletteSections({ sections, hi, setHi, onPick, currentSlug }) {
+  const listRef = useRef(null)
+
+  // Scroll the highlighted row into view when the cursor moves.
+  useEffect(() => {
+    const el = listRef.current?.querySelector(`[data-idx='${hi}']`)
+    if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' })
+  }, [hi])
+
+  let flatIndex = 0
+  return (
+    <div ref={listRef}>
+      {sections.map((sec, si) => (
+        <div key={`${sec.label}-${si}`}>
+          <div className='px-4 pt-2 pb-1 text-[10px] font-mono uppercase tracking-widest text-fg-muted flex items-center gap-1.5'>
+            {sec.icon}
+            {sec.label}
+          </div>
+          {sec.items.map((c) => {
+            const idx = flatIndex++
+            const active = idx === hi
+            const current = c.slug === currentSlug
+            return (
+              <button
+                key={c.slug}
+                type='button'
+                data-idx={idx}
+                onMouseEnter={() => setHi(idx)}
+                onMouseDown={(e) => { e.preventDefault(); onPick(c.slug) }}
+                className={`w-full text-left px-4 py-2 flex items-center gap-3 transition ${
+                  active ? 'bg-amber-400/10' : 'hover:bg-white/[0.03]'
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${current ? 'bg-amber-300' : 'bg-white/20'}`} />
+                <span className='flex-1 min-w-0'>
+                  <span className='block text-sm text-fg-primary truncate'>
+                    {c.name}
+                    {current && (
+                      <span className='ml-2 text-[10px] font-mono text-amber-300/80 uppercase'>· loaded</span>
+                    )}
+                  </span>
+                  <span className='block text-[11px] text-fg-muted truncate font-mono'>
+                    {c.state || '—'}
+                  </span>
+                </span>
+                {active && (
+                  <span className='text-[10px] font-mono text-amber-300'>↵</span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      ))}
+    </div>
   )
 }
