@@ -3191,22 +3191,55 @@ function ComposerRow({
 // cinema, generic building) were added Sep 2026 when the BE places
 // index was widened beyond suburbs + landmarks.
 const KIND_ICON = {
-  landmark:       '📍',
-  suburb:         '🏘️',
-  neighbourhood:  '🏙️',
-  quarter:        '🏙️',
-  square:         '⛲',
-  town:           '🏛️',
-  village:        '🏡',
-  hospital:       '🏥',
-  school:         '🏫',
-  university:     '🎓',
-  mall:           '🛍️',
-  office:         '🏢',
-  library:        '📚',
-  theatre:        '🎭',
-  cinema:         '🎭',
-  building:       '🏗️',
+  // Places
+  landmark: '📍', suburb: '🏘️', neighbourhood: '🏙️', quarter: '🏙️',
+  square: '⛲', town: '🏛️', village: '🏡', hamlet: '🏡',
+  city_block: '🏙️', locality: '🏘️',
+  // Buildings + offices
+  building: '🏗️', office: '🏢',
+  // Health
+  hospital: '🏥', pharmacy: '💊', veterinary: '🐾',
+  // Education
+  school: '🏫', university: '🎓', kindergarten: '🎨', library: '📚',
+  // Culture / entertainment
+  museum: '🏛️', gallery: '🖼️', theatre: '🎭', cinema: '🎬',
+  arts_centre: '🎨', casino: '🎰', nightclub: '🪩', venue: '🎤',
+  entertainment: '🎉', artwork: '🖼️',
+  // Food + drink
+  restaurant: '🍽️', cafe: '☕', fast_food: '🍔', bar: '🍸',
+  food_court: '🍱', ice_cream: '🍨',
+  // Shopping
+  mall: '🛍️', supermarket: '🛒', clothing: '👕', electronics: '💻',
+  grocery: '🥬', bookshop: '📖', alcohol: '🍷', sports_shop: '⚽',
+  hardware: '🔨', auto_shop: '🚗', beauty: '💄', shop: '🛒',
+  // Finance
+  bank: '🏦', atm: '💳',
+  // Transport
+  fuel: '⛽', charging_station: '🔌', bus_station: '🚌', taxi: '🚕',
+  parking: '🅿️', ferry_terminal: '⛴️', transport_service: '🛻',
+  airport: '✈️', heliport: '🚁', train_station: '🚉',
+  tram_stop: '🚊', metro: '🚇',
+  // Hospitality
+  hotel: '🏨', camp_site: '⛺',
+  // Fitness + wellness
+  gym: '💪', spa: '🧖', pool: '🏊', sports_centre: '🏟️',
+  stadium: '🏟️', ice_rink: '⛸️', golf: '⛳', marina: '⛵',
+  // Nature + outdoors
+  park: '🌳', playground: '🛝', beach: '🏖️', viewpoint: '👀',
+  zoo: '🦁', theme_park: '🎢', aquarium: '🐠', leisure: '🎯',
+  // Public services
+  police: '👮', fire_station: '🚒', post_office: '📮',
+  courthouse: '⚖️', townhall: '🏛️', embassy: '🏛️',
+  community_centre: '🤝', marketplace: '🏪', place_of_worship: '⛪',
+  childcare: '👶', social_facility: '🤲', shelter: '🏠',
+  // Workspace
+  coworking: '💼',
+  // Historic
+  castle: '🏰', monument: '🗿', ruins: '🏛️', manor: '🏛️',
+  historic: '🏺',
+  // Utilities / landmarks
+  lighthouse: '🗼', tower: '🗼', bridge: '🌉', windmill: '🌬️',
+  observatory: '🔭', fountain: '⛲', clock: '🕰️', information: 'ℹ️',
 }
 function iconForKind(k) { return KIND_ICON[k] || '📌' }
 
