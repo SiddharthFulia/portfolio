@@ -196,7 +196,12 @@ export default function AgentsTab() {
   // Model selector — persisted separately from the thread so switching
   // models mid-conversation doesn't burn the whole history.
   const [model, setModel] = useState(() => {
-    try { return localStorage.getItem(MODEL_KEY) || MODELS[0].value } catch { return MODELS[0].value }
+    try {
+      const saved = localStorage.getItem(MODEL_KEY)
+      // Groq deprecated Llama 3.x — coerce any stale saved id to a valid one.
+      const valid = MODELS.some(m => m.value === saved)
+      return valid ? saved : MODELS[0].value
+    } catch { return MODELS[0].value }
   })
   useEffect(() => { try { localStorage.setItem(MODEL_KEY, model) } catch {} }, [model])
 
