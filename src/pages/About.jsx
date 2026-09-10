@@ -220,48 +220,83 @@ const About = () => {
         {/* ── Flagship hero — recruiter dwell-time peaks here, so this is the keep-them-scrolling moment. ── */}
         <motion.div initial="hidden" animate="show" variants={fadeUp}>
           <p className="eyebrow-mono">About</p>
-          <h1 className="gradient-text-amber luxe-section-title text-4xl sm:text-5xl md:text-6xl mt-3 leading-[1.05]">
-            Engineer · creator · builder
+          <h1 className="gradient-text-amber luxe-section-title font-bold text-4xl sm:text-5xl md:text-6xl mt-3 leading-[1.05]">
+            Engineer at an AI-agent platform
           </h1>
 
-          {/* Status pill — gives recruiters an at-a-glance signal. */}
-          <div className="mt-5 inline-flex items-center gap-2 px-3 py-1.5 rounded-full
-                          bg-surface-elevated/60 backdrop-blur-sm border border-line">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-emerald opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-accent-emerald" />
-            </span>
-            <span className="text-xs font-medium text-fg-secondary">Open to senior engineering roles · Mumbai / Remote</span>
+          {/* Currently-at strip — replaces the generic status pill so the first
+              thing recruiters see is the actual day job, not a marketing line. */}
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full
+                            bg-surface-elevated/60 backdrop-blur-sm border border-line">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-emerald opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-accent-emerald" />
+              </span>
+              <span className="text-xs font-medium text-fg-secondary">
+                Currently at{" "}
+                <a href="https://getpassionfruit.com" target="_blank" rel="noreferrer"
+                   className="text-accent-amber hover:text-amber-200 underline-offset-4 hover:underline font-semibold">
+                  Passionfruit
+                </a>{" "}
+                · Founding Engineer · Remote (NY)
+              </span>
+            </div>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full
+                            bg-surface-elevated/40 backdrop-blur-sm border border-line">
+              <span className="text-xs font-medium text-fg-muted">Based in Mumbai</span>
+            </div>
           </div>
 
+          {/* Day-job narrative — what Passionfruit actually is, what he builds there. */}
           <p className="mt-5 max-w-2xl leading-relaxed text-fg-secondary text-base">
-            Founding Engineer & ML Researcher based in Mumbai, India. I build scalable
-            full-stack products and AI-driven systems — from 100+ REST APIs at{" "}
-            <a href="https://www.linkedin.com/company/getpassionfruit/posts/?feedView=all"
-               target="_blank" rel="noreferrer"
-               className="text-accent-amber hover:text-amber-200 underline-offset-4 hover:underline font-medium">
-              Passionfruit (NY)
-            </a>{" "}
-            to graph neural networks for blockchain phishing detection at{" "}
+            I'm a Founding Engineer at{" "}
+            <a href="https://getpassionfruit.com" target="_blank" rel="noreferrer"
+               className="text-accent-amber hover:text-amber-200 underline-offset-4 hover:underline font-semibold">
+              Passionfruit
+            </a>
+            , an AI-agent platform that turns prompts into deployable agents. We ship two
+            products on the same stack: <span className="text-fg-primary font-medium">Getoz</span>,
+            where teams build, version, and publish AI agents from natural language, and{" "}
+            <span className="text-fg-primary font-medium">Tryworkflows</span>, an ops
+            layer that runs SEO agencies on top of those agents. My work spans the backend
+            that powers it — 100+ REST APIs, GSC + GA4 pipelines across 200+ sites,
+            RabbitMQ workers processing 10K+ jobs/day, and the data plane feeding the
+            agent runtime.
+          </p>
+
+          {/* Before-that + portfolio-context paragraph — separates day job from side work. */}
+          <p className="mt-4 max-w-2xl leading-relaxed text-fg-secondary text-base">
+            Before Passionfruit I was an ML Research Intern at{" "}
             <a href="https://www.iitp.ac.in" target="_blank" rel="noreferrer"
                className="text-accent-amber hover:text-amber-200 underline-offset-4 hover:underline font-medium">
               IIT Patna
-            </a>.{" "}
-            B.Tech CE from DJS College (CGPA 9.1), 3 research publications, Meta Hacker Cup 2025{" "}
+            </a>{" "}
+            working on graph neural networks for Ethereum phishing detection. B.Tech in
+            Computer Engineering from DJS College (CGPA 9.1), 3 research publications, and{" "}
             <a href="https://www.linkedin.com/posts/siddharth-fulia_metahackercup2025-top200-round3-activity-7432281275920728066-5b8P?utm_source=share&utm_medium=member_desktop&rcm=ACoAADbS-ywBYuwbaIFL7brrtMs_7hHq9KiB_bw"
                target="_blank" rel="noreferrer"
                className="text-accent-amber hover:text-amber-200 underline-offset-4 hover:underline font-medium">
-              Global Rank 186
-            </a>, and CodeChef 5★ (2114 rating).
+              Meta Hacker Cup 2025 Global Rank 186
+            </a>.
+          </p>
+
+          {/* Proof-of-work callout — the site itself is a portfolio, not the day job. */}
+          <p className="mt-4 max-w-2xl leading-relaxed text-fg-muted text-sm">
+            <span className="text-fg-secondary font-medium">About this site:</span>{" "}
+            Everything below — the physics sims, real-time WebGL, WebAssembly chess
+            engine, hand-tracking demos, ML pipelines, and 30+ interactive tools — is a
+            proof-of-work showcase I build in my own time. It's not what I ship at
+            Passionfruit; it's the surface area where I stretch beyond it.
           </p>
 
           {/* ── Stat strip — recruiter-readable proof points at a glance. ── */}
           <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
             {[
               { value: '100+',  label: 'REST APIs shipped',  accent: 'text-accent-amber' },
-              { value: '3',     label: 'Publications',       accent: 'text-accent-rose' },
-              { value: '186',   label: 'Hacker Cup global',  accent: 'text-accent-fuchsia' },
-              { value: '5★',    label: 'CodeChef · 2114',    accent: 'text-accent-cyan' },
+              { value: '10K+',  label: 'Jobs / day',         accent: 'text-accent-rose' },
+              { value: '200+',  label: 'GSC / GA4 sites',    accent: 'text-accent-fuchsia' },
+              { value: '186',   label: 'Hacker Cup global',  accent: 'text-accent-cyan' },
             ].map((s) => (
               <div key={s.label}
                    className="luxe-card p-5 sm:p-6 flex flex-col gap-1 transition-transform hover:-translate-y-0.5">

@@ -226,7 +226,7 @@ const Navbar = () => {
                   ? 'text-gray-300 hover:text-white bg-gray-800/60 border-gray-700 hover:border-amber-400/40 hover:bg-gray-800'
                   : 'text-gray-600 hover:text-black bg-gray-100 border-gray-200 hover:bg-gray-200'
             }`}>
-            The Playground
+            Workbench
             <svg className={`w-3 h-3 transition-transform ${moreOpen ? 'rotate-180' : 'group-hover:translate-y-0.5'}`}
               fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
