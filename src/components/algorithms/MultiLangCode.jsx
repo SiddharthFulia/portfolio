@@ -1,151 +1,88 @@
-// MultiLangCode — one algorithm, six views + a Run button.
+// MultiLangCode — one algorithm, six views, a real Monaco IDE.
 //
-// Same idea as PseudocodeBlock (line-numbered, syntax-tinted, active-line
-// highlight, header chip) but with a segmented tab bar across the top for
-// Pseudocode / C / C++ / Python / Java / Rust. The last-picked language is
-// persisted in sessionStorage so users don't re-pick on every topic.
-//
-// Runnable languages (C, C++, Python, Java, Rust) get a Run button that
-// hits the BE's sandboxed exec proxy. Pseudocode shows a disabled Run
-// button with a "pick a real language" tooltip. Every run result is
-// cached in sessionStorage keyed by (topic slug + language) so switching
-// tabs doesn't lose the output.
+// Segmented tab bar across the top: Pseudocode / C / C++ / Python /
+// Java / Rust. Each tab loads a Monaco editor (lazy-loaded — the
+// ~500KB Monaco chunk only ships to `/algorithms/*` visitors) with:
+//   - Editable source code (persisted per-topic-per-language)
+//   - 8 hand-picked themes (default VS Code Dark+)
+//   - Export to disk with the right extension
+//   - Reset to the canonical implementation
+//   - Auto-run toggle (debounced 800ms) with in-flight abort
+//   - Runnable languages fire the same sandboxed exec API as before
 //
 // Props:
 //   title        — panel title (bold)
 //   active       — legacy prop, forwarded to activeLines.pseudo if that
-//                  slot isn't explicitly set (keeps parity with the old
-//                  PseudocodeBlock signature)
+//                  slot isn't explicitly set
 //   code         — { pseudo, c, cpp, python, java, rust } — strings, one
 //                  language per key. Missing keys just skip that tab.
 //   activeLines  — { pseudo?, c?, cpp?, python?, java?, rust? } — 0-indexed
-//                  line to highlight per language. Omit a key → no highlight.
+//                  line to highlight per language (only used when the
+//                  editor value matches the canonical source — otherwise
+//                  the user is editing and highlighting the wrong line
+//                  would be misleading).
 //   comments     — optional footer legend
 //   className    — extra classes on the outer card
 //   runnable     — bool (default true). Set false on read-only pages
-//                  (Learn tutorials, etc.) to hide the Run controls.
+//                  (Learn tutorials, etc.) to hide the Run + editor
+//                  controls; falls back to a read-only Monaco view.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Tooltip } from 'antd'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Tooltip, Switch } from 'antd'
 import { Button } from '../ui'
 import { runCode } from '../../api/codeRun'
+import { THEMES, DEFAULT_THEME_ID } from './monacoThemes'
+
+// Monaco is heavy (~500KB gzipped) — code-split it out of the main
+// bundle. Only algorithms-page visitors download this chunk.
+const MonacoEditorPanel = lazy(() => import('./MonacoEditorPanel'))
+
+// Analyze tab (step-through debugger) — Pyodide + js-interpreter are
+// both CDN-loaded on first Trace click, so this chunk stays tiny and
+// out of the main graph.
+const Analyze = lazy(() => import('./Analyze'))
+
+// Languages the Analyze tab supports in-browser today. Python via
+// Pyodide, JavaScript via NeilFraser/JS-Interpreter (ES5). C / C++ /
+// Java / Rust would need a GDB backend — the tab still opens on those,
+// but shows a "coming soon" panel.
+const ANALYZE_SUPPORTED = new Set(['python', 'js', 'javascript'])
 
 const TABS = [
-  { key: 'pseudo', label: 'Pseudocode', name: 'pseudocode' },
-  { key: 'c',      label: 'C',          name: 'c' },
-  { key: 'cpp',    label: 'C++',        name: 'cpp' },
-  { key: 'python', label: 'Python',     name: 'python' },
-  { key: 'java',   label: 'Java',       name: 'java' },
-  { key: 'rust',   label: 'Rust',       name: 'rust' },
+  { key: 'pseudo', label: 'Pseudocode', name: 'pseudocode', monacoLang: 'plaintext', ext: 'txt' },
+  { key: 'c',      label: 'C',          name: 'c',          monacoLang: 'c',         ext: 'c'   },
+  { key: 'cpp',    label: 'C++',        name: 'cpp',        monacoLang: 'cpp',       ext: 'cpp' },
+  { key: 'python', label: 'Python',     name: 'python',     monacoLang: 'python',    ext: 'py'  },
+  { key: 'java',   label: 'Java',       name: 'java',       monacoLang: 'java',      ext: 'java'},
+  { key: 'rust',   label: 'Rust',       name: 'rust',       monacoLang: 'rust',      ext: 'rs'  },
 ]
 
 // Languages the sandbox will actually compile + run. `pseudo` is
 // documentation — the Run button stays disabled + shows a tooltip.
 const RUNNABLE = new Set(['c', 'cpp', 'python', 'java', 'rust'])
 
-// A per-language keyword set. Kept small — enough to make the tab feel like
-// code without pulling in Prism or highlight.js. Any identifier that's not
-// a keyword and not a string / number falls through to plain text.
-const KEYWORDS = {
-  pseudo: new Set([
-    'if', 'else', 'elif', 'while', 'for', 'do', 'to', 'in', 'and', 'or', 'not',
-    'return', 'yield', 'break', 'continue', 'pass', 'true', 'false', 'null', 'nil',
-    'function', 'def', 'let', 'var', 'const', 'int', 'float', 'bool', 'string',
-    'push', 'pop', 'peek', 'enqueue', 'dequeue', 'insert', 'delete', 'search',
-    'begin', 'end', 'then', 'until', 'repeat', 'foreach', 'each', 'of', 'mod',
-  ]),
-  c: new Set([
-    'int', 'char', 'void', 'return', 'if', 'else', 'while', 'for', 'do',
-    'struct', 'typedef', 'static', 'const', 'unsigned', 'long', 'short',
-    'sizeof', 'break', 'continue', 'NULL', 'true', 'false', 'switch', 'case',
-    'default', 'malloc', 'free', 'include', 'printf', 'scanf',
-  ]),
-  cpp: new Set([
-    'int', 'char', 'void', 'bool', 'auto', 'return', 'if', 'else', 'while', 'for',
-    'do', 'struct', 'class', 'public', 'private', 'protected', 'template',
-    'typename', 'const', 'static', 'namespace', 'using', 'std', 'nullptr',
-    'true', 'false', 'new', 'delete', 'this', 'virtual', 'override', 'break',
-    'continue', 'switch', 'case', 'default', 'include', 'sizeof',
-  ]),
-  python: new Set([
-    'def', 'return', 'if', 'elif', 'else', 'while', 'for', 'in', 'not', 'and',
-    'or', 'is', 'True', 'False', 'None', 'class', 'self', 'from', 'import',
-    'as', 'try', 'except', 'raise', 'with', 'lambda', 'yield', 'pass', 'break',
-    'continue', 'global', 'nonlocal',
-  ]),
-  java: new Set([
-    'public', 'private', 'protected', 'class', 'interface', 'extends', 'implements',
-    'static', 'final', 'void', 'int', 'long', 'short', 'byte', 'char', 'boolean',
-    'double', 'float', 'String', 'return', 'if', 'else', 'while', 'for', 'do',
-    'new', 'this', 'super', 'null', 'true', 'false', 'try', 'catch', 'throw',
-    'throws', 'import', 'package', 'break', 'continue', 'switch', 'case', 'default',
-  ]),
-  rust: new Set([
-    'fn', 'let', 'mut', 'pub', 'struct', 'impl', 'enum', 'trait', 'for', 'while',
-    'loop', 'if', 'else', 'match', 'return', 'break', 'continue', 'ref', 'as',
-    'in', 'move', 'self', 'Self', 'true', 'false', 'None', 'Some', 'Ok', 'Err',
-    'use', 'crate', 'mod', 'i32', 'i64', 'u32', 'u64', 'usize', 'isize', 'f32',
-    'f64', 'bool', 'str', 'String', 'Vec', 'Box', 'Option', 'Result', 'where',
-    'type', 'const', 'static', 'unsafe',
-  ]),
-}
+const LANG_STORE_KEY = 'algo-lang'
+const THEME_STORE_KEY = 'algo-monaco-theme'
 
-const COMMENT_STARTS = {
-  pseudo: ['//', '#'],
-  c: ['//', '/*'],
-  cpp: ['//', '/*'],
-  python: ['#'],
-  java: ['//', '/*'],
-  rust: ['//'],
-}
-
-function tint(text, lang) {
-  const kw = KEYWORDS[lang] || KEYWORDS.pseudo
-  const starts = COMMENT_STARTS[lang] || ['//']
-  // Whole-line comment? Fast path — colour the entire line grey/italic.
-  const trimmed = text.trimStart()
-  for (const s of starts) {
-    if (trimmed.startsWith(s)) {
-      return <span className="text-gray-500 italic">{text}</span>
-    }
-  }
-  const parts = text.split(/("[^"]*"|'[^']*'|\/\/[^\n]*|#[^\n]*|\b\d+(?:\.\d+)?\b|[A-Za-z_][A-Za-z0-9_]*|[<>=!+\-*/%&|^]+)/g)
-  return parts.map((p, i) => {
-    if (!p) return null
-    if (p.startsWith('//') || (lang === 'python' && p.startsWith('#'))) {
-      return <span key={i} className="text-gray-500 italic">{p}</span>
-    }
-    if (p.startsWith('"') || p.startsWith("'")) {
-      return <span key={i} className="text-emerald-300">{p}</span>
-    }
-    if (/^\d+(\.\d+)?$/.test(p)) {
-      return <span key={i} className="text-fuchsia-300">{p}</span>
-    }
-    if (/^[A-Za-z_]/.test(p)) {
-      if (kw.has(p)) return <span key={i} className="text-amber-300 font-semibold">{p}</span>
-      return <span key={i} className="text-gray-100">{p}</span>
-    }
-    if (/^[<>=!+\-*/%&|^]+$/.test(p)) {
-      return <span key={i} className="text-amber-200">{p}</span>
-    }
-    return <span key={i}>{p}</span>
-  })
-}
-
-const STORE_KEY = 'algo-lang'
 function readStoredLang() {
   try {
     if (typeof window === 'undefined') return 'pseudo'
-    const v = window.sessionStorage?.getItem(STORE_KEY)
+    const v = window.sessionStorage?.getItem(LANG_STORE_KEY)
     return TABS.some(t => t.key === v) ? v : 'pseudo'
   } catch { return 'pseudo' }
+}
+
+function readStoredTheme() {
+  try {
+    if (typeof window === 'undefined') return DEFAULT_THEME_ID
+    const v = window.localStorage?.getItem(THEME_STORE_KEY)
+    return THEMES.some(t => t.id === v) ? v : DEFAULT_THEME_ID
+  } catch { return DEFAULT_THEME_ID }
 }
 
 // Best-effort topic slug — the URL for every algorithms page is
 // `/algorithms/<slug>` so we can lift it straight off window.location.
 // Falls back to `general` for anywhere else the component is used.
-// Used to key sessionStorage entries so switching between topics keeps
-// each topic's last output separately.
 function currentTopicSlug() {
   try {
     if (typeof window === 'undefined') return 'general'
@@ -156,10 +93,23 @@ function currentTopicSlug() {
   } catch { return 'general' }
 }
 
-function runCacheKey(topic, lang) {
-  return `algo.run.${topic}.${lang}`
+// ─── localStorage: per-topic-per-language code drafts ─────────────
+function codeKey(topic, lang) { return `algo.code.${topic}.${lang}` }
+function readSavedCode(topic, lang) {
+  try { return window.localStorage?.getItem(codeKey(topic, lang)) ?? null }
+  catch { return null }
+}
+function writeSavedCode(topic, lang, value) {
+  try { window.localStorage?.setItem(codeKey(topic, lang), value) }
+  catch { /* private mode or quota */ }
+}
+function clearSavedCode(topic, lang) {
+  try { window.localStorage?.removeItem(codeKey(topic, lang)) }
+  catch { /* ignore */ }
 }
 
+// ─── sessionStorage: cached run results ─────────────────────────
+function runCacheKey(topic, lang) { return `algo.run.${topic}.${lang}` }
 function readCachedRun(topic, lang) {
   try {
     const raw = window.sessionStorage?.getItem(runCacheKey(topic, lang))
@@ -169,16 +119,11 @@ function readCachedRun(topic, lang) {
     return null
   } catch { return null }
 }
-
 function writeCachedRun(topic, lang, payload) {
-  try {
-    window.sessionStorage?.setItem(runCacheKey(topic, lang), JSON.stringify(payload))
-  } catch { /* private mode or quota */ }
+  try { window.sessionStorage?.setItem(runCacheKey(topic, lang), JSON.stringify(payload)) }
+  catch { /* private mode or quota */ }
 }
 
-// Human-friendly summary line for the "Info" panel. `payload.limits` is
-// present on server runs but missing on cache-only reads — we defensively
-// stringify each field.
 function infoLine(payload) {
   if (!payload) return ''
   const bits = []
@@ -195,11 +140,9 @@ function infoLine(payload) {
 const RUN_TABS = [
   { key: 'stdout', label: 'Stdout' },
   { key: 'stderr', label: 'Stderr' },
-  { key: 'info',   label: 'Info' },
+  { key: 'info',   label: 'Info'   },
 ]
 
-// Detect the user's reduced-motion preference so we don't spin an
-// endless loader on top of the accessibility contract.
 function prefersReducedMotion() {
   try {
     return typeof window !== 'undefined'
@@ -208,14 +151,39 @@ function prefersReducedMotion() {
   } catch { return false }
 }
 
+function isMobileViewport() {
+  try {
+    return typeof window !== 'undefined'
+      && window.matchMedia
+      && window.matchMedia('(max-width: 767px)').matches
+  } catch { return false }
+}
+
+// Trigger a browser download of the given text as a file.
+function downloadTextFile(filename, text) {
+  try {
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.rel = 'noopener'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 500)
+  } catch { /* ignore */ }
+}
+
 export default function MultiLangCode({
   title = 'Implementation',
-  active = null,       // legacy prop → maps to activeLines.pseudo
+  active = null,       // legacy → maps to activeLines.pseudo
   code = {},
   activeLines = {},
   comments,
   className = '',
   runnable = true,
+  samples = null,      // optional [{ name, description, stdin, expected }]
 }) {
   const available = TABS.filter(t => typeof code[t.key] === 'string' && code[t.key].length > 0)
   const fallback = available[0]?.key || 'pseudo'
@@ -223,27 +191,65 @@ export default function MultiLangCode({
     const stored = readStoredLang()
     return available.some(t => t.key === stored) ? stored : fallback
   })
+  const [theme, setTheme] = useState(() => readStoredTheme())
   const [copied, setCopied] = useState(false)
 
-  // Run state — the last result payload, an in-flight phase label,
-  // an elapsed-ms counter for the "compiling…" / "running…" UI, the
-  // output panel tab (stdout | stderr | info), and the stdin box.
   const topic = useMemo(() => currentTopicSlug(), [])
+  const reducedMotion = useMemo(() => prefersReducedMotion(), [])
+  const [mobile, setMobile] = useState(() => isMobileViewport())
+
+  // Canonical (reference implementation) source for the current tab —
+  // used as the baseline for Reset and as the initial value when there
+  // is no saved draft.
+  const canonical = code[lang] || ''
+
+  // The editor's current value. Seeded from localStorage first, falling
+  // back to canonical.
+  const [source, setSource] = useState(() => {
+    const saved = readSavedCode(topic, lang)
+    return saved != null ? saved : canonical
+  })
+
+  // Run state
   const [runResult, setRunResult] = useState(() => readCachedRun(topic, lang))
-  const [runPhase, setRunPhase] = useState('idle')     // 'idle' | 'compiling' | 'running'
+  const [runPhase, setRunPhase] = useState('idle')     // 'idle' | 'compiling' | 'running' | 'auto'
   const [runElapsed, setRunElapsed] = useState(0)
   const [runTab, setRunTab] = useState('stdout')
   const [stdin, setStdin] = useState('')
   const [showStdin, setShowStdin] = useState(false)
+  const [autoRun, setAutoRun] = useState(false)
+  const [activeSample, setActiveSample] = useState(null)
   const runTimerRef = useRef(null)
-  const reducedMotion = useMemo(() => prefersReducedMotion(), [])
+  const abortRef = useRef(null)
+  const saveDebounceRef = useRef(null)
+  const autoRunDebounceRef = useRef(null)
 
-  // Re-hydrate the cached run when the language tab changes.
+  // Analyze mode — swaps the Monaco editor + Run panels for the
+  // step-through debugger. Stays off by default (opt-in on click).
+  const [analyzeOn, setAnalyzeOn] = useState(false)
+
+  // ─── viewport tracking (for auto-disabling auto-run on mobile) ──
+  useEffect(() => {
+    const mq = window.matchMedia?.('(max-width: 767px)')
+    if (!mq) return
+    const on = () => setMobile(mq.matches)
+    on()
+    mq.addEventListener?.('change', on)
+    return () => mq.removeEventListener?.('change', on)
+  }, [])
+
+  // ─── re-hydrate cached run + saved source when lang / topic flips
   useEffect(() => {
     setRunResult(readCachedRun(topic, lang))
     setRunPhase('idle')
     setRunElapsed(0)
     setRunTab('stdout')
+    const saved = readSavedCode(topic, lang)
+    setSource(saved != null ? saved : (code[lang] || ''))
+  // Intentionally exclude `code` — it's a fresh object literal on every
+  // parent render, so including it would clobber the user's edits with
+  // canonical on every keystroke elsewhere on the page.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topic, lang])
 
   useEffect(() => {
@@ -251,27 +257,30 @@ export default function MultiLangCode({
   }, [available, lang, fallback])
 
   useEffect(() => {
-    try { window.sessionStorage?.setItem(STORE_KEY, lang) } catch { /* private mode */ }
+    try { window.sessionStorage?.setItem(LANG_STORE_KEY, lang) } catch { /* ignore */ }
   }, [lang])
 
-  const src = code[lang] || ''
-  const lines = useMemo(() => src.replace(/\t/g, '  ').split('\n'), [src])
+  useEffect(() => {
+    try { window.localStorage?.setItem(THEME_STORE_KEY, theme) } catch { /* ignore */ }
+  }, [theme])
 
-  // active-line resolution: explicit activeLines[lang] wins, else fall back
-  // to the legacy `active` prop when the tab is pseudocode.
+  // active-line resolution: only meaningful when the user hasn't diverged
+  // from the canonical source (otherwise "line 12" points at a different
+  // instruction after edits).
   const activeIdx = useMemo(() => {
+    if (source !== canonical) return -1
     if (activeLines && typeof activeLines[lang] === 'number') return activeLines[lang]
     if (lang === 'pseudo' && typeof active === 'number') return active
     return -1
-  }, [activeLines, lang, active])
+  }, [source, canonical, activeLines, lang, active])
 
   const onCopy = useCallback(async () => {
     try {
       if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(src)
+        await navigator.clipboard.writeText(source)
       } else {
         const ta = document.createElement('textarea')
-        ta.value = src
+        ta.value = source
         ta.style.position = 'fixed'
         ta.style.opacity = '0'
         document.body.appendChild(ta)
@@ -282,32 +291,38 @@ export default function MultiLangCode({
       setCopied(true)
       setTimeout(() => setCopied(false), 1400)
     } catch { /* clipboard blocked */ }
-  }, [src])
+  }, [source])
 
-  const isRunnable = runnable && RUNNABLE.has(lang) && src.trim().length > 0
+  const isRunnable = runnable && RUNNABLE.has(lang) && source.trim().length > 0
 
-  // Fire the run. We flip through 'compiling' → 'running' phases so the
-  // button label reflects roughly what the sandbox is doing (there's no
-  // real signal from upstream, but users see feedback within 300 ms of
-  // clicking rather than a static spinner for 2-5 s).
-  const onRun = useCallback(async () => {
-    if (!isRunnable || runPhase !== 'idle') return
-    setRunPhase('compiling')
+  // Core run function — used by both the Run button and auto-run. The
+  // `silent` flag lets auto-run avoid stealing the output-tab focus.
+  const doRun = useCallback(async ({ silent = false } = {}) => {
+    if (!isRunnable) return
+    // Cancel any in-flight run first (auto-run rapid-fire case).
+    if (abortRef.current) {
+      try { abortRef.current.abort() } catch { /* ignore */ }
+    }
+    const ctrl = new AbortController()
+    abortRef.current = ctrl
+
+    setRunPhase(silent ? 'auto' : 'compiling')
     setRunElapsed(0)
-    setRunTab('stdout')
+    if (!silent) setRunTab('stdout')
     const started = Date.now()
-    // Elapsed timer — 100 ms tick so the "0.4s" counter feels responsive.
+
     if (runTimerRef.current) clearInterval(runTimerRef.current)
     runTimerRef.current = setInterval(() => {
       const ms = Date.now() - started
       setRunElapsed(ms)
-      // Once we're past ~800 ms the compile step is almost certainly
-      // done, so we swap the label to "running". Pure UX signal.
-      setRunPhase(prev => (prev === 'compiling' && ms > 800 ? 'running' : prev))
+      if (!silent) {
+        setRunPhase(prev => (prev === 'compiling' && ms > 800 ? 'running' : prev))
+      }
     }, 100)
 
     try {
-      const { data, error } = await runCode({ language: lang, code: src, stdin })
+      const { data, error } = await runCode({ language: lang, code: source, stdin, signal: ctrl.signal })
+      if (ctrl.signal.aborted) return
       const payload = data || {
         stdout: '',
         stderr: error || 'Run failed.',
@@ -319,23 +334,83 @@ export default function MultiLangCode({
       }
       setRunResult(payload)
       writeCachedRun(topic, lang, payload)
-      // Auto-focus the tab most likely to be useful.
-      if (payload.exit_code === 0 && payload.stdout) setRunTab('stdout')
-      else if (payload.stderr || payload.compile_output) setRunTab('stderr')
-      else setRunTab('info')
+      if (!silent) {
+        if (payload.exit_code === 0 && payload.stdout) setRunTab('stdout')
+        else if (payload.stderr || payload.compile_output) setRunTab('stderr')
+        else setRunTab('info')
+      }
     } finally {
       if (runTimerRef.current) { clearInterval(runTimerRef.current); runTimerRef.current = null }
       setRunPhase('idle')
+      if (abortRef.current === ctrl) abortRef.current = null
     }
-  }, [isRunnable, runPhase, lang, src, stdin, topic])
+  }, [isRunnable, lang, source, stdin, topic])
 
-  // Stop the timer if the component unmounts mid-run.
+  const onRun = useCallback(() => {
+    if (runPhase !== 'idle') return
+    doRun({ silent: false })
+  }, [doRun, runPhase])
+
+  // ─── debounced localStorage save on every edit ────────────────
+  useEffect(() => {
+    if (saveDebounceRef.current) clearTimeout(saveDebounceRef.current)
+    saveDebounceRef.current = setTimeout(() => {
+      // Only persist a draft when it diverges from the canonical value.
+      if (source === canonical) clearSavedCode(topic, lang)
+      else writeSavedCode(topic, lang, source)
+    }, 500)
+    return () => {
+      if (saveDebounceRef.current) clearTimeout(saveDebounceRef.current)
+    }
+  }, [source, canonical, topic, lang])
+
+  // ─── auto-run: debounce 800ms after keystrokes, abort in-flight ─
+  useEffect(() => {
+    if (!autoRun || !isRunnable || mobile) return
+    if (autoRunDebounceRef.current) clearTimeout(autoRunDebounceRef.current)
+    autoRunDebounceRef.current = setTimeout(() => {
+      doRun({ silent: true })
+    }, 800)
+    return () => {
+      if (autoRunDebounceRef.current) clearTimeout(autoRunDebounceRef.current)
+    }
+  // Intentionally reacts to source / stdin / autoRun / lang. Rebuilding
+  // the timer on every render is exactly the debounce behaviour we want.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [source, stdin, autoRun, isRunnable, mobile, lang])
+
+  // Auto-disable auto-run when the viewport goes mobile.
+  useEffect(() => {
+    if (mobile && autoRun) setAutoRun(false)
+  }, [mobile, autoRun])
+
+  // Stop timers + abort in-flight on unmount.
   useEffect(() => () => {
     if (runTimerRef.current) clearInterval(runTimerRef.current)
+    if (autoRunDebounceRef.current) clearTimeout(autoRunDebounceRef.current)
+    if (saveDebounceRef.current) clearTimeout(saveDebounceRef.current)
+    if (abortRef.current) { try { abortRef.current.abort() } catch { /* ignore */ } }
   }, [])
 
-  const currentName = TABS.find(t => t.key === lang)?.name || lang
+  // ─── Export: download current source with the right extension ──
+  const onExport = useCallback(() => {
+    const t = TABS.find(x => x.key === lang)
+    const ext = t?.ext || 'txt'
+    const filename = `${topic || 'algorithm'}.${ext}`
+    downloadTextFile(filename, source)
+  }, [lang, topic, source])
+
+  // ─── Reset: revert to canonical + clear the localStorage draft ──
+  const onReset = useCallback(() => {
+    clearSavedCode(topic, lang)
+    setSource(canonical)
+  }, [topic, lang, canonical])
+
+  const currentTab = TABS.find(t => t.key === lang)
+  const currentName = currentTab?.name || lang
+  const monacoLang = currentTab?.monacoLang || 'plaintext'
   const running = runPhase !== 'idle'
+  const isDirty = source !== canonical
   const exitOk = runResult?.exit_code === 0
   const outputHeaderClass = runResult
     ? exitOk
@@ -343,13 +418,10 @@ export default function MultiLangCode({
       : 'bg-rose-500/10 border-rose-400/40 text-rose-200'
     : 'bg-white/[0.02] border-white/10 text-gray-300'
 
-  // Which body content to render in the output panel.
   const outputBody = useMemo(() => {
     if (!runResult) return ''
     if (runTab === 'stdout') return runResult.stdout || ''
     if (runTab === 'stderr') {
-      // Prefer compile_output when present — it's the friendlier of the
-      // two on a build failure.
       return runResult.compile_output || runResult.stderr || ''
     }
     if (runTab === 'info') {
@@ -367,6 +439,8 @@ export default function MultiLangCode({
     return ''
   }, [runResult, runTab])
 
+  const editorReadOnly = !runnable
+
   return (
     <div className={`luxe-card rounded-2xl border border-white/10 overflow-hidden ${className}`}>
       {/* Header */}
@@ -374,6 +448,21 @@ export default function MultiLangCode({
         <p className="text-[11px] uppercase tracking-[0.2em] font-bold text-white">{title}</p>
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-mono text-gray-500 hidden sm:inline">{currentName}</span>
+          {/* Theme picker */}
+          <Tooltip title="Editor theme — remembered per browser.">
+            <select
+              value={theme}
+              onChange={e => setTheme(e.target.value)}
+              aria-label="Editor theme"
+              className="text-[10px] font-mono px-2 py-1 rounded border border-white/10 bg-white/[0.03] text-gray-200 hover:bg-white/[0.06] focus:outline-none focus:border-amber-400/50"
+            >
+              {THEMES.map(t => (
+                <option key={t.id} value={t.id} className="bg-[#0a0a0e] text-gray-200">
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </Tooltip>
           <button
             type="button"
             onClick={onCopy}
@@ -390,45 +479,133 @@ export default function MultiLangCode({
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex flex-wrap gap-1 px-3 py-2 border-b border-white/10 bg-white/[0.015]">
+      {/* Language tabs */}
+      <div className="flex flex-wrap items-center gap-1 px-3 py-2 border-b border-white/10 bg-white/[0.015]">
         {available.map(t => {
           const on = t.key === lang
           return (
             <button
               key={t.key}
               type="button"
-              onClick={() => setLang(t.key)}
+              onClick={() => { setLang(t.key); if (analyzeOn) setAnalyzeOn(false) }}
               className={`text-[11px] font-bold px-2.5 py-1 rounded-md transition-colors ${
-                on
+                on && !analyzeOn
                   ? t.key === 'pseudo'
                     ? 'bg-amber-500/20 text-amber-200 border border-amber-400/40'
                     : 'bg-white/10 text-white border border-white/20'
                   : 'text-gray-400 border border-transparent hover:bg-white/[0.04] hover:text-gray-200'
               }`}
-              aria-pressed={on}
+              aria-pressed={on && !analyzeOn}
             >
               {t.label}
             </button>
           )
         })}
+        {/* Vertical divider + Analyze tab */}
+        <span className="mx-1 h-4 w-px bg-white/10 hidden sm:inline-block" aria-hidden="true" />
+        <Tooltip title={
+          ANALYZE_SUPPORTED.has(lang)
+            ? 'Step through the code line-by-line and inspect variables at each step.'
+            : `Step-through for ${currentTab?.name || lang} is coming soon — try Python for now.`
+        }>
+          <button
+            type="button"
+            onClick={() => setAnalyzeOn(v => !v)}
+            className={`text-[11px] font-bold px-2.5 py-1 rounded-md transition-colors inline-flex items-center gap-1 ${
+              analyzeOn
+                ? 'bg-fuchsia-500/20 text-fuchsia-200 border border-fuchsia-400/40'
+                : 'text-gray-400 border border-transparent hover:bg-white/[0.04] hover:text-gray-200'
+            }`}
+            aria-pressed={analyzeOn}
+          >
+            <span aria-hidden="true">🔍</span> Analyze
+          </button>
+        </Tooltip>
       </div>
 
-      {/* Run controls row + safety banner */}
-      {runnable && (
+      {/* Body: Monaco editor OR Analyze step-through */}
+      {analyzeOn ? (
+        <div className="p-3 bg-[#08080b]/60">
+          <Suspense fallback={
+            <div className="h-[240px] flex items-center justify-center text-[11px] font-mono text-gray-500">
+              Loading Analyze…
+            </div>
+          }>
+            <Analyze code={source} lang={lang} topicSlug={topic} />
+          </Suspense>
+        </div>
+      ) : (
+      <div className="bg-[#08080b]/80" style={{ minHeight: 360 }}>
+        <Suspense fallback={
+          <div className="h-[360px] flex items-center justify-center text-[11px] font-mono text-gray-500">
+            Loading editor…
+          </div>
+        }>
+          <MonacoEditorPanel
+            value={source}
+            language={monacoLang}
+            theme={theme}
+            onChange={setSource}
+            height="360px"
+            readOnly={editorReadOnly}
+            reducedMotion={reducedMotion}
+          />
+        </Suspense>
+        {activeIdx >= 0 && (
+          <div className="px-4 py-1 text-[10px] font-mono text-amber-300/80 bg-amber-500/5 border-t border-amber-400/20">
+            active line: {activeIdx + 1}
+          </div>
+        )}
+      </div>
+      )}
+
+      {/* Run controls + auto-run + export + reset */}
+      {runnable && !analyzeOn && (
         <div className="flex flex-col gap-2 px-3 py-2 border-b border-white/10 bg-white/[0.015]">
+          {/* Sample-input chip row */}
+          {Array.isArray(samples) && samples.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mr-1">
+                Samples:
+              </span>
+              {samples.map((s) => {
+                const on = activeSample === s.name
+                return (
+                  <Tooltip key={s.name} title={s.description || s.name}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStdin(s.stdin || '')
+                        setActiveSample(s.name)
+                        setShowStdin(true)
+                      }}
+                      className={`text-[11px] font-mono px-2 py-0.5 rounded border transition-colors ${
+                        on
+                          ? 'bg-amber-500/20 text-amber-200 border-amber-400/40'
+                          : 'text-gray-300 border-white/10 bg-white/[0.03] hover:bg-white/[0.06] hover:text-white'
+                      }`}
+                      aria-pressed={on}
+                    >
+                      {s.name}
+                    </button>
+                  </Tooltip>
+                )
+              })}
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-2">
             {isRunnable ? (
               <Button
                 variant="primary"
                 size="small"
                 onClick={onRun}
-                loading={running}
+                loading={running && runPhase !== 'auto'}
                 disabled={running}
                 aria-label="Run code in a sandbox"
               >
                 {runPhase === 'compiling' && `Compiling… ${(runElapsed / 1000).toFixed(1)}s`}
                 {runPhase === 'running'   && `Running… ${(runElapsed / 1000).toFixed(1)}s`}
+                {runPhase === 'auto'      && 'Run'}
                 {runPhase === 'idle'      && 'Run'}
               </Button>
             ) : (
@@ -442,6 +619,49 @@ export default function MultiLangCode({
                 </span>
               </Tooltip>
             )}
+
+            {/* Auto-run toggle — hidden on mobile to save BE quota */}
+            {!mobile && (
+              <Tooltip title="Runs 800ms after you stop typing. Rate-limited to 10 runs/min.">
+                <label className="flex items-center gap-2 text-[11px] font-bold text-gray-300 cursor-pointer px-2 py-1 rounded border border-white/10 bg-white/[0.03] hover:bg-white/[0.06]">
+                  <Switch
+                    size="small"
+                    checked={autoRun}
+                    onChange={setAutoRun}
+                    disabled={!RUNNABLE.has(lang)}
+                    aria-label="Auto-run on change"
+                  />
+                  <span>Auto-run</span>
+                </label>
+              </Tooltip>
+            )}
+
+            <Tooltip title={`Downloads the current code as a .${currentTab?.ext || 'txt'} file.`}>
+              <Button
+                variant="ghost"
+                size="small"
+                onClick={onExport}
+                disabled={!source.trim()}
+                aria-label="Export code as file"
+              >
+                Export
+              </Button>
+            </Tooltip>
+
+            <Tooltip title="Reverts to the reference implementation.">
+              <span>
+                <Button
+                  variant="subtle"
+                  size="small"
+                  onClick={onReset}
+                  disabled={!isDirty}
+                  aria-label="Reset to reference implementation"
+                >
+                  Reset
+                </Button>
+              </span>
+            </Tooltip>
+
             <button
               type="button"
               onClick={() => setShowStdin(v => !v)}
@@ -451,16 +671,29 @@ export default function MultiLangCode({
             >
               {showStdin ? 'Hide stdin' : 'Add stdin'}
             </button>
+
+            {isDirty && (
+              <span className="text-[10px] font-mono text-amber-300/80 hidden sm:inline">
+                edited · saved locally
+              </span>
+            )}
+
+            {runPhase === 'auto' && !reducedMotion && (
+              <span className="text-[10px] font-mono text-gray-400 hidden sm:inline">
+                auto-running…
+              </span>
+            )}
+
             {reducedMotion
               ? null
-              : running && (
+              : (running && runPhase !== 'auto') && (
                 <span className="text-[10px] font-mono text-gray-500 hidden sm:inline">
                   sandbox active — this is safe
                 </span>
               )}
           </div>
 
-          {/* Stdin — collapsible, only rendered when opened */}
+          {/* Stdin */}
           {showStdin && (
             <div>
               <label htmlFor="algo-stdin-input" className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
@@ -488,36 +721,9 @@ export default function MultiLangCode({
         </div>
       )}
 
-      {/* Code */}
-      <div className="bg-[#08080b]/80">
-        <pre className="text-[12.5px] leading-6 font-mono overflow-x-auto py-3">
-          {lines.map((raw, i) => {
-            const isActive = activeIdx === i
-            return (
-              <div
-                key={i}
-                className={`flex items-start gap-3 px-4 border-l-2 transition-colors ${
-                  isActive
-                    ? 'bg-amber-500/10 border-amber-400'
-                    : 'border-transparent hover:bg-white/[0.02]'
-                }`}
-              >
-                <span className={`select-none w-7 text-right shrink-0 ${
-                  isActive ? 'text-amber-300' : 'text-gray-600'
-                }`}>{i + 1}</span>
-                <span className="flex-1 whitespace-pre">
-                  {tint(raw.length ? raw : ' ', lang)}
-                </span>
-              </div>
-            )
-          })}
-        </pre>
-      </div>
-
-      {/* Output panel — only rendered when a run has happened */}
-      {runnable && runResult && (
+      {/* Output panel */}
+      {runnable && !analyzeOn && runResult && (
         <div className="border-t border-white/10">
-          {/* Output tabs + status header */}
           <div className={`flex items-center gap-1 px-3 py-2 border-b ${outputHeaderClass}`}>
             <p className="text-[11px] uppercase tracking-[0.2em] font-bold mr-2">
               Output
@@ -538,12 +744,29 @@ export default function MultiLangCode({
                 </button>
               )
             })}
+            {/* Expected-output match indicator */}
+            {(() => {
+              if (!activeSample || !Array.isArray(samples) || !runResult) return null
+              const s = samples.find(x => x.name === activeSample)
+              if (!s || !s.expected) return null
+              const actual = (runResult.stdout || '').trim()
+              const expected = String(s.expected).trim()
+              const ok = actual === expected
+              return (
+                <Tooltip title={ok
+                  ? `Output matches expected for "${s.name}"`
+                  : `Output differs from expected for "${s.name}"`}>
+                  <span className={`text-[11px] font-bold ml-1 ${ok ? 'text-emerald-300' : 'text-rose-300'}`}>
+                    {ok ? '✓ match' : '✗ diff'}
+                  </span>
+                </Tooltip>
+              )
+            })()}
             <span className="ml-auto text-[10px] font-mono opacity-80 hidden sm:inline">
               {infoLine(runResult)}
             </span>
           </div>
 
-          {/* Output body */}
           <pre className="bg-[#08080b]/90 text-[12px] leading-6 font-mono text-gray-200 px-4 py-3 max-h-64 overflow-auto whitespace-pre-wrap break-words">
             {outputBody || <span className="text-gray-600">(empty)</span>}
           </pre>
