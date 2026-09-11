@@ -35,10 +35,29 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import GameShell from '../../components/arcade/GameShell'
 import { getSfx } from '../../components/arcade/sfx'
 
+const RULES = [
+  { heading: 'Goal', body: 'Reveal every non-mine cell without triggering any mine. If you flag every mine correctly OR reveal every safe cell you win — either path is fine.' },
+  { heading: 'Controls', body: 'Left-click reveals a cell. Right-click (or long-press on touch) cycles flag → question mark → clear. Clicking both mouse buttons on a numbered revealed cell ("chord click") auto-reveals its neighbours if you have flagged as many mines as its number says.' },
+  { heading: 'Numbers', body: 'A revealed empty cell shows how many of its 8 neighbours are mines. 0 auto-cascades — the flood-fill sweeps open until it hits numbered cells. Numbers 1–8 use the classic colour palette: 1 blue, 2 green, 3 red, 4 dark blue, 5 dark red, 6 cyan, 7 black, 8 grey.' },
+  { heading: 'First-click safety', body: 'The very first cell you click (and its 8 neighbours) is guaranteed safe. Mines are placed AFTER the first click. On "no-guess" custom mode, we also verify the board can be solved by pure logic without guessing.' },
+  { heading: 'Scoring', body: 'Score is time-based — the faster you clear, the higher you rank. Best time per preset persists locally.' },
+  { heading: 'Difficulty', body: 'Easy is 9×9 with only 10 mines. Medium is 16×16 with 40 mines. Hard is expert 30×16 with 99 mines. Custom exposes board size, mine density, first-click safe radius and a no-guess toggle.' },
+]
+
 const PRESETS = {
   beginner:     { w: 9,  h: 9,  mines: 10 },
   intermediate: { w: 16, h: 16, mines: 40 },
   expert:       { w: 30, h: 16, mines: 99 },
+}
+
+const SHELL_TO_PRESET = { Easy: 'beginner', Medium: 'intermediate', Hard: 'expert' }
+
+const CUSTOM_SCHEMA = {
+  boardW:       { label: 'Board width',       min: 6, max: 40, step: 1, default: 16 },
+  boardH:       { label: 'Board height',      min: 6, max: 24, step: 1, default: 16 },
+  mineDensity:  { label: 'Mine density %',    min: 5, max: 35, step: 1, default: 16 },
+  safeRadius:   { label: 'Safe click radius', min: 0, max: 3,  step: 1, default: 1 },
+  noGuess:      { label: 'No-guess (0/1)',    min: 0, max: 1,  step: 1, default: 0 },
 }
 
 const NUM_COLOR = ['transparent', '#60a5fa', '#4ade80', '#f87171', '#a78bfa', '#facc15', '#22d3ee', '#e879f9', '#f43f5e']
@@ -166,8 +185,26 @@ const CELL_LABEL = {
 }
 
 export default function Minesweeper() {
+  const [shellDifficulty, setShellDifficulty] = useState('Easy')
+  const [customValues, setCustomValues] = useState(() => Object.fromEntries(
+    Object.entries(CUSTOM_SCHEMA).map(([k, v]) => [k, v.default])
+  ))
   const [preset, setPreset] = useState('beginner')
-  const { w, h, mines } = PRESETS[preset]
+  // Sync shell difficulty → legacy preset.
+  useEffect(() => {
+    const p = SHELL_TO_PRESET[shellDifficulty]
+    if (p && p !== preset) setPreset(p)
+  }, [shellDifficulty]) // eslint-disable-line react-hooks/exhaustive-deps
+  const isCustom = shellDifficulty === 'Custom'
+  const { w, h, mines } = useMemo(() => {
+    if (isCustom) {
+      const bw = Math.max(6, Math.round(customValues.boardW || 16))
+      const bh = Math.max(6, Math.round(customValues.boardH || 16))
+      const density = (customValues.mineDensity || 16) / 100
+      return { w: bw, h: bh, mines: Math.max(1, Math.round(bw * bh * density)) }
+    }
+    return PRESETS[preset]
+  }, [isCustom, customValues, preset])
   const [board, setBoard] = useState(null)         // -1 mine, 0..8 numbers, null before first click
   const [revealed, setRevealed] = useState(() => new Uint8Array(w * h))
   const [flags, setFlags]       = useState(() => new Uint8Array(w * h))   // 0=none,1=flag,2=?
@@ -185,17 +222,16 @@ export default function Minesweeper() {
   useEffect(() => { sfxRef.current.setEnabled(soundOn) }, [soundOn])
 
   const reset = useCallback(() => {
-    const size = PRESETS[preset]
     setBoard(null)
-    setRevealed(new Uint8Array(size.w * size.h))
-    setFlags(new Uint8Array(size.w * size.h))
+    setRevealed(new Uint8Array(w * h))
+    setFlags(new Uint8Array(w * h))
     setStatus('ready')
     setTriggered(-1)
     setSeconds(0)
     setPaused(false)
-  }, [preset])
+  }, [w, h])
 
-  useEffect(() => { reset() }, [preset, reset])
+  useEffect(() => { reset() }, [preset, w, h, mines, reset])
 
   useEffect(() => {
     try { setBest(Number(localStorage.getItem(`arcade.minesweeper.best.${preset}`)) || 0) } catch {}
@@ -371,6 +407,13 @@ export default function Minesweeper() {
         { key: 'Both', label: 'Chord' },
         { key: 'Long-press', label: 'Flag (mobile)' },
       ]}
+      rules={RULES}
+      difficulty={shellDifficulty}
+      onDifficultyChange={setShellDifficulty}
+      difficultyModes={['Easy', 'Medium', 'Hard', 'Custom']}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
     >
       <div className="flex flex-col items-center gap-4 p-3 sm:p-4">
         <div className="flex flex-wrap items-center justify-center gap-2">

@@ -26,6 +26,30 @@ import GameShell from '../../components/arcade/GameShell'
 import { Button } from '../../components/ui'
 import { getSfx } from '../../components/arcade/sfx'
 
+const RULES = [
+  { heading: 'Goal', body: 'Reduce your opponent to 2 pieces on the board, OR leave them with no legal move. Both count as a win.' },
+  { heading: 'Board layout', body: '24 nodes arranged as three nested squares connected by cross-lines. Nodes are numbered 0–7 outer, 8–15 middle, 16–23 inner. Every piece sits on a node — never on an intersection.' },
+  { heading: 'Phase 1 — Placing', body: 'Each side takes turns placing one of its 9 pieces on any empty node. This continues until all 18 pieces are on the board.' },
+  { heading: 'Phase 2 — Moving', body: 'On your turn, slide one of your pieces along a connecting line to an adjacent empty node. If neither side can move, that side loses.' },
+  { heading: 'Phase 3 — Flying', body: 'The instant you have exactly 3 pieces left (in Custom mode this can be disabled), your remaining pieces can "fly" to ANY empty node — not just adjacent ones. This gives the losing side a last-chance comeback.' },
+  { heading: 'Mills', body: 'Three of YOUR pieces in a straight line along one of the 16 pre-defined mill lines forms a "mill". Forming a mill (either by placing OR sliding into it) lets you remove one of the opponent\'s pieces. You cannot remove a piece that is already part of an opponent mill — unless ALL their pieces are in mills, in which case any is fair game.' },
+  { heading: 'AI strategy', body: 'Alpha-beta minimax with a phase-aware heuristic: material differential, mills formed, two-in-a-row potentials, mobility (movable pieces) and blocked opponent count.' },
+  { heading: 'Difficulty', body: 'Easy uses AI depth 3 with lower mill weight and flying disabled. Hard uses depth 6, doubled mill weight, and allows mill-repeat (re-open + re-close the same mill for a second capture). Custom exposes AI depth, mill weight, mill-repeat rule and flying phase toggle.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { aiDepth: 3, phaseEval: 0.6, millRepeat: false, flyingEnabled: true  },
+  Medium: { aiDepth: 4, phaseEval: 1.0, millRepeat: false, flyingEnabled: true  },
+  Hard:   { aiDepth: 6, phaseEval: 1.6, millRepeat: true,  flyingEnabled: true  },
+}
+
+const CUSTOM_SCHEMA = {
+  aiDepth:       { label: 'AI depth',                min: 2, max: 7, step: 1,   default: 4 },
+  phaseEval:     { label: 'Mill weight ×',           min: 0.2, max: 2.5, step: 0.1, default: 1.0 },
+  millRepeat:    { label: 'Mill-repeat (0/1)',       min: 0, max: 1, step: 1,   default: 0 },
+  flyingEnabled: { label: 'Flying phase (0/1)',      min: 0, max: 1, step: 1,   default: 1 },
+}
+
 const EMPTY = 0
 const HUMAN = 1
 const AI    = 2
@@ -365,9 +389,20 @@ const CELL = 60           // px per grid cell (7×7 grid)
 const NODE_R = 12         // node radius
 
 export default function NineMensMorris() {
+  const [shellDifficulty, setShellDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState(() => Object.fromEntries(
+    Object.entries(CUSTOM_SCHEMA).map(([k, v]) => [k, v.default])
+  ))
+  const shellCfg = useMemo(
+    () => shellDifficulty === 'Custom' ? customValues : DIFFICULTIES[shellDifficulty] || DIFFICULTIES.Medium,
+    [shellDifficulty, customValues],
+  )
   const [state, setState] = useState(() => initialState())
   const [selected, setSelected] = useState(-1)
   const [depth, setDepth] = useState(4)
+  useEffect(() => {
+    if (shellCfg.aiDepth) setDepth(Math.max(2, Math.min(7, Math.round(shellCfg.aiDepth))))
+  }, [shellCfg.aiDepth])
   const [aiThinking, setAiThinking] = useState(false)
   const [soundOn, setSoundOn] = useState(true)
   const sfxRef = useRef(getSfx())
@@ -531,6 +566,13 @@ export default function NineMensMorris() {
         { key: 'Click', label: 'Place / select / move' },
         { key: 'R',     label: 'Restart' },
       ]}
+      rules={RULES}
+      difficulty={shellDifficulty}
+      onDifficultyChange={setShellDifficulty}
+      difficultyModes={['Easy', 'Medium', 'Hard', 'Custom']}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       footer={
         <div className="mt-4 luxe-card-alt rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-5">
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between flex-wrap">
@@ -654,7 +696,8 @@ export default function NineMensMorris() {
                     fill="none"
                     stroke="#34d399"
                     strokeWidth="2"
-                    animate={{ opacity: [0.4, 1, 0.4], r: [NODE_R * 1.0, NODE_R * 1.4, NODE_R * 1.0] }}
+                    initial={{ opacity: 0.4 }}
+                    animate={{ opacity: [0.4, 1, 0.4] }}
                     transition={{ duration: 1.4, repeat: Infinity }}
                   />
                 )}

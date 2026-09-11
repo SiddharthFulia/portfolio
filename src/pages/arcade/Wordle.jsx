@@ -25,7 +25,29 @@ import GameShell from '../../components/arcade/GameShell'
 import { getSfx } from '../../components/arcade/sfx'
 import { ANSWERS, VALID_GUESSES, VALID_GUESS_COUNT } from './wordleWords'
 
-const ROWS = 6
+const RULES = [
+  { heading: 'Goal', body: 'Guess the hidden five-letter word in as few attempts as possible. You have 6 tries by default. The word is drawn from a curated list of common English words.' },
+  { heading: 'Controls', body: 'Type letters with your keyboard (or tap the on-screen keyboard). Enter submits a completed row. Backspace erases. You cannot submit an incomplete or non-dictionary word.' },
+  { heading: 'Feedback tiles', body: 'After each guess, tiles flip to reveal how close you were:\n• Green — right letter, right position.\n• Yellow — right letter, wrong position.\n• Grey — letter is not in the word.\nDuplicates are handled the canonical way — you only get yellow for as many copies of a letter as remain unmatched.' },
+  { heading: 'Keyboard aggregation', body: 'The on-screen keyboard colours accumulate across attempts. A letter marked green never downgrades. This lets you cross out or lock in letters at a glance.' },
+  { heading: 'Streaks & sharing', body: 'Your solve streak persists across sessions. A loss OR a "give up" resets it. The share button produces the classic emoji grid you can paste anywhere.' },
+  { heading: 'Hard mode', body: 'When hard mode is on, every green tile MUST appear in the same position in every subsequent guess, and every yellow letter MUST be included. This bans "spam guessing" for information.' },
+  { heading: 'Difficulty', body: 'Easy gives 8 attempts, no hard-mode enforcement, and accepts obscure words. Hard turns on hard mode, only 4 attempts, and rejects any word not in the answer list. Custom exposes attempts, hard mode, and dictionary strictness.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { attempts: 8, hardMode: false, strictDict: false },
+  Medium: { attempts: 6, hardMode: false, strictDict: false },
+  Hard:   { attempts: 4, hardMode: true,  strictDict: true },
+}
+
+const CUSTOM_SCHEMA = {
+  attempts:   { label: 'Attempts',              min: 3, max: 10, step: 1, default: 6 },
+  hardMode:   { label: 'Hard mode (0/1)',       min: 0, max: 1,  step: 1, default: 0 },
+  strictDict: { label: 'Strict dictionary (0/1)', min: 0, max: 1, step: 1, default: 0 },
+}
+
+const DEFAULT_ROWS = 6
 const COLS = 5
 
 const KEYBOARD_ROWS = [
@@ -115,6 +137,16 @@ function pickAnswer() {
 const MARK_TO_EMOJI = { g: '🟩', y: '🟨', x: '⬛' }
 
 export default function Wordle() {
+  const [shellDifficulty, setShellDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState(() => Object.fromEntries(
+    Object.entries(CUSTOM_SCHEMA).map(([k, v]) => [k, v.default])
+  ))
+  const shellCfg = useMemo(
+    () => shellDifficulty === 'Custom' ? customValues : DIFFICULTIES[shellDifficulty] || DIFFICULTIES.Medium,
+    [shellDifficulty, customValues],
+  )
+  const ROWS = Math.max(3, Math.min(10, Math.round(shellCfg.attempts || DEFAULT_ROWS)))
+
   const [answer, setAnswer] = useState(() => pickAnswer())
   const [history, setHistory] = useState([])          // [{ guess, mark }]
   const [current, setCurrent] = useState('')
@@ -124,6 +156,11 @@ export default function Wordle() {
   const [hardMode, setHardMode] = useState(() => {
     try { return localStorage.getItem('arcade.wordle.hard') === '1' } catch { return false }
   })
+  // Shell "Hard" / "Custom.hardMode=1" wins over the toggle.
+  useEffect(() => {
+    const shellHard = !!(shellCfg.hardMode && shellCfg.hardMode !== 0)
+    if (shellHard !== hardMode) setHardMode(shellHard)
+  }, [shellCfg.hardMode]) // eslint-disable-line react-hooks/exhaustive-deps
   const [streak, setStreak] = useState(() => {
     try { return Number(localStorage.getItem('arcade.wordle.streak')) || 0 } catch { return 0 }
   })
@@ -160,8 +197,11 @@ export default function Wordle() {
       return
     }
     const g = current.toLowerCase()
-    if (!VALID_GUESSES.has(g)) {
-      showFlash('Not in word list')
+    const answerSet = new Set(ANSWERS)
+    const strict = !!(shellCfg.strictDict && shellCfg.strictDict !== 0)
+    const passesDict = strict ? answerSet.has(g) : VALID_GUESSES.has(g)
+    if (!passesDict) {
+      showFlash(strict ? 'Not a common word' : 'Not in word list')
       sfxRef.current.hit()
       return
     }
@@ -198,7 +238,7 @@ export default function Wordle() {
         sfxRef.current.pop()
       }
     }, flipDur)
-  }, [status, paused, current, hardMode, hardReq, history, answer, showFlash, streak, best])
+  }, [status, paused, current, hardMode, hardReq, history, answer, showFlash, streak, best, shellCfg, ROWS])
 
   const type = useCallback((ch) => {
     if (status !== 'playing' || paused) return
@@ -298,6 +338,13 @@ export default function Wordle() {
         { key: 'Enter', label: 'Submit' },
         { key: 'Bksp', label: 'Undo letter' },
       ]}
+      rules={RULES}
+      difficulty={shellDifficulty}
+      onDifficultyChange={setShellDifficulty}
+      difficultyModes={['Easy', 'Medium', 'Hard', 'Custom']}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
     >
       <div className="flex flex-col items-center gap-4 sm:gap-6 p-3 sm:p-6">
         {/* Toggle rail */}

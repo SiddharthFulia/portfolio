@@ -22,6 +22,29 @@ import GameShell from '../../components/arcade/GameShell'
 import { Button } from '../../components/ui'
 import { getSfx } from '../../components/arcade/sfx'
 
+const RULES = [
+  { heading: 'Goal', body: 'End the game with more discs of your colour on the board than your opponent. Reversi always fills up (unless both sides run out of legal moves early) — you win by out-flipping.' },
+  { heading: 'Starting position', body: 'The board begins with 4 discs in a 2×2 diamond at the centre — two white on the a1→h8 diagonal, two black on the h1→a8 diagonal. Black (you) moves first.' },
+  { heading: 'Legal moves', body: 'On your turn, you must place a disc so that it sandwiches at least one straight line (horizontal, vertical or diagonal) of your opponent\'s discs between the new disc and one of your existing discs. Any and all sandwiched discs flip to your colour. If you cannot make a legal move, your turn passes automatically.' },
+  { heading: 'Corner strategy', body: 'Corner squares (a1, a8, h1, h8) can never be flipped once taken — they are the most valuable squares on the board (+120 weight). Their neighbours (X-squares and C-squares) are usually bad plays because they give your opponent access to the corner (-40 / -20 weight).' },
+  { heading: 'AI evaluation', body: 'The AI runs alpha-beta minimax up to depth 8. Position score = Rosenbloom / Iago weight table + mobility differential + frontier disc count. In the endgame (≤ 10 empty squares) the AI switches to full-depth perfect play.' },
+  { heading: 'Game end', body: 'The game ends when neither side has a legal move — usually when the board is full. Count discs. Ties are possible.' },
+  { heading: 'Difficulty', body: 'Easy uses AI depth 2 and low positional weights. Hard uses depth 8, aggressive mobility bonus, and endgame perfect play from 12+ empties. Custom exposes AI depth, endgame threshold, positional weights and mobility bonus.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { aiDepth: 2, endgameEmpties: 6,  posWeightMul: 0.5, mobilityMul: 0.5 },
+  Medium: { aiDepth: 6, endgameEmpties: 10, posWeightMul: 1.0, mobilityMul: 1.0 },
+  Hard:   { aiDepth: 8, endgameEmpties: 14, posWeightMul: 1.5, mobilityMul: 2.0 },
+}
+
+const CUSTOM_SCHEMA = {
+  aiDepth:        { label: 'AI depth',              min: 2, max: 9,  step: 1,   default: 6 },
+  endgameEmpties: { label: 'Endgame perfect (≤ N)', min: 4, max: 20, step: 1,   default: 10 },
+  posWeightMul:   { label: 'Position weight ×',     min: 0, max: 3,  step: 0.1, default: 1.0 },
+  mobilityMul:    { label: 'Mobility bonus ×',      min: 0, max: 3,  step: 0.1, default: 1.0 },
+}
+
 const N = 8
 const EMPTY = 0
 const BLACK = 1        // human
@@ -236,11 +259,22 @@ function Disc({ player, r, c, cellSize, justFlipped, isLast }) {
 }
 
 export default function Reversi() {
+  const [shellDifficulty, setShellDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState(() => Object.fromEntries(
+    Object.entries(CUSTOM_SCHEMA).map(([k, v]) => [k, v.default])
+  ))
+  const shellCfg = useMemo(
+    () => shellDifficulty === 'Custom' ? customValues : DIFFICULTIES[shellDifficulty] || DIFFICULTIES.Medium,
+    [shellDifficulty, customValues],
+  )
   const [board, setBoard] = useState(() => makeBoard())
   const [turn, setTurn] = useState(BLACK)
   const [lastFlips, setLastFlips] = useState(new Set())
   const [lastMove, setLastMove] = useState(-1)
   const [depth, setDepth] = useState(6)
+  useEffect(() => {
+    if (shellCfg.aiDepth) setDepth(Math.max(2, Math.min(9, Math.round(shellCfg.aiDepth))))
+  }, [shellCfg.aiDepth])
   const [aiThinking, setAiThinking] = useState(false)
   const [passInfo, setPassInfo] = useState('')
   const [gameOver, setGameOver] = useState(false)
@@ -367,6 +401,13 @@ export default function Reversi() {
         { key: 'Click', label: 'Play on a highlighted cell' },
         { key: 'R',     label: 'Restart' },
       ]}
+      rules={RULES}
+      difficulty={shellDifficulty}
+      onDifficultyChange={setShellDifficulty}
+      difficultyModes={['Easy', 'Medium', 'Hard', 'Custom']}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       footer={
         <div className="mt-4 luxe-card-alt rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-5">
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">

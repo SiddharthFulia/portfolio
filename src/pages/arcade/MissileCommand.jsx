@@ -11,9 +11,32 @@
 // Every missile is a warhead + smoke trail (not a stick line). Cities
 // have skyline silhouettes.  Silos have visible ammo bar.
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import GameShell from '../../components/arcade/GameShell'
 import { getSfx } from '../../components/arcade/sfx'
+
+const RULES = [
+  { heading: 'Goal', body: 'Keep at least one of your six cities alive. Every wave rains more ICBMs from the sky — clear them with counter-missiles before they land.' },
+  { heading: 'Controls', body: 'Aim with the mouse (or touch). Click / tap to launch a counter-missile from the nearest silo with ammo. Q, A, E force-fire from the left, middle, and right silo respectively at wherever you are aiming. Space pauses.' },
+  { heading: 'Scoring', body: 'Every downed ICBM is worth 25 pts (plain) or 50 pts (smart bomb). Surviving cities pay a wave bonus at the end. Unused counter-missiles also cash in.' },
+  { heading: 'Silos & ammo', body: 'Three silos with 10 counter-missiles each per wave. A silo that gets hit is destroyed and can no longer fire this wave. Ammo refills at the start of every new wave.' },
+  { heading: 'Incoming missile types', body: '• Plain ICBM: straight-line dive to a random ground target.\n• MIRV (from level 2, ~20%): splits into 3 warheads midway.\n• Smart bomb (from level 3, ~15%): steers around your counter-missile explosions.' },
+  { heading: 'Explosions', body: 'A counter-missile detonates into an expanding fireball. Any ICBM caught inside is destroyed. Chain kills by placing the blast where several missiles converge.' },
+  { heading: 'Difficulty', body: 'Easy halves the incoming rate and doubles silo ammo. Hard doubles incoming rate, raises MIRV and smart-bomb chances, and cuts silo ammo. Custom exposes incoming rate, MIRV chance, smart-bomb chance and silo ammo.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { incomingRate: 0.5, mirvChance: 0.10, smartChance: 0.05, siloAmmo: 15 },
+  Medium: { incomingRate: 1.0, mirvChance: 0.20, smartChance: 0.15, siloAmmo: 10 },
+  Hard:   { incomingRate: 1.8, mirvChance: 0.35, smartChance: 0.30, siloAmmo: 7 },
+}
+
+const CUSTOM_SCHEMA = {
+  incomingRate: { label: 'Incoming rate',     min: 0.3, max: 3.0, step: 0.1,  default: 1.0 },
+  mirvChance:   { label: 'MIRV chance',       min: 0,   max: 0.7, step: 0.05, default: 0.20 },
+  smartChance:  { label: 'Smart-bomb chance', min: 0,   max: 0.6, step: 0.05, default: 0.15 },
+  siloAmmo:     { label: 'Silo ammo',         min: 3,   max: 20,  step: 1,    default: 10 },
+}
 
 const W = 800
 const H = 600
@@ -35,6 +58,16 @@ export default function MissileCommand() {
   const [level, setLevel] = useState(1)
   const [status, setStatus] = useState('playing')
   const [soundOn, setSoundOn] = useState(true)
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState(() => Object.fromEntries(
+    Object.entries(CUSTOM_SCHEMA).map(([k, v]) => [k, v.default])
+  ))
+  const cfg = useMemo(
+    () => difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty] || DIFFICULTIES.Medium,
+    [difficulty, customValues],
+  )
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
 
   const stateRef = useRef({
     cities: cityOffsets.map((x) => ({ x, alive: true, burn: 0 })),
@@ -57,17 +90,19 @@ export default function MissileCommand() {
 
   const startWave = useCallback((lv) => {
     const s = stateRef.current
-    s.waveIcbms = 8 + lv * 3
-    s.waveTimer = 30
+    const rate = cfgRef.current.incomingRate || 1
+    s.waveIcbms = Math.max(3, Math.round((8 + lv * 3) * rate))
+    s.waveTimer = 30 / Math.max(0.5, rate)
     s.waveActive = true
     s.spawnTimer = 0
-    s.silos.forEach((si) => { si.ammo = 10; si.alive = true })
+    const ammo = cfgRef.current.siloAmmo || 10
+    s.silos.forEach((si) => { si.ammo = ammo; si.alive = true })
   }, [])
 
   const reset = useCallback(() => {
     setScore(0); setLevel(1); setStatus('playing')
     stateRef.current.cities = cityOffsets.map((x) => ({ x, alive: true, burn: 0 }))
-    stateRef.current.silos = SILO_POS.map((x) => ({ x, ammo: 10, alive: true }))
+    stateRef.current.silos = SILO_POS.map((x) => ({ x, ammo: cfgRef.current.siloAmmo || 10, alive: true }))
     stateRef.current.icbms = []
     stateRef.current.counters = []
     stateRef.current.explosions = []
@@ -178,8 +213,8 @@ export default function MissileCommand() {
       const dy = t.y - y1
       const dist = Math.hypot(dx, dy) || 1
       const speed = 0.7 + lv * 0.1
-      const smart = lv >= 3 && Math.random() < 0.15
-      const mirv = lv >= 2 && Math.random() < 0.2 ? 3 : 0
+      const smart = lv >= 3 && Math.random() < (cfgRef.current.smartChance ?? 0.15)
+      const mirv = lv >= 2 && Math.random() < (cfgRef.current.mirvChance ?? 0.2) ? 3 : 0
       s.icbms.push({
         x1, y1, x2: t.x, y2: t.y,
         x: x1, y: y1,
@@ -541,6 +576,13 @@ export default function MissileCommand() {
         { key: 'Space', label: 'Pause' },
       ]}
       subtitle="Six cities. Ten counter-missiles per silo. MIRVs split, smart bombs dodge. Save who you can."
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      difficultyModes={['Easy', 'Medium', 'Hard', 'Custom']}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
     >
       <canvas ref={canvasRef} width={W} height={H} className="w-full h-auto max-h-[78vh] block bg-black cursor-crosshair" />
     </GameShell>

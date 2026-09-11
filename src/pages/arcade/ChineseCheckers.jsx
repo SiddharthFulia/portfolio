@@ -27,6 +27,28 @@ import GameShell from '../../components/arcade/GameShell'
 import { Button } from '../../components/ui'
 import { getSfx } from '../../components/arcade/sfx'
 
+const RULES = [
+  { heading: 'Goal', body: 'Race all 10 of your pieces from your starting triangle to the opposite triangle across the board. First side to fill their target triangle wins.' },
+  { heading: 'Board', body: '121 nodes arranged as a six-pointed star. In a 2-player game, only opposite triangles are used — human at the bottom, AI at the top. The central hexagon is neutral territory both sides must traverse.' },
+  { heading: 'Movement', body: 'Two move types:\n• Step: slide one piece to an adjacent empty node.\n• Jump: hop over an adjacent piece (either colour) to the empty node directly beyond, in a straight line. Jumps chain — after landing, you may keep jumping until you decide to stop or no more jumps are legal.\nA turn is a single step OR a single jump chain — not both.' },
+  { heading: 'No back-out rule', body: 'Once a piece has fully entered the target triangle, it cannot leave. This prevents "shuttling" pieces to block the opponent forever.' },
+  { heading: 'AI strategy', body: 'Greedy BFS — for each piece the AI enumerates every reachable node in a single move (adjacent + all jump-chain destinations). Each move is scored by distance-closer-to-target + bonus for jumps + penalty for backing out of goal. Higher lookahead ply searches the opponent\'s best response.' },
+  { heading: 'Difficulty', body: 'Easy uses 1-ply greedy (fast, sometimes short-sighted). Medium uses 2-ply. Hard uses 3-ply with a "max-chain" jump preference. Custom exposes player count, AI lookahead ply, jump-chain style and colour mode.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { playerCount: 2, aiLookahead: 1, chainStyle: 'max', hexColorMode: false },
+  Medium: { playerCount: 2, aiLookahead: 2, chainStyle: 'max', hexColorMode: false },
+  Hard:   { playerCount: 2, aiLookahead: 3, chainStyle: 'max', hexColorMode: true  },
+}
+
+const CUSTOM_SCHEMA = {
+  playerCount:  { label: 'Players (2/3/6)',        min: 2, max: 6, step: 1, default: 2 },
+  aiLookahead:  { label: 'AI lookahead ply',       min: 1, max: 3, step: 1, default: 2 },
+  chainStyle:   { label: 'Chain style (0=min,1=max)', min: 0, max: 1, step: 1, default: 1 },
+  hexColorMode: { label: 'Hex colour mode (0/1)',  min: 0, max: 1, step: 1, default: 0 },
+}
+
 const EMPTY = 0
 const HUMAN = 1
 const AI    = 2
@@ -281,8 +303,19 @@ function pickAiMove(state, side, depth) {
 const CENTER = { x: 200, y: 200 }
 
 export default function ChineseCheckers() {
+  const [shellDifficulty, setShellDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState(() => Object.fromEntries(
+    Object.entries(CUSTOM_SCHEMA).map(([k, v]) => [k, v.default])
+  ))
+  const shellCfg = useMemo(
+    () => shellDifficulty === 'Custom' ? customValues : DIFFICULTIES[shellDifficulty] || DIFFICULTIES.Medium,
+    [shellDifficulty, customValues],
+  )
   const [state, setState] = useState(() => initialState())
   const [depth, setDepth] = useState(2)
+  useEffect(() => {
+    if (shellCfg.aiLookahead) setDepth(Math.max(1, Math.min(3, Math.round(shellCfg.aiLookahead))))
+  }, [shellCfg.aiLookahead])
   const [aiThinking, setAiThinking] = useState(false)
   const [soundOn, setSoundOn] = useState(true)
   const [vsAI, setVsAI] = useState(true)
@@ -390,6 +423,13 @@ export default function ChineseCheckers() {
         { key: 'Click', label: 'Select piece, click empty node or jump target' },
         { key: 'R',     label: 'Restart' },
       ]}
+      rules={RULES}
+      difficulty={shellDifficulty}
+      onDifficultyChange={setShellDifficulty}
+      difficultyModes={['Easy', 'Medium', 'Hard', 'Custom']}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       footer={
         <div className="mt-4 luxe-card-alt rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-5">
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between flex-wrap">

@@ -15,8 +15,31 @@
 // Effects: screen shake 40 ms on bumper hits, sparks on collisions, chromatic
 // aberration burst on multiball spawn, 7-seg font score digits.
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import GameShell from '../../components/arcade/GameShell'
+
+const RULES = [
+  { heading: 'Goal', body: 'Score as many points as possible before you lose all your balls. The high-score digits use classic seven-segment red LEDs — beat your previous best to see the "NEW HIGH" flash.' },
+  { heading: 'Controls', body: '← or A actuates the left flipper. → or D actuates the right flipper. Space pauses. Nudge the table with N or a swipe up on the canvas — but nudge too many times in 4 seconds and the machine tilts and locks your flippers for 5 seconds.' },
+  { heading: 'Table elements', body: '• Bumpers (round): +100 pts and a hard kick.\n• Slingshots (triangles): +25 pts and a fling toward the flippers.\n• Ramps: pass through for a smooth boost and combo count-up.\n• Drop targets: reset when you clear the whole bank.' },
+  { heading: 'Multiball', body: 'At 20k, 50k and 100k score you trigger multiball — one, two, then three balls simultaneously on the table. Losing all balls but one closes multiball and returns to single-ball mode.' },
+  { heading: 'Tilt', body: 'Small nudges are legal but stack. Three nudges inside a 4-second window lights TILT — your flippers lock up for the next 5 seconds. Very risky trade-off.' },
+  { heading: 'Physics', body: 'Impulse-based response — flippers impart both linear AND angular velocity to the ball, bumpers apply an outward kick, slingshots amplify the reflection. Air friction (0.9985) drains speed subtly over long shots.' },
+  { heading: 'Difficulty', body: 'Easy gives 5 balls, 20% stronger flippers, and a very forgiving tilt threshold. Hard gives 2 balls, weaker flippers, and 1-nudge tilt. Custom exposes ball count, flipper power, tilt threshold and multiball score threshold.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { ballCount: 5, flipperPower: 1.2, tiltThreshold: 5, multiballScore: 15000 },
+  Medium: { ballCount: 3, flipperPower: 1.0, tiltThreshold: 3, multiballScore: 20000 },
+  Hard:   { ballCount: 2, flipperPower: 0.8, tiltThreshold: 1, multiballScore: 30000 },
+}
+
+const CUSTOM_SCHEMA = {
+  ballCount:      { label: 'Ball count',       min: 1,    max: 8,    step: 1,    default: 3 },
+  flipperPower:   { label: 'Flipper power ×',  min: 0.5,  max: 2,    step: 0.1,  default: 1.0 },
+  tiltThreshold:  { label: 'Tilt threshold',   min: 1,    max: 8,    step: 1,    default: 3 },
+  multiballScore: { label: 'Multiball at',     min: 5000, max: 50000, step: 5000, default: 20000 },
+}
 
 const W = 420
 const H = 680
@@ -103,9 +126,20 @@ export default function Pinball() {
     nextMultiball: 20000, multiballLevel: 0,
     reduced: false,
   })
+  const [shellDifficulty, setShellDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState(() => Object.fromEntries(
+    Object.entries(CUSTOM_SCHEMA).map(([k, v]) => [k, v.default])
+  ))
+  const cfg = useMemo(
+    () => shellDifficulty === 'Custom' ? customValues : DIFFICULTIES[shellDifficulty] || DIFFICULTIES.Medium,
+    [shellDifficulty, customValues],
+  )
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
+
   const [score, setScore] = useState(0)
   const [best, setBest] = useState(0)
-  const [balls, setBalls] = useState(3)
+  const [balls, setBalls] = useState(cfg.ballCount || 3)
   const [status, setStatus] = useState('ready')
   const [paused, setPaused] = useState(false)
   const [soundOn, setSoundOn] = useState(true)
@@ -137,9 +171,9 @@ export default function Pinball() {
     const s = stateRef.current
     s.balls = []; s.particles = []; s.plungerPower = 0
     s.tiltNudges = []; s.tilted = 0
-    s.nextMultiball = 20000; s.multiballLevel = 0
+    s.nextMultiball = cfgRef.current.multiballScore || 20000; s.multiballLevel = 0
     s.targets = TARGETS_INIT.map(t => ({ ...t }))
-    setScore(0); setBalls(3); setStatus('ready')
+    setScore(0); setBalls(cfgRef.current.ballCount || 3); setStatus('ready')
     spawnBall()
   }, [spawnBall])
 
@@ -155,7 +189,7 @@ export default function Pinball() {
         const now = Date.now()
         s.tiltNudges.push(now)
         s.tiltNudges = s.tiltNudges.filter(t => now - t < 4000)
-        if (s.tiltNudges.length >= 3) { s.tilted = 5000; s.tiltNudges = []; beep(120, 0.4, 'sawtooth') }
+        if (s.tiltNudges.length >= (cfgRef.current.tiltThreshold || 3)) { s.tilted = 5000; s.tiltNudges = []; beep(120, 0.4, 'sawtooth') }
         s.balls.forEach(b => { b.vx += (Math.random() - 0.5) * 3; b.vy -= 1 })
       }
     }
@@ -261,8 +295,9 @@ export default function Pinball() {
           const vdot = ball.vx * nx + ball.vy * ny
           if (vdot < 0) { ball.vx -= 1.5 * vdot * nx; ball.vy -= 1.5 * vdot * ny }
           const rx = px - fx, ry = py - fy
-          ball.vx += -ry * omega * 0.9
-          ball.vy +=  rx * omega * 0.9
+          const fp = cfgRef.current.flipperPower || 1
+          ball.vx += -ry * omega * 0.9 * fp
+          ball.vy +=  rx * omega * 0.9 * fp
           if (Math.abs(omega) > 0.05) { addParticles(px, py, 5, '#fef3c7'); beep(440, 0.03, 'sine', 0.04) }
         }
       }
@@ -322,7 +357,7 @@ export default function Pinball() {
       setScore(sc => {
         if (sc >= s.nextMultiball && s.multiballLevel < 3) {
           s.multiballLevel++
-          s.nextMultiball = sc + 30000 + s.multiballLevel * 15000
+          s.nextMultiball = sc + (cfgRef.current.multiballScore || 20000) * 1.5 + s.multiballLevel * 15000
           for (let k = 0; k < 2; k++) {
             s.balls.push({ x: W / 2 + (Math.random() - 0.5) * 40, y: 150, vx: (Math.random() - 0.5) * 6, vy: 2, spin: 0 })
           }
@@ -462,6 +497,13 @@ export default function Pinball() {
         { key: 'N', label: 'Nudge (careful — tilts)' },
         { key: 'Tap L/R', label: 'Mobile flippers' },
       ]}
+      rules={RULES}
+      difficulty={shellDifficulty}
+      onDifficultyChange={setShellDifficulty}
+      difficultyModes={['Easy', 'Medium', 'Hard', 'Custom']}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       overlay={status === 'over' ? (
         <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-3">
           <div className="text-4xl font-bold bg-gradient-to-r from-amber-300 to-rose-400 bg-clip-text text-transparent">Game Over</div>

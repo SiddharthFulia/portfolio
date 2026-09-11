@@ -17,6 +17,28 @@ import GameShell from '../../components/arcade/GameShell'
 import { Button, Slider } from '../../components/ui'
 import { getSfx } from '../../components/arcade/sfx'
 
+const RULES = [
+  { heading: 'Goal', body: 'Be the first to line up four of your discs in a row — horizontally, vertically or diagonally — on the 7-column, 6-row board.' },
+  { heading: 'How discs fall', body: 'Tap a column to drop your disc. It lands on the lowest empty slot in that column. You cannot place a disc in a mid-air position — gravity always applies.' },
+  { heading: 'Turn order', body: 'You (red) always move first unless you swap. After each move the AI responds with its own drop. If all 42 cells fill without a four-in-a-row, the game is a draw.' },
+  { heading: 'Winning lines', body: 'There are 69 possible winning four-in-a-rows on the board. Blocks are as important as attacks — leaving a "double threat" (two winning columns your opponent can\'t block simultaneously) usually decides the game.' },
+  { heading: 'AI strategy', body: 'The AI uses negamax with alpha-beta pruning, iterative deepening up to the configured depth. Move ordering prefers centre columns first; a transposition table caches evaluated positions. Higher depth = deeper look-ahead but slower moves.' },
+  { heading: 'Difficulty', body: 'Easy uses AI depth 4 and lets you undo. Hard uses AI depth 8 with no undo and displays a move analysis line. Custom exposes AI depth, per-move timer, undo count and analysis toggle.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { aiDepth: 4, moveTimer: 30, undoCount: 3, showAnalysis: false },
+  Medium: { aiDepth: 6, moveTimer: 20, undoCount: 1, showAnalysis: false },
+  Hard:   { aiDepth: 8, moveTimer: 10, undoCount: 0, showAnalysis: true  },
+}
+
+const CUSTOM_SCHEMA = {
+  aiDepth:      { label: 'AI depth',           min: 2, max: 9,  step: 1, default: 6 },
+  moveTimer:    { label: 'Move timer (s)',     min: 5, max: 60, step: 5, default: 20 },
+  undoCount:    { label: 'Undo count',         min: 0, max: 10, step: 1, default: 1 },
+  showAnalysis: { label: 'Show analysis (0/1)',min: 0, max: 1,  step: 1, default: 0 },
+}
+
 const COLS = 7
 const ROWS = 6
 const EMPTY = 0
@@ -188,12 +210,23 @@ function Confetti({ active }) {
 }
 
 export default function ConnectFour() {
+  const [shellDifficulty, setShellDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState(() => Object.fromEntries(
+    Object.entries(CUSTOM_SCHEMA).map(([k, v]) => [k, v.default])
+  ))
+  const shellCfg = useMemo(
+    () => shellDifficulty === 'Custom' ? customValues : DIFFICULTIES[shellDifficulty] || DIFFICULTIES.Medium,
+    [shellDifficulty, customValues],
+  )
   const [board, setBoard] = useState(() => emptyBoard())
   const [turn, setTurn] = useState(HUMAN)
   const [winner, setWinner] = useState(0)              // 0 | HUMAN | AI | -1 (draw)
   const [winLine, setWinLine] = useState(null)
   const [hoverCol, setHoverCol] = useState(-1)
   const [depth, setDepth] = useState(6)
+  useEffect(() => {
+    if (shellCfg.aiDepth) setDepth(Math.max(2, Math.min(9, Math.round(shellCfg.aiDepth))))
+  }, [shellCfg.aiDepth])
   const [aiThinking, setAiThinking] = useState(false)
   const [wins, setWins] = useState({ human: 0, ai: 0, draws: 0 })
   const [soundOn, setSoundOn] = useState(true)
@@ -323,6 +356,13 @@ export default function ConnectFour() {
         { key: 'Click', label: 'Drop a piece in a column' },
         { key: 'R',     label: 'Restart' },
       ]}
+      rules={RULES}
+      difficulty={shellDifficulty}
+      onDifficultyChange={setShellDifficulty}
+      difficultyModes={['Easy', 'Medium', 'Hard', 'Custom']}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       footer={
         <div className="mt-4 luxe-card-alt rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-5">
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">

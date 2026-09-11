@@ -21,6 +21,29 @@ import GameShell from '../../components/arcade/GameShell'
 import PlayingCard, { RANK_VALUE, makeDeck, shuffle } from '../../components/arcade/PlayingCard'
 import { Button } from '../../components/ui'
 
+const RULES = [
+  { heading: 'Goal', body: 'Form your 10-card hand into melds (sets of 3+ same-rank cards or runs of 3+ same-suit consecutive cards) and end the hand when your unmelded "deadwood" is 10 points or less. Win by knocking with less deadwood than your opponent — or by hitting Gin (zero deadwood) for the full bonus.' },
+  { heading: 'Card values', body: 'Aces = 1. 2–10 = face value. Face cards (J, Q, K) = 10 each. Deadwood is the total value of your unmelded cards.' },
+  { heading: 'Turn flow', body: 'On each turn: (1) draw from the stock OR pick up the top discard, (2) rearrange melds if you like, (3) discard one card face-up onto the discard pile. You must always end your turn with 10 cards.' },
+  { heading: 'Melds', body: 'Set = 3 or 4 cards of the same rank. Run = 3 or more consecutive same-suit cards (A is always low; no wrap around K-A-2). A card can only participate in one meld at a time — the auto-arrange solver picks the arrangement that minimises deadwood.' },
+  { heading: 'Knock & Gin', body: 'Knocking with ≤ 10 deadwood ends the hand. Difference in deadwood is your points. Gin (deadwood = 0) awards a 25-point bonus. If the non-knocker actually has less deadwood, they "undercut" and win the round with a 25-point bonus.' },
+  { heading: 'Modes', body: 'Single hand — one deal decides everything. First-to-100 — play multiple hands until one player crosses 100 points; that player wins the match.' },
+  { heading: 'Difficulty', body: 'Easy uses an 8-card hand, knock threshold 12, and a 50-point Gin bonus. Hard uses an 11-card hand, knock threshold 7, and a 15-point Gin bonus. Custom exposes hand size, knock threshold, gin bonus and mode.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { handSize: 8,  knockThreshold: 12, ginBonus: 50, singleHand: true  },
+  Medium: { handSize: 10, knockThreshold: 10, ginBonus: 25, singleHand: false },
+  Hard:   { handSize: 11, knockThreshold: 7,  ginBonus: 15, singleHand: false },
+}
+
+const CUSTOM_SCHEMA = {
+  handSize:       { label: 'Hand size',        min: 7,  max: 13, step: 1, default: 10 },
+  knockThreshold: { label: 'Knock threshold',  min: 5,  max: 15, step: 1, default: 10 },
+  ginBonus:       { label: 'Gin bonus',        min: 0,  max: 50, step: 5, default: 25 },
+  singleHand:     { label: 'Single-hand mode (0=first-to-100)', min: 0, max: 1, step: 1, default: 0 },
+}
+
 const HAND_SIZE = 10
 
 // Card deadwood point value (A=1, face=10, else face value)
@@ -156,7 +179,18 @@ const MODE_SINGLE = 'single'
 const MODE_100 = 'first-to-100'
 
 export default function Rummy() {
+  const [shellDifficulty, setShellDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState(() => Object.fromEntries(
+    Object.entries(CUSTOM_SCHEMA).map(([k, v]) => [k, v.default])
+  ))
+  const shellCfg = useMemo(
+    () => shellDifficulty === 'Custom' ? customValues : DIFFICULTIES[shellDifficulty] || DIFFICULTIES.Medium,
+    [shellDifficulty, customValues],
+  )
   const [mode, setMode] = useState(MODE_100)
+  useEffect(() => {
+    setMode(shellCfg.singleHand ? MODE_SINGLE : MODE_100)
+  }, [shellCfg.singleHand])
   const [deck, setDeck] = useState([])
   const [discard, setDiscard] = useState([])
   const [playerHand, setPlayerHand] = useState([])
@@ -250,7 +284,7 @@ export default function Rummy() {
   }, [turn, phase, playerHand, discard, beep])
 
   const knock = useCallback(() => {
-    if (playerArrangement.deadwoodPoints > 10) return
+    if (playerArrangement.deadwoodPoints > (shellCfg.knockThreshold ?? 10)) return
     finalizeHand(true)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerArrangement])
@@ -395,8 +429,15 @@ export default function Rummy() {
       controls={[
         { key: 'Draw', label: 'Stock or discard pile' },
         { key: 'Discard', label: 'Click a card in your hand' },
-        { key: 'Knock', label: 'Deadwood ≤ 10' },
+        { key: 'Knock', label: `Deadwood ≤ ${shellCfg.knockThreshold ?? 10}` },
       ]}
+      rules={RULES}
+      difficulty={shellDifficulty}
+      onDifficultyChange={setShellDifficulty}
+      difficultyModes={['Easy', 'Medium', 'Hard', 'Custom']}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       extraStats={
         <div className="flex flex-col items-start">
           <span className="text-[10px] uppercase tracking-widest text-white/40">Mode</span>

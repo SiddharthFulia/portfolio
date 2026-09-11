@@ -21,6 +21,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import GameShell from '../../components/arcade/GameShell'
 import { getSfx } from '../../components/arcade/sfx'
+import { RULES, DIFFICULTIES, CUSTOM_SCHEMA } from './tetris/rules'
 
 const COLS = 10
 const ROWS = 20
@@ -170,7 +171,7 @@ function scoreForClear({ lines, tSpin, tSpinMini, backToBack, level }) {
   return (base + bonus) * level
 }
 
-function makeInitialState() {
+function makeInitialState(startLevel = 1) {
   const bag = shuffle(PIECE_ORDER)
   const first = bag.shift()
   return {
@@ -182,7 +183,7 @@ function makeInitialState() {
     holdUsed:   false,
     score:      0,
     lines:      0,
-    level:      1,
+    level:      Math.max(1, Math.min(20, startLevel)),
     combo:      -1,
     b2b:        false,
     over:       false,
@@ -201,6 +202,16 @@ export default function Tetris() {
     try { return Number(localStorage.getItem('arcade.tetris.best')) || 0 } catch { return 0 }
   })
   const [pop, setPop] = useState(null)
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState(() => Object.fromEntries(
+    Object.entries(CUSTOM_SCHEMA).map(([k, v]) => [k, v.default])
+  ))
+  const cfg = useMemo(
+    () => difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty] || DIFFICULTIES.Medium,
+    [difficulty, customValues],
+  )
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
   const stateRef = useRef(makeInitialState())
   const dropAccRef = useRef(0)
   const lastTsRef  = useRef(0)
@@ -385,7 +396,7 @@ export default function Tetris() {
   }, [bump, paused, refillQueue])
 
   const reset = useCallback(() => {
-    stateRef.current = makeInitialState()
+    stateRef.current = makeInitialState(cfgRef.current.startLevel || 1)
     setStatus('playing')
     setPaused(false)
     setPop(null)
@@ -551,6 +562,13 @@ export default function Tetris() {
         { key: 'P',   label: 'Pause' },
         { key: 'Swipe',label: 'Mobile move + tap rotate' },
       ]}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      difficultyModes={['Easy', 'Medium', 'Hard', 'Custom']}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
     >
       <div
         className="flex items-start justify-center gap-4 p-3 sm:p-4"
@@ -626,7 +644,7 @@ export default function Tetris() {
 
         <SidePanel title="Next">
           <div className="flex flex-col gap-2 items-center">
-            {s.queue.slice(0, 3).map((t, i) => <PieceIcon key={i} type={t} />)}
+            {s.queue.slice(0, Math.max(0, cfg.previewCount ?? 3)).map((t, i) => <PieceIcon key={i} type={t} />)}
           </div>
         </SidePanel>
       </div>

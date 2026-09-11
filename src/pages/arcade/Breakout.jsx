@@ -16,14 +16,37 @@
 //   • Screen shake ramps with impact strength; killed by reduced-motion.
 //   • Chromatic flash on level clear.
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import GameShell from '../../components/arcade/GameShell'
 import { getSfx } from '../../components/arcade/sfx'
+
+const RULES = [
+  { heading: 'Goal', body: 'Clear every brick on all 20 levels without letting the ball fall off the bottom. Beating level 20 wins the game.' },
+  { heading: 'Controls', body: 'Arrow keys or A / D move the paddle. Enter, ↑ or W launches the ball from the paddle and fires lasers when the laser power-up is active. On touch devices, drag anywhere on the playfield to move the paddle and tap to launch.' },
+  { heading: 'Scoring', body: 'Each brick is worth 20 × its starting HP (a 3-HP brick pays 60). The +500 power-up drops a flat bonus. High scores persist locally per browser.' },
+  { heading: 'Power-ups', body: 'Bricks have a 14% chance to drop a capsule. Catch it with the paddle to trigger the effect:\n• MULTI (M) — split each ball into three.\n• WIDE (W) — enlarges the paddle for ~12 s.\n• LASER (L) — fires paired lasers for ~10 s.\n• SLOW (S) — halves ball speed for ~10 s.\n• +1 LIFE (+) — extra life, capped at 6.\n• +500 ($) — flat point bonus.' },
+  { heading: 'Levels & bricks', body: 'Each level uses a hand-crafted layout (checker, pyramid, arches, boss wall, etc.). Higher-HP bricks glow different colours and crack visibly as you damage them.' },
+  { heading: 'Lives', body: 'You start with 3 lives. Every ball you drop costs one life. Running out ends the game — surviving all 20 layouts wins.' },
+  { heading: 'Difficulty', body: 'Easy widens the paddle to 140 px, slows the ball, and drops one row of bricks. Hard shrinks the paddle to 70 px and starts at a fast ball with 8 rows. Custom exposes paddle width, ball speed and brick rows directly.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { paddleW: 140, ballSpeedMax: 7,  brickRows: 5, powerChance: 0.20 },
+  Medium: { paddleW: 100, ballSpeedMax: 9,  brickRows: 6, powerChance: 0.14 },
+  Hard:   { paddleW: 70,  ballSpeedMax: 11, brickRows: 8, powerChance: 0.08 },
+}
+
+const CUSTOM_SCHEMA = {
+  paddleW:      { label: 'Paddle width',    min: 40,  max: 200, step: 10,   default: 100 },
+  ballSpeedMax: { label: 'Ball speed cap',  min: 4,   max: 14,  step: 1,    default: 9 },
+  brickRows:    { label: 'Brick rows',      min: 3,   max: 10,  step: 1,    default: 6 },
+  powerChance:  { label: 'Power-up chance', min: 0,   max: 0.5, step: 0.02, default: 0.14 },
+}
 
 const W = 800
 const H = 600
 const PADDLE_Y   = H - 40
-const PADDLE_W   = 100
+const PADDLE_W   = 100 // baseline paddle used inside pre-computed level layouts
 const PADDLE_H   = 14
 const BALL_R     = 7
 const BRICK_ROWS = 6
@@ -93,6 +116,16 @@ export default function Breakout() {
   const [level, setLevel] = useState(1)
   const [lives, setLives] = useState(3)
   const [soundOn, setSoundOn] = useState(true)
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState(() => Object.fromEntries(
+    Object.entries(CUSTOM_SCHEMA).map(([k, v]) => [k, v.default])
+  ))
+  const cfg = useMemo(
+    () => difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty] || DIFFICULTIES.Medium,
+    [difficulty, customValues],
+  )
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
 
   const stateRef = useRef({
     paddle: { x: W / 2 - PADDLE_W / 2, w: PADDLE_W, laserCd: 0, wideT: 0, laserT: 0 },
@@ -115,8 +148,9 @@ export default function Breakout() {
 
   const buildLevel = useCallback((lvIdx) => {
     const layout = LEVELS[lvIdx % LEVELS.length]
+    const rows = Math.max(3, Math.min(BRICK_ROWS, Math.round(cfgRef.current.brickRows || BRICK_ROWS)))
     const bricks = []
-    for (let r = 0; r < BRICK_ROWS; r++) {
+    for (let r = 0; r < rows; r++) {
       for (let c = 0; c < BRICK_COLS; c++) {
         const hp = layout[r][c]
         if (!hp) continue
@@ -132,7 +166,8 @@ export default function Breakout() {
   }, [])
 
   const resetBallPaddle = useCallback((s) => {
-    s.paddle = { x: W / 2 - PADDLE_W / 2, w: PADDLE_W, laserCd: 0, wideT: 0, laserT: 0 }
+    const pw = cfgRef.current.paddleW || PADDLE_W
+    s.paddle = { x: W / 2 - pw / 2, w: pw, laserCd: 0, wideT: 0, laserT: 0 }
     s.balls = [{ x: W / 2, y: PADDLE_Y - BALL_R - 1, vx: 0, vy: 0, stuck: true, trail: [] }]
     s.powers = []
     s.lasers = []
@@ -259,7 +294,7 @@ export default function Breakout() {
         popup(s.paddle.x + s.paddle.w / 2, PADDLE_Y - 12, '+MULTI', '#f0abfc')
         sfx.chirp()
       } else if (type === 'wide') {
-        s.paddle.w = PADDLE_W * 1.7
+        s.paddle.w = (cfgRef.current.paddleW || PADDLE_W) * 1.7
         s.paddle.wideT = 12
         popup(s.paddle.x + s.paddle.w / 2, PADDLE_Y - 12, 'WIDE', '#a3e635')
         sfx.pop()
@@ -298,7 +333,7 @@ export default function Breakout() {
         }
         s.paddle.x = Math.max(0, Math.min(W - s.paddle.w, s.paddle.x))
 
-        if (s.paddle.wideT > 0) { s.paddle.wideT -= dt / 60; if (s.paddle.wideT <= 0) s.paddle.w = PADDLE_W }
+        if (s.paddle.wideT > 0) { s.paddle.wideT -= dt / 60; if (s.paddle.wideT <= 0) s.paddle.w = cfgRef.current.paddleW || PADDLE_W }
         if (s.paddle.laserT > 0) s.paddle.laserT -= dt / 60
         if (s.slowT > 0)         s.slowT -= dt / 60
         if (s.paddle.laserCd > 0) s.paddle.laserCd -= dt
@@ -343,7 +378,7 @@ export default function Breakout() {
               b.y + BALL_R > PADDLE_Y && b.y - BALL_R < PADDLE_Y + PADDLE_H &&
               b.x > s.paddle.x - BALL_R && b.x < s.paddle.x + s.paddle.w + BALL_R) {
             const hit = (b.x - (s.paddle.x + s.paddle.w / 2)) / (s.paddle.w / 2)
-            const speed = Math.min(9, Math.hypot(b.vx, b.vy) * 1.02)
+            const speed = Math.min(cfgRef.current.ballSpeedMax || 9, Math.hypot(b.vx, b.vy) * 1.02)
             const angle = hit * 1.05 - Math.PI / 2
             b.vx = Math.cos(angle) * speed
             b.vy = Math.sin(angle) * speed
@@ -366,7 +401,7 @@ export default function Breakout() {
                 setScore((v) => v + 20 * br.maxHp)
                 const cx = br.x + br.w / 2, cy = br.y + br.h / 2
                 spawnParticles(cx, cy, HP_COLORS[br.maxHp]?.[0] || '#f0abfc', 24, 3.5)
-                if (Math.random() < 0.14) spawnPower(cx, cy)
+                if (Math.random() < (cfgRef.current.powerChance ?? 0.14)) spawnPower(cx, cy)
                 sfx.boom(); shake(1.4)
               } else {
                 sfx.hit()
@@ -409,7 +444,7 @@ export default function Breakout() {
                 br.alive = false
                 setScore((v) => v + 20 * br.maxHp)
                 spawnParticles(br.x + br.w / 2, br.y + br.h / 2, HP_COLORS[br.maxHp]?.[0] || '#f0abfc', 20, 3)
-                if (Math.random() < 0.08) spawnPower(br.x + br.w / 2, br.y + br.h / 2)
+                if (Math.random() < ((cfgRef.current.powerChance ?? 0.14) * 0.6)) spawnPower(br.x + br.w / 2, br.y + br.h / 2)
                 sfx.boom()
               } else {
                 spawnParticles(l.x, l.y, '#22d3ee', 4, 1.5)
@@ -609,6 +644,13 @@ export default function Breakout() {
       onSoundToggle={() => setSoundOn((v) => !v)}
       onRestart={reset}
       onPause={() => setStatus((v) => v === 'paused' ? 'playing' : (v === 'playing' ? 'paused' : v))}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      difficultyModes={['Easy', 'Medium', 'Hard', 'Custom']}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       controls={[
         { key: '← →', label: 'Move' },
         { key: 'Enter', label: 'Launch / Laser' },

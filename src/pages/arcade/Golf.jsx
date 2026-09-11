@@ -10,8 +10,30 @@
 //
 // Drag-to-aim UI: drag from ball to set direction + power. Release to strike.
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import GameShell from '../../components/arcade/GameShell'
+
+const RULES = [
+  { heading: 'Goal', body: 'Sink your ball in each of the 9 holes using as few strokes as possible. Score is your total strokes minus par — under par is good; over par is bad.' },
+  { heading: 'Controls', body: 'Drag from the ball to aim. Distance dragged = shot power (capped at MAX_POWER). Release to strike. Space skips to the next hole once you\'ve holed out. On mobile: touch and drag from the ball.' },
+  { heading: 'Terrain', body: '• Fairway: rolling friction 0.985 — smooth glide.\n• Sand: rolling friction 0.90 — kills momentum fast, get out ASAP.\n• Water: penalty — ball resets to last shot with +1 stroke.\n• Boulder: static circle obstacle. Bounces at 0.85 restitution.\n• Walls: reflect at 0.85 restitution.' },
+  { heading: 'Wind', body: 'Some holes have a constant wind vector. It adds a small impulse to the ball every frame — you can see the direction indicator in the top corner of a windy hole. Aim into or against wind accordingly.' },
+  { heading: 'Par', body: 'Each hole has a stated par (2 to 5). Beat par → birdie (-1), eagle (-2), etc. Exceed par → bogey (+1), double bogey (+2). Final match score is total strokes across all 9 holes.' },
+  { heading: 'Difficulty', body: 'Easy zero wind, forgiving sand, no water penalty (resets you 1 stroke back but ball keeps original momentum). Hard: strong random wind gusts, slippery sand, and full water penalty. Custom exposes wind strength, water penalty, sand friction and hole positioning.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { windMul: 0, sandFriction: 0.94, waterPenalty: 0, holeOffset: 0.0 },
+  Medium: { windMul: 1, sandFriction: 0.90, waterPenalty: 1, holeOffset: 0.0 },
+  Hard:   { windMul: 2, sandFriction: 0.82, waterPenalty: 2, holeOffset: 0.15 },
+}
+
+const CUSTOM_SCHEMA = {
+  windMul:      { label: 'Wind strength ×', min: 0, max: 3,    step: 0.1,  default: 1.0 },
+  sandFriction: { label: 'Sand friction',   min: 0.6, max: 0.99, step: 0.02, default: 0.90 },
+  waterPenalty: { label: 'Water penalty',   min: 0, max: 3,    step: 1,    default: 1 },
+  holeOffset:   { label: 'Hole jitter ×',   min: 0, max: 0.3,  step: 0.02, default: 0 },
+}
 
 const W = 640
 const H = 420
@@ -113,6 +135,16 @@ const segCircle = (x1, y1, x2, y2, cx, cy, r) => {
 }
 
 export default function Golf() {
+  const [shellDifficulty, setShellDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState(() => Object.fromEntries(
+    Object.entries(CUSTOM_SCHEMA).map(([k, v]) => [k, v.default])
+  ))
+  const cfg = useMemo(
+    () => shellDifficulty === 'Custom' ? customValues : DIFFICULTIES[shellDifficulty] || DIFFICULTIES.Medium,
+    [shellDifficulty, customValues],
+  )
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
   const canvasRef = useRef(null)
   const stateRef = useRef({
     holeIndex: 0,
@@ -252,10 +284,11 @@ export default function Golf() {
     const step = () => {
       const hole = HOLES[s.holeIndex]
       const ball = s.ball
-      ball.vx += hole.wind[0]; ball.vy += hole.wind[1]
+      const wm = cfgRef.current.windMul ?? 1
+      ball.vx += hole.wind[0] * wm; ball.vy += hole.wind[1] * wm
       let inSand = false
       for (const sa of hole.sand) if (Math.hypot(ball.x - sa.x, ball.y - sa.y) < sa.r) { inSand = true; break }
-      const fric = inSand ? SAND_FRICTION : FRICTION
+      const fric = inSand ? (cfgRef.current.sandFriction ?? SAND_FRICTION) : FRICTION
       ball.vx *= fric; ball.vy *= fric
       const speed = Math.hypot(ball.vx, ball.vy)
       if (speed < 0.05) { ball.vx = 0; ball.vy = 0 }
@@ -476,6 +509,13 @@ export default function Golf() {
         { key: 'Release', label: 'Strike ball' },
         { key: 'Touch', label: 'Drag on mobile' },
       ]}
+      rules={RULES}
+      difficulty={shellDifficulty}
+      onDifficultyChange={setShellDifficulty}
+      difficultyModes={['Easy', 'Medium', 'Hard', 'Custom']}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       overlay={status === 'won' ? (
         <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-3">
           <div className="text-4xl font-bold bg-gradient-to-r from-amber-300 to-rose-400 bg-clip-text text-transparent">Tournament complete!</div>

@@ -16,8 +16,30 @@
 //
 // Score: rubble points (each falling block) + unused birds bonus.
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import GameShell from '../../components/arcade/GameShell'
+
+const RULES = [
+  { heading: 'Goal', body: 'Knock out every pig on the level by flinging birds at their towers. You clear a level when zero pigs remain. Bonus points come from rubble + unused birds.' },
+  { heading: 'Controls', body: 'Drag the bird backward from the slingshot to aim + power up. Release to fling. The trajectory arc previews the shot in flight. Space or click during flight to activate the current bird\'s special (fast birds accelerate; big birds arc more).' },
+  { heading: 'Bird types', body: '• Regular (red circle): balanced impact, 3-4 per level.\n• Fast (yellow triangle): 1.4× launch velocity, smaller, punches through single blocks.\n• Big (green oval): 2.5× mass, slow but devastating on stacks.\nEach level rations bird types — spend the right bird on the right target.' },
+  { heading: 'Physics', body: 'Impulse-based 2D rigid-body solver: OBB-vs-OBB collisions for blocks (SAT algorithm), circle-vs-OBB for the bird. Contact impulses handle normal (restitution) and tangential (friction). 6 iterations per frame keep stacks stable.' },
+  { heading: 'Scoring', body: 'Each pig killed: 500 pts. Each block dislodged (falls past a threshold): 10-50 pts depending on block size. Unused birds at level completion: 1000 pts each.' },
+  { heading: 'Difficulty', body: 'Easy grants +2 birds per level with weaker blocks. Hard removes 1 bird per level and strengthens block HP. Custom exposes bird count offset, block strength, slo-mo trigger threshold and gravity.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { birdBonus: 2,  blockStrength: 0.6, sloMoThreshold: 8, gravity: 0.35 },
+  Medium: { birdBonus: 0,  blockStrength: 1.0, sloMoThreshold: 5, gravity: 0.40 },
+  Hard:   { birdBonus: -1, blockStrength: 1.6, sloMoThreshold: 3, gravity: 0.48 },
+}
+
+const CUSTOM_SCHEMA = {
+  birdBonus:      { label: 'Bird count offset',    min: -2, max: 4, step: 1,    default: 0 },
+  blockStrength:  { label: 'Block strength ×',     min: 0.3, max: 2.5, step: 0.1, default: 1.0 },
+  sloMoThreshold: { label: 'Slo-mo threshold',     min: 1, max: 10, step: 1,    default: 5 },
+  gravity:        { label: 'Gravity',              min: 0.1, max: 0.8, step: 0.05, default: 0.4 },
+}
 
 const W = 900
 const H = 500
@@ -129,8 +151,8 @@ const LEVELS = [
   ),
 ]
 
-const makeBlock = (x, y, w, h, rot = 0) => {
-  const mass = w * h * 0.001 + 0.5
+const makeBlock = (x, y, w, h, rot = 0, strengthMul = 1) => {
+  const mass = (w * h * 0.001 + 0.5) * (strengthMul || 1)
   return {
     x, y, w, h, rot, vx: 0, vy: 0, omega: 0,
     mass, inv: 1 / mass,
@@ -199,6 +221,17 @@ export default function AngrySlings() {
     shake: 0, reduced: false, slowmo: 0,
   })
 
+  const [shellDifficulty, setShellDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState(() => Object.fromEntries(
+    Object.entries(CUSTOM_SCHEMA).map(([k, v]) => [k, v.default])
+  ))
+  const cfg = useMemo(
+    () => shellDifficulty === 'Custom' ? customValues : DIFFICULTIES[shellDifficulty] || DIFFICULTIES.Medium,
+    [shellDifficulty, customValues],
+  )
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
+
   const [level, setLevel] = useState(0)
   const [score, setScore] = useState(0)
   const [best, setBest] = useState(0)
@@ -229,9 +262,14 @@ export default function AngrySlings() {
   const loadLevel = useCallback((idx) => {
     const L = LEVELS[idx]
     const s = stateRef.current
-    s.blocks = L.blocks.map(b => makeBlock(b.x, b.y, b.w, b.h, b.rot || 0))
+    const bs = cfgRef.current.blockStrength ?? 1
+    s.blocks = L.blocks.map(b => makeBlock(b.x, b.y, b.w, b.h, b.rot || 0, bs))
     s.pigs = L.pigs.map(p => ({ ...p, alive: true, wobble: 0 }))
-    s.birds = [...L.birds]
+    const birdList = [...L.birds]
+    const bonus = Math.max(-2, Math.min(4, Math.round(cfgRef.current.birdBonus || 0)))
+    if (bonus > 0) for (let i = 0; i < bonus; i++) birdList.push('regular')
+    if (bonus < 0) birdList.length = Math.max(1, birdList.length + bonus)
+    s.birds = birdList
     s.currentBird = s.birds.shift() || null
     s.inFlight = null; s.trail = []
     setLevel(idx)
@@ -347,7 +385,7 @@ export default function AngrySlings() {
     const step = () => {
       s.blocks.forEach(b => {
         if (b.sleep > 30) return
-        b.vy += GRAVITY
+        b.vy += (cfgRef.current.gravity ?? GRAVITY)
         b.vx *= 0.995; b.vy *= 0.995
         b.omega *= 0.98
         b.x += b.vx; b.y += b.vy; b.rot += b.omega
@@ -400,7 +438,7 @@ export default function AngrySlings() {
 
       if (s.inFlight) {
         const bird = s.inFlight
-        bird.vy += GRAVITY
+        bird.vy += (cfgRef.current.gravity ?? GRAVITY)
         bird.vx *= 0.999
         bird.x += bird.vx; bird.y += bird.vy
         bird.life--
@@ -568,7 +606,7 @@ export default function AngrySlings() {
         let pvx = dx * 0.22 * mult, pvy = dy * 0.22 * mult
         ctx.fillStyle = 'rgba(255,255,255,0.5)'
         for (let i = 0; i < 30; i++) {
-          pvy += GRAVITY
+          pvy += (cfgRef.current.gravity ?? GRAVITY)
           px += pvx; py += pvy
           if (py > GROUND_Y) break
           if (i % 2 === 0) ctx.fillRect(px - 1.5, py - 1.5, 3, 3)
@@ -685,6 +723,13 @@ export default function AngrySlings() {
         { key: 'Release', label: 'Launch bird' },
         { key: 'Touch', label: 'Drag on mobile' },
       ]}
+      rules={RULES}
+      difficulty={shellDifficulty}
+      onDifficultyChange={setShellDifficulty}
+      difficultyModes={['Easy', 'Medium', 'Hard', 'Custom']}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       overlay={status === 'won' ? (
         <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-3">
           <div className="text-4xl font-bold bg-gradient-to-r from-amber-300 to-rose-400 bg-clip-text text-transparent">All levels cleared!</div>

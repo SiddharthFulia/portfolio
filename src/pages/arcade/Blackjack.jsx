@@ -18,6 +18,31 @@ import GameShell from '../../components/arcade/GameShell'
 import PlayingCard, { bjPoint, makeShoe, shuffle } from '../../components/arcade/PlayingCard'
 import { Button } from '../../components/ui'
 
+const RULES = [
+  { heading: 'Goal', body: 'Beat the dealer\'s hand without your own total going over 21. Winning a hand pays 1:1 (2:1 for insurance, 3:2 for a natural blackjack).' },
+  { heading: 'Card values', body: 'Number cards are worth their pip value (2–10). Face cards (J / Q / K) are worth 10. Aces are worth 11 unless that would bust you, in which case they revert to 1. A hand that still uses an 11-valued ace is "soft".' },
+  { heading: 'Actions', body: '• Hit — take another card.\n• Stand — end your turn.\n• Double — double the bet and take exactly ONE more card.\n• Split — if your two cards are the same rank, split them into two hands with a matching bet on each. Up to 4 hands total.\n• Surrender — forfeit half your bet on the first two cards (only if enabled).' },
+  { heading: 'Dealer rules', body: 'After you finish, the dealer flips their hole card and hits according to a fixed rule: hit until 17+, then stand. Whether the dealer stands or hits on soft 17 is a table rule you can toggle.' },
+  { heading: 'Blackjack & insurance', body: 'A two-card 21 (Ace + ten-value) is a natural blackjack — pays 3:2 unless the dealer also has one, which is a push. When the dealer shows an Ace, you may take insurance for half your bet — pays 2:1 if the dealer has blackjack.' },
+  { heading: 'Bankroll & bets', body: 'You start with a 1,000-chip bankroll and can bet 5, 25, 100 or 500 chips per round. Running out ends the session. Best bankroll persists locally.' },
+  { heading: 'Count assist', body: 'Optional Hi-Lo running-count HUD (2–6 = +1, 7–9 = 0, 10–A = −1) and true-count. Purely educational — swings the odds in your favour only if paired with correct bet sizing.' },
+  { heading: 'Difficulty', body: 'Easy uses a single deck, dealer stands on soft 17, surrender allowed, and count-assist ON by default. Hard uses 8 decks, dealer hits soft 17, no surrender, no double-after-split. Custom exposes deck count, soft-17 rule, DAS, surrender and count assist.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { decks: 1, soft17: 'stand', das: true,  surrender: true,  counting: true  },
+  Medium: { decks: 6, soft17: 'stand', das: true,  surrender: false, counting: false },
+  Hard:   { decks: 8, soft17: 'hit',   das: false, surrender: false, counting: false },
+}
+
+const CUSTOM_SCHEMA = {
+  decks:     { label: 'Deck count',           min: 1, max: 8, step: 1, default: 6 },
+  soft17:    { label: 'Dealer soft 17 (0=stand,1=hit)', min: 0, max: 1, step: 1, default: 0 },
+  das:       { label: 'Double after split (0/1)', min: 0, max: 1, step: 1, default: 1 },
+  surrender: { label: 'Surrender allowed (0/1)',  min: 0, max: 1, step: 1, default: 0 },
+  counting:  { label: 'Count assist (0/1)',       min: 0, max: 1, step: 1, default: 0 },
+}
+
 const STARTING_BANK = 1000
 const DECKS_IN_SHOE = 6
 
@@ -74,7 +99,16 @@ function basicStrategyHint(hand, dealerUp, canDouble, canSplit) {
 }
 
 export default function Blackjack() {
-  const [shoe, setShoe] = useState(() => shuffle(makeShoe(DECKS_IN_SHOE)))
+  const [shellDifficulty, setShellDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState(() => Object.fromEntries(
+    Object.entries(CUSTOM_SCHEMA).map(([k, v]) => [k, v.default])
+  ))
+  const shellCfg = useMemo(
+    () => shellDifficulty === 'Custom' ? customValues : DIFFICULTIES[shellDifficulty] || DIFFICULTIES.Medium,
+    [shellDifficulty, customValues],
+  )
+  const decksInShoe = shellCfg.decks || DECKS_IN_SHOE
+  const [shoe, setShoe] = useState(() => shuffle(makeShoe(decksInShoe)))
   const [dealtCount, setDealtCount] = useState(0)
   const [bank, setBank] = useState(() => {
     const v = Number(localStorage.getItem('arcade.blackjack.bank') || STARTING_BANK)
@@ -92,6 +126,11 @@ export default function Blackjack() {
   const [phase, setPhase] = useState('bet')
   const [runningCount, setRunningCount] = useState(0)
   const [assist, setAssist] = useState(false)
+  // Sync counting-assist with shell setting.
+  useEffect(() => {
+    const on = !!(shellCfg.counting && shellCfg.counting !== 0)
+    if (on !== assist) setAssist(on)
+  }, [shellCfg.counting]) // eslint-disable-line react-hooks/exhaustive-deps
   const [message, setMessage] = useState('Place your bet')
   const [soundOn, setSoundOn] = useState(true)
   const audioCtxRef = useRef(null)
@@ -122,7 +161,7 @@ export default function Blackjack() {
 
   const drawCard = useCallback((faceUp = true) => {
     if (dealtRef.current >= shoeRef.current.length - 4) {
-      const fresh = shuffle(makeShoe(DECKS_IN_SHOE))
+      const fresh = shuffle(makeShoe(decksInShoe))
       shoeRef.current = fresh
       dealtRef.current = 0
       setShoe(fresh)
@@ -134,7 +173,7 @@ export default function Blackjack() {
     setDealtCount(dealtRef.current)
     if (faceUp) setRunningCount((c) => c + huLoValue(card.rank))
     return card
-  }, [])
+  }, [decksInShoe])
 
   const startRound = useCallback(() => {
     if (bank < bet) { setMessage('Not enough chips'); return }
@@ -246,9 +285,12 @@ export default function Blackjack() {
     if (activeHands.length > 0) {
       let loop = 0
       while (loop++ < 30) {
-        const { value } = handValue(cards)
-        if (value >= 17) break
-        cards = [...cards, drawCard(true)]
+        const { value, soft } = handValue(cards)
+        const hitsSoft17 = !!(shellCfg.soft17 === 'hit' || shellCfg.soft17 === 1)
+        if (value > 17) break
+        if (value === 17 && !(soft && hitsSoft17)) break
+        if (value < 17 || (value === 17 && soft && hitsSoft17)) cards = [...cards, drawCard(true)]
+        else break
       }
       setDealer(cards)
     }
@@ -333,6 +375,13 @@ export default function Blackjack() {
         { key: 'Dbl', label: 'Double bet, one card' },
         { key: 'Split', label: 'Same-rank two hands' },
       ]}
+      rules={RULES}
+      difficulty={shellDifficulty}
+      onDifficultyChange={setShellDifficulty}
+      difficultyModes={['Easy', 'Medium', 'Hard', 'Custom']}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       extraStats={
         <div className="flex flex-col items-start">
           <span className="text-[10px] uppercase tracking-widest text-white/40">Assist</span>

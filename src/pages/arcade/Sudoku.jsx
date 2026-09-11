@@ -31,6 +31,31 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import GameShell from '../../components/arcade/GameShell'
 import { getSfx } from '../../components/arcade/sfx'
 
+const RULES = [
+  { heading: 'Goal', body: 'Fill the 9×9 grid so that every row, every column and each of the nine 3×3 boxes contain the digits 1–9 exactly once. The puzzle you start with is guaranteed to have a unique solution.' },
+  { heading: 'Controls', body: 'Click / tap a cell to select it. Type 1–9 or use the number bar to enter a digit. Delete or 0 clears. Toggle pencil mode (P) to jot small candidates instead. Ctrl/Cmd + Z undoes, Shift-Z redoes. Arrow keys move the selection.' },
+  { heading: 'Scoring & timer', body: 'Each puzzle is timed. Faster completions rank higher; your best time per difficulty persists locally. There is no per-move scoring — this is a race against yourself and the clock.' },
+  { heading: 'Conflict feedback', body: 'When you enter a digit that clashes with the row, column or box, that digit glows red. The clue cells you start with are locked and cannot be changed.' },
+  { heading: 'Hints', body: 'You start with a small hint budget (3 by default). Each hint reveals the correct digit for the currently selected empty cell, drawn from the puzzle\'s solved board. Used hints do not refund.' },
+  { heading: 'Pencil marks', body: 'Pencil mode paints small candidate digits into a cell without committing. Useful for tracking twins, triples and X-wings. In Custom mode you can auto-fill all pencils on generation.' },
+  { heading: 'Difficulty', body: 'Easy leaves ~40 clues, a large hint budget and visible timer. Hard leaves ~26 clues, only 1 hint and hides the timer. Custom exposes clue count, hint budget, timer visibility and pencil-mark auto-fill.' },
+]
+
+const DIFFICULTY_MODES = ['Easy', 'Medium', 'Hard', 'Custom']
+
+const PRESET_DIFFICULTIES = {
+  Easy:   { clueCount: 40, hintBudget: 6, timerVisible: true,  pencilAuto: false },
+  Medium: { clueCount: 32, hintBudget: 3, timerVisible: true,  pencilAuto: false },
+  Hard:   { clueCount: 26, hintBudget: 1, timerVisible: false, pencilAuto: false },
+}
+
+const CUSTOM_SCHEMA = {
+  clueCount:    { label: 'Clue count',       min: 17, max: 45, step: 1, default: 32 },
+  hintBudget:   { label: 'Hint budget',      min: 0,  max: 10, step: 1, default: 3 },
+  timerVisible: { label: 'Timer visible (0/1)', min: 0, max: 1, step: 1, default: 1 },
+  pencilAuto:   { label: 'Auto-fill pencils (0/1)', min: 0, max: 1, step: 1, default: 0 },
+}
+
 const N = 9
 const BOX = 3
 
@@ -122,8 +147,10 @@ function countSolutions(board, limit = 2) {
 
 const CLUES_BY_DIFF = { easy: 40, medium: 32, hard: 26, expert: 23 }
 
-function generatePuzzle(difficulty) {
-  const clueTarget = CLUES_BY_DIFF[difficulty]
+function generatePuzzle(difficultyOrClueCount) {
+  const clueTarget = typeof difficultyOrClueCount === 'number'
+    ? Math.max(17, Math.min(45, difficultyOrClueCount))
+    : (CLUES_BY_DIFF[difficultyOrClueCount] ?? 32)
   const solution = fillSolution(new Int8Array(N * N))
   const puzzle = new Int8Array(solution)
   const indices = shuffle([...Array(N * N).keys()])
@@ -148,6 +175,14 @@ function generatePuzzle(difficulty) {
 const DIFFICULTIES = ['easy', 'medium', 'hard', 'expert']
 
 export default function Sudoku() {
+  const [shellDifficulty, setShellDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState(() => Object.fromEntries(
+    Object.entries(CUSTOM_SCHEMA).map(([k, v]) => [k, v.default])
+  ))
+  const shellCfg = useMemo(
+    () => shellDifficulty === 'Custom' ? customValues : PRESET_DIFFICULTIES[shellDifficulty] || PRESET_DIFFICULTIES.Medium,
+    [shellDifficulty, customValues],
+  )
   const [difficulty, setDifficulty] = useState('medium')
   const [puzzle, setPuzzle] = useState(null)
   const [solution, setSolution] = useState(null)
@@ -177,14 +212,26 @@ export default function Sudoku() {
   const startNew = useCallback((diff) => {
     setGenerating(true)
     setTimeout(() => {
-      const { puzzle: p, solution: s } = generatePuzzle(diff)
+      // Prefer explicit shell clue count when set; fall back to legacy difficulty string.
+      const clueOrDiff = shellCfg.clueCount ?? diff
+      const { puzzle: p, solution: s } = generatePuzzle(clueOrDiff)
       setPuzzle(new Int8Array(p))
       setSolution(new Int8Array(s))
       setBoard(new Int8Array(p))
-      setPencils(new Uint16Array(N * N))
+      const pencils = new Uint16Array(N * N)
+      if (shellCfg.pencilAuto) {
+        // Auto-fill every empty cell with all legal candidates.
+        const m = maskFrom(p)
+        for (let i = 0; i < N * N; i++) {
+          if (p[i]) continue
+          const used = m.rows[rowOf(i)] | m.cols[colOf(i)] | m.boxes[boxOf(i)]
+          pencils[i] = (~used) & 0x1ff
+        }
+      }
+      setPencils(pencils)
       setHistory([])
       setFuture([])
-      setHintsLeft(3)
+      setHintsLeft(shellCfg.hintBudget ?? 3)
       setSeconds(0)
       setSelected(40)
       setPencilMode(false)
@@ -193,7 +240,7 @@ export default function Sudoku() {
       setGenerating(false)
       setConfetti(false)
     }, 30)
-  }, [])
+  }, [shellCfg])
 
   useEffect(() => { startNew(difficulty) }, [difficulty, startNew])
 
@@ -357,10 +404,12 @@ export default function Sudoku() {
       status={status === 'won' ? 'won' : (paused ? 'paused' : (generating ? 'ready' : 'playing'))}
       extraStats={
         <>
-          <div className="flex flex-col items-start">
-            <span className="text-[10px] uppercase tracking-widest text-white/40">Time</span>
-            <span className="text-xl sm:text-2xl font-bold tabular-nums text-cyan-300">{timeStr}</span>
-          </div>
+          {shellCfg.timerVisible !== 0 && shellCfg.timerVisible !== false && (
+            <div className="flex flex-col items-start">
+              <span className="text-[10px] uppercase tracking-widest text-white/40">Time</span>
+              <span className="text-xl sm:text-2xl font-bold tabular-nums text-cyan-300">{timeStr}</span>
+            </div>
+          )}
           <div className="flex flex-col items-start">
             <span className="text-[10px] uppercase tracking-widest text-white/40">Best</span>
             <span className="text-xl sm:text-2xl font-bold tabular-nums text-rose-300">{bestStr}</span>
@@ -387,6 +436,13 @@ export default function Sudoku() {
         { key: 'Z / Y', label: 'Undo / Redo' },
         { key: '↑↓←→', label: 'Move cursor' },
       ]}
+      rules={RULES}
+      difficulty={shellDifficulty}
+      onDifficultyChange={setShellDifficulty}
+      difficultyModes={DIFFICULTY_MODES}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
     >
       <div className="flex flex-col lg:flex-row items-center lg:items-start gap-6 p-3 sm:p-5">
         <div className="w-full lg:w-auto flex flex-wrap justify-center gap-2 lg:hidden">

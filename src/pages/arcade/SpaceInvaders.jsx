@@ -10,9 +10,33 @@
 // Sprite atlas: aliens are drawn from tiny inline binary grids so
 // three distinct species show up with a two-frame waddle animation.
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import GameShell from '../../components/arcade/GameShell'
 import { getSfx } from '../../components/arcade/sfx'
+
+const RULES = [
+  { heading: 'Goal', body: 'Wipe out every alien in the 5×11 grid before they either reach your line or blast you with bombs. Clearing all 55 aliens rolls the next wave.' },
+  { heading: 'Controls', body: '← / → or A / D moves your cannon. Z, ↑ or Enter fires a laser (only one bullet on screen at a time). Space pauses. Touch users get on-screen buttons.' },
+  { heading: 'Scoring', body: 'Top row (small squid) = 30 pts. Middle rows (crab) = 20 pts. Bottom rows (octopus) = 10 pts. The pink UFO awards a random 50–300 pt bonus when picked off.' },
+  { heading: 'Bunkers', body: 'Four green bunkers sit above the player. They erode with every bullet (yours OR alien bombs) that hits them, so use them sparingly.' },
+  { heading: 'Alien behaviour', body: 'The whole formation shifts side-to-side and steps down when it hits a wall. Aliens speed up as their numbers thin out. From level 3, some bombs are "smart bombs" that home in on you.' },
+  { heading: 'UFO', body: 'The pink saucer streaks across the top every 400–800 ticks. It is worth big points but never bombs you.' },
+  { heading: 'Lives', body: 'You start with 3 lives. Getting bombed costs a life (and a small stun frame). Zero lives ends the game.' },
+  { heading: 'Difficulty', body: 'Easy slows the march, lowers bomb frequency and gives 4 lives. Hard doubles bomb rate, speeds the march, and raises smart-bomb chance. Custom exposes march speed, fire rate, UFO frequency and bunker HP.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { stepBase: 60, shootChance: 0.18, ufoInterval: 800, bunkerHp: 4 },
+  Medium: { stepBase: 45, shootChance: 0.30, ufoInterval: 500, bunkerHp: 3 },
+  Hard:   { stepBase: 30, shootChance: 0.55, ufoInterval: 300, bunkerHp: 2 },
+}
+
+const CUSTOM_SCHEMA = {
+  stepBase:    { label: 'March interval (lower = faster)', min: 10, max: 80,  step: 2,    default: 45 },
+  shootChance: { label: 'Bomb frequency',                  min: 0.05, max: 0.9, step: 0.05, default: 0.3 },
+  ufoInterval: { label: 'UFO interval',                    min: 150, max: 1500, step: 50, default: 500 },
+  bunkerHp:    { label: 'Bunker HP',                       min: 1,   max: 6,   step: 1,    default: 3 },
+}
 
 const W = 800
 const H = 600
@@ -78,6 +102,16 @@ export default function SpaceInvaders() {
   const [lives, setLives] = useState(3)
   const [status, setStatus] = useState('playing')
   const [soundOn, setSoundOn] = useState(true)
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState(() => Object.fromEntries(
+    Object.entries(CUSTOM_SCHEMA).map(([k, v]) => [k, v.default])
+  ))
+  const cfg = useMemo(
+    () => difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty] || DIFFICULTIES.Medium,
+    [difficulty, customValues],
+  )
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
 
   const stateRef = useRef({
     player: { x: W / 2 - PLAYER_W / 2, hit: 0 },
@@ -119,15 +153,17 @@ export default function SpaceInvaders() {
     for (let i = 0; i < 4; i++) {
       const bx = 80 + i * (W - 160) / 3
       const by = H - 160
-      const cells = BUNKER_SPRITE.map((row) => row.split('').map((v) => v === '1' ? 3 : 0))
+      const bunkerHp = cfgRef.current.bunkerHp || 3
+      const cells = BUNKER_SPRITE.map((row) => row.split('').map((v) => v === '1' ? bunkerHp : 0))
       bunkers.push({ x: bx, y: by, cells, cellSize: 6 })
     }
     const s = stateRef.current
     s.aliens = aliens; s.bunkers = bunkers
     s.bullets = []; s.bombs = []
-    s.ufo = null; s.ufoTimer = 400 + Math.random() * 400
+    const ufoBase = cfgRef.current.ufoInterval || 500
+    s.ufo = null; s.ufoTimer = ufoBase * 0.8 + Math.random() * ufoBase * 0.8
     s.dir = 1; s.stepTimer = 0
-    s.stepInterval = Math.max(6, 45 - lvl * 3)
+    s.stepInterval = Math.max(6, (cfgRef.current.stepBase || 45) - lvl * 3)
     s.animFrame = 0
   }, [])
 
@@ -245,7 +281,7 @@ export default function SpaceInvaders() {
             if (!prev || a.y > prev.y) bottoms.set(a.c, a)
           }
           const candidates = [...bottoms.values()]
-          if (candidates.length && Math.random() < 0.3 + level * 0.05) {
+          if (candidates.length && Math.random() < (cfgRef.current.shootChance || 0.3) + level * 0.05) {
             const bomber = candidates[Math.floor(Math.random() * candidates.length)]
             const type = Math.random() < 0.15 && level >= 3 ? 'smart' : 'plain'
             s.bombs.push({ x: bomber.x + CELL_W / 2, y: bomber.y + CELL_H, type, vx: 0, wobble: Math.random() * Math.PI * 2 })
@@ -254,7 +290,7 @@ export default function SpaceInvaders() {
         }
 
         const aliveCount = s.aliens.filter((a) => a.alive).length
-        s.stepInterval = Math.max(4, (45 - level * 3) * (aliveCount / (ROWS * COLS)) + 6)
+        s.stepInterval = Math.max(4, ((cfgRef.current.stepBase || 45) - level * 3) * (aliveCount / (ROWS * COLS)) + 6)
 
         for (const b of s.bullets) b.y -= BULLET_SPEED * dt
         s.bullets = s.bullets.filter((b) => {
@@ -316,7 +352,7 @@ export default function SpaceInvaders() {
         if (s.ufoTimer <= 0 && !s.ufo) {
           const fromLeft = Math.random() < 0.5
           s.ufo = { x: fromLeft ? -30 : W + 30, y: 50, vx: fromLeft ? 2 : -2 }
-          s.ufoTimer = 700 + Math.random() * 700
+          s.ufoTimer = (cfgRef.current.ufoInterval || 500) * 1.4 + Math.random() * (cfgRef.current.ufoInterval || 500) * 1.4
           sfx.chirp()
         }
         if (s.ufo) {
@@ -492,6 +528,13 @@ export default function SpaceInvaders() {
       ]}
       mobile={mobilePad}
       subtitle="Waddling squids, marching crabs, one lonely cannon. Duck the smart bombs, cover under bunkers, chase the pink UFO."
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      difficultyModes={['Easy', 'Medium', 'Hard', 'Custom']}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
     >
       <canvas ref={canvasRef} width={W} height={H} className="w-full h-auto max-h-[78vh] block bg-black" />
     </GameShell>

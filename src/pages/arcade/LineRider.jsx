@@ -13,8 +13,30 @@
 //   - Camera follows sledder centroid, smooth-tweened.
 //   - Save/load track to localStorage under 'linerider-track'.
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import GameShell from '../../components/arcade/GameShell'
+
+const RULES = [
+  { heading: 'Goal', body: 'Build a track by drawing lines with your mouse. When you switch to Play mode, the sledder starts at your marked spot and rides the lines under gravity. Score = furthest horizontal distance reached before falling off the visible world.' },
+  { heading: 'Controls', body: 'Draw tool: hold and drag to lay down a track line. Erase tool: click any line to remove it. Move mode: click and drag empty space to pan. Play button starts the sledder; Reset pauses and returns to edit. Space toggles play/pause once the sledder is rolling.' },
+  { heading: 'Sledder physics', body: 'Two-particle body (front foot + back foot) linked by a rigid rod, plus a head particle attached above the midpoint. Verlet integration keeps stacks stable. Collisions with your lines push the sledder out along the surface normal with 0.4 restitution, plus 0.995 sliding friction on the tangent.' },
+  { heading: 'Track tips', body: 'Downhill slopes build speed. Long flat drops let the sledder settle before impacting. Loop-the-loops work if you build enough entry speed. Very sharp angles can bounce the sledder chaotically — smoother curves preserve momentum.' },
+  { heading: 'Persistence', body: 'Your track auto-saves to localStorage under "linerider-track". Refreshing keeps it. Clear the storage entry (or press Clear Track) to start fresh.' },
+  { heading: 'Difficulty', body: 'Easy uses low gravity and a light sledder for smooth long rides. Hard uses high gravity, heavier sledder and low camera lerp for jerky, tricky flights. Custom exposes sledder mass, gravity, line friction and camera lerp speed.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { sledderMass: 0.7, gravity: 0.22, lineFriction: 0.999, cameraLerp: 0.18 },
+  Medium: { sledderMass: 1.0, gravity: 0.28, lineFriction: 0.995, cameraLerp: 0.12 },
+  Hard:   { sledderMass: 1.5, gravity: 0.38, lineFriction: 0.985, cameraLerp: 0.06 },
+}
+
+const CUSTOM_SCHEMA = {
+  sledderMass:  { label: 'Sledder mass ×',  min: 0.5,  max: 2,     step: 0.1,  default: 1.0 },
+  gravity:      { label: 'Gravity',         min: 0.10, max: 0.60,  step: 0.02, default: 0.28 },
+  lineFriction: { label: 'Line friction',   min: 0.95, max: 1.00,  step: 0.005, default: 0.995 },
+  cameraLerp:   { label: 'Camera lerp',     min: 0.02, max: 0.30,  step: 0.02, default: 0.12 },
+}
 
 const W = 900
 const H = 500
@@ -38,6 +60,17 @@ const segClosest = (x1, y1, x2, y2, px, py) => {
 }
 
 export default function LineRider() {
+  const [shellDifficulty, setShellDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState(() => Object.fromEntries(
+    Object.entries(CUSTOM_SCHEMA).map(([k, v]) => [k, v.default])
+  ))
+  const cfg = useMemo(
+    () => shellDifficulty === 'Custom' ? customValues : DIFFICULTIES[shellDifficulty] || DIFFICULTIES.Medium,
+    [shellDifficulty, customValues],
+  )
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
+
   const canvasRef = useRef(null)
   const stateRef = useRef({
     tool: 'draw', // 'draw' | 'erase'
@@ -260,8 +293,9 @@ export default function LineRider() {
               const rest = 0.15
               const tx = vx - vdotn * nx
               const ty = vy - vdotn * ny
-              const newvx = tx * 0.995 - vdotn * nx * rest
-              const newvy = ty * 0.995 - vdotn * ny * rest
+              const fric = cfgRef.current.lineFriction ?? 0.995
+              const newvx = tx * fric - vdotn * nx * rest
+              const newvy = ty * fric - vdotn * ny * rest
               ppx = px - newvx
               ppy = py - newvy
               if (Math.abs(vdotn) > 4 && !s.reduced) {
@@ -279,11 +313,13 @@ export default function LineRider() {
       if (s.mode !== 'play' || !s.sledder || !s.sledder.alive) return
       const sd = s.sledder
       // Integrate each particle
+      const gravVal = cfgRef.current.gravity ?? GRAVITY
+      const massMul = cfgRef.current.sledderMass ?? 1
       const integ = (x, y, px, py, gravity = true) => {
         const vx = (x - px) * DAMPING
         const vy = (y - py) * DAMPING
         const npx = x, npy = y
-        let nx = x + vx, ny = y + vy + (gravity ? GRAVITY : 0)
+        let nx = x + vx, ny = y + vy + (gravity ? gravVal * massMul : 0)
         return [nx, ny, npx, npy]
       }
       let [fbx, fby, fbpx, fbpy] = integ(sd.backX, sd.backY, sd.backPx, sd.backPy)
@@ -321,8 +357,8 @@ export default function LineRider() {
       // Camera follow (smooth)
       s.camera.tx = cx - W / 2
       s.camera.ty = ((fby + ffy) / 2) - H / 2
-      s.camera.x += (s.camera.tx - s.camera.x) * 0.08
-      s.camera.y += (s.camera.ty - s.camera.y) * 0.08
+      s.camera.x += (s.camera.tx - s.camera.x) * (cfgRef.current.cameraLerp ?? 0.08)
+      s.camera.y += (s.camera.ty - s.camera.y) * (cfgRef.current.cameraLerp ?? 0.08)
       // Clamp camera y (don't go too far up above 0)
       if (s.camera.y < -300) s.camera.y = -300
 
@@ -534,6 +570,13 @@ export default function LineRider() {
         { key: 'Erase', label: 'Click near a line to remove it' },
         { key: 'Play', label: 'Send the sledder' },
       ]}
+      rules={RULES}
+      difficulty={shellDifficulty}
+      onDifficultyChange={setShellDifficulty}
+      difficultyModes={['Easy', 'Medium', 'Hard', 'Custom']}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       footer={
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
           <button type="button" onClick={toggleTool} disabled={mode !== 'edit'}

@@ -11,9 +11,32 @@
 // trucks have cab + trailer split, logs have grain rings, turtles
 // have shell segments with flicker before sink.
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import GameShell from '../../components/arcade/GameShell'
 import { getSfx } from '../../components/arcade/sfx'
+
+const RULES = [
+  { heading: 'Goal', body: 'Hop the frog from the bottom safe strip up to one of five home slots at the top of the screen. Fill all five slots to clear the level and roll over to a faster one.' },
+  { heading: 'Controls', body: 'Arrow keys or WASD hop one cell in that direction. On touch devices, tap the edge of the canvas nearest the direction you want to hop. Space pauses. Each hop counts — you cannot cancel one mid-air.' },
+  { heading: 'Road (rows 8–12)', body: 'Five lanes of cars and trucks. Getting clipped kills you. Trucks are 2-wide and slower, cars are 1-wide and faster. Alternating lanes travel left and right.' },
+  { heading: 'River (rows 2–6)', body: 'Water is death — you must ride logs or turtles across. Turtles blink for a moment, then dive: step off before they disappear or you drown.' },
+  { heading: 'Scoring', body: 'Each row advanced = 10 pts. Reaching a home slot = 50 pts + timer bonus (10 × seconds left). Filling all 5 homes = 1000 pt round bonus.' },
+  { heading: 'Timer & lives', body: 'Each attempt is on a countdown timer. Running it out costs a life. You start with 3 lives; zero ends the game. Reaching a home resets the timer for the next attempt.' },
+  { heading: 'Difficulty', body: 'Easy slows traffic and river, gives 90 s per hop and 4 lives. Hard speeds traffic 60%, shortens timer to 40 s, and packs the river tighter. Custom exposes car density, car speed, river speed and timer length.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { carSpeed: 0.7, carDensity: 0.7, riverSpeed: 0.8, timer: 90 },
+  Medium: { carSpeed: 1.0, carDensity: 1.0, riverSpeed: 1.0, timer: 60 },
+  Hard:   { carSpeed: 1.6, carDensity: 1.4, riverSpeed: 1.4, timer: 40 },
+}
+
+const CUSTOM_SCHEMA = {
+  carSpeed:   { label: 'Car speed',   min: 0.4, max: 2.5, step: 0.1, default: 1.0 },
+  carDensity: { label: 'Car density', min: 0.4, max: 2.0, step: 0.1, default: 1.0 },
+  riverSpeed: { label: 'River speed', min: 0.4, max: 2.0, step: 0.1, default: 1.0 },
+  timer:      { label: 'Timer (s)',   min: 20,  max: 120, step: 5,   default: 60 },
+}
 
 const W = 640
 const H = 640
@@ -40,6 +63,16 @@ export default function Frogger() {
   const [level, setLevel] = useState(1)
   const [status, setStatus] = useState('playing')
   const [soundOn, setSoundOn] = useState(true)
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState(() => Object.fromEntries(
+    Object.entries(CUSTOM_SCHEMA).map(([k, v]) => [k, v.default])
+  ))
+  const cfg = useMemo(
+    () => difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty] || DIFFICULTIES.Medium,
+    [difficulty, customValues],
+  )
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
 
   const stateRef = useRef({
     frog: { x: (COLS - 1) / 2 * CELL + CELL / 2, y: (ROWS - 2) * CELL + CELL / 2, dir: 0, jumpT: 0, onCarrier: null, ridingVx: 0 },
@@ -59,22 +92,24 @@ export default function Frogger() {
 
   const buildLanes = useCallback((lv) => {
     const lanes = []
-    const speedMul = 1 + (lv - 1) * 0.12
+    const carMul = (cfgRef.current.carSpeed || 1) * (1 + (lv - 1) * 0.12)
+    const riverMul = (cfgRef.current.riverSpeed || 1) * (1 + (lv - 1) * 0.12)
+    const density = cfgRef.current.carDensity || 1
     // Road lanes rows 8-12.
     const roadCfg = [
-      { row: 8,  kind: 'truck', dir:  1, speed: 0.8 * speedMul, spacing: 5.5, w: 2 },
-      { row: 9,  kind: 'car',   dir: -1, speed: 1.4 * speedMul, spacing: 4,   w: 1 },
-      { row: 10, kind: 'car',   dir:  1, speed: 1.9 * speedMul, spacing: 4.5, w: 1 },
-      { row: 11, kind: 'truck', dir: -1, speed: 1.0 * speedMul, spacing: 6,   w: 2 },
-      { row: 12, kind: 'car',   dir:  1, speed: 2.2 * speedMul, spacing: 3.5, w: 1 },
+      { row: 8,  kind: 'truck', dir:  1, speed: 0.8 * carMul, spacing: 5.5 / density, w: 2 },
+      { row: 9,  kind: 'car',   dir: -1, speed: 1.4 * carMul, spacing: 4   / density, w: 1 },
+      { row: 10, kind: 'car',   dir:  1, speed: 1.9 * carMul, spacing: 4.5 / density, w: 1 },
+      { row: 11, kind: 'truck', dir: -1, speed: 1.0 * carMul, spacing: 6   / density, w: 2 },
+      { row: 12, kind: 'car',   dir:  1, speed: 2.2 * carMul, spacing: 3.5 / density, w: 1 },
     ]
     // River lanes rows 2-6.
     const riverCfg = [
-      { row: 2, kind: 'log',    dir: -1, speed: 1.0 * speedMul, spacing: 5, w: 3 },
-      { row: 3, kind: 'turtle', dir:  1, speed: 0.9 * speedMul, spacing: 3.4, w: 1 },
-      { row: 4, kind: 'log',    dir:  1, speed: 1.4 * speedMul, spacing: 5.5, w: 4 },
-      { row: 5, kind: 'turtle', dir: -1, speed: 1.0 * speedMul, spacing: 3, w: 1 },
-      { row: 6, kind: 'log',    dir: -1, speed: 1.2 * speedMul, spacing: 4.5, w: 3 },
+      { row: 2, kind: 'log',    dir: -1, speed: 1.0 * riverMul, spacing: 5, w: 3 },
+      { row: 3, kind: 'turtle', dir:  1, speed: 0.9 * riverMul, spacing: 3.4, w: 1 },
+      { row: 4, kind: 'log',    dir:  1, speed: 1.4 * riverMul, spacing: 5.5, w: 4 },
+      { row: 5, kind: 'turtle', dir: -1, speed: 1.0 * riverMul, spacing: 3, w: 1 },
+      { row: 6, kind: 'log',    dir: -1, speed: 1.2 * riverMul, spacing: 4.5, w: 3 },
     ]
     for (const c of [...roadCfg, ...riverCfg]) {
       const items = []
@@ -98,7 +133,7 @@ export default function Frogger() {
       y: (ROWS - 2) * CELL + CELL / 2,
       dir: 0, jumpT: 0, onCarrier: null, ridingVx: 0,
     }
-    stateRef.current.timer = 60
+    stateRef.current.timer = cfgRef.current.timer || 60
   }, [])
 
   const reset = useCallback(() => {
@@ -528,7 +563,7 @@ export default function Frogger() {
       ctx.fillStyle = 'rgba(255,255,255,0.2)'
       ctx.fillRect(60, 14, 200, 12)
       ctx.fillStyle = s.timer > 20 ? '#22c55e' : s.timer > 10 ? '#f59e0b' : '#ef4444'
-      ctx.fillRect(60, 14, 200 * Math.max(0, s.timer / 60), 12)
+      ctx.fillRect(60, 14, 200 * Math.max(0, s.timer / (cfgRef.current.timer || 60)), 12)
       ctx.fillStyle = '#fff'
       ctx.textAlign = 'right'
       ctx.fillText(`LIVES ${lives}   LV ${level}`, W - 12, 24)
@@ -556,6 +591,13 @@ export default function Frogger() {
         { key: 'Space', label: 'Pause' },
       ]}
       subtitle="Five road lanes, five river lanes, five homes. Turtles sink. Timer bar drains. Bonus for a full row of homes."
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      difficultyModes={['Easy', 'Medium', 'Hard', 'Custom']}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
     >
       <canvas ref={canvasRef} width={W} height={H} className="w-full h-auto max-h-[82vh] block bg-black" />
     </GameShell>

@@ -23,6 +23,29 @@ import PlayingCard, {
 } from '../../components/arcade/PlayingCard'
 import { Button } from '../../components/ui'
 
+const RULES = [
+  { heading: 'Goal', body: 'Build four foundation piles — one per suit — from Ace up to King. Winning happens the instant all 52 cards are stacked on the foundations.' },
+  { heading: 'Board layout', body: 'Seven tableau columns are dealt 1–7 cards, with only the bottom card of each column face-up. The remaining 24 cards form the stock (top-left). Waste receives whatever you flip off the stock.' },
+  { heading: 'Tableau moves', body: 'A face-up card (or a sequence of face-up cards) can move onto another tableau top if the destination card is one rank higher AND opposite colour. Example: red 6 lands on black 7. Empty columns only accept a King.' },
+  { heading: 'Foundation moves', body: 'Send a card up to the foundation of its own suit if the top card is exactly one rank lower (or the pile is empty and this is an Ace). Double-click on a card to auto-send it if legal.' },
+  { heading: 'Stock & waste', body: 'Click the stock to flip 1 or 3 cards (chosen mode) onto the waste. Only the top waste card is playable. Empty stock: click again to restock the waste back into the stock. In Hard mode the restock is limited.' },
+  { heading: 'Undo & hints', body: 'Undo peels back any single action. The hint highlights the next legal move — prefering foundation sends over tableau shifts.' },
+  { heading: 'Scoring', body: 'Score climbs as you send cards to the foundation and reveal new tableau cards. Fast wins get a time bonus. Best time and best move count persist locally.' },
+  { heading: 'Difficulty', body: 'Easy plays draw-1 with unlimited restocks. Medium is classic draw-3, 3 restocks. Hard is draw-3, ONE restock only, and a shortened time bonus. Custom exposes draw count, restock limit and time-bonus multiplier.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { drawCount: 1, restockLimit: Infinity, timeBonus: 1.5 },
+  Medium: { drawCount: 3, restockLimit: 3,        timeBonus: 1.0 },
+  Hard:   { drawCount: 3, restockLimit: 1,        timeBonus: 0.6 },
+}
+
+const CUSTOM_SCHEMA = {
+  drawCount:    { label: 'Draw count',    min: 1, max: 3,  step: 2,   default: 3 }, // 1 or 3 effectively
+  restockLimit: { label: 'Restock limit', min: 0, max: 10, step: 1,   default: 3 },
+  timeBonus:    { label: 'Time bonus ×',  min: 0, max: 3,  step: 0.1, default: 1.0 },
+}
+
 // ── Rules helpers ────────────────────────────────────────────────
 
 // The foundation accepts a card if its suit matches the pile and its
@@ -129,9 +152,20 @@ function isWin(s) {
 // ── Component ────────────────────────────────────────────────────
 
 export default function Solitaire() {
+  const [shellDifficulty, setShellDifficulty] = useState('Easy')
+  const [customValues, setCustomValues] = useState(() => Object.fromEntries(
+    Object.entries(CUSTOM_SCHEMA).map(([k, v]) => [k, v.default])
+  ))
+  const shellCfg = useMemo(
+    () => shellDifficulty === 'Custom' ? customValues : DIFFICULTIES[shellDifficulty] || DIFFICULTIES.Medium,
+    [shellDifficulty, customValues],
+  )
+  const [restockCount, setRestockCount] = useState(0)
   const [state, setState] = useState(() => dealLayout())
   const [history, setHistory] = useState([])
   const [drawCount, setDrawCount] = useState(1)
+  // Shell difficulty overrides drawCount.
+  useEffect(() => { if (shellCfg.drawCount) setDrawCount(shellCfg.drawCount) }, [shellCfg.drawCount])
   const [moves, setMoves] = useState(0)
   const [elapsed, setElapsed] = useState(0)
   const [best, setBest] = useState(() => {
@@ -198,6 +232,7 @@ export default function Solitaire() {
     setElapsed(0)
     setHint(null)
     setConfetti([])
+    setRestockCount(0)
     beep(600, 0.1)
   }, [beep])
 
@@ -205,8 +240,11 @@ export default function Solitaire() {
     const s = cloneState(state)
     if (s.stock.length === 0) {
       if (s.waste.length === 0) return
+      const limit = shellCfg.restockLimit
+      if (Number.isFinite(limit) && restockCount >= limit) { beep(200, 0.05); return }
       s.stock = s.waste.reverse().map((c) => ({ ...c, faceUp: false }))
       s.waste = []
+      setRestockCount((c) => c + 1)
     } else {
       const n = Math.min(drawCount, s.stock.length)
       for (let i = 0; i < n; i++) {
@@ -216,7 +254,7 @@ export default function Solitaire() {
     }
     push(s)
     beep(520, 0.05)
-  }, [state, drawCount, push, beep])
+  }, [state, drawCount, push, beep, shellCfg.restockLimit, restockCount])
 
   const autoMoveToFoundation = useCallback((source) => {
     const s = cloneState(state)
@@ -421,6 +459,13 @@ export default function Solitaire() {
           </div>
         </div>
       }
+      rules={RULES}
+      difficulty={shellDifficulty}
+      onDifficultyChange={setShellDifficulty}
+      difficultyModes={['Easy', 'Medium', 'Hard', 'Custom']}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
     >
       <div
         ref={boardRef}

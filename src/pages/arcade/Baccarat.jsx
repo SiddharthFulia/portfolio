@@ -27,6 +27,29 @@ import GameShell from '../../components/arcade/GameShell'
 import PlayingCard, { makeShoe, shuffle } from '../../components/arcade/PlayingCard'
 import { Button } from '../../components/ui'
 
+const RULES = [
+  { heading: 'Goal', body: 'Bet on which of two hands — Player or Banker — will end up closer to 9, or bet on Tie. You do not decide any card actions; the tableau (drawing rules) plays out automatically.' },
+  { heading: 'Card values', body: 'Aces = 1. 2 through 9 = face value. 10s and face cards (J, Q, K) = 0. Hand total is the sum mod 10, so 7+8 = 15 = "5".' },
+  { heading: 'Deal & natural', body: 'Player and Banker are each dealt two cards. If either has an 8 or 9 total ("natural"), both hands stand — no more cards. Otherwise the tableau kicks in.' },
+  { heading: 'Third-card rules', body: 'Player rule — draws a third card on 0–5, stands on 6–7.\nBanker rule — depends on Banker\'s total AND Player\'s third card:\n• Banker 0-2: always draws.\n• Banker 3: draws unless Player\'s 3rd was an 8.\n• Banker 4: draws only if Player\'s 3rd was 2-7.\n• Banker 5: draws only if Player\'s 3rd was 4-7.\n• Banker 6: draws only if Player\'s 3rd was 6 or 7.\n• Banker 7+: always stands.' },
+  { heading: 'Payouts', body: 'Player win = 1:1. Banker win = 1:1 minus 5% commission (0.95:1). Tie = 8:1. Side bets (Pair, Perfect Pair, Big, Small) pay long odds when they hit.' },
+  { heading: 'Scorecard', body: 'Big Road groups outcomes in vertical columns by run (same result). Bead Plate is time-ordered. Neither predicts the future — the shoe is memoryless — but they are traditional trackers.' },
+  { heading: 'Difficulty', body: 'Easy uses a low ante, no commission, side bets enabled and quick card display. Hard uses higher minimum, standard 5% commission, no side bets and slower dramatic reveal. Custom exposes min bet, commission rate, side bets and card animation speed.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { minBet: 5,  commission: 0.00, sideBets: true,  dealSpeed: 200 },
+  Medium: { minBet: 25, commission: 0.05, sideBets: true,  dealSpeed: 400 },
+  Hard:   { minBet: 50, commission: 0.05, sideBets: false, dealSpeed: 700 },
+}
+
+const CUSTOM_SCHEMA = {
+  minBet:     { label: 'Minimum bet',    min: 5,   max: 200, step: 5,   default: 25 },
+  commission: { label: 'Commission %',   min: 0,   max: 0.10,step: 0.01,default: 0.05 },
+  sideBets:   { label: 'Side bets (0/1)',min: 0,   max: 1,   step: 1,   default: 1 },
+  dealSpeed:  { label: 'Deal speed (ms/card)', min: 100, max: 1000, step: 50, default: 400 },
+}
+
 // Card -> baccarat value (0 for 10/J/Q/K, 1 for A, face otherwise)
 function bacValue(rank) {
   if (rank === 'A') return 1
@@ -122,6 +145,14 @@ const HAND_MAX = 500
 const DECKS = 8
 
 export default function Baccarat() {
+  const [shellDifficulty, setShellDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState(() => Object.fromEntries(
+    Object.entries(CUSTOM_SCHEMA).map(([k, v]) => [k, v.default])
+  ))
+  const shellCfg = useMemo(
+    () => shellDifficulty === 'Custom' ? customValues : DIFFICULTIES[shellDifficulty] || DIFFICULTIES.Medium,
+    [shellDifficulty, customValues],
+  )
   const [shoe, setShoe] = useState(() => shuffle(makeShoe(DECKS)))
   const [cursor, setCursor] = useState(0)
   const [bank, setBank] = useState(() => {
@@ -203,11 +234,11 @@ export default function Baccarat() {
     // Main bets
     if (h.winner === 'P' && bets.player > 0) { winnings += bets.player * 2; results.push('Player win 1:1') }
     if (h.winner === 'B' && bets.banker > 0) {
-      // 5% commission
-      const gross = bets.banker * 2
-      const win = bets.banker * 0.95
+      // Commission is a table rule — 5% is standard.
+      const comm = shellCfg.commission ?? 0.05
+      const win = bets.banker * (1 - comm)
       winnings += bets.banker + win
-      results.push(`Banker win 0.95:1 (5% comm)`)
+      results.push(`Banker win ${(1 - comm).toFixed(2)}:1 (${Math.round(comm * 100)}% comm)`)
     }
     if (h.winner === 'T' && bets.tie > 0) {
       winnings += bets.tie * 9    // 8:1 + stake back
@@ -296,6 +327,13 @@ export default function Baccarat() {
         { key: 'Banker', label: 'Bet Banker · 0.95:1' },
         { key: 'Tie', label: 'Bet Tie · 8:1' },
       ]}
+      rules={RULES}
+      difficulty={shellDifficulty}
+      onDifficultyChange={setShellDifficulty}
+      difficultyModes={['Easy', 'Medium', 'Hard', 'Custom']}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
     >
       <div className="relative bg-[#0d3f2b] p-4 sm:p-6 min-h-[600px]"
         style={{ backgroundImage: 'radial-gradient(ellipse at 50% 30%, rgba(52,211,153,0.12), transparent 70%)' }}

@@ -14,6 +14,27 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import GameShell from '../../components/arcade/GameShell'
 import { getSfx } from '../../components/arcade/sfx'
 
+const RULES = [
+  { heading: 'Goal', body: 'Slide the numbered tiles until two matching numbers touch, merging into their sum. Keep merging until you build the target tile (default 2048) — reach it and you win, but you can keep playing to chase 4096, 8192 and beyond.' },
+  { heading: 'Controls', body: 'Arrow keys or WASD slide every tile in that direction. On mobile, swipe from anywhere on the board. U or H undo the last move (limited). Space pauses. Every move causes one new 2 (or occasional 4) to spawn on a random empty cell.' },
+  { heading: 'Scoring', body: 'Each merge adds the value of the resulting tile to your score. 4+4=8 earns 8 pts, 512+512=1024 earns 1024 pts. Best scores are tracked separately per grid size.' },
+  { heading: 'Game over', body: 'When the board is full AND no adjacent tiles match in any direction, no move can be made — the game ends. Use Undo (if you have any left) or start over.' },
+  { heading: 'Spawn probabilities', body: 'After every move, 90% chance the new tile is a 2, 10% chance a 4. Every spawn is on a uniformly-random empty cell.' },
+  { heading: 'Difficulty', body: 'Easy uses a 3×3 grid with generous undo and a low 1024 target. Medium is the classic 4×4 to 2048. Hard is 5×5 with target 4096 and only 1 undo. Custom exposes grid size, undo budget and target tile.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { size: 3, undoBudget: 20, target: 1024 },
+  Medium: { size: 4, undoBudget: 5,  target: 2048 },
+  Hard:   { size: 5, undoBudget: 1,  target: 4096 },
+}
+
+const CUSTOM_SCHEMA = {
+  size:       { label: 'Grid size',    min: 3,    max: 6,    step: 1, default: 4 },
+  undoBudget: { label: 'Undo budget',  min: 0,    max: 30,   step: 1, default: 5 },
+  target:     { label: 'Target tile',  min: 512,  max: 8192, step: 512, default: 2048 },
+}
+
 // Tile visual palette — chosen to make each value distinct at a glance.
 const TILE_STYLE = {
   2:    { bg: '#26262e', fg: '#e5e7eb', shadow: 'rgba(255,255,255,0.05)' },
@@ -141,14 +162,24 @@ function isGameOver(grid) {
   return true
 }
 
-function has2048(grid) {
-  return grid.flat().some((t) => t && t.value >= 2048)
+function hasTarget(grid, target = 2048) {
+  return grid.flat().some((t) => t && t.value >= target)
 }
 
 export default function Twenty48() {
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState(() => Object.fromEntries(
+    Object.entries(CUSTOM_SCHEMA).map(([k, v]) => [k, v.default])
+  ))
+  const cfg = useMemo(
+    () => difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty] || DIFFICULTIES.Medium,
+    [difficulty, customValues],
+  )
   const [size, setSize] = useState(() => {
     try { return Number(localStorage.getItem('arcade.2048.size')) || 4 } catch { return 4 }
   })
+  // Difficulty overrides the grid size on change.
+  useEffect(() => { if (cfg.size && cfg.size !== size) setSize(cfg.size) }, [cfg.size])
   const [grid, setGrid] = useState(() => spawnRandom(spawnRandom(emptyGrid(4))))
   const [score, setScore] = useState(0)
   const [best4, setBest4] = useState(() => Number(localStorage.getItem('arcade.2048.best.4') || 0))
@@ -178,7 +209,7 @@ export default function Twenty48() {
     if (status === 'over' || paused) return
     const { grid: ng, gained, changed } = applyMove(grid, dir)
     if (!changed) return
-    setHistory((h) => [{ grid: cloneGrid(grid), score }, ...h].slice(0, 3))
+    setHistory((h) => [{ grid: cloneGrid(grid), score }, ...h].slice(0, Math.max(0, cfg.undoBudget ?? 5)))
     let after = ng
     after = spawnRandom(cloneGrid(after))
     setGrid(after)
@@ -192,7 +223,7 @@ export default function Twenty48() {
     }
     if (size === 4 && newScore > best4) { setBest4(newScore); try { localStorage.setItem('arcade.2048.best.4', String(newScore)) } catch {} }
     if (size === 5 && newScore > best5) { setBest5(newScore); try { localStorage.setItem('arcade.2048.best.5', String(newScore)) } catch {} }
-    if (!reached2048 && has2048(after)) {
+    if (!reached2048 && hasTarget(after, cfg.target || 2048)) {
       setReached2048(true)
       setStatus('won')
       sfxRef.current.win()
@@ -204,7 +235,7 @@ export default function Twenty48() {
         sfxRef.current.death()
       }
     }, 200)
-  }, [grid, score, status, paused, size, best4, best5, reached2048])
+  }, [grid, score, status, paused, size, best4, best5, reached2048, cfg])
 
   const undo = useCallback(() => {
     if (!history.length || paused) return
@@ -294,7 +325,7 @@ export default function Twenty48() {
           {history.length > 0 && (
             <div className="flex flex-col items-start">
               <span className="text-[10px] uppercase tracking-widest text-white/40">Undo</span>
-              <span className="text-sm font-semibold text-emerald-300">{history.length}/3</span>
+              <span className="text-sm font-semibold text-emerald-300">{history.length}/{cfg.undoBudget ?? 5}</span>
             </div>
           )}
         </>
@@ -309,6 +340,13 @@ export default function Twenty48() {
         { key: 'U / Z', label: 'Undo' },
         { key: 'Swipe', label: 'Mobile' },
       ]}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      difficultyModes={['Easy', 'Medium', 'Hard', 'Custom']}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
     >
       <div className="flex flex-col items-center gap-4 p-3 sm:p-6">
         <div className="flex items-center gap-2">

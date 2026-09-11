@@ -30,6 +30,29 @@ import GameShell from '../../components/arcade/GameShell'
 import PlayingCard, { RANK_VALUE, makeDeck, shuffle } from '../../components/arcade/PlayingCard'
 import { Button } from '../../components/ui'
 
+const RULES = [
+  { heading: 'Goal', body: 'Win chips by building the best 5-card poker hand (or by making everyone else fold). Each hand is a standalone contest — chips carry over between hands.' },
+  { heading: 'Round flow', body: 'Ante (5 chips each) → Deal 5 cards → First betting round → Draw (discard 0–3 cards, get new ones) → Second betting round → Showdown, best hand wins pot. Split on ties.' },
+  { heading: 'Hand rankings (high → low)', body: 'Royal Flush > Straight Flush > Four of a Kind > Full House > Flush > Straight > Three of a Kind > Two Pair > One Pair > High Card. Ace can play high or low in a straight (A-2-3-4-5 wheel or 10-J-Q-K-A broadway).' },
+  { heading: 'Betting actions', body: 'On your turn you can check (when no bet is outstanding), call (match the current bet), raise (bump it up), or fold (throw your hand away and forfeit prior contributions to the pot).' },
+  { heading: 'AI archetypes', body: 'Opponents are tight, loose or wild. Tight folds weak hands quickly. Loose plays more hands. Wild bluffs and raises freely. Watch the "tell" flash — calm nod = strong; twitchy pulse = bluff.' },
+  { heading: 'Discard strategy', body: 'On the draw, keep pairs / triples / quads. Keep a 4-card flush or open-ended straight. Otherwise keep the highest card. You may hold anywhere from all 5 to none of your cards.' },
+  { heading: 'Difficulty', body: 'Easy plays with 1 tight opponent. Medium is 3 mixed. Hard is 3 wild bluff-heavy opponents. Custom exposes AI count, bluff frequency multiplier, ante and pot-limit.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { aiCount: 1, bluffMul: 0.6, ante: 5,  potLimit: 100 },
+  Medium: { aiCount: 3, bluffMul: 1.0, ante: 5,  potLimit: 200 },
+  Hard:   { aiCount: 3, bluffMul: 2.0, ante: 10, potLimit: 400 },
+}
+
+const CUSTOM_SCHEMA = {
+  aiCount:  { label: 'AI opponents',   min: 1, max: 3,   step: 1,   default: 3 },
+  bluffMul: { label: 'Bluff frequency ×', min: 0, max: 3, step: 0.1, default: 1.0 },
+  ante:     { label: 'Ante',           min: 1, max: 50,  step: 1,   default: 5 },
+  potLimit: { label: 'Pot limit',      min: 50, max: 1000, step: 50, default: 200 },
+}
+
 const ANTE = 5
 const STARTING_STACK = 500
 
@@ -167,8 +190,20 @@ function decideBet(cards, potSize, callAmount, style, stack, phase) {
 // ── Component ────────────────────────────────────────────────────
 
 export default function Poker() {
+  const [shellDifficulty, setShellDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState(() => Object.fromEntries(
+    Object.entries(CUSTOM_SCHEMA).map(([k, v]) => [k, v.default])
+  ))
+  const shellCfg = useMemo(
+    () => shellDifficulty === 'Custom' ? customValues : DIFFICULTIES[shellDifficulty] || DIFFICULTIES.Medium,
+    [shellDifficulty, customValues],
+  )
   // Players: [YOU, AI0, AI1, AI2]. Position rotates each hand.
-  const [players, setPlayers] = useState(() => makePlayers())
+  const [players, setPlayers] = useState(() => makePlayers(shellCfg.aiCount))
+  // On difficulty change, reseat the table.
+  useEffect(() => {
+    setPlayers(makePlayers(shellCfg.aiCount))
+  }, [shellCfg.aiCount])
   const [deck, setDeck] = useState([])
   const [pot, setPot] = useState(0)
   const [currentBet, setCurrentBet] = useState(0)
@@ -440,7 +475,14 @@ export default function Poker() {
       status={status}
       soundOn={soundOn}
       onSoundToggle={() => setSoundOn((v) => !v)}
-      onRestart={() => { setPlayers(makePlayers()); setPhase('idle'); setMessage('Deal to start'); setHandsPlayed(0); setTotalWon(0) }}
+      onRestart={() => { setPlayers(makePlayers(shellCfg.aiCount)); setPhase('idle'); setMessage('Deal to start'); setHandsPlayed(0); setTotalWon(0) }}
+      rules={RULES}
+      difficulty={shellDifficulty}
+      onDifficultyChange={setShellDifficulty}
+      difficultyModes={['Easy', 'Medium', 'Hard', 'Custom']}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       controls={[
         { key: 'Click', label: 'Hold / discard your cards' },
         { key: 'Bet', label: 'Fold · Check · Call · Raise · All-in' },
@@ -564,10 +606,11 @@ export default function Poker() {
   )
 }
 
-function makePlayers() {
+function makePlayers(aiCount = 3) {
+  const n = Math.max(1, Math.min(AI_ROSTER.length, Math.round(aiCount || 3)))
   return [
     { name: 'You',  style: 'you',   emoji: '🧑', cards: [], folded: false, contributed: 0, inHand: true, stack: STARTING_STACK, drewCount: null },
-    ...AI_ROSTER.map((a) => ({
+    ...AI_ROSTER.slice(0, n).map((a) => ({
       name: a.name, style: a.style, emoji: a.emoji, cards: [], folded: false,
       contributed: 0, inHand: true, stack: STARTING_STACK, drewCount: null,
     })),

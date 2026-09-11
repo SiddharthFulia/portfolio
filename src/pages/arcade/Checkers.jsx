@@ -23,6 +23,30 @@ import GameShell from '../../components/arcade/GameShell'
 import { Button } from '../../components/ui'
 import { getSfx } from '../../components/arcade/sfx'
 
+const RULES = [
+  { heading: 'Goal', body: 'Capture all of your opponent\'s pieces, or leave them with no legal moves. English draughts is a race for territory and material.' },
+  { heading: 'Setup', body: 'Each side starts with 12 pieces on the dark squares of the three back rows. Human plays the light pieces at the bottom; AI plays the dark pieces at the top. Only dark squares are used.' },
+  { heading: 'Movement', body: 'Regular pieces ("men") move one square diagonally forward. Kings move one square diagonally in either direction. You cannot land on an occupied square (unless jumping).' },
+  { heading: 'Captures & forced-jump rule', body: 'Jumping an opponent piece is done by hopping over it to the empty diagonal square beyond. When any jump is available, you MUST take it — non-capturing moves are hidden while captures exist. After landing, if the same piece can jump again, the chain continues until no more jumps are possible.' },
+  { heading: 'King promotion', body: 'A man that lands on the opponent\'s back rank is instantly crowned a King (double-thickness disc). Kings move and jump in both diagonal directions.' },
+  { heading: 'Draws', body: 'Chess-like 40-move / three-fold repetition rules aren\'t enforced here, but a position where neither side can force progress is a practical draw — restart the round.' },
+  { heading: 'AI evaluation', body: 'Alpha-beta minimax to configured depth. Material with kings weighted 2-4× a man, plus positional weight for advancing pawns and centre control, plus back-row control bonus. Multi-capture moves are ordered first for stronger pruning.' },
+  { heading: 'Difficulty', body: 'Easy: depth 4, kings worth 2, forced captures on. Hard: depth 8, kings worth 4, forced captures on. Custom exposes AI depth, king value, forced-capture rule and multi-jump chain rule.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { aiDepth: 4, kingValue: 2, forcedCapture: true, multiJump: true },
+  Medium: { aiDepth: 6, kingValue: 3, forcedCapture: true, multiJump: true },
+  Hard:   { aiDepth: 8, kingValue: 4, forcedCapture: true, multiJump: true },
+}
+
+const CUSTOM_SCHEMA = {
+  aiDepth:       { label: 'AI depth',            min: 3, max: 9, step: 1, default: 6 },
+  kingValue:     { label: 'King value ×',        min: 2, max: 5, step: 1, default: 3 },
+  forcedCapture: { label: 'Forced captures (0/1)', min: 0, max: 1, step: 1, default: 1 },
+  multiJump:     { label: 'Multi-jump chain (0/1)', min: 0, max: 1, step: 1, default: 1 },
+}
+
 const N = 8
 const EMPTY = 0
 const HUMAN_MAN  = 1
@@ -225,10 +249,21 @@ const Crown = ({ size, color }) => (
 )
 
 export default function Checkers() {
+  const [shellDifficulty, setShellDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState(() => Object.fromEntries(
+    Object.entries(CUSTOM_SCHEMA).map(([k, v]) => [k, v.default])
+  ))
+  const shellCfg = useMemo(
+    () => shellDifficulty === 'Custom' ? customValues : DIFFICULTIES[shellDifficulty] || DIFFICULTIES.Medium,
+    [shellDifficulty, customValues],
+  )
   const [board, setBoard] = useState(() => initialBoard())
   const [turn, setTurn] = useState('human')
   const [selected, setSelected] = useState(-1)
   const [depth, setDepth] = useState(6)
+  useEffect(() => {
+    if (shellCfg.aiDepth) setDepth(Math.max(3, Math.min(9, Math.round(shellCfg.aiDepth))))
+  }, [shellCfg.aiDepth])
   const [aiThinking, setAiThinking] = useState(false)
   const [gameOver, setGameOver] = useState(null)
   const [theme, setTheme] = useState('wood')
@@ -369,6 +404,13 @@ export default function Checkers() {
         { key: 'Pause',  label: 'Undo (last pair of plies)' },
         { key: 'R',      label: 'Restart' },
       ]}
+      rules={RULES}
+      difficulty={shellDifficulty}
+      onDifficultyChange={setShellDifficulty}
+      difficultyModes={['Easy', 'Medium', 'Hard', 'Custom']}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       footer={
         <div className="mt-4 luxe-card-alt rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-5">
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between flex-wrap">

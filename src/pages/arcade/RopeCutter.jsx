@@ -11,8 +11,31 @@
 //   - Stars are collectibles the candy passes through.
 //   - Bubbles rise, capturing the candy and floating it up until popped.
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import GameShell from '../../components/arcade/GameShell'
+
+const RULES = [
+  { heading: 'Goal', body: 'Get the candy into the monster\'s mouth by cutting ropes at the right moment. Collect the three stars on each level for bonus points and full completion.' },
+  { heading: 'Controls', body: 'Swipe across a rope with the mouse (or finger on touch) to cut it. The cut only registers if the swipe actually crosses the rope\'s current midpoint. Space pauses. Cutting is unlimited — you can cut every rope on the level if you want.' },
+  { heading: 'Rope physics', body: 'Ropes are simulated as verlet chains of particles with distance constraints (solved 6 iterations per frame for stability). Anchors have infinite mass — they don\'t move. Cut a segment and the two halves fall independently under gravity.' },
+  { heading: 'Bubbles & stars', body: 'Bubbles rise. When candy touches a bubble it locks in and floats up with it. Tap the bubble to pop it and drop the candy. Stars are three collectibles per level — passing the candy through them awards 1 star each; 3-star completions give a big bonus.' },
+  { heading: 'Monster', body: 'The monster waits at the bottom (or wherever the level places it). Candy landing within its mouth radius (roughly 30 px) is eaten — level complete. Miss the monster and the level fails.' },
+  { heading: 'Scoring', body: 'Base clear: 500 pts. Each star collected: 200 pts. Speed bonus (clear within 8 seconds): 500 pts. All 15 levels form a single tournament run.' },
+  { heading: 'Difficulty', body: 'Easy uses longer ropes (more forgiving swings), a wider monster mouth, and denser star spawns. Hard uses shorter ropes, narrower mouth and higher candy weight. Custom exposes rope segment count, candy weight, monster mouth width and star spawn density.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { ropeSegMul: 1.4, candyWeight: 0.8, mouthWidth: 45, starSpawnMul: 1.4 },
+  Medium: { ropeSegMul: 1.0, candyWeight: 1.0, mouthWidth: 30, starSpawnMul: 1.0 },
+  Hard:   { ropeSegMul: 0.7, candyWeight: 1.4, mouthWidth: 22, starSpawnMul: 0.6 },
+}
+
+const CUSTOM_SCHEMA = {
+  ropeSegMul:    { label: 'Rope segments ×',    min: 0.5, max: 2,   step: 0.1, default: 1.0 },
+  candyWeight:   { label: 'Candy weight ×',     min: 0.5, max: 2,   step: 0.1, default: 1.0 },
+  mouthWidth:    { label: 'Monster mouth (px)', min: 15,  max: 60,  step: 1,   default: 30 },
+  starSpawnMul:  { label: 'Star spawn density ×', min: 0.3, max: 2, step: 0.1, default: 1.0 },
+}
 
 const W = 600
 const H = 500
@@ -77,6 +100,17 @@ const distSegPoint = (x1, y1, x2, y2, px, py) => {
 }
 
 export default function RopeCutter() {
+  const [shellDifficulty, setShellDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState(() => Object.fromEntries(
+    Object.entries(CUSTOM_SCHEMA).map(([k, v]) => [k, v.default])
+  ))
+  const cfg = useMemo(
+    () => shellDifficulty === 'Custom' ? customValues : DIFFICULTIES[shellDifficulty] || DIFFICULTIES.Medium,
+    [shellDifficulty, customValues],
+  )
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
+
   const canvasRef = useRef(null)
   const stateRef = useRef({
     particles: [],
@@ -343,7 +377,7 @@ export default function RopeCutter() {
 
       // Monster catch (candy falls into mouth)
       const [mx, my] = s.monster
-      if (Math.hypot(candy.x - mx, candy.y - my) < 30 && !s.holed) {
+      if (Math.hypot(candy.x - mx, candy.y - my) < (cfgRef.current.mouthWidth || 30) && !s.holed) {
         s.holed = true
         s.monsterMouthOpen = 20
         addFx(mx, my, 20, '#fb923c')
@@ -590,6 +624,13 @@ export default function RopeCutter() {
         { key: 'Swipe bubble', label: 'Pop it' },
         { key: 'Goal', label: 'Feed candy to the monster' },
       ]}
+      rules={RULES}
+      difficulty={shellDifficulty}
+      onDifficultyChange={setShellDifficulty}
+      difficultyModes={['Easy', 'Medium', 'Hard', 'Custom']}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       overlay={status === 'won' ? (
         <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-3">
           <div className="text-4xl font-bold bg-gradient-to-r from-amber-300 to-rose-400 bg-clip-text text-transparent">Monster is full!</div>

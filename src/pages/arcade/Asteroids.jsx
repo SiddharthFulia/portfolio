@@ -12,9 +12,31 @@
 // weathered shading, not just a circle. Ship, saucer and shots are pure
 // vector primitives to keep the classic vector-arcade feel.
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import GameShell from '../../components/arcade/GameShell'
 import { getSfx } from '../../components/arcade/sfx'
+
+const RULES = [
+  { heading: 'Goal', body: 'Destroy every asteroid on screen without letting one collide with your ship. Clearing all rocks spawns the next wave with one more rock than the last.' },
+  { heading: 'Controls', body: '← / → or A / D rotate. ↑ or W applies thrust — your ship keeps its inertia so plan your stops. Z or Enter fires (small cooldown). X or Shift triggers hyperspace: you jump to a random point with a ~10% chance of self-destructing on arrival. The universe wraps at every edge.' },
+  { heading: 'Rock sizes & scoring', body: 'Large rocks split into two mediums, mediums split into two smalls, smalls vanish.\n• Large = 20 pts\n• Medium = 50 pts\n• Small = 100 pts\n• Saucer = 200 pts (small) / 1000 pts (large)' },
+  { heading: 'Saucer', body: 'A vector saucer appears every ~1200 ticks and takes potshots at you. Large saucers aim loosely, small saucers aim right at you. Kill or evade before it clears the screen.' },
+  { heading: 'Lives & invulnerability', body: 'You start with 3 lives. Respawning gives ~2 seconds of blinking invulnerability. Zero lives ends the game.' },
+  { heading: 'Difficulty', body: 'Easy starts with 3 slow rocks, weaker thrust and rarer saucers. Hard opens with 6 fast rocks, faster saucers and twice-normal thrust. Custom exposes initial rock count, rock speed, saucer frequency and thrust power.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { startRocks: 3, rockSpeed: 0.8, saucerInterval: 1800, thrustPower: 0.12 },
+  Medium: { startRocks: 4, rockSpeed: 1.0, saucerInterval: 1200, thrustPower: 0.18 },
+  Hard:   { startRocks: 6, rockSpeed: 1.5, saucerInterval: 700,  thrustPower: 0.24 },
+}
+
+const CUSTOM_SCHEMA = {
+  startRocks:     { label: 'Starting rocks',   min: 2,    max: 10,   step: 1,    default: 4 },
+  rockSpeed:      { label: 'Rock speed',       min: 0.4,  max: 2.5,  step: 0.1,  default: 1.0 },
+  saucerInterval: { label: 'Saucer interval',  min: 400,  max: 3000, step: 100,  default: 1200 },
+  thrustPower:    { label: 'Thrust power',     min: 0.06, max: 0.35, step: 0.02, default: 0.18 },
+}
 
 const W = 800
 const H = 600
@@ -42,6 +64,16 @@ export default function Asteroids() {
   const [level, setLevel] = useState(1)
   const [status, setStatus] = useState('playing')
   const [soundOn, setSoundOn] = useState(true)
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState(() => Object.fromEntries(
+    Object.entries(CUSTOM_SCHEMA).map(([k, v]) => [k, v.default])
+  ))
+  const cfg = useMemo(
+    () => difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty] || DIFFICULTIES.Medium,
+    [difficulty, customValues],
+  )
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
 
   const stateRef = useRef({
     ship: { x: W / 2, y: H / 2, vx: 0, vy: 0, angle: -Math.PI / 2, thrust: false, invuln: 60, dead: false, deadT: 0, hyperCd: 0 },
@@ -63,12 +95,14 @@ export default function Asteroids() {
 
   const spawnWave = useCallback((n) => {
     const rocks = []
-    for (let i = 0; i < n; i++) {
+    const rockSpeedMul = cfgRef.current.rockSpeed || 1
+    const count = Math.max(2, Math.round(n))
+    for (let i = 0; i < count; i++) {
       let x, y
       do { x = Math.random() * W; y = Math.random() * H }
       while (Math.hypot(x - W / 2, y - H / 2) < 140)
       const a = Math.random() * Math.PI * 2
-      const spd = 0.6 + Math.random() * 1.1
+      const spd = (0.6 + Math.random() * 1.1) * rockSpeedMul
       rocks.push({
         x, y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd,
         size: 3, shape: makeRockShape(SIZE_R[3]),
@@ -83,12 +117,12 @@ export default function Asteroids() {
     stateRef.current.ship = { x: W / 2, y: H / 2, vx: 0, vy: 0, angle: -Math.PI / 2, thrust: false, invuln: 60, dead: false, deadT: 0, hyperCd: 0 }
     stateRef.current.bullets = []
     stateRef.current.saucer = null
-    stateRef.current.saucerTimer = 1200
+    stateRef.current.saucerTimer = cfgRef.current.saucerInterval || 1200
     stateRef.current.saucerBullets = []
-    spawnWave(4)
+    spawnWave(cfgRef.current.startRocks || 4)
   }, [spawnWave])
 
-  useEffect(() => { spawnWave(4) }, [spawnWave])
+  useEffect(() => { spawnWave(cfgRef.current.startRocks || 4) }, [spawnWave])
 
   useEffect(() => {
     const s = stateRef.current
@@ -182,8 +216,9 @@ export default function Asteroids() {
           if (s.keys.right) s.ship.angle += 0.08 * dt
           s.ship.thrust = s.keys.thrust
           if (s.ship.thrust) {
-            s.ship.vx += Math.cos(s.ship.angle) * 0.14 * dt
-            s.ship.vy += Math.sin(s.ship.angle) * 0.14 * dt
+            const tp = cfgRef.current.thrustPower || 0.14
+            s.ship.vx += Math.cos(s.ship.angle) * tp * dt
+            s.ship.vy += Math.sin(s.ship.angle) * tp * dt
             const speed = Math.hypot(s.ship.vx, s.ship.vy)
             if (speed > 6) { s.ship.vx *= 6 / speed; s.ship.vy *= 6 / speed }
             sfx.thrust()
@@ -261,7 +296,7 @@ export default function Asteroids() {
               popup(s.saucer.x, s.saucer.y, s.saucer.small ? '+1000' : '+200', '#f0abfc')
               spawnParticles(s.saucer.x, s.saucer.y, '#f0abfc', 40, 4)
               shake(6); sfx.win()
-              s.saucer = null; s.saucerTimer = 1200
+              s.saucer = null; s.saucerTimer = cfgRef.current.saucerInterval || 1200
               break
             }
           }
@@ -289,7 +324,7 @@ export default function Asteroids() {
             sfx.laser()
           }
           if (s.saucer.x < -40 || s.saucer.x > W + 40) {
-            s.saucer = null; s.saucerTimer = 900 + Math.random() * 600
+            s.saucer = null; s.saucerTimer = (cfgRef.current.saucerInterval || 1200) * 0.75 + Math.random() * (cfgRef.current.saucerInterval || 1200) * 0.5
           }
         }
         for (const sb of s.saucerBullets) {
@@ -525,6 +560,13 @@ export default function Asteroids() {
       ]}
       mobile={mobilePad}
       subtitle="Vector wireframes, true inertia, wraparound universe. Beware the pink saucer and think twice before hitting hyperspace."
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      difficultyModes={['Easy', 'Medium', 'Hard', 'Custom']}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
     >
       <canvas ref={canvasRef} width={W} height={H} className="w-full h-auto max-h-[78vh] block bg-black" />
     </GameShell>
