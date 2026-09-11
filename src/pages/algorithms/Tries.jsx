@@ -13,7 +13,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   Field, TextInput, Chip,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
-import { TRIES_CODE } from './code/Tries'
+import { TRIES_CODE, TRIES_SAMPLES } from './code/Tries'
 
 /* ---------- trie ops ---------- */
 
@@ -233,6 +233,7 @@ export default function Tries() {
       <MultiLangCode
         title="Implementation — trie insert / search"
         code={TRIES_CODE}
+        samples={TRIES_SAMPLES}
         activeLines={{ pseudo: activeIdx > 0 ? 5 : -1 }}
       />
 

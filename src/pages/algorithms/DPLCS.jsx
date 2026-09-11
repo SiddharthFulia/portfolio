@@ -70,10 +70,10 @@ while i > 0 and j > 0:
     j -= 1
 reverse out → LCS`,
 
-  c: `#include <string.h>
+  c: `#include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 
-/* Returns LCS length; writes the LCS string to 'out' (caller pre-allocates). */
 int lcs(const char* A, const char* B, char* out) {
     int m = (int)strlen(A), n = (int)strlen(B);
     int (*dp)[n + 1] = calloc(m + 1, sizeof(int[n + 1]));
@@ -92,9 +92,19 @@ int lcs(const char* A, const char* B, char* out) {
     }
     free(dp);
     return len;
+}
+
+int main(void) {
+    const char* A = "AGCAT";
+    const char* B = "GAC";
+    char out[16];
+    int len = lcs(A, B, out);
+    printf("LCS(\\"%s\\", \\"%s\\") = \\"%s\\" (len %d)\\n", A, B, out, len);
+    return 0;
 }`,
 
-  cpp: `#include <string>
+  cpp: `#include <iostream>
+#include <string>
 #include <vector>
 #include <algorithm>
 
@@ -116,77 +126,94 @@ std::string lcs(const std::string& A, const std::string& B) {
     }
     std::reverse(out.begin(), out.end());
     return out;
+}
+
+int main() {
+    std::string a = "AGCAT", b = "GAC";
+    std::string r = lcs(a, b);
+    std::cout << "LCS(\\"" << a << "\\", \\"" << b << "\\") = \\"" << r << "\\" (len " << r.size() << ")\\n";
+    return 0;
 }`,
 
   python: `def lcs(A, B):
     m, n = len(A), len(B)
-    # dp[i][j] = LCS length of prefixes A[:i] and B[:j].
     dp = [[0] * (n + 1) for _ in range(m + 1)]
     for i in range(1, m + 1):
         for j in range(1, n + 1):
-            if A[i - 1] == B[j - 1]:
-                dp[i][j] = dp[i - 1][j - 1] + 1
-            else:
-                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
-    # Backtrack from the corner — reveals the LCS in reverse.
+            if A[i - 1] == B[j - 1]: dp[i][j] = dp[i - 1][j - 1] + 1
+            else:                    dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
     out, i, j = [], m, n
     while i > 0 and j > 0:
         if A[i - 1] == B[j - 1]:
             out.append(A[i - 1]); i -= 1; j -= 1
-        elif dp[i - 1][j] >= dp[i][j - 1]:
-            i -= 1
-        else:
-            j -= 1
-    return ''.join(reversed(out))`,
+        elif dp[i - 1][j] >= dp[i][j - 1]: i -= 1
+        else:                               j -= 1
+    return ''.join(reversed(out))
 
-  java: `public static String lcs(String A, String B) {
-    int m = A.length(), n = B.length();
-    int[][] dp = new int[m + 1][n + 1];
-    for (int i = 1; i <= m; i++) {
-        for (int j = 1; j <= n; j++) {
-            if (A.charAt(i - 1) == B.charAt(j - 1)) dp[i][j] = dp[i - 1][j - 1] + 1;
-            else dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+if __name__ == "__main__":
+    a, b = "AGCAT", "GAC"
+    r = lcs(a, b)
+    print(f'LCS("{a}", "{b}") = "{r}" (len {len(r)})')`,
+
+  java: `public class Main {
+    public static String lcs(String A, String B) {
+        int m = A.length(), n = B.length();
+        int[][] dp = new int[m + 1][n + 1];
+        for (int i = 1; i <= m; i++) {
+            for (int j = 1; j <= n; j++) {
+                if (A.charAt(i - 1) == B.charAt(j - 1)) dp[i][j] = dp[i - 1][j - 1] + 1;
+                else dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+            }
         }
+        StringBuilder sb = new StringBuilder();
+        int i = m, j = n;
+        while (i > 0 && j > 0) {
+            if (A.charAt(i - 1) == B.charAt(j - 1)) { sb.append(A.charAt(i - 1)); i--; j--; }
+            else if (dp[i - 1][j] >= dp[i][j - 1]) i--;
+            else j--;
+        }
+        return sb.reverse().toString();
     }
-    StringBuilder sb = new StringBuilder();
-    int i = m, j = n;
-    while (i > 0 && j > 0) {
-        if (A.charAt(i - 1) == B.charAt(j - 1)) {
-            sb.append(A.charAt(i - 1)); i--; j--;
-        } else if (dp[i - 1][j] >= dp[i][j - 1]) i--;
-        else j--;
+    public static void main(String[] args) {
+        String a = "AGCAT", b = "GAC";
+        String r = lcs(a, b);
+        System.out.println("LCS(\\"" + a + "\\", \\"" + b + "\\") = \\"" + r + "\\" (len " + r.length() + ")");
     }
-    return sb.reverse().toString();
 }`,
 
-  rust: `pub fn lcs(a: &[u8], b: &[u8]) -> Vec<u8> {
+  rust: `fn lcs(a: &[u8], b: &[u8]) -> Vec<u8> {
     let (m, n) = (a.len(), b.len());
     let mut dp = vec![vec![0u32; n + 1]; m + 1];
     for i in 1..=m {
         for j in 1..=n {
-            dp[i][j] = if a[i - 1] == b[j - 1] {
-                dp[i - 1][j - 1] + 1
-            } else {
-                dp[i - 1][j].max(dp[i][j - 1])
-            };
+            dp[i][j] = if a[i - 1] == b[j - 1] { dp[i - 1][j - 1] + 1 }
+                       else { dp[i - 1][j].max(dp[i][j - 1]) };
         }
     }
-    // Backtrack along the winning direction at every cell.
     let (mut i, mut j, mut out) = (m, n, Vec::new());
     while i > 0 && j > 0 {
-        if a[i - 1] == b[j - 1] {
-            out.push(a[i - 1]);
-            i -= 1; j -= 1;
-        } else if dp[i - 1][j] >= dp[i][j - 1] {
-            i -= 1;
-        } else {
-            j -= 1;
-        }
+        if a[i - 1] == b[j - 1] { out.push(a[i - 1]); i -= 1; j -= 1; }
+        else if dp[i - 1][j] >= dp[i][j - 1] { i -= 1; }
+        else { j -= 1; }
     }
     out.reverse();
     out
+}
+
+fn main() {
+    let a = "AGCAT";
+    let b = "GAC";
+    let r = lcs(a.as_bytes(), b.as_bytes());
+    let rs = String::from_utf8(r).unwrap();
+    println!("LCS(\"{}\", \"{}\") = \"{}\" (len {})", a, b, rs, rs.len());
 }`,
 }
+
+const LCS_SAMPLES = [
+  { name: 'AGCAT/GAC',  description: 'Classic short strings — LCS = "GA" or "AC"', stdin: '', expected: '' },
+  { name: 'Same',       description: 'Identical strings — LCS = full length',     stdin: '', expected: '' },
+  { name: 'Disjoint',   description: 'No common chars — LCS = ""',                stdin: '', expected: '' },
+]
 
 const ACTIVE_MAP = {
   pseudo: { init: 0, fill: 6, back: 13 },
@@ -317,7 +344,7 @@ export default function DPLCS() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <MultiLangCode title='Longest Common Subsequence' code={CODE} activeLines={activeLinesFor(f?.phase)} />
+      <MultiLangCode title='Longest Common Subsequence' code={CODE} samples={LCS_SAMPLES} activeLines={activeLinesFor(f?.phase)} />
 
       <ComplexityTable rows={[
         { op: 'LCS DP',                 best: 'O(mn)',        avg: 'O(mn)',        worst: 'O(mn)',        space: 'O(mn)' },

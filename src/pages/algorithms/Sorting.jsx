@@ -20,7 +20,14 @@ import { ExplanationBlock, VisualiserSection, VizPanel,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
-import { CODE as SORTING_CODE } from './code/Sorting'
+import {
+  CODE as SORTING_CODE,
+  SORTING_BUBBLE_SAMPLES,
+  SORTING_COUNTING_SAMPLES,
+  SORTING_QUICK_SAMPLES,
+  SORTING_MERGE_SAMPLES,
+  SORTING_RADIX_SAMPLES,
+} from './code/Sorting'
 
 // ─── RNG ──────────────────────────────────────────────────
 function mulberry32(seed) {
@@ -327,7 +334,18 @@ function DetailMode({ pick, base }) {
         />
       </div>
       <div className='mt-4'>
-        <MultiLangCode title={`${ALGS[pick].name}`} code={SORTING_CODE[pick] || SORTING_CODE.bubble} />
+        <MultiLangCode
+          title={`${ALGS[pick].name}`}
+          code={SORTING_CODE[pick] || SORTING_CODE.bubble}
+          samples={
+            pick === 'bubble'   ? SORTING_BUBBLE_SAMPLES :
+            pick === 'counting' ? SORTING_COUNTING_SAMPLES :
+            pick === 'quick'    ? SORTING_QUICK_SAMPLES :
+            pick === 'merge'    ? SORTING_MERGE_SAMPLES :
+            pick === 'radix'    ? SORTING_RADIX_SAMPLES :
+            null
+          }
+        />
       </div>
     </>
   )

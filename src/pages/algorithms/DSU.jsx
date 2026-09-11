@@ -16,7 +16,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
-import { DSU_CODE } from './code/DSU'
+import { DSU_CODE, DSU_SAMPLES } from './code/DSU'
 
 /* ---------- ops ---------- */
 
@@ -265,6 +265,7 @@ export default function DSU() {
       <MultiLangCode
         title="Implementation — find + union"
         code={DSU_CODE}
+        samples={DSU_SAMPLES}
         activeLines={{ pseudo: activeLine }}
       />
 

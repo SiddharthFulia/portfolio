@@ -113,7 +113,8 @@ while i > 0:
     taken.push(i); w -= items[i].w
   i -= 1`,
 
-  c: `#include <stdlib.h>
+  c: `#include <stdio.h>
+#include <stdlib.h>
 
 typedef struct { int w, v; } Item;
 
@@ -131,7 +132,6 @@ int knapsack01(Item* items, int n, int C, int* taken_out, int* taken_count) {
     }
     int ans = dp[n][C], k = 0, cw = C;
     for (int i = n; i > 0; i--) {
-        /* If value changed, we must have taken item i to earn it. */
         if (dp[i][cw] != dp[i - 1][cw]) {
             taken_out[k++] = i - 1;
             cw -= items[i - 1].w;
@@ -140,9 +140,21 @@ int knapsack01(Item* items, int n, int C, int* taken_out, int* taken_count) {
     *taken_count = k;
     free(dp);
     return ans;
+}
+
+int main(void) {
+    Item items[] = {{2, 3}, {3, 4}, {4, 5}, {5, 6}};
+    int taken[8], k;
+    int best = knapsack01(items, 4, 5, taken, &k);
+    printf("Best value: %d\\n", best);
+    printf("Items taken (0-indexed):");
+    for (int i = k - 1; i >= 0; i--) printf(" %d", taken[i]);
+    printf("\\n");
+    return 0;
 }`,
 
-  cpp: `#include <vector>
+  cpp: `#include <iostream>
+#include <vector>
 #include <algorithm>
 
 struct Item { int w, v; };
@@ -154,22 +166,32 @@ int knapsack01(const std::vector<Item>& items, int C, std::vector<int>& taken) {
         for (int w = 0; w <= C; ++w) {
             dp[i][w] = dp[i - 1][w];
             if (w >= items[i - 1].w)
-                dp[i][w] = std::max(dp[i][w],
-                                    dp[i - 1][w - items[i - 1].w] + items[i - 1].v);
+                dp[i][w] = std::max(dp[i][w], dp[i - 1][w - items[i - 1].w] + items[i - 1].v);
         }
     }
     int cw = C;
     for (int i = n; i > 0; --i) {
-        if (dp[i][cw] != dp[i - 1][cw]) {   // item i was taken
+        if (dp[i][cw] != dp[i - 1][cw]) {
             taken.push_back(i - 1);
             cw -= items[i - 1].w;
         }
     }
     return dp[n][C];
+}
+
+int main() {
+    std::vector<Item> items = {{2, 3}, {3, 4}, {4, 5}, {5, 6}};
+    int C = 5;
+    std::vector<int> taken;
+    int best = knapsack01(items, C, taken);
+    std::cout << "Best value: " << best << "\\n";
+    std::cout << "Items taken (0-indexed):";
+    for (int i = taken.size() - 1; i >= 0; --i) std::cout << " " << taken[i];
+    std::cout << "\\n";
+    return 0;
 }`,
 
   python: `def knapsack01(items, C):
-    """items = list of (weight, value). Returns (max_value, taken_indices)."""
     n = len(items)
     dp = [[0] * (C + 1) for _ in range(n + 1)]
     for i in range(1, n + 1):
@@ -178,40 +200,54 @@ int knapsack01(const std::vector<Item>& items, int C, std::vector<int>& taken) {
             dp[i][cap] = dp[i - 1][cap]
             if cap >= w:
                 dp[i][cap] = max(dp[i][cap], dp[i - 1][cap - w] + v)
-    # Backtrack — value change on row i means item i-1 was taken.
     taken, cap = [], C
     for i in range(n, 0, -1):
         if dp[i][cap] != dp[i - 1][cap]:
             taken.append(i - 1)
             cap -= items[i - 1][0]
-    return dp[n][C], taken[::-1]`,
+    return dp[n][C], taken[::-1]
+
+if __name__ == "__main__":
+    items = [(2, 3), (3, 4), (4, 5), (5, 6)]
+    best, taken = knapsack01(items, 5)
+    print(f"Best value: {best}")
+    print(f"Items taken (0-indexed): {taken}")`,
 
   java: `import java.util.*;
 
-public static int knapsack01(int[][] items, int C, List<Integer> taken) {
-    // items[i] = { weight, value }
-    int n = items.length;
-    int[][] dp = new int[n + 1][C + 1];
-    for (int i = 1; i <= n; i++) {
-        int w = items[i - 1][0], v = items[i - 1][1];
-        for (int cap = 0; cap <= C; cap++) {
-            dp[i][cap] = dp[i - 1][cap];
-            if (cap >= w)
-                dp[i][cap] = Math.max(dp[i][cap], dp[i - 1][cap - w] + v);
+public class Main {
+    public static int knapsack01(int[][] items, int C, List<Integer> taken) {
+        int n = items.length;
+        int[][] dp = new int[n + 1][C + 1];
+        for (int i = 1; i <= n; i++) {
+            int w = items[i - 1][0], v = items[i - 1][1];
+            for (int cap = 0; cap <= C; cap++) {
+                dp[i][cap] = dp[i - 1][cap];
+                if (cap >= w)
+                    dp[i][cap] = Math.max(dp[i][cap], dp[i - 1][cap - w] + v);
+            }
         }
-    }
-    int cw = C;
-    for (int i = n; i > 0; i--) {
-        if (dp[i][cw] != dp[i - 1][cw]) {
-            taken.add(i - 1);
-            cw -= items[i - 1][0];
+        int cw = C;
+        for (int i = n; i > 0; i--) {
+            if (dp[i][cw] != dp[i - 1][cw]) {
+                taken.add(i - 1);
+                cw -= items[i - 1][0];
+            }
         }
+        Collections.reverse(taken);
+        return dp[n][C];
     }
-    Collections.reverse(taken);
-    return dp[n][C];
+
+    public static void main(String[] args) {
+        int[][] items = {{2, 3}, {3, 4}, {4, 5}, {5, 6}};
+        List<Integer> taken = new ArrayList<>();
+        int best = knapsack01(items, 5, taken);
+        System.out.println("Best value: " + best);
+        System.out.println("Items taken (0-indexed): " + taken);
+    }
 }`,
 
-  rust: `pub fn knapsack01(items: &[(u32, u32)], capacity: usize) -> (u32, Vec<usize>) {
+  rust: `fn knapsack01(items: &[(u32, u32)], capacity: usize) -> (u32, Vec<usize>) {
     let n = items.len();
     let mut dp = vec![vec![0u32; capacity + 1]; n + 1];
     for i in 1..=n {
@@ -225,7 +261,6 @@ public static int knapsack01(int[][] items, int C, List<Integer> taken) {
             }
         }
     }
-    // Backtrack — any row where value changed means item i-1 was taken.
     let mut taken = Vec::new();
     let mut cw = capacity;
     for i in (1..=n).rev() {
@@ -236,8 +271,22 @@ public static int knapsack01(int[][] items, int C, List<Integer> taken) {
     }
     taken.reverse();
     (dp[n][capacity], taken)
+}
+
+fn main() {
+    let items = [(2u32, 3u32), (3, 4), (4, 5), (5, 6)];
+    let (best, taken) = knapsack01(&items, 5);
+    println!("Best value: {}", best);
+    println!("Items taken (0-indexed): {:?}", taken);
 }`,
 }
+
+const KNAPSACK_SAMPLES = [
+  { name: 'Classic',   description: '4 items, capacity 5 → best 7', stdin: '', expected: '' },
+  { name: 'Zero cap',  description: 'C=0 — no items fit',           stdin: '', expected: '' },
+  { name: 'Single',    description: '1 item consuming full capacity', stdin: '', expected: '' },
+  { name: 'All fit',   description: 'Sum of weights ≤ capacity',    stdin: '', expected: '' },
+]
 
 const ACTIVE_MAP = {
   pseudo: { init: 0, fill: 6, back: 12 },
@@ -397,7 +446,7 @@ export default function DPKnapsack() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <MultiLangCode title='0/1 Knapsack — DP + backtrack' code={CODE} activeLines={activeLinesFor(f?.phase)} />
+      <MultiLangCode title='0/1 Knapsack — DP + backtrack' code={CODE} samples={KNAPSACK_SAMPLES} activeLines={activeLinesFor(f?.phase)} />
 
       <ComplexityTable rows={[
         { op: '0/1 Knapsack DP',       best: 'O(nC)',   avg: 'O(nC)',   worst: 'O(nC)',   space: 'O(nC)' },

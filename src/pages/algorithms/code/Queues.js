@@ -13,7 +13,8 @@ function dequeue():
     size -= 1
     return v`,
 
-  c: `#include <stdbool.h>
+  c: `#include <stdio.h>
+#include <stdbool.h>
 #define CAP 8
 
 typedef struct { int buf[CAP]; int head, tail, size; } Queue;
@@ -30,37 +31,65 @@ int dequeue(Queue *q) {
     q->head = (q->head + 1) % CAP;
     q->size--;
     return v;
+}
+
+int main(void) {
+    Queue q = {0};
+    for (int i = 1; i <= 5; i++) enqueue(&q, i * 10);
+    printf("Dequeued:");
+    while (q.size) printf(" %d", dequeue(&q));
+    printf("\\n");
+    return 0;
 }`,
 
-  cpp: `#include <queue>
-#include <deque>
+  cpp: `#include <iostream>
+#include <queue>
 
-// std::queue is a container adaptor. Push at back, pop from front — no wrap
-// arithmetic exposed to the caller (deque handles it internally).
-std::queue<int> q;
-q.push(42);
-int front = q.front();
-q.pop();      // removes, does NOT return`,
+int main() {
+    std::queue<int> q;
+    for (int i = 1; i <= 5; i++) q.push(i * 10);
+    std::cout << "Dequeued:";
+    while (!q.empty()) { std::cout << " " << q.front(); q.pop(); }
+    std::cout << "\\n";
+    return 0;
+}`,
 
   python: `from collections import deque
 
-# deque is a doubly-linked block-list, O(1) at both ends. Use it, not list.
-q = deque()
-q.append(42)          # enqueue at tail
-val = q.popleft()     # dequeue from head`,
+if __name__ == "__main__":
+    q = deque()
+    for i in range(1, 6):
+        q.append(i * 10)              # enqueue at tail
+    out = []
+    while q:
+        out.append(q.popleft())       # dequeue from head
+    print("Dequeued:", out)`,
 
   java: `import java.util.ArrayDeque;
 import java.util.Queue;
 
-// ArrayDeque backs a circular buffer under the hood — same idea as above.
-Queue<Integer> q = new ArrayDeque<>();
-q.offer(42);          // enqueue
-int val = q.poll();   // dequeue (null if empty; use remove() to throw)`,
+public class Main {
+    public static void main(String[] args) {
+        Queue<Integer> q = new ArrayDeque<>();
+        for (int i = 1; i <= 5; i++) q.offer(i * 10);
+        StringBuilder sb = new StringBuilder("Dequeued:");
+        while (!q.isEmpty()) sb.append(" ").append(q.poll());
+        System.out.println(sb);
+    }
+}`,
 
   rust: `use std::collections::VecDeque;
 
-// VecDeque is a ring buffer over Vec — offers O(1) push_back / pop_front.
-let mut q: VecDeque<i32> = VecDeque::new();
-q.push_back(42);              // enqueue
-let val = q.pop_front();      // dequeue → Option<i32>`,
+fn main() {
+    let mut q: VecDeque<i32> = VecDeque::new();
+    for i in 1..=5 { q.push_back(i * 10); }
+    let mut out: Vec<i32> = Vec::new();
+    while let Some(v) = q.pop_front() { out.push(v); }
+    println!("Dequeued: {:?}", out);
+}`,
 }
+
+export const QUEUE_SAMPLES = [
+  { name: 'FIFO 10..50', description: 'Enqueue 10,20,30,40,50 — dequeue same order', stdin: '', expected: '' },
+  { name: 'Empty',       description: 'Dequeue on empty is safe / no-op',            stdin: '', expected: '' },
+]

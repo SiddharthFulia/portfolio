@@ -20,7 +20,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
-import { BST_INSERT_CODE, BST_DELETE_CODE } from './code/BST'
+import { BST_INSERT_CODE, BST_DELETE_CODE, BST_INSERT_SAMPLES, BST_DELETE_SAMPLES } from './code/BST'
 
 /* ---------- tree ops ---------- */
 
@@ -325,6 +325,7 @@ export default function BST() {
       <MultiLangCode
         title={mode === 'delete' ? 'Implementation — delete' : 'Implementation — insert'}
         code={mode === 'delete' ? BST_DELETE_CODE : BST_INSERT_CODE}
+        samples={mode === 'delete' ? BST_DELETE_SAMPLES : BST_INSERT_SAMPLES}
         activeLines={{ pseudo: activeLine }}
       />
 

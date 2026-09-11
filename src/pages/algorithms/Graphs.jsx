@@ -15,7 +15,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   MultiLangCode, ComplexityTable, RealWorldCard, Field, TextInput, Chip,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
-import { GRAPH_CODE } from './code/Graphs'
+import { GRAPH_CODE, GRAPH_SAMPLES } from './code/Graphs'
 
 const INITIAL = {
   nodes: ['A', 'B', 'C', 'D', 'E'],
@@ -262,6 +262,7 @@ export default function Graphs() {
       <MultiLangCode
         title="Implementation — representations"
         code={GRAPH_CODE}
+        samples={GRAPH_SAMPLES}
       />
 
       <ComplexityTable rows={[

@@ -24,7 +24,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   MultiLangCode, ComplexityTable, RealWorldCard, StepControls, useStepEngine,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
-import { AVL_CODE } from './code/BalancedTrees'
+import { AVL_CODE, AVL_SAMPLES } from './code/BalancedTrees'
 import { Button } from '../../components/ui'
 
 /* ─────────── AVL ─────────── */
@@ -298,6 +298,7 @@ export default function BalancedTrees() {
       <MultiLangCode
         title="Implementation — AVL insert (representative)"
         code={AVL_CODE}
+        samples={AVL_SAMPLES}
       />
 
       <ComplexityTable rows={[

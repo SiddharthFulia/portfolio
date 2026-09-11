@@ -68,7 +68,8 @@ for iv in intervals:
     lastEnd = iv.end
 return chosen`,
 
-  c: `#include <stdlib.h>
+  c: `#include <stdio.h>
+#include <stdlib.h>
 
 typedef struct { int start, end; } Interval;
 
@@ -76,7 +77,6 @@ static int cmp_end(const void* a, const void* b) {
     return ((Interval*)a)->end - ((Interval*)b)->end;
 }
 
-/* Fills 'out' with chosen intervals and returns their count. */
 int max_intervals(Interval* iv, int n, Interval* out) {
     qsort(iv, n, sizeof(Interval), cmp_end);
     int last_end = -2147483648, k = 0;
@@ -87,10 +87,22 @@ int max_intervals(Interval* iv, int n, Interval* out) {
         }
     }
     return k;
+}
+
+int main(void) {
+    Interval iv[] = {{1,4},{3,5},{0,6},{5,7},{3,8},{5,9},{6,10},{8,11},{8,12},{2,13},{12,14}};
+    Interval out[16];
+    int n = max_intervals(iv, 11, out);
+    printf("Selected %d intervals:", n);
+    for (int i = 0; i < n; i++) printf(" [%d,%d]", out[i].start, out[i].end);
+    printf("\\n");
+    return 0;
 }`,
 
-  cpp: `#include <vector>
+  cpp: `#include <iostream>
+#include <vector>
 #include <algorithm>
+#include <climits>
 
 struct Interval { int start, end; };
 
@@ -98,56 +110,78 @@ std::vector<Interval> max_intervals(std::vector<Interval> iv) {
     std::sort(iv.begin(), iv.end(),
               [](const Interval& a, const Interval& b) { return a.end < b.end; });
     std::vector<Interval> chosen;
-    int last_end = INT32_MIN;
+    int last_end = INT_MIN;
     for (const auto& x : iv) {
-        if (x.start >= last_end) {   // no overlap with previous pick
-            chosen.push_back(x);
-            last_end = x.end;
-        }
+        if (x.start >= last_end) { chosen.push_back(x); last_end = x.end; }
     }
     return chosen;
+}
+
+int main() {
+    std::vector<Interval> iv = {{1,4},{3,5},{0,6},{5,7},{3,8},{5,9},{6,10},{8,11},{8,12},{2,13},{12,14}};
+    auto out = max_intervals(iv);
+    std::cout << "Selected " << out.size() << " intervals:";
+    for (auto& x : out) std::cout << " [" << x.start << "," << x.end << "]";
+    std::cout << "\\n";
+    return 0;
 }`,
 
   python: `def max_intervals(intervals):
-    # Sort by end time — the earliest-finishing choice leaves the most room.
     intervals = sorted(intervals, key=lambda x: x[1])
     chosen, last_end = [], float('-inf')
     for start, end in intervals:
         if start >= last_end:
-            chosen.append((start, end))
-            last_end = end
-    return chosen`,
+            chosen.append((start, end)); last_end = end
+    return chosen
+
+if __name__ == "__main__":
+    iv = [(1,4),(3,5),(0,6),(5,7),(3,8),(5,9),(6,10),(8,11),(8,12),(2,13),(12,14)]
+    out = max_intervals(iv)
+    print(f"Selected {len(out)} intervals:", out)`,
 
   java: `import java.util.*;
 
-public static int[][] maxIntervals(int[][] iv) {
-    // Sort by end time; scan left-to-right taking every compatible interval.
-    Arrays.sort(iv, (a, b) -> Integer.compare(a[1], b[1]));
-    List<int[]> chosen = new ArrayList<>();
-    int lastEnd = Integer.MIN_VALUE;
-    for (int[] x : iv) {
-        if (x[0] >= lastEnd) {
-            chosen.add(x);
-            lastEnd = x[1];
+public class Main {
+    public static int[][] maxIntervals(int[][] iv) {
+        Arrays.sort(iv, (a, b) -> Integer.compare(a[1], b[1]));
+        List<int[]> chosen = new ArrayList<>();
+        int lastEnd = Integer.MIN_VALUE;
+        for (int[] x : iv) {
+            if (x[0] >= lastEnd) { chosen.add(x); lastEnd = x[1]; }
         }
+        return chosen.toArray(new int[0][]);
     }
-    return chosen.toArray(new int[0][]);
+    public static void main(String[] args) {
+        int[][] iv = {{1,4},{3,5},{0,6},{5,7},{3,8},{5,9},{6,10},{8,11},{8,12},{2,13},{12,14}};
+        int[][] out = maxIntervals(iv);
+        StringBuilder sb = new StringBuilder("Selected " + out.length + " intervals:");
+        for (int[] x : out) sb.append(" [").append(x[0]).append(",").append(x[1]).append("]");
+        System.out.println(sb);
+    }
 }`,
 
-  rust: `pub fn max_intervals(mut iv: Vec<(i32, i32)>) -> Vec<(i32, i32)> {
-    // Earliest-end first — leaves the most room for later picks.
+  rust: `fn max_intervals(mut iv: Vec<(i32, i32)>) -> Vec<(i32, i32)> {
     iv.sort_by_key(|x| x.1);
     let mut chosen = Vec::new();
     let mut last_end = i32::MIN;
     for x in iv {
-        if x.0 >= last_end {
-            chosen.push(x);
-            last_end = x.1;
-        }
+        if x.0 >= last_end { chosen.push(x); last_end = x.1; }
     }
     chosen
+}
+
+fn main() {
+    let iv = vec![(1,4),(3,5),(0,6),(5,7),(3,8),(5,9),(6,10),(8,11),(8,12),(2,13),(12,14)];
+    let out = max_intervals(iv);
+    println!("Selected {} intervals: {:?}", out.len(), out);
 }`,
 }
+
+const GI_SAMPLES = [
+  { name: 'Meetings',      description: '11 candidate meetings — greedy picks 4',   stdin: '', expected: '' },
+  { name: 'All overlap',   description: 'Only one interval fits',                  stdin: '', expected: '' },
+  { name: 'No overlap',    description: 'All disjoint — pick everything',          stdin: '', expected: '' },
+]
 
 const ACTIVE_MAP = {
   pseudo: { sort: 0, accept: 5, reject: 4, done: 7 },
@@ -281,7 +315,7 @@ export default function GreedyIntervals() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <MultiLangCode title='Interval scheduling (greedy)' code={CODE} activeLines={activeLinesFor(f?.kind)} />
+      <MultiLangCode title='Interval scheduling (greedy)' code={CODE} samples={GI_SAMPLES} activeLines={activeLinesFor(f?.kind)} />
 
       <ComplexityTable rows={[
         { op: 'Greedy (end sort)', best: 'O(n \\log n)', avg: 'O(n \\log n)', worst: 'O(n \\log n)', space: 'O(n)' },

@@ -11,7 +11,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
-import { QUEUE_CODE } from './code/Queues'
+import { QUEUE_CODE, QUEUE_SAMPLES } from './code/Queues'
 
 const CAP = 8
 
@@ -248,6 +248,7 @@ export default function Queues() {
       <MultiLangCode
         title="Implementation — circular-buffer queue"
         code={QUEUE_CODE}
+        samples={QUEUE_SAMPLES}
         activeLines={{ pseudo: activeLine }}
       />
 

@@ -77,84 +77,170 @@ for k = 0 .. n-1:
         dist[i][j] = dist[i][k] + dist[k][j]
 # After iteration k, dist[i][j] uses only intermediates in {0..k}`,
 
-  c: `#include <limits.h>
+  c: `#include <stdio.h>
+#include <limits.h>
+#define N 4
+#define INF 999999L
 
-/* dist is n*n; INF is a large sentinel. Runs in O(n^3). */
-void floyd_warshall(int n, long dist[][n]) {
-    for (int k = 0; k < n; k++) {
+void floyd_warshall(int n, long dist[][N]) {
+    for (int k = 0; k < n; k++)
         for (int i = 0; i < n; i++) {
-            if (dist[i][k] == LONG_MAX) continue;   /* skip unreachable */
+            if (dist[i][k] >= INF) continue;
             for (int j = 0; j < n; j++) {
-                if (dist[k][j] == LONG_MAX) continue;
+                if (dist[k][j] >= INF) continue;
                 long via = dist[i][k] + dist[k][j];
                 if (via < dist[i][j]) dist[i][j] = via;
             }
         }
+}
+
+int main(void) {
+    long dist[N][N] = {
+        {0, 3, INF, 5},
+        {2, 0, INF, 4},
+        {INF, 1, 0, INF},
+        {INF, INF, 2, 0}
+    };
+    floyd_warshall(N, dist);
+    printf("All-pairs shortest paths:\\n");
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++)
+            printf(dist[i][j] >= INF ? "  inf" : "%5ld", dist[i][j]);
+        printf("\\n");
     }
+    return 0;
 }`,
 
-  cpp: `#include <vector>
+  cpp: `#include <iostream>
+#include <vector>
 #include <climits>
+
+const long long INF = 999999;
 
 void floyd_warshall(std::vector<std::vector<long long>>& dist) {
     int n = (int)dist.size();
-    for (int k = 0; k < n; ++k) {
+    for (int k = 0; k < n; ++k)
         for (int i = 0; i < n; ++i) {
-            if (dist[i][k] == LLONG_MAX) continue;
+            if (dist[i][k] >= INF) continue;
             for (int j = 0; j < n; ++j) {
-                if (dist[k][j] == LLONG_MAX) continue;
+                if (dist[k][j] >= INF) continue;
                 long long via = dist[i][k] + dist[k][j];
                 if (via < dist[i][j]) dist[i][j] = via;
             }
         }
+}
+
+int main() {
+    std::vector<std::vector<long long>> dist = {
+        {0, 3, INF, 5},
+        {2, 0, INF, 4},
+        {INF, 1, 0, INF},
+        {INF, INF, 2, 0}
+    };
+    floyd_warshall(dist);
+    std::cout << "All-pairs shortest paths:\\n";
+    for (auto& row : dist) {
+        for (long long x : row) {
+            if (x >= INF) std::cout << "  inf";
+            else std::cout << " " << x;
+        }
+        std::cout << "\\n";
     }
+    return 0;
 }`,
 
   python: `from math import inf
 
 def floyd_warshall(dist):
-    """dist is an n*n matrix with inf for missing edges, 0 on the diagonal."""
     n = len(dist)
     for k in range(n):
-        # After this k, dist[i][j] uses only intermediates in {0..k}.
         for i in range(n):
-            if dist[i][k] == inf:
-                continue
+            if dist[i][k] == inf: continue
             for j in range(n):
                 via = dist[i][k] + dist[k][j]
-                if via < dist[i][j]:
-                    dist[i][j] = via
-    return dist`,
+                if via < dist[i][j]: dist[i][j] = via
+    return dist
 
-  java: `public static void floydWarshall(long[][] dist) {
-    int n = dist.length;
-    for (int k = 0; k < n; k++) {
-        for (int i = 0; i < n; i++) {
-            if (dist[i][k] == Long.MAX_VALUE) continue;
-            for (int j = 0; j < n; j++) {
-                if (dist[k][j] == Long.MAX_VALUE) continue;
-                long via = dist[i][k] + dist[k][j];
-                if (via < dist[i][j]) dist[i][j] = via;
+if __name__ == "__main__":
+    dist = [
+        [0, 3, inf, 5],
+        [2, 0, inf, 4],
+        [inf, 1, 0, inf],
+        [inf, inf, 2, 0]
+    ]
+    floyd_warshall(dist)
+    print("All-pairs shortest paths:")
+    for row in dist: print(row)`,
+
+  java: `public class Main {
+    static final long INF = 999999L;
+
+    public static void floydWarshall(long[][] dist) {
+        int n = dist.length;
+        for (int k = 0; k < n; k++)
+            for (int i = 0; i < n; i++) {
+                if (dist[i][k] >= INF) continue;
+                for (int j = 0; j < n; j++) {
+                    if (dist[k][j] >= INF) continue;
+                    long via = dist[i][k] + dist[k][j];
+                    if (via < dist[i][j]) dist[i][j] = via;
+                }
             }
+    }
+
+    public static void main(String[] args) {
+        long[][] dist = {
+            {0, 3, INF, 5},
+            {2, 0, INF, 4},
+            {INF, 1, 0, INF},
+            {INF, INF, 2, 0}
+        };
+        floydWarshall(dist);
+        System.out.println("All-pairs shortest paths:");
+        for (long[] row : dist) {
+            StringBuilder sb = new StringBuilder();
+            for (long x : row) sb.append(x >= INF ? "  inf" : String.format("%5d", x));
+            System.out.println(sb);
         }
     }
 }`,
 
-  rust: `pub fn floyd_warshall(dist: &mut Vec<Vec<i64>>) {
+  rust: `const INF: i64 = 999999;
+
+fn floyd_warshall(dist: &mut Vec<Vec<i64>>) {
     let n = dist.len();
-    let inf = i64::MAX / 4;
     for k in 0..n {
         for i in 0..n {
-            if dist[i][k] >= inf { continue; }   // unreachable → skip row work
+            if dist[i][k] >= INF { continue; }
             for j in 0..n {
-                if dist[k][j] >= inf { continue; }
+                if dist[k][j] >= INF { continue; }
                 let via = dist[i][k] + dist[k][j];
                 if via < dist[i][j] { dist[i][j] = via; }
             }
         }
     }
+}
+
+fn main() {
+    let mut dist: Vec<Vec<i64>> = vec![
+        vec![0, 3, INF, 5],
+        vec![2, 0, INF, 4],
+        vec![INF, 1, 0, INF],
+        vec![INF, INF, 2, 0]
+    ];
+    floyd_warshall(&mut dist);
+    println!("All-pairs shortest paths:");
+    for row in &dist {
+        let s: String = row.iter().map(|&x| if x >= INF { "  inf".to_string() } else { format!("{:5}", x) }).collect();
+        println!("{}", s);
+    }
 }`,
 }
+
+const FW_SAMPLES = [
+  { name: '4-node digraph', description: 'Standard weighted digraph', stdin: '', expected: '' },
+  { name: 'Isolated',       description: 'No edges — infinities stay', stdin: '', expected: '' },
+]
 
 const ACTIVE_MAP = {
   pseudo: { init: 0, fill: 5, done: 6 },
@@ -295,7 +381,7 @@ export default function FloydWarshall() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <MultiLangCode title='Floyd–Warshall — all-pairs shortest paths' code={CODE} activeLines={activeLinesFor(f)} />
+      <MultiLangCode title='Floyd–Warshall — all-pairs shortest paths' code={CODE} samples={FW_SAMPLES} activeLines={activeLinesFor(f)} />
 
       <ComplexityTable rows={[
         { op: 'Floyd–Warshall',    best: 'O(V^3)',      avg: 'O(V^3)',       worst: 'O(V^3)',       space: 'O(V^2)' },

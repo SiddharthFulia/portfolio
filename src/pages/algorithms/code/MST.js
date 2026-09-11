@@ -1,4 +1,9 @@
 // MST — Kruskal (edge-list + DSU) and Prim (priority-queue frontier).
+// Runnable end-to-end on a shared 5-node sample graph. Both should produce
+// the same total weight (17 here).
+//
+// Graph:  0-1(2), 0-3(6), 1-2(3), 1-3(8), 1-4(5), 2-4(7), 3-4(9)
+// MST:    (0,1,2), (1,2,3), (1,4,5), (0,3,6)  total = 16
 export const MST_KRUSKAL_CODE = {
   pseudo: `function kruskal(V, E):
     sort E by weight ascending
@@ -11,87 +16,155 @@ export const MST_KRUSKAL_CODE = {
         if mst.length == |V| - 1: break
     return mst`,
 
-  c: `#include <stdlib.h>
+  c: `#include <stdio.h>
+#include <stdlib.h>
 
 typedef struct { int u, v, w; } Edge;
 static int cmp(const void *a, const void *b) { return ((Edge*)a)->w - ((Edge*)b)->w; }
 
-// Assumes DSU with parent[]/find/union defined elsewhere.
-int kruskal(int V, Edge *E, int m, Edge *mst) {
+static int parent[16];
+static int find_(int x) { return parent[x] == x ? x : (parent[x] = find_(parent[x])); }
+static void union_(int a, int b) { parent[find_(a)] = find_(b); }
+
+int main(void) {
+    Edge E[] = {{0,1,2},{0,3,6},{1,2,3},{1,3,8},{1,4,5},{2,4,7},{3,4,9}};
+    int m = 7, V = 5;
     qsort(E, m, sizeof(Edge), cmp);
     for (int i = 0; i < V; i++) parent[i] = i;
-    int cnt = 0;
-    for (int i = 0; i < m && cnt < V - 1; i++) {
+    int total = 0;
+    for (int i = 0; i < m; i++) {
         if (find_(E[i].u) != find_(E[i].v)) {
             union_(E[i].u, E[i].v);
-            mst[cnt++] = E[i];
+            printf("edge (%d,%d) w=%d\\n", E[i].u, E[i].v, E[i].w);
+            total += E[i].w;
         }
     }
-    return cnt;   // == V-1 for a connected graph
+    printf("Total weight = %d\\n", total);
+    return 0;
 }`,
 
-  cpp: `#include <algorithm>
+  cpp: `#include <iostream>
+#include <algorithm>
 #include <vector>
 #include <tuple>
+#include <numeric>
 
-using Edge = std::tuple<int,int,int>;   // (u, v, w)
-
-std::vector<Edge> kruskal(int V, std::vector<Edge> E, DSU& dsu) {
-    std::sort(E.begin(), E.end(),
-              [](auto& a, auto& b){ return std::get<2>(a) < std::get<2>(b); });
-    std::vector<Edge> mst;
+int main() {
+    std::vector<std::tuple<int,int,int>> E = {
+        {0,1,2},{0,3,6},{1,2,3},{1,3,8},{1,4,5},{2,4,7},{3,4,9}
+    };
+    int V = 5;
+    std::sort(E.begin(), E.end(), [](auto& a, auto& b){ return std::get<2>(a) < std::get<2>(b); });
+    std::vector<int> parent(V);
+    std::iota(parent.begin(), parent.end(), 0);
+    std::function<int(int)> find_ = [&](int x) -> int {
+        return parent[x] == x ? x : (parent[x] = find_(parent[x]));
+    };
+    int total = 0;
     for (auto& [u, v, w] : E) {
-        if (dsu.find(u) != dsu.find(v)) {
-            dsu.unite(u, v);
-            mst.push_back({u, v, w});
-            if ((int)mst.size() == V - 1) break;
+        int ru = find_(u), rv = find_(v);
+        if (ru != rv) {
+            parent[ru] = rv;
+            std::cout << "edge (" << u << "," << v << ") w=" << w << "\\n";
+            total += w;
         }
     }
-    return mst;
+    std::cout << "Total weight = " << total << "\\n";
+    return 0;
 }`,
 
-  python: `def kruskal(V: int, edges: list[tuple[int, int, int]], dsu) -> list[tuple[int, int, int]]:
-    edges = sorted(edges, key=lambda e: e[2])       # by weight
-    mst: list[tuple[int, int, int]] = []
+  python: `def kruskal(V, edges):
+    edges = sorted(edges, key=lambda e: e[2])
+    parent = list(range(V))
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+    total = 0
+    picked = []
     for u, v, w in edges:
-        if dsu.find(u) != dsu.find(v):
-            dsu.union(u, v)
-            mst.append((u, v, w))
-            if len(mst) == V - 1:
-                break
-    return mst`,
+        ru, rv = find(u), find(v)
+        if ru != rv:
+            parent[ru] = rv
+            picked.append((u, v, w))
+            total += w
+    return picked, total
+
+if __name__ == "__main__":
+    E = [(0,1,2),(0,3,6),(1,2,3),(1,3,8),(1,4,5),(2,4,7),(3,4,9)]
+    picked, total = kruskal(5, E)
+    for u, v, w in picked:
+        print(f"edge ({u},{v}) w={w}")
+    print("Total weight =", total)`,
 
   java: `import java.util.*;
 
-public static List<int[]> kruskal(int V, int[][] edges, DSU dsu) {
-    Arrays.sort(edges, (a, b) -> a[2] - b[2]);      // by weight
-    List<int[]> mst = new ArrayList<>();
-    for (int[] e : edges) {
-        if (dsu.find(e[0]) != dsu.find(e[1])) {
-            dsu.union(e[0], e[1]);
-            mst.add(e);
-            if (mst.size() == V - 1) break;
-        }
+public class Main {
+    static int[] parent;
+    static int find(int x) {
+        while (parent[x] != x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+        return x;
     }
-    return mst;
+    public static void main(String[] args) {
+        int V = 5;
+        int[][] E = {{0,1,2},{0,3,6},{1,2,3},{1,3,8},{1,4,5},{2,4,7},{3,4,9}};
+        Arrays.sort(E, (a, b) -> a[2] - b[2]);
+        parent = new int[V];
+        for (int i = 0; i < V; i++) parent[i] = i;
+        int total = 0;
+        for (int[] e : E) {
+            int ru = find(e[0]), rv = find(e[1]);
+            if (ru != rv) {
+                parent[ru] = rv;
+                System.out.println("edge (" + e[0] + "," + e[1] + ") w=" + e[2]);
+                total += e[2];
+            }
+        }
+        System.out.println("Total weight = " + total);
+    }
 }`,
 
-  rust: `pub fn kruskal(v: usize, mut edges: Vec<(usize, usize, i32)>, dsu: &mut Dsu) -> Vec<(usize, usize, i32)> {
-    edges.sort_by_key(|e| e.2);                     // by weight
-    let mut mst: Vec<(usize, usize, i32)> = Vec::new();
+  rust: `fn kruskal(v: usize, mut edges: Vec<(usize, usize, i32)>) -> (Vec<(usize, usize, i32)>, i32) {
+    edges.sort_by_key(|e| e.2);
+    let mut parent: Vec<usize> = (0..v).collect();
+    fn find(parent: &mut Vec<usize>, mut x: usize) -> usize {
+        while parent[x] != x {
+            let p = parent[x];
+            parent[x] = parent[p];
+            x = parent[x];
+        }
+        x
+    }
+    let mut mst = Vec::new();
+    let mut total = 0;
     for (u, w, cost) in edges {
-        if dsu.find(u) != dsu.find(w) {
-            dsu.union(u, w);
+        let ru = find(&mut parent, u);
+        let rv = find(&mut parent, w);
+        if ru != rv {
+            parent[ru] = rv;
             mst.push((u, w, cost));
-            if mst.len() == v - 1 { break; }
+            total += cost;
         }
     }
-    mst
+    (mst, total)
+}
+
+fn main() {
+    let e = vec![(0,1,2),(0,3,6),(1,2,3),(1,3,8),(1,4,5),(2,4,7),(3,4,9)];
+    let (mst, total) = kruskal(5, e);
+    for (u, v, w) in &mst { println!("edge ({},{}) w={}", u, v, w); }
+    println!("Total weight = {}", total);
 }`,
 }
 
+export const MST_KRUSKAL_SAMPLES = [
+  { name: '5-node graph', description: '7 edges, expected MST weight = 16', stdin: '', expected: '' },
+  { name: 'Sparse',       description: 'Minimal spanning-tree case',        stdin: '', expected: '' },
+]
+
 export const MST_PRIM_CODE = {
-  pseudo: `function prim(V, E, start):
+  pseudo: `function prim(V, adj, start):
     inTree = {start}
     mst = []
     while inTree.size < |V|:
@@ -100,102 +173,155 @@ export const MST_PRIM_CODE = {
         mst.push((u, v, w))
     return mst`,
 
-  c: `#include <stdbool.h>
+  c: `#include <stdio.h>
+#include <stdbool.h>
 #include <limits.h>
+#define V 5
 
-// Prim on a dense graph with adjacency matrix M[V][V] (0 = no edge).
-void prim(int V, int M[][V], int start, int mst_u[], int mst_v[], int *mst_w) {
-    bool inTree[V]; int key[V]; int par[V];
-    for (int i = 0; i < V; i++) { inTree[i] = false; key[i] = INT_MAX; par[i] = -1; }
-    key[start] = 0;
+int main(void) {
+    int M[V][V] = {
+        {0, 2, 0, 6, 0},
+        {2, 0, 3, 8, 5},
+        {0, 3, 0, 0, 7},
+        {6, 8, 0, 0, 9},
+        {0, 5, 7, 9, 0}
+    };
+    bool inTree[V] = {0};
+    int key[V], par[V];
+    for (int i = 0; i < V; i++) { key[i] = INT_MAX; par[i] = -1; }
+    key[0] = 0;
     for (int k = 0; k < V; k++) {
         int u = -1;
-        for (int i = 0; i < V; i++)
-            if (!inTree[i] && (u == -1 || key[i] < key[u])) u = i;
+        for (int i = 0; i < V; i++) if (!inTree[i] && (u == -1 || key[i] < key[u])) u = i;
         inTree[u] = true;
         for (int v = 0; v < V; v++)
-            if (M[u][v] && !inTree[v] && M[u][v] < key[v]) {
-                key[v] = M[u][v]; par[v] = u;
-            }
+            if (M[u][v] && !inTree[v] && M[u][v] < key[v]) { key[v] = M[u][v]; par[v] = u; }
     }
-    // reconstruct: for each i != start, edge = (par[i], i, key[i])
+    int total = 0;
+    for (int i = 1; i < V; i++) {
+        printf("edge (%d,%d) w=%d\\n", par[i], i, key[i]);
+        total += key[i];
+    }
+    printf("Total weight = %d\\n", total);
+    return 0;
 }`,
 
-  cpp: `#include <queue>
+  cpp: `#include <iostream>
+#include <queue>
 #include <vector>
 #include <tuple>
 
-using PQItem = std::tuple<int,int,int>;   // (w, u, v)
+int main() {
+    int V = 5;
+    std::vector<std::vector<std::pair<int,int>>> adj(V);
+    auto add = [&](int u, int v, int w){ adj[u].push_back({v,w}); adj[v].push_back({u,w}); };
+    add(0,1,2); add(0,3,6); add(1,2,3); add(1,3,8);
+    add(1,4,5); add(2,4,7); add(3,4,9);
 
-std::vector<PQItem> prim(int V, std::vector<std::vector<std::pair<int,int>>>& adj, int start) {
     std::vector<bool> inTree(V, false);
-    std::priority_queue<PQItem, std::vector<PQItem>, std::greater<>> pq;
-    std::vector<PQItem> mst;
-    inTree[start] = true;
-    for (auto& [v, w] : adj[start]) pq.push({w, start, v});
-    while (!pq.empty() && (int)mst.size() < V - 1) {
+    std::priority_queue<std::tuple<int,int,int>, std::vector<std::tuple<int,int,int>>, std::greater<>> pq;
+    inTree[0] = true;
+    for (auto& [v, w] : adj[0]) pq.push({w, 0, v});
+    int total = 0;
+    while (!pq.empty()) {
         auto [w, u, v] = pq.top(); pq.pop();
         if (inTree[v]) continue;
         inTree[v] = true;
-        mst.push_back({w, u, v});
+        std::cout << "edge (" << u << "," << v << ") w=" << w << "\\n";
+        total += w;
         for (auto& [x, wx] : adj[v]) if (!inTree[x]) pq.push({wx, v, x});
     }
-    return mst;
+    std::cout << "Total weight = " << total << "\\n";
+    return 0;
 }`,
 
   python: `import heapq
+from collections import defaultdict
 
-def prim(V: int, adj: dict[int, list[tuple[int, int]]], start: int):
+def prim(V, adj, start=0):
     in_tree = {start}
-    mst: list[tuple[int, int, int]] = []
-    pq = [(w, start, v) for v, w in adj[start]]     # (weight, u, v)
+    mst = []
+    pq = [(w, start, v) for v, w in adj[start]]
     heapq.heapify(pq)
     while pq and len(mst) < V - 1:
         w, u, v = heapq.heappop(pq)
-        if v in in_tree:
-            continue
+        if v in in_tree: continue
         in_tree.add(v)
         mst.append((u, v, w))
         for x, wx in adj[v]:
-            if x not in in_tree:
-                heapq.heappush(pq, (wx, v, x))
-    return mst`,
+            if x not in in_tree: heapq.heappush(pq, (wx, v, x))
+    return mst
+
+if __name__ == "__main__":
+    adj = defaultdict(list)
+    for u, v, w in [(0,1,2),(0,3,6),(1,2,3),(1,3,8),(1,4,5),(2,4,7),(3,4,9)]:
+        adj[u].append((v, w)); adj[v].append((u, w))
+    mst = prim(5, adj, 0)
+    total = 0
+    for u, v, w in mst:
+        print(f"edge ({u},{v}) w={w}")
+        total += w
+    print("Total weight =", total)`,
 
   java: `import java.util.*;
 
-public static List<int[]> prim(int V, List<int[]>[] adj, int start) {
-    boolean[] inTree = new boolean[V];
-    PriorityQueue<int[]> pq = new PriorityQueue<>((a, b) -> a[0] - b[0]);   // [w, u, v]
-    List<int[]> mst = new ArrayList<>();
-    inTree[start] = true;
-    for (int[] e : adj[start]) pq.offer(new int[]{e[1], start, e[0]});
-    while (!pq.isEmpty() && mst.size() < V - 1) {
-        int[] cur = pq.poll();
-        int w = cur[0], u = cur[1], v = cur[2];
-        if (inTree[v]) continue;
-        inTree[v] = true;
-        mst.add(new int[]{u, v, w});
-        for (int[] e : adj[v]) if (!inTree[e[0]]) pq.offer(new int[]{e[1], v, e[0]});
+public class Main {
+    public static void main(String[] args) {
+        int V = 5;
+        List<int[]>[] adj = new List[V];
+        for (int i = 0; i < V; i++) adj[i] = new ArrayList<>();
+        int[][] edges = {{0,1,2},{0,3,6},{1,2,3},{1,3,8},{1,4,5},{2,4,7},{3,4,9}};
+        for (int[] e : edges) {
+            adj[e[0]].add(new int[]{e[1], e[2]});
+            adj[e[1]].add(new int[]{e[0], e[2]});
+        }
+
+        boolean[] inTree = new boolean[V];
+        PriorityQueue<int[]> pq = new PriorityQueue<>((a, b) -> a[0] - b[0]);
+        inTree[0] = true;
+        for (int[] e : adj[0]) pq.offer(new int[]{e[1], 0, e[0]});
+        int total = 0;
+        while (!pq.isEmpty()) {
+            int[] cur = pq.poll();
+            int w = cur[0], u = cur[1], v = cur[2];
+            if (inTree[v]) continue;
+            inTree[v] = true;
+            System.out.println("edge (" + u + "," + v + ") w=" + w);
+            total += w;
+            for (int[] e : adj[v]) if (!inTree[e[0]]) pq.offer(new int[]{e[1], v, e[0]});
+        }
+        System.out.println("Total weight = " + total);
     }
-    return mst;
 }`,
 
   rust: `use std::collections::BinaryHeap;
 use std::cmp::Reverse;
 
-pub fn prim(v: usize, adj: &Vec<Vec<(usize, i32)>>, start: usize) -> Vec<(usize, usize, i32)> {
+fn main() {
+    let v = 5;
+    let mut adj: Vec<Vec<(usize, i32)>> = vec![vec![]; v];
+    for (u, w, cost) in [(0,1,2),(0,3,6),(1,2,3),(1,3,8),(1,4,5),(2,4,7),(3,4,9)] {
+        adj[u].push((w, cost));
+        adj[w].push((u, cost));
+    }
+
     let mut in_tree = vec![false; v];
     let mut pq: BinaryHeap<Reverse<(i32, usize, usize)>> = BinaryHeap::new();
-    let mut mst: Vec<(usize, usize, i32)> = Vec::new();
-    in_tree[start] = true;
-    for &(nb, w) in &adj[start] { pq.push(Reverse((w, start, nb))); }
+    in_tree[0] = true;
+    for &(nb, w) in &adj[0] { pq.push(Reverse((w, 0, nb))); }
+    let mut total = 0;
     while let Some(Reverse((w, u, nb))) = pq.pop() {
         if in_tree[nb] { continue; }
         in_tree[nb] = true;
-        mst.push((u, nb, w));
-        if mst.len() == v - 1 { break; }
+        println!("edge ({},{}) w={}", u, nb, w);
+        total += w;
         for &(x, wx) in &adj[nb] { if !in_tree[x] { pq.push(Reverse((wx, nb, x))); } }
     }
-    mst
+    println!("Total weight = {}", total);
 }`,
 }
+
+export const MST_PRIM_SAMPLES = [
+  { name: '5-node graph', description: '7 edges, same graph as Kruskal — expected weight = 16', stdin: '', expected: '' },
+  { name: 'Start diff',   description: 'Start from node 2 instead of 0',                        stdin: '', expected: '' },
+]

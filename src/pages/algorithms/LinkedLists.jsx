@@ -20,7 +20,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
 import { motion } from 'framer-motion'
-import { LL_INSERT_CODE, LL_REVERSE_CODE } from './code/LinkedLists'
+import { LL_INSERT_CODE, LL_REVERSE_CODE, LL_INSERT_SAMPLES, LL_REVERSE_SAMPLES } from './code/LinkedLists'
 
 /* ---------- data model ----------
    Store list as a flat array of {id, value} nodes and a separate
@@ -337,6 +337,7 @@ export default function LinkedLists() {
       <MultiLangCode
         title={mode === 'reverse' ? 'Implementation — reverse (singly)' : 'Implementation — insertAt (singly)'}
         code={mode === 'reverse' ? LL_REVERSE_CODE : LL_INSERT_CODE}
+        samples={mode === 'reverse' ? LL_REVERSE_SAMPLES : LL_INSERT_SAMPLES}
         activeLines={{ pseudo: activeLine }}
       />
 

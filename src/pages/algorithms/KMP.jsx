@@ -86,7 +86,8 @@ for i = 0 .. n-1:
     report match at i - m + 1
     j = pi[j-1]`,
 
-  c: `#include <string.h>
+  c: `#include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 
 void build_pi(const char* pat, int m, int* pi) {
@@ -102,7 +103,7 @@ void build_pi(const char* pat, int m, int* pi) {
 int kmp_search(const char* text, const char* pat, int* out) {
     int n = (int)strlen(text), m = (int)strlen(pat);
     if (m == 0) return 0;
-    int* pi = (int*)malloc(m * sizeof(int));
+    int* pi = malloc(m * sizeof(int));
     build_pi(pat, m, pi);
     int j = 0, matches = 0;
     for (int i = 0; i < n; i++) {
@@ -110,14 +111,26 @@ int kmp_search(const char* text, const char* pat, int* out) {
         if (text[i] == pat[j]) j++;
         if (j == m) {
             out[matches++] = i - m + 1;
-            j = pi[j - 1];   /* keep going for overlapping matches */
+            j = pi[j - 1];
         }
     }
     free(pi);
     return matches;
+}
+
+int main(void) {
+    const char* text = "ababcababcababaabab";
+    const char* pat = "ababc";
+    int out[64];
+    int n = kmp_search(text, pat, out);
+    printf("Text: %s\\nPattern: %s\\nMatches at indices:", text, pat);
+    for (int i = 0; i < n; i++) printf(" %d", out[i]);
+    printf("\\n");
+    return 0;
 }`,
 
-  cpp: `#include <string>
+  cpp: `#include <iostream>
+#include <string>
 #include <vector>
 
 std::vector<int> build_pi(const std::string& pat) {
@@ -140,12 +153,19 @@ std::vector<int> kmp_search(const std::string& text, const std::string& pat) {
     for (int i = 0; i < (int)text.size(); ++i) {
         while (j > 0 && text[i] != pat[j]) j = pi[j - 1];
         if (text[i] == pat[j]) j++;
-        if (j == m) {
-            matches.push_back(i - m + 1);
-            j = pi[j - 1];              // allow overlapping matches
-        }
+        if (j == m) { matches.push_back(i - m + 1); j = pi[j - 1]; }
     }
     return matches;
+}
+
+int main() {
+    std::string text = "ababcababcababaabab";
+    std::string pat = "ababc";
+    auto m = kmp_search(text, pat);
+    std::cout << "Text: " << text << "\\nPattern: " << pat << "\\nMatches at indices:";
+    for (int x : m) std::cout << " " << x;
+    std::cout << "\\n";
+    return 0;
 }`,
 
   python: `def build_pi(pat):
@@ -153,61 +173,63 @@ std::vector<int> kmp_search(const std::string& text, const std::string& pat) {
     pi = [0] * m
     k = 0
     for i in range(1, m):
-        # Roll back k using previous π values until we can extend or hit 0.
-        while k > 0 and pat[k] != pat[i]:
-            k = pi[k - 1]
-        if pat[k] == pat[i]:
-            k += 1
+        while k > 0 and pat[k] != pat[i]: k = pi[k - 1]
+        if pat[k] == pat[i]: k += 1
         pi[i] = k
     return pi
 
 def kmp_search(text, pat):
-    if not pat:
-        return []
+    if not pat: return []
     pi = build_pi(pat)
-    matches = []
-    j = 0
+    matches, j = [], 0
     for i, ch in enumerate(text):
-        while j > 0 and ch != pat[j]:
-            j = pi[j - 1]
-        if ch == pat[j]:
-            j += 1
+        while j > 0 and ch != pat[j]: j = pi[j - 1]
+        if ch == pat[j]: j += 1
         if j == len(pat):
             matches.append(i - len(pat) + 1)
-            j = pi[j - 1]     # continue for overlapping matches
-    return matches`,
+            j = pi[j - 1]
+    return matches
+
+if __name__ == "__main__":
+    text, pat = "ababcababcababaabab", "ababc"
+    m = kmp_search(text, pat)
+    print(f"Text: {text}\\nPattern: {pat}\\nMatches at indices: {m}")`,
 
   java: `import java.util.*;
 
-public static int[] buildPi(String pat) {
-    int m = pat.length();
-    int[] pi = new int[m];
-    int k = 0;
-    for (int i = 1; i < m; i++) {
-        while (k > 0 && pat.charAt(k) != pat.charAt(i)) k = pi[k - 1];
-        if (pat.charAt(k) == pat.charAt(i)) k++;
-        pi[i] = k;
-    }
-    return pi;
-}
-
-public static List<Integer> kmpSearch(String text, String pat) {
-    List<Integer> matches = new ArrayList<>();
-    if (pat.isEmpty()) return matches;
-    int[] pi = buildPi(pat);
-    int j = 0, m = pat.length();
-    for (int i = 0; i < text.length(); i++) {
-        while (j > 0 && text.charAt(i) != pat.charAt(j)) j = pi[j - 1];
-        if (text.charAt(i) == pat.charAt(j)) j++;
-        if (j == m) {
-            matches.add(i - m + 1);
-            j = pi[j - 1];        // overlapping matches
+public class Main {
+    public static int[] buildPi(String pat) {
+        int m = pat.length();
+        int[] pi = new int[m];
+        int k = 0;
+        for (int i = 1; i < m; i++) {
+            while (k > 0 && pat.charAt(k) != pat.charAt(i)) k = pi[k - 1];
+            if (pat.charAt(k) == pat.charAt(i)) k++;
+            pi[i] = k;
         }
+        return pi;
     }
-    return matches;
+
+    public static List<Integer> kmpSearch(String text, String pat) {
+        List<Integer> matches = new ArrayList<>();
+        if (pat.isEmpty()) return matches;
+        int[] pi = buildPi(pat);
+        int j = 0, m = pat.length();
+        for (int i = 0; i < text.length(); i++) {
+            while (j > 0 && text.charAt(i) != pat.charAt(j)) j = pi[j - 1];
+            if (text.charAt(i) == pat.charAt(j)) j++;
+            if (j == m) { matches.add(i - m + 1); j = pi[j - 1]; }
+        }
+        return matches;
+    }
+
+    public static void main(String[] args) {
+        String text = "ababcababcababaabab", pat = "ababc";
+        System.out.println("Text: " + text + "\\nPattern: " + pat + "\\nMatches at indices: " + kmpSearch(text, pat));
+    }
 }`,
 
-  rust: `pub fn build_pi(pat: &[u8]) -> Vec<usize> {
+  rust: `fn build_pi(pat: &[u8]) -> Vec<usize> {
     let m = pat.len();
     let mut pi = vec![0usize; m];
     let mut k = 0usize;
@@ -219,7 +241,7 @@ public static List<Integer> kmpSearch(String text, String pat) {
     pi
 }
 
-pub fn kmp_search(text: &[u8], pat: &[u8]) -> Vec<usize> {
+fn kmp_search(text: &[u8], pat: &[u8]) -> Vec<usize> {
     if pat.is_empty() { return Vec::new(); }
     let pi = build_pi(pat);
     let (mut j, mut matches) = (0usize, Vec::new());
@@ -228,12 +250,25 @@ pub fn kmp_search(text: &[u8], pat: &[u8]) -> Vec<usize> {
         if pat[j] == ch { j += 1; }
         if j == pat.len() {
             matches.push(i + 1 - pat.len());
-            j = pi[j - 1];    // continue for overlapping hits
+            j = pi[j - 1];
         }
     }
     matches
+}
+
+fn main() {
+    let text = "ababcababcababaabab";
+    let pat = "ababc";
+    let m = kmp_search(text.as_bytes(), pat.as_bytes());
+    println!("Text: {}\\nPattern: {}\\nMatches at indices: {:?}", text, pat, m);
 }`,
 }
+
+const KMP_SAMPLES = [
+  { name: 'Overlap',    description: '"ababc" in "ababcababcababaabab" (2 matches)', stdin: '', expected: '' },
+  { name: 'No match',   description: '"xyz" not present',                            stdin: '', expected: '' },
+  { name: 'All match',  description: '"aa" in "aaaa" — 3 overlapping matches',       stdin: '', expected: '' },
+]
 
 // Map the current visualiser step to an active line per language.
 const ACTIVE_MAP = {
@@ -408,7 +443,7 @@ export default function KMP() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <MultiLangCode title='KMP — failure function + search' code={CODE} activeLines={activeLinesFor(f?.kind)} />
+      <MultiLangCode title='KMP — failure function + search' code={CODE} samples={KMP_SAMPLES} activeLines={activeLinesFor(f?.kind)} />
 
       <ComplexityTable rows={[
         { op: 'Naive search',      best: 'O(n)',      avg: 'O(nm)',   worst: 'O(nm)',   space: 'O(1)' },

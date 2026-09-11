@@ -20,7 +20,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
-import { STACK_CORE_CODE, STACK_BRACKETS_CODE } from './code/Stacks'
+import { STACK_CORE_CODE, STACK_BRACKETS_CODE, STACK_CORE_SAMPLES, STACK_BRACKETS_SAMPLES } from './code/Stacks'
 
 const OPEN = { '(': ')', '[': ']', '{': '}' }
 const CLOSE = { ')': '(', ']': '[', '}': '{' }
@@ -260,6 +260,7 @@ export default function Stacks() {
       <MultiLangCode
         title={mode === 'brackets' ? 'Implementation — bracket matcher' : 'Implementation — stack ops'}
         code={mode === 'brackets' ? STACK_BRACKETS_CODE : STACK_CORE_CODE}
+        samples={mode === 'brackets' ? STACK_BRACKETS_SAMPLES : STACK_CORE_SAMPLES}
         activeLines={{ pseudo: activeLine }}
       />
 

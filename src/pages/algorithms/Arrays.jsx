@@ -23,7 +23,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
-import { ARRAYS_CODE } from './code/Arrays'
+import { ARRAYS_CODE, ARRAYS_SAMPLES } from './code/Arrays'
 
 const INITIAL = [3, 8, 15, 21, 42, 61]
 const INITIAL_CAP = 8
@@ -297,6 +297,7 @@ export default function Arrays() {
       <MultiLangCode
         title="Implementation — insert at index"
         code={ARRAYS_CODE}
+        samples={ARRAYS_SAMPLES}
         activeLines={{ pseudo: activeLine }}
       />
 

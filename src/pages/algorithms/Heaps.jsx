@@ -18,7 +18,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
-import { HEAP_INSERT_CODE, HEAP_EXTRACT_CODE } from './code/Heaps'
+import { HEAP_INSERT_CODE, HEAP_EXTRACT_CODE, HEAP_INSERT_SAMPLES, HEAP_EXTRACT_SAMPLES } from './code/Heaps'
 
 const cmp = (a, b, isMin) => isMin ? a < b : a > b
 
@@ -277,6 +277,7 @@ export default function Heaps() {
       <MultiLangCode
         title={mode === 'extract' ? 'Implementation — extract min' : 'Implementation — insert (min-heap)'}
         code={mode === 'extract' ? HEAP_EXTRACT_CODE : HEAP_INSERT_CODE}
+        samples={mode === 'extract' ? HEAP_EXTRACT_SAMPLES : HEAP_INSERT_SAMPLES}
         activeLines={{ pseudo: activeLine }}
       />
 

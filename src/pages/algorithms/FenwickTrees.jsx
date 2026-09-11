@@ -21,7 +21,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
-import { BIT_CODE } from './code/FenwickTrees'
+import { BIT_CODE, BIT_SAMPLES } from './code/FenwickTrees'
 
 const lowbit = (x) => x & -x
 
@@ -260,6 +260,7 @@ export default function FenwickTrees() {
       <MultiLangCode
         title="Implementation — BIT update / prefix"
         code={BIT_CODE}
+        samples={BIT_SAMPLES}
         activeLines={{ pseudo: activeLine }}
       />
 

@@ -14,7 +14,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel,
   ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
-import { CODE as TOPO_CODE } from './code/TopologicalSort'
+import { CODE as TOPO_CODE, KAHN_SAMPLES, DFS_TOPO_SAMPLES } from './code/TopologicalSort'
 
 function mulberry32(seed) {
   let a = (seed | 0) || 1
@@ -339,8 +339,8 @@ export default function TopologicalSort() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <MultiLangCode title="Kahn's algorithm (BFS on in-degree)" code={TOPO_CODE.kahn} />
-      <MultiLangCode title='DFS post-order topological sort' code={TOPO_CODE.dfs} />
+      <MultiLangCode title="Kahn's algorithm (BFS on in-degree)" code={TOPO_CODE.kahn} samples={KAHN_SAMPLES} />
+      <MultiLangCode title='DFS post-order topological sort' code={TOPO_CODE.dfs} samples={DFS_TOPO_SAMPLES} />
 
       <ComplexityTable rows={[
         { op: "Kahn's algorithm", best: 'O(V+E)', avg: 'O(V+E)', worst: 'O(V+E)', space: 'O(V)' },

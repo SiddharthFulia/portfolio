@@ -11,7 +11,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
-import { CODE as SEARCHING_CODE } from './code/Searching'
+import { CODE as SEARCHING_CODE, SEARCHING_LINEAR_SAMPLES, SEARCHING_BINARY_SAMPLES } from './code/Searching'
 
 function mulberry32(seed) {
   let a = (seed | 0) || 1
@@ -223,10 +223,10 @@ export default function Searching() {
       </VisualiserSection>
 
       {(mode === 'race' || mode === 'linear') && (
-        <MultiLangCode title='Linear Search' code={SEARCHING_CODE.linear} />
+        <MultiLangCode title='Linear Search' code={SEARCHING_CODE.linear} samples={SEARCHING_LINEAR_SAMPLES} />
       )}
       {(mode === 'race' || mode === 'binary') && (
-        <MultiLangCode title='Binary Search' code={SEARCHING_CODE.binary} />
+        <MultiLangCode title='Binary Search' code={SEARCHING_CODE.binary} samples={SEARCHING_BINARY_SAMPLES} />
       )}
 
       <ComplexityTable rows={[

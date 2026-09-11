@@ -19,7 +19,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
-import { SEG_QUERY_CODE, SEG_UPDATE_CODE } from './code/SegmentTrees'
+import { SEG_QUERY_CODE, SEG_UPDATE_CODE, SEG_QUERY_SAMPLES, SEG_UPDATE_SAMPLES } from './code/SegmentTrees'
 
 const OP_SUM = 'sum'
 const OP_MIN = 'min'
@@ -321,6 +321,7 @@ export default function SegmentTrees() {
       <MultiLangCode
         title={mode === 'update' ? 'Implementation — point update' : 'Implementation — range query'}
         code={mode === 'update' ? SEG_UPDATE_CODE : SEG_QUERY_CODE}
+        samples={mode === 'update' ? SEG_UPDATE_SAMPLES : SEG_QUERY_SAMPLES}
         activeLines={{ pseudo: activeLine }}
       />
 

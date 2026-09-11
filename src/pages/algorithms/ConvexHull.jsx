@@ -76,7 +76,8 @@ for p in reversed(points):
   upper.push(p)
 hull = lower[:-1] + upper[:-1]`,
 
-  c: `#include <stdlib.h>
+  c: `#include <stdio.h>
+#include <stdlib.h>
 
 typedef struct { double x, y; } Pt;
 
@@ -102,10 +103,21 @@ int convex_hull(Pt* pts, int n, Pt* out) {
         while (k >= lower && cross(out[k - 2], out[k - 1], pts[i]) <= 0) k--;
         out[k++] = pts[i];
     }
-    return k - 1;   /* last point equals first, drop it */
+    return k - 1;
+}
+
+int main(void) {
+    Pt pts[] = {{0,0},{4,0},{4,4},{0,4},{2,2},{1,1},{3,1}};
+    Pt out[16];
+    int n = convex_hull(pts, 7, out);
+    printf("Hull (%d vertices):", n);
+    for (int i = 0; i < n; i++) printf(" (%.0f,%.0f)", out[i].x, out[i].y);
+    printf("\\n");
+    return 0;
 }`,
 
-  cpp: `#include <vector>
+  cpp: `#include <iostream>
+#include <vector>
 #include <algorithm>
 
 struct Pt { double x, y; };
@@ -130,6 +142,15 @@ std::vector<Pt> convex_hull(std::vector<Pt> pts) {
     }
     h.resize(k - 1);
     return h;
+}
+
+int main() {
+    std::vector<Pt> pts = {{0,0},{4,0},{4,4},{0,4},{2,2},{1,1},{3,1}};
+    auto hull = convex_hull(pts);
+    std::cout << "Hull (" << hull.size() << " vertices):";
+    for (auto& p : hull) std::cout << " (" << p.x << "," << p.y << ")";
+    std::cout << "\\n";
+    return 0;
 }`,
 
   python: `def convex_hull(points):
@@ -150,31 +171,44 @@ std::vector<Pt> convex_hull(std::vector<Pt> pts) {
         while len(upper) >= 2 and cross(upper[-2], upper[-1], p) <= 0:
             upper.pop()
         upper.append(p)
-    return lower[:-1] + upper[:-1]`,
+    return lower[:-1] + upper[:-1]
+
+if __name__ == "__main__":
+    pts = [(0,0),(4,0),(4,4),(0,4),(2,2),(1,1),(3,1)]
+    hull = convex_hull(pts)
+    print(f"Hull ({len(hull)} vertices):", hull)`,
 
   java: `import java.util.*;
 
-public static double[][] convexHull(double[][] pts) {
-    Arrays.sort(pts, (a, b) -> a[0] != b[0]
-        ? Double.compare(a[0], b[0]) : Double.compare(a[1], b[1]));
-    int n = pts.length, k = 0;
-    double[][] h = new double[2 * n][];
-    for (int i = 0; i < n; i++) {
-        while (k >= 2 && cross(h[k - 2], h[k - 1], pts[i]) <= 0) k--;
-        h[k++] = pts[i];
+public class Main {
+    static double cross(double[] o, double[] a, double[] b) {
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
     }
-    for (int i = n - 2, t = k + 1; i >= 0; i--) {
-        while (k >= t && cross(h[k - 2], h[k - 1], pts[i]) <= 0) k--;
-        h[k++] = pts[i];
+    public static double[][] convexHull(double[][] pts) {
+        Arrays.sort(pts, (a, b) -> a[0] != b[0]
+            ? Double.compare(a[0], b[0]) : Double.compare(a[1], b[1]));
+        int n = pts.length, k = 0;
+        double[][] h = new double[2 * n][];
+        for (int i = 0; i < n; i++) {
+            while (k >= 2 && cross(h[k - 2], h[k - 1], pts[i]) <= 0) k--;
+            h[k++] = pts[i];
+        }
+        for (int i = n - 2, t = k + 1; i >= 0; i--) {
+            while (k >= t && cross(h[k - 2], h[k - 1], pts[i]) <= 0) k--;
+            h[k++] = pts[i];
+        }
+        return Arrays.copyOf(h, k - 1);
     }
-    return Arrays.copyOf(h, k - 1);
-}
-
-private static double cross(double[] o, double[] a, double[] b) {
-    return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+    public static void main(String[] args) {
+        double[][] pts = {{0,0},{4,0},{4,4},{0,4},{2,2},{1,1},{3,1}};
+        double[][] hull = convexHull(pts);
+        StringBuilder sb = new StringBuilder("Hull (" + hull.length + " vertices):");
+        for (double[] p : hull) sb.append(" (").append((int) p[0]).append(",").append((int) p[1]).append(")");
+        System.out.println(sb);
+    }
 }`,
 
-  rust: `pub fn convex_hull(mut pts: Vec<(f64, f64)>) -> Vec<(f64, f64)> {
+  rust: `fn convex_hull(mut pts: Vec<(f64, f64)>) -> Vec<(f64, f64)> {
     pts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap()
         .then(a.1.partial_cmp(&b.1).unwrap()));
     let cross = |o: (f64, f64), a: (f64, f64), b: (f64, f64)| -> f64 {
@@ -193,10 +227,22 @@ private static double cross(double[] o, double[] a, double[] b) {
         while h.len() >= t && cross(h[h.len() - 2], h[h.len() - 1], p) <= 0.0 { h.pop(); }
         h.push(p);
     }
-    h.pop();   // last point equals the first
+    h.pop();
     h
+}
+
+fn main() {
+    let pts = vec![(0.0, 0.0), (4.0, 0.0), (4.0, 4.0), (0.0, 4.0), (2.0, 2.0), (1.0, 1.0), (3.0, 1.0)];
+    let hull = convex_hull(pts);
+    println!("Hull ({} vertices): {:?}", hull.len(), hull);
 }`,
 }
+
+const CH_SAMPLES = [
+  { name: 'Square + interior', description: '4 corners + 3 interior points → 4 hull vertices', stdin: '', expected: '' },
+  { name: 'Triangle',          description: '3 points — hull = all of them',                  stdin: '', expected: '' },
+  { name: 'Colinear',          description: 'All on a line — hull = 2 endpoints',             stdin: '', expected: '' },
+]
 
 const ACTIVE_MAP = {
   pseudo: { 'lower-pop': 4, 'lower-push': 6, 'upper-pop': 9, 'upper-push': 11, done: 12 },
@@ -336,7 +382,7 @@ export default function ConvexHull() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <MultiLangCode title='Convex hull — Andrew monotone chain' code={CODE} activeLines={activeLinesFor(f?.phase)} />
+      <MultiLangCode title='Convex hull — Andrew monotone chain' code={CODE} samples={CH_SAMPLES} activeLines={activeLinesFor(f?.phase)} />
 
       <ComplexityTable rows={[
         { op: 'Andrew monotone chain', best: 'O(n \\log n)', avg: 'O(n \\log n)', worst: 'O(n \\log n)', space: 'O(n)' },

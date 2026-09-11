@@ -58,80 +58,117 @@ for p = 2 .. sqrt(N):
       mark[m] = true
 primes = { i : not mark[i] }`,
 
-  c: `#include <stdbool.h>
+  c: `#include <stdio.h>
+#include <stdbool.h>
 #include <stdlib.h>
 
-/* Returns the count of primes in [2, N] and fills 'out' with them. */
 int sieve(int N, int* out) {
-    bool* mark = (bool*)calloc(N + 1, sizeof(bool));
+    bool* mark = calloc(N + 1, sizeof(bool));
     for (int p = 2; (long)p * p <= N; p++) {
         if (mark[p]) continue;
-        /* Start crossing at p*p — every smaller multiple has a smaller prime factor. */
         for (long m = (long)p * p; m <= N; m += p) mark[m] = true;
     }
     int k = 0;
     for (int i = 2; i <= N; i++) if (!mark[i]) out[k++] = i;
     free(mark);
     return k;
+}
+
+int main(void) {
+    int N = 50;
+    int primes[64];
+    int k = sieve(N, primes);
+    printf("Primes up to %d (%d found):", N, k);
+    for (int i = 0; i < k; i++) printf(" %d", primes[i]);
+    printf("\\n");
+    return 0;
 }`,
 
-  cpp: `#include <vector>
+  cpp: `#include <iostream>
+#include <vector>
 
 std::vector<int> sieve(int N) {
     std::vector<bool> mark(N + 1, false);
     for (int p = 2; (long long)p * p <= N; ++p) {
         if (mark[p]) continue;
-        // Start at p*p — every smaller multiple of p was crossed by a smaller prime.
         for (long long m = (long long)p * p; m <= N; m += p) mark[m] = true;
     }
     std::vector<int> primes;
     for (int i = 2; i <= N; ++i) if (!mark[i]) primes.push_back(i);
     return primes;
+}
+
+int main() {
+    int N = 50;
+    auto primes = sieve(N);
+    std::cout << "Primes up to " << N << " (" << primes.size() << " found):";
+    for (int p : primes) std::cout << " " << p;
+    std::cout << "\\n";
+    return 0;
 }`,
 
   python: `def sieve(N):
-    """Sieve of Eratosthenes — returns all primes in [2, N]."""
-    if N < 2:
-        return []
+    if N < 2: return []
     mark = [False] * (N + 1)
     p = 2
     while p * p <= N:
         if not mark[p]:
-            # Composites below p*p were already crossed by a smaller prime.
-            for m in range(p * p, N + 1, p):
-                mark[m] = True
+            for m in range(p * p, N + 1, p): mark[m] = True
         p += 1
-    return [i for i in range(2, N + 1) if not mark[i]]`,
+    return [i for i in range(2, N + 1) if not mark[i]]
+
+if __name__ == "__main__":
+    N = 50
+    primes = sieve(N)
+    print(f"Primes up to {N} ({len(primes)} found):", primes)`,
 
   java: `import java.util.*;
 
-public static List<Integer> sieve(int N) {
-    boolean[] mark = new boolean[N + 1];
-    for (int p = 2; (long) p * p <= N; p++) {
-        if (mark[p]) continue;
-        // Kick off from p*p — smaller multiples already have a smaller prime factor.
-        for (long m = (long) p * p; m <= N; m += p) mark[(int) m] = true;
+public class Main {
+    public static List<Integer> sieve(int N) {
+        boolean[] mark = new boolean[N + 1];
+        for (int p = 2; (long) p * p <= N; p++) {
+            if (mark[p]) continue;
+            for (long m = (long) p * p; m <= N; m += p) mark[(int) m] = true;
+        }
+        List<Integer> primes = new ArrayList<>();
+        for (int i = 2; i <= N; i++) if (!mark[i]) primes.add(i);
+        return primes;
     }
-    List<Integer> primes = new ArrayList<>();
-    for (int i = 2; i <= N; i++) if (!mark[i]) primes.add(i);
-    return primes;
+
+    public static void main(String[] args) {
+        int N = 50;
+        List<Integer> primes = sieve(N);
+        System.out.println("Primes up to " + N + " (" + primes.size() + " found): " + primes);
+    }
 }`,
 
-  rust: `pub fn sieve(n: usize) -> Vec<usize> {
+  rust: `fn sieve(n: usize) -> Vec<usize> {
     if n < 2 { return Vec::new(); }
     let mut mark = vec![false; n + 1];
     let mut p = 2usize;
     while p * p <= n {
         if !mark[p] {
-            // Start at p*p — smaller multiples of p are already crossed off.
             let mut m = p * p;
             while m <= n { mark[m] = true; m += p; }
         }
         p += 1;
     }
     (2..=n).filter(|&i| !mark[i]).collect()
+}
+
+fn main() {
+    let n = 50;
+    let primes = sieve(n);
+    println!("Primes up to {} ({} found): {:?}", n, primes.len(), primes);
 }`,
 }
+
+const SIEVE_SAMPLES = [
+  { name: 'N = 50',   description: 'Primes up to 50 (15 total)',      stdin: '', expected: '' },
+  { name: 'N = 100',  description: 'Primes up to 100 (25 total)',     stdin: '', expected: '' },
+  { name: 'N = 2',    description: 'Edge case — only 2',              stdin: '', expected: '' },
+]
 
 const ACTIVE_MAP = {
   pseudo: { init: 0, prime: 2, cross: 4, done: 5 },
@@ -315,7 +352,7 @@ export default function Sieve() {
         </ul>
       </section>
 
-      <MultiLangCode title='Sieve of Eratosthenes' code={CODE} activeLines={activeLinesFor(f)} />
+      <MultiLangCode title='Sieve of Eratosthenes' code={CODE} samples={SIEVE_SAMPLES} activeLines={activeLinesFor(f)} />
 
       <ComplexityTable rows={[
         { op: 'Sieve of Eratosthenes', best: 'O(N \\log \\log N)', avg: 'O(N \\log \\log N)', worst: 'O(N \\log \\log N)', space: 'O(N)' },

@@ -158,7 +158,8 @@ solve(lo, hi):
       best = min(best, dist(strip[i], strip[j]))
   return best`,
 
-  c: `#include <math.h>
+  c: `#include <stdio.h>
+#include <math.h>
 #include <stdlib.h>
 
 typedef struct { double x, y; } Point;
@@ -204,9 +205,18 @@ double solve(Point* pts, int lo, int hi) {
             if (d < best) best = d;
         }
     return best;
+}
+
+int main(void) {
+    Point pts[] = {{0,0},{1,1},{4,4},{3,1},{2,3},{5,2}};
+    int n = 6;
+    qsort(pts, n, sizeof(Point), cmp_x);
+    printf("Closest pair distance = %.4f\\n", solve(pts, 0, n));
+    return 0;
 }`,
 
-  cpp: `#include <vector>
+  cpp: `#include <iostream>
+#include <vector>
 #include <algorithm>
 #include <cmath>
 
@@ -244,6 +254,12 @@ double closest_pair(std::vector<Point> pts) {
     std::sort(pts.begin(), pts.end(),
               [](const Point& a, const Point& b) { return a.x < b.x; });
     return solve(pts, 0, (int)pts.size());
+}
+
+int main() {
+    std::vector<Point> pts = {{0,0},{1,1},{4,4},{3,1},{2,3},{5,2}};
+    std::cout << "Closest pair distance = " << closest_pair(pts) << "\\n";
+    return 0;
 }`,
 
   python: `from math import hypot, inf
@@ -271,11 +287,15 @@ def closest_pair(points):
                 best = min(best, hypot(strip[i][0] - strip[j][0], strip[i][1] - strip[j][1]))
                 j += 1
         return best
-    return solve(0, len(pts))`,
+    return solve(0, len(pts))
+
+if __name__ == "__main__":
+    pts = [(0,0),(1,1),(4,4),(3,1),(2,3),(5,2)]
+    print(f"Closest pair distance = {closest_pair(pts):.4f}")`,
 
   java: `import java.util.*;
 
-public class ClosestPair {
+public class Main {
     public static double solve(double[][] pts, int lo, int hi) {
         int n = hi - lo;
         if (n <= 3) {
@@ -306,9 +326,14 @@ public class ClosestPair {
         Arrays.sort(pts, (a, b) -> Double.compare(a[0], b[0]));
         return solve(pts, 0, pts.length);
     }
+
+    public static void main(String[] args) {
+        double[][] pts = {{0,0},{1,1},{4,4},{3,1},{2,3},{5,2}};
+        System.out.printf("Closest pair distance = %.4f%n", closestPair(pts));
+    }
 }`,
 
-  rust: `pub fn closest_pair(mut pts: Vec<(f64, f64)>) -> f64 {
+  rust: `fn closest_pair(mut pts: Vec<(f64, f64)>) -> f64 {
     pts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
     fn dist(a: (f64, f64), b: (f64, f64)) -> f64 {
         ((a.0 - b.0).powi(2) + (a.1 - b.1).powi(2)).sqrt()
@@ -340,8 +365,19 @@ public class ClosestPair {
         cur
     }
     solve(&pts)
+}
+
+fn main() {
+    let pts = vec![(0.0, 0.0), (1.0, 1.0), (4.0, 4.0), (3.0, 1.0), (2.0, 3.0), (5.0, 2.0)];
+    println!("Closest pair distance = {:.4}", closest_pair(pts));
 }`,
 }
+
+const DC_SAMPLES = [
+  { name: '6 points',   description: 'Small 2D cloud',              stdin: '', expected: '' },
+  { name: 'Coincident', description: 'Two identical points (dist=0)', stdin: '', expected: '' },
+  { name: 'Colinear',   description: 'All on same horizontal line', stdin: '', expected: '' },
+]
 
 // Map frame kind to active line index for each language body.
 const ACTIVE_MAP = {
@@ -537,7 +573,7 @@ export default function DivideConquer() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <MultiLangCode title='Closest pair — divide & conquer' code={CODE} activeLines={activeLines} />
+      <MultiLangCode title='Closest pair — divide & conquer' code={CODE} samples={DC_SAMPLES} activeLines={activeLines} />
 
       <ComplexityTable rows={[
         { op: 'Closest pair (D&C)',   best: 'O(n \\log n)', avg: 'O(n \\log n)', worst: 'O(n \\log n)', space: 'O(n)' },

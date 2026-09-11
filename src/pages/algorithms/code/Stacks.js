@@ -1,148 +1,210 @@
-// Stacks — array-backed stack + balanced-brackets classic.
+// Stacks — classic push/pop core + balanced brackets checker.
 export const STACK_CORE_CODE = {
-  pseudo: `push(v): arr[++top] = v
-pop(): return arr[top--]
-peek(): return arr[top]
-size(): return top + 1`,
+  pseudo: `function push(v):
+    if size == CAP: return FULL
+    data[size] = v
+    size += 1
 
-  c: `#include <stdlib.h>
+function pop():
+    if size == 0: return EMPTY
+    size -= 1
+    return data[size]`,
 
-typedef struct { int *a; int top; int cap; } Stack;
+  c: `#include <stdio.h>
+#include <stdbool.h>
+#define CAP 16
 
-void push(Stack *s, int v) {
-    if (s->top + 1 >= s->cap) {
-        s->cap = s->cap ? s->cap * 2 : 8;
-        s->a = realloc(s->a, s->cap * sizeof(int));
-    }
-    s->a[++s->top] = v;
+typedef struct { int data[CAP]; int size; } Stack;
+
+bool push(Stack *s, int v) {
+    if (s->size == CAP) return false;
+    s->data[s->size++] = v;
+    return true;
 }
-int  pop(Stack *s)  { return s->a[s->top--]; }
-int  peek(Stack *s) { return s->a[s->top]; }
-int  size(Stack *s) { return s->top + 1; }`,
+int pop(Stack *s) { return s->data[--s->size]; }
 
-  cpp: `#include <stack>
-#include <vector>
+int main(void) {
+    Stack s = {.size = 0};
+    for (int i = 1; i <= 5; i++) push(&s, i);   // push 1..5
+    printf("Popped:");
+    while (s.size) printf(" %d", pop(&s));
+    printf("\\n");
+    return 0;
+}`,
 
-// std::stack is a container adaptor — vector-backed by default.
-std::stack<int> s;
-s.push(42);
-int top = s.top();   // peek
-s.pop();             // removes, does NOT return`,
+  cpp: `#include <iostream>
+#include <stack>
 
-  python: `# Python list doubles as a stack — append / pop are amortised O(1).
-stack = []
-stack.append(42)      # push
-top = stack[-1]       # peek
-val = stack.pop()     # pop returns the value
-n   = len(stack)      # size`,
+int main() {
+    std::stack<int> s;
+    for (int i = 1; i <= 5; i++) s.push(i);
+    std::cout << "Popped:";
+    while (!s.empty()) { std::cout << " " << s.top(); s.pop(); }
+    std::cout << "\\n";
+    return 0;
+}`,
+
+  python: `if __name__ == "__main__":
+    s = []
+    for i in range(1, 6):
+        s.append(i)           # push
+    out = []
+    while s:
+        out.append(s.pop())   # pop from end — LIFO
+    print("Popped:", out)`,
 
   java: `import java.util.ArrayDeque;
 import java.util.Deque;
 
-// ArrayDeque is the preferred stack in modern Java (java.util.Stack is legacy).
-Deque<Integer> stack = new ArrayDeque<>();
-stack.push(42);
-int top = stack.peek();
-int val = stack.pop();
-int n   = stack.size();`,
+public class Main {
+    public static void main(String[] args) {
+        Deque<Integer> s = new ArrayDeque<>();
+        for (int i = 1; i <= 5; i++) s.push(i);
+        StringBuilder sb = new StringBuilder("Popped:");
+        while (!s.isEmpty()) sb.append(" ").append(s.pop());
+        System.out.println(sb);
+    }
+}`,
 
-  rust: `// Rust's Vec is the canonical stack: push / pop are amortised O(1).
-let mut stack: Vec<i32> = Vec::new();
-stack.push(42);
-let top = *stack.last().unwrap();   // peek
-let val = stack.pop().unwrap();
-let n   = stack.len();`,
+  rust: `fn main() {
+    let mut s: Vec<i32> = Vec::new();
+    for i in 1..=5 { s.push(i); }
+    let mut out = Vec::new();
+    while let Some(v) = s.pop() { out.push(v); }
+    println!("Popped: {:?}", out);
+}`,
 }
 
+export const STACK_CORE_SAMPLES = [
+  { name: 'Push 1..5', description: 'Push then pop 1..5 — verify LIFO', stdin: '', expected: '' },
+  { name: 'Push 1..3', description: 'Small stack', stdin: '', expected: '' },
+]
+
 export const STACK_BRACKETS_CODE = {
-  pseudo: `function isBalanced(s):
+  pseudo: `function balanced(s):
     stack = []
     for c in s:
         if c in "([{":
             stack.push(c)
         else if c in ")]}":
-            if stack.isEmpty(): return false
-            if match(stack.pop(), c) == false: return false
-    return stack.isEmpty()`,
+            if stack.empty() or !matches(stack.top(), c):
+                return false
+            stack.pop()
+    return stack.empty()`,
 
-  c: `#include <stdbool.h>
+  c: `#include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
 
-static bool matches(char o, char c) {
-    return (o == '(' && c == ')') || (o == '[' && c == ']') || (o == '{' && c == '}');
-}
-
-bool is_balanced(const char *s) {
-    char stk[1024]; int top = -1;
+bool balanced(const char *s) {
+    char st[256]; int top = 0;
     for (; *s; s++) {
         char c = *s;
-        if (strchr("([{", c))       stk[++top] = c;
-        else if (strchr(")]}", c)) {
-            if (top < 0 || !matches(stk[top--], c)) return false;
+        if (c == '(' || c == '[' || c == '{') st[top++] = c;
+        else if (c == ')' || c == ']' || c == '}') {
+            if (top == 0) return false;
+            char o = st[--top];
+            if ((c == ')' && o != '(') || (c == ']' && o != '[') || (c == '}' && o != '{'))
+                return false;
         }
     }
-    return top == -1;
+    return top == 0;
+}
+
+int main(void) {
+    const char *cases[] = { "()[]{}", "([)]", "{[()()]}", "((", "" };
+    for (int i = 0; i < 5; i++)
+        printf("balanced(\\"%s\\") = %s\\n", cases[i], balanced(cases[i]) ? "true" : "false");
+    return 0;
 }`,
 
-  cpp: `#include <stack>
+  cpp: `#include <iostream>
+#include <stack>
 #include <string>
 
-bool is_balanced(const std::string& s) {
+bool balanced(const std::string& s) {
     std::stack<char> st;
     for (char c : s) {
         if (c == '(' || c == '[' || c == '{') st.push(c);
         else if (c == ')' || c == ']' || c == '}') {
             if (st.empty()) return false;
             char o = st.top(); st.pop();
-            if ((o == '(' && c != ')') || (o == '[' && c != ']') || (o == '{' && c != '}'))
+            if ((c == ')' && o != '(') || (c == ']' && o != '[') || (c == '}' && o != '{'))
                 return false;
         }
     }
     return st.empty();
+}
+
+int main() {
+    for (const std::string& s : {"()[]{}", "([)]", "{[()()]}", "((", ""})
+        std::cout << "balanced(\\"" << s << "\\") = " << (balanced(s) ? "true" : "false") << "\\n";
+    return 0;
 }`,
 
-  python: `def is_balanced(s: str) -> bool:
-    pair = {')': '(', ']': '[', '}': '{'}
+  python: `def balanced(s: str) -> bool:
+    pairs = {')': '(', ']': '[', '}': '{'}
     stack = []
     for c in s:
-        if c in "([{":
+        if c in '([{':
             stack.append(c)
-        elif c in ")]}":
-            if not stack or stack.pop() != pair[c]:
+        elif c in ')]}':
+            if not stack or stack.pop() != pairs[c]:
                 return False
-    return not stack`,
+    return not stack
 
-  java: `import java.util.ArrayDeque;
-import java.util.Deque;
+if __name__ == "__main__":
+    for s in ["()[]{}", "([)]", "{[()()]}", "((", ""]:
+        print(f'balanced("{s}") = {balanced(s)}')`,
 
-public static boolean isBalanced(String s) {
-    Deque<Character> st = new ArrayDeque<>();
-    for (char c : s.toCharArray()) {
-        if (c == '(' || c == '[' || c == '{') st.push(c);
-        else if (c == ')' || c == ']' || c == '}') {
-            if (st.isEmpty()) return false;
-            char o = st.pop();
-            if ((o == '(' && c != ')') || (o == '[' && c != ']') || (o == '{' && c != '}'))
-                return false;
+  java: `public class Main {
+    public static boolean balanced(String s) {
+        java.util.Deque<Character> st = new java.util.ArrayDeque<>();
+        for (char c : s.toCharArray()) {
+            if (c == '(' || c == '[' || c == '{') st.push(c);
+            else if (c == ')' || c == ']' || c == '}') {
+                if (st.isEmpty()) return false;
+                char o = st.pop();
+                if ((c == ')' && o != '(') || (c == ']' && o != '[') || (c == '}' && o != '{'))
+                    return false;
+            }
         }
+        return st.isEmpty();
     }
-    return st.isEmpty();
+    public static void main(String[] args) {
+        for (String s : new String[]{"()[]{}", "([)]", "{[()()]}", "((", ""})
+            System.out.println("balanced(\\"" + s + "\\") = " + balanced(s));
+    }
 }`,
 
-  rust: `pub fn is_balanced(s: &str) -> bool {
-    let mut stk: Vec<char> = Vec::new();
+  rust: `fn balanced(s: &str) -> bool {
+    let mut st: Vec<char> = Vec::new();
     for c in s.chars() {
         match c {
-            '(' | '[' | '{' => stk.push(c),
+            '(' | '[' | '{' => st.push(c),
             ')' | ']' | '}' => {
-                let o = match stk.pop() { Some(x) => x, None => return false };
-                if (o == '(' && c != ')') || (o == '[' && c != ']') || (o == '{' && c != '}') {
+                let o = match st.pop() { Some(x) => x, None => return false };
+                if (c == ')' && o != '(') || (c == ']' && o != '[') || (c == '}' && o != '{') {
                     return false;
                 }
             }
             _ => {}
         }
     }
-    stk.is_empty()
+    st.is_empty()
+}
+
+fn main() {
+    for s in ["()[]{}", "([)]", "{[()()]}", "((", ""] {
+        println!("balanced(\\"{}\\") = {}", s, balanced(s));
+    }
 }`,
 }
+
+export const STACK_BRACKETS_SAMPLES = [
+  { name: 'All matched',  description: '()[]{}', stdin: '', expected: '' },
+  { name: 'Wrong nest',   description: '([)] — brackets interleave', stdin: '', expected: '' },
+  { name: 'Deep nest',    description: '{[()()]}', stdin: '', expected: '' },
+  { name: 'Unclosed',     description: '(( — never closed', stdin: '', expected: '' },
+  { name: 'Empty',        description: 'empty string is balanced', stdin: '', expected: '' },
+]

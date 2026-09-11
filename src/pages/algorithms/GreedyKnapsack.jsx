@@ -81,7 +81,8 @@ for it in items:
     break
 return gain`,
 
-  c: `#include <stdlib.h>
+  c: `#include <stdio.h>
+#include <stdlib.h>
 
 typedef struct { double weight, value; } Item;
 
@@ -105,9 +106,17 @@ double fractional_knapsack(Item* items, int n, double C) {
         }
     }
     return gain;
+}
+
+int main(void) {
+    Item items[] = {{10, 60}, {20, 100}, {30, 120}};
+    double gain = fractional_knapsack(items, 3, 50);
+    printf("Max fractional gain = %.2f\\n", gain);
+    return 0;
 }`,
 
-  cpp: `#include <vector>
+  cpp: `#include <iostream>
+#include <vector>
 #include <algorithm>
 
 struct Item { double weight, value; };
@@ -123,61 +132,73 @@ double fractional_knapsack(std::vector<Item> items, double C) {
             used += it.weight;
             gain += it.value;
         } else {
-            gain += it.value * (C - used) / it.weight;   // partial slice
+            gain += it.value * (C - used) / it.weight;
             break;
         }
     }
     return gain;
+}
+
+int main() {
+    std::vector<Item> items = {{10, 60}, {20, 100}, {30, 120}};
+    std::cout << "Max fractional gain = " << fractional_knapsack(items, 50) << "\\n";
+    return 0;
 }`,
 
   python: `def fractional_knapsack(items, C):
-    """items = list of (weight, value). Returns max gain (float)."""
-    # Best ratio first — linear gain per unit weight.
     items = sorted(items, key=lambda x: x[1] / x[0], reverse=True)
     used, gain = 0.0, 0.0
     for w, v in items:
         if used + w <= C:
-            used += w
-            gain += v
+            used += w; gain += v
         else:
             gain += v * (C - used) / w
             break
-    return gain`,
+    return gain
+
+if __name__ == "__main__":
+    items = [(10, 60), (20, 100), (30, 120)]
+    print(f"Max fractional gain = {fractional_knapsack(items, 50):.2f}")`,
 
   java: `import java.util.*;
 
-public static double fractionalKnapsack(double[][] items, double C) {
-    // items[i] = { weight, value }. Sort by value/weight descending.
-    Arrays.sort(items, (a, b) -> Double.compare(b[1] / b[0], a[1] / a[0]));
-    double used = 0, gain = 0;
-    for (double[] it : items) {
-        if (used + it[0] <= C) {
-            used += it[0];
-            gain += it[1];
-        } else {
-            gain += it[1] * (C - used) / it[0];   // fractional top-up
-            break;
+public class Main {
+    public static double fractionalKnapsack(double[][] items, double C) {
+        Arrays.sort(items, (a, b) -> Double.compare(b[1] / b[0], a[1] / a[0]));
+        double used = 0, gain = 0;
+        for (double[] it : items) {
+            if (used + it[0] <= C) { used += it[0]; gain += it[1]; }
+            else { gain += it[1] * (C - used) / it[0]; break; }
         }
+        return gain;
     }
-    return gain;
+    public static void main(String[] args) {
+        double[][] items = {{10, 60}, {20, 100}, {30, 120}};
+        System.out.printf("Max fractional gain = %.2f%n", fractionalKnapsack(items, 50));
+    }
 }`,
 
-  rust: `pub fn fractional_knapsack(mut items: Vec<(f64, f64)>, capacity: f64) -> f64 {
-    // items = (weight, value). Best value/weight ratio first.
+  rust: `fn fractional_knapsack(mut items: Vec<(f64, f64)>, capacity: f64) -> f64 {
     items.sort_by(|a, b| (b.1 / b.0).partial_cmp(&(a.1 / a.0)).unwrap());
     let (mut used, mut gain) = (0.0, 0.0);
     for (w, v) in items {
-        if used + w <= capacity {
-            used += w;
-            gain += v;
-        } else {
-            gain += v * (capacity - used) / w;   // last fractional slice
-            break;
-        }
+        if used + w <= capacity { used += w; gain += v; }
+        else { gain += v * (capacity - used) / w; break; }
     }
     gain
+}
+
+fn main() {
+    let items = vec![(10.0, 60.0), (20.0, 100.0), (30.0, 120.0)];
+    println!("Max fractional gain = {:.2}", fractional_knapsack(items, 50.0));
 }`,
 }
+
+const GK_SAMPLES = [
+  { name: 'Classic',    description: '3 items, capacity 50 → gain 240',    stdin: '', expected: '' },
+  { name: 'All fit',    description: 'Sum weight ≤ capacity',               stdin: '', expected: '' },
+  { name: 'One split',  description: 'One item consumes remainder fractionally', stdin: '', expected: '' },
+]
 
 const ACTIVE_MAP = {
   pseudo: { sort: 0, whole: 6, frac: 10, done: 12 },
@@ -324,7 +345,7 @@ export default function GreedyKnapsack() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <MultiLangCode title='Fractional knapsack' code={CODE} activeLines={activeLinesFor(f?.kind)} />
+      <MultiLangCode title='Fractional knapsack' code={CODE} samples={GK_SAMPLES} activeLines={activeLinesFor(f?.kind)} />
 
       <ComplexityTable rows={[
         { op: 'Fractional Knapsack (sort + scan)', best: 'O(n \\log n)', avg: 'O(n \\log n)', worst: 'O(n \\log n)', space: 'O(n)' },

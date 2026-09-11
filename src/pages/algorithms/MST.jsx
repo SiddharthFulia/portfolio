@@ -17,7 +17,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
-import { MST_KRUSKAL_CODE, MST_PRIM_CODE } from './code/MST'
+import { MST_KRUSKAL_CODE, MST_PRIM_CODE, MST_KRUSKAL_SAMPLES, MST_PRIM_SAMPLES } from './code/MST'
 
 /* ---------- graph ---------- */
 
@@ -253,6 +253,7 @@ export default function MST() {
       <MultiLangCode
         title={algo === 'kruskal' ? 'Implementation — Kruskal' : 'Implementation — Prim'}
         code={algo === 'kruskal' ? MST_KRUSKAL_CODE : MST_PRIM_CODE}
+        samples={algo === 'kruskal' ? MST_KRUSKAL_SAMPLES : MST_PRIM_SAMPLES}
         activeLines={{ pseudo: activeLine }}
       />
 

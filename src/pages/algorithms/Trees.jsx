@@ -19,7 +19,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button } from '../../components/ui'
-import { TREES_PRE, TREES_IN, TREES_POST, TREES_LEVEL } from './code/Trees'
+import { TREES_PRE, TREES_IN, TREES_POST, TREES_LEVEL, TREES_SAMPLES } from './code/Trees'
 
 let NID = 100
 const mkNode = (v, children = []) => ({ id: NID++, v, children })
@@ -304,6 +304,7 @@ export default function Trees() {
       <MultiLangCode
         title={`Implementation — ${order}-order`}
         code={TRAVERSAL_CODE[order]}
+        samples={TREES_SAMPLES}
         activeLines={{ pseudo: currentIdx >= 0 ? 1 : -1 }}
       />
 

@@ -10,7 +10,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel,
   ControlsPanel, StepControls, useStepEngine, MultiLangCode,
   ComplexityTable, RealWorldCard, Field, Chip, TeX,
 } from '../../components/algorithms'
-import { CODE as TRAVERSAL_CODE } from './code/GraphTraversal'
+import { CODE as TRAVERSAL_CODE, BFS_SAMPLES, DFS_SAMPLES } from './code/GraphTraversal'
 
 function mulberry32(seed) {
   let a = (seed | 0) || 1
@@ -271,8 +271,8 @@ export default function GraphTraversal() {
         </ControlsPanel>
       </VisualiserSection>
 
-      <MultiLangCode title='BFS' code={TRAVERSAL_CODE.bfs} />
-      <MultiLangCode title='DFS' code={TRAVERSAL_CODE.dfs} />
+      <MultiLangCode title='BFS' code={TRAVERSAL_CODE.bfs} samples={BFS_SAMPLES} />
+      <MultiLangCode title='DFS' code={TRAVERSAL_CODE.dfs} samples={DFS_SAMPLES} />
 
       <ComplexityTable rows={[
         { op: 'BFS',                   best: 'O(V+E)', avg: 'O(V+E)', worst: 'O(V+E)', space: 'O(V)' },

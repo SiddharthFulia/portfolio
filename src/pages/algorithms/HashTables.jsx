@@ -22,7 +22,7 @@ import { ExplanationBlock, VisualiserSection, VizPanel, ControlsPanel,
   Field, TextInput, Chip, OperationLog,
 } from '../../components/algorithms'
 import { Button, Slider } from '../../components/ui'
-import { HASH_CHAIN_CODE, HASH_PROBE_CODE } from './code/HashTables'
+import { HASH_CHAIN_CODE, HASH_PROBE_CODE, HASH_CHAIN_SAMPLES, HASH_PROBE_SAMPLES } from './code/HashTables'
 
 const INITIAL_CAP = 8
 
@@ -416,6 +416,7 @@ export default function HashTables() {
       <MultiLangCode
         title={mode === 'chain' ? 'Implementation — chaining insert' : 'Implementation — linear-probe insert'}
         code={mode === 'chain' ? HASH_CHAIN_CODE : HASH_PROBE_CODE}
+        samples={mode === 'chain' ? HASH_CHAIN_SAMPLES : HASH_PROBE_SAMPLES}
         activeLines={{ pseudo: activeLine }}
       />
 
