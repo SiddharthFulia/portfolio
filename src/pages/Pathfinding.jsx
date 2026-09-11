@@ -1368,13 +1368,14 @@ export default function Pathfinding() {
   // Auto-pick banner — populated by the "Auto pick" button. Cleared when
   // the user manually picks an algo or changes src/dst.
   const [autoPickReason, setAutoPickReason] = useState('')
-  // Clear the Auto-pick reason whenever src or dst change — the pick is
-  // route-specific so stale reasoning shouldn't linger on a fresh route.
-  useEffect(() => { setAutoPickReason('') }, [src, dst])
   const [running, setRunning] = useState(false)
   const [speed, setSpeed] = useState(120)  // steps per frame
   const [src, setSrc] = useState(null)
   const [dst, setDst] = useState(null)
+  // Clear the Auto-pick reason whenever src or dst change — the pick is
+  // route-specific so stale reasoning shouldn't linger on a fresh route.
+  // (Placed AFTER src/dst declarations to avoid TDZ on module init.)
+  useEffect(() => { setAutoPickReason('') }, [src, dst])
   const [tele, setTele] = useState({ visited: 0, ms: 0, pathKm: 0, pathN: 0, done: false, found: false })
 
   // Multi-city state
