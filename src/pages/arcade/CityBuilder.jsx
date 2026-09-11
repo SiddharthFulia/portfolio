@@ -8,6 +8,29 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import GameShell from '../../components/arcade/GameShell'
 import { getSfx } from '../../components/arcade/sfx'
 
+const RULES = [
+  { heading: 'Goal', body: 'This is an open-ended sim — there\'s no fixed win state. Grow the population as high as you can without going bankrupt. The current run "score" is peak population, saved to your best.' },
+  { heading: 'Controls', body: 'Left-click and drag on the map to apply the selected tool.\nTool bar (bottom): Bulldoze, Road, Power, R-zone, C-zone, I-zone.\nTax slider adjusts income vs desirability. Space pauses the clock; R starts a fresh city.' },
+  { heading: 'Zoning', body: 'Residential zones (green) become homes when adjacent to a road AND a power line. Commercial (blue) needs road access. Industrial (yellow) needs road access + water/power access; produces jobs.\nEach zone has 4 growth stages that appear over time if their needs stay met.' },
+  { heading: 'Economy', body: 'Yearly income = population × tax rate × 12.\nExpenses = building upkeep + disaster payouts.\nHigh tax slows growth (residents leave for lower-tax neighbourhoods); low tax explodes growth but starves the treasury.' },
+  { heading: 'Disasters', body: 'A random-event timer rolls every 25-50 seconds:\n• Fire — burns a random building. Roads act as firebreaks.\n• Earthquake — cracks a random cluster of tiles into rubble; bulldoze to clear.\nDisaster frequency scales with city size.' },
+  { heading: 'Difficulty', body: 'Easy = $50k start, low tax elasticity (people don\'t care as much), rare disasters, fast pop growth. Hard = $8k start, high elasticity, frequent disasters, slow growth. Custom exposes starting funds, tax elasticity, disaster frequency, and population growth speed.' },
+  { heading: 'Tip', body: 'Sim games are hard to "win" — treat the difficulty presets as sandbox modes. Easy = doodle around. Hard = actually engaging challenge. Custom = infinite money mode by turning everything to easy values.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { startFunds: 50000, taxElasticity: 0.4, disasterFreq: 0.4, popGrowth: 1.5 },
+  Medium: { startFunds: 20000, taxElasticity: 1.0, disasterFreq: 1.0, popGrowth: 1.0 },
+  Hard:   { startFunds: 8000,  taxElasticity: 1.8, disasterFreq: 2.0, popGrowth: 0.6 },
+}
+
+const CUSTOM_SCHEMA = {
+  startFunds:    { label: 'Starting funds',   min: 4000, max: 100000, step: 500, default: 20000 },
+  taxElasticity: { label: 'Tax elasticity',   min: 0.2, max: 2.5, step: 0.1, default: 1.0 },
+  disasterFreq:  { label: 'Disaster rate',    min: 0.1, max: 3.0, step: 0.1, default: 1.0 },
+  popGrowth:     { label: 'Pop growth speed', min: 0.4, max: 2.5, step: 0.1, default: 1.0 },
+}
+
 const COLS = 40
 const ROWS = 24
 const TILE = 20
@@ -76,6 +99,16 @@ export default function CityBuilder() {
   const [tool, setTool] = useState(TOOL.R)
   const [tax, setTax] = useState(7)
   const [tick, setTick] = useState(0)
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState({
+    startFunds: CUSTOM_SCHEMA.startFunds.default,
+    taxElasticity: CUSTOM_SCHEMA.taxElasticity.default,
+    disasterFreq: CUSTOM_SCHEMA.disasterFreq.default,
+    popGrowth: CUSTOM_SCHEMA.popGrowth.default,
+  })
+  const cfg = difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty]
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
 
   useEffect(() => { sfxRef.current.setEnabled(soundOn) }, [soundOn])
   useEffect(() => { try { setBest(Number(localStorage.getItem('sid-city-best') || 0)) } catch {} }, [])
@@ -90,7 +123,7 @@ export default function CityBuilder() {
       agents: [],
       particles: [],
       floats: [],       // floating +/- money text
-      moneyFloat: 20000,
+      moneyFloat: cfgRef.current.startFunds,
       elapsed: 0,
       dayTimer: 0,
       taxTimer: 0,
@@ -100,7 +133,7 @@ export default function CityBuilder() {
       paused: false,
       score: 0,
     }
-    setMoney(20000); setPopulation(0); setYear(1); setStatus('playing')
+    setMoney(cfgRef.current.startFunds); setPopulation(0); setYear(1); setStatus('playing')
   }, [])
 
   useEffect(() => { reset() }, [reset])
@@ -244,7 +277,9 @@ export default function CityBuilder() {
           if (k === K.R) want = Math.min(3, (cCount + iCount) / Math.max(1, rCount) * 2)
           else if (k === K.C) want = Math.min(3, (rCount * 0.6) / Math.max(1, cCount))
           else if (k === K.I) want = Math.min(3, (rCount * 0.4) / Math.max(1, iCount))
-          if (want > cur) s.density[idx] = Math.min(want, cur + dt * 0.35)
+          // Tax elasticity: higher tax slows density growth; higher elasticity amplifies effect.
+          const taxPenalty = 1 - Math.min(0.9, Math.max(0, (tax - 7) * 0.03 * cfgRef.current.taxElasticity))
+          if (want > cur) s.density[idx] = Math.min(want, cur + dt * 0.35 * cfgRef.current.popGrowth * taxPenalty)
           if (k === K.R) pop += Math.floor(s.density[idx] * 20)
         }
       }
@@ -477,7 +512,7 @@ export default function CityBuilder() {
 
       // Disaster rolls
       if (s.disasterTimer <= 0) {
-        s.disasterTimer = 25 + Math.random() * 25
+        s.disasterTimer = (25 + Math.random() * 25) / Math.max(0.1, cfgRef.current.disasterFreq)
         if (pop > 40 && Math.random() < 0.7) doDisaster(s)
       }
       if (s.disaster) {
@@ -545,6 +580,12 @@ export default function CityBuilder() {
       onSoundToggle={() => setSoundOn((v) => !v)}
       onRestart={onRestart}
       onPause={onPause}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       extraStats={
         <>
           <div className="flex flex-col items-start">

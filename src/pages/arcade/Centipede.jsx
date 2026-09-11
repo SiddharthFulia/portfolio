@@ -24,6 +24,29 @@ const ROWS = 32
 const CELL = 16
 const PLAYER_ZONE_TOP = 26
 
+const RULES = [
+  { heading: 'Goal', body: 'Destroy every segment of the descending centipede before it reaches the player zone. Each new level respawns a fresh centipede plus more field junk to weave around.' },
+  { heading: 'Controls', body: 'Arrow keys / WASD move the shooter inside the bottom zone (rows 26-31). Space, ↑, or W fire a bullet. Only one bullet is on-screen at a time — accuracy matters more than mash rate.' },
+  { heading: 'Scoring', body: 'Head segment = 100.\nBody segment = 10.\nMushroom (destroy) = 1.\nSpider = 300 / 600 / 900 depending on how close you were.\nFlea = 200. Scorpion = 1000. Extra life at 12,000.' },
+  { heading: 'Splitting', body: 'Shooting a mid-body segment turns it into a mushroom and splits the chain into two smaller centipedes, each with a new head. This is the core scoring loop — clearing splits fast means shooting heads.' },
+  { heading: 'Enemies', body: 'Spider — ricochets through the shooter zone, munches mushrooms.\nFlea — drops straight down leaving mushroom trails; only appears when your zone is thin.\nScorpion — crosses horizontally; every mushroom it touches turns poisoned and forces the centipede to plummet on contact.' },
+  { heading: 'Field', body: 'Mushrooms take 4 shots to destroy (they visibly shrink). Full-height mushrooms block movement; the centipede descends whenever it hits one, a screen edge, or a poisoned mushroom.' },
+  { heading: 'Difficulty', body: 'Easy = 8-segment centipede, slow steps, rare spider. Hard = 14 segments, fast steps, aggressive spider. Custom exposes length, step speed, spider frequency, and mushroom respawn rate.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { centLength: 8,  moveEvery: 12, spiderDelay: 700, mushroomRespawn: 0.3 },
+  Medium: { centLength: 10, moveEvery: 8,  spiderDelay: 400, mushroomRespawn: 0.5 },
+  Hard:   { centLength: 14, moveEvery: 5,  spiderDelay: 200, mushroomRespawn: 0.8 },
+}
+
+const CUSTOM_SCHEMA = {
+  centLength:      { label: 'Centipede length', min: 6,   max: 18,  step: 1,  default: 10 },
+  moveEvery:       { label: 'Step interval',    min: 3,   max: 16,  step: 1,  default: 8 },
+  spiderDelay:     { label: 'Spider delay',     min: 100, max: 900, step: 50, default: 400 },
+  mushroomRespawn: { label: 'Shroom respawn',   min: 0.0, max: 1.0, step: 0.05, default: 0.5 },
+}
+
 const emptyField = () => Array.from({ length: ROWS }, () => Array(COLS).fill(0))
 
 const seedMushrooms = () => {
@@ -36,8 +59,8 @@ const seedMushrooms = () => {
   return f
 }
 
-const newCentipede = (level) => {
-  const length = 10 + Math.min(4, level - 1)
+const newCentipede = (level, baseLength = 10) => {
+  const length = baseLength + Math.min(4, level - 1)
   const segs = []
   for (let i = 0; i < length; i++) {
     segs.push({ x: length - i - 1, y: 0, dir: 1, head: i === 0, plunge: false })
@@ -57,6 +80,16 @@ export default function Centipede() {
   const [level, setLevel] = useState(1)
   const [lives, setLives] = useState(3)
   const [soundOn, setSoundOn] = useState(true)
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState({
+    centLength: CUSTOM_SCHEMA.centLength.default,
+    moveEvery: CUSTOM_SCHEMA.moveEvery.default,
+    spiderDelay: CUSTOM_SCHEMA.spiderDelay.default,
+    mushroomRespawn: CUSTOM_SCHEMA.mushroomRespawn.default,
+  })
+  const cfg = difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty]
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
 
   const state = useRef(null)
   const keys = useRef({})
@@ -65,7 +98,7 @@ export default function Centipede() {
   const reset = useCallback(() => {
     state.current = {
       field: seedMushrooms(),
-      centipedes: [newCentipede(1)],
+      centipedes: [newCentipede(1, cfgRef.current.centLength)],
       player: { x: COLS / 2, y: ROWS - 2 },
       bullets: [],
       spider: null,
@@ -289,7 +322,7 @@ export default function Centipede() {
 
       // Centipede stepping — grid-aligned, 1 tile per moveEvery frames
       s.moveTick = (s.moveTick || 0) + 1
-      const moveEvery = Math.max(4, 10 - s.level)
+      const moveEvery = Math.max(3, cfgRef.current.moveEvery - Math.floor(s.level / 2))
       if (s.moveTick >= moveEvery) {
         s.moveTick = 0
         for (const c of s.centipedes) {
@@ -340,7 +373,7 @@ export default function Centipede() {
         if (soundOn) sfx.win()
         s.level += 1
         setLevel(s.level)
-        s.centipedes = [newCentipede(s.level)]
+        s.centipedes = [newCentipede(s.level, cfgRef.current.centLength)]
         s.startCountdown = 60
         setStatus('playing')
       }
@@ -355,7 +388,7 @@ export default function Centipede() {
           vy: (Math.random() - 0.5) * 0.09,
           munch: 0,
         }
-        s.spiderTimer = 400 + Math.random() * 400
+        s.spiderTimer = cfgRef.current.spiderDelay + Math.random() * cfgRef.current.spiderDelay
       }
       if (s.spider) {
         s.spider.x += s.spider.vx
@@ -581,6 +614,12 @@ export default function Centipede() {
       onSoundToggle={() => setSoundOn(v => !v)}
       onPause={() => setStatus(prev => prev === 'paused' ? 'playing' : prev === 'playing' ? 'paused' : prev)}
       onRestart={reset}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       controls={[
         { key: 'Arrows', label: 'Move' },
         { key: 'Space',  label: 'Fire' },

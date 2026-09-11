@@ -26,6 +26,30 @@ import GameShell from '../../components/arcade/GameShell'
 import { getSfx } from '../../components/arcade/sfx'
 
 const RAILS = 16
+
+const RULES = [
+  { heading: 'Goal', body: 'Survive waves of enemies climbing up the tunnel toward you. Every level clears when the wave is empty. Enemies that reach the rim kill you on contact.' },
+  { heading: 'Controls', body: '← → / A D — slide the claw around the rim.\nSpace / ↑ / W — fire down a rail (zap-line).\nShift / Z / ZAP button — superzapper: wipes every enemy on-screen. One per level, rare bonus grants extra ones.' },
+  { heading: 'Enemies', body: 'Flipper — climbs its rail, occasionally hops sideways to a neighbour. Deadly at the rim.\nTanker — slow-mover that splits into two flippers when it reaches the rim.\nSpiker — plants a growing axial spike; the spike blocks bullets and kills on rail-touch.\nFuseball — bounces vertically, wraps around, can also kill at the rim.' },
+  { heading: 'Superzappers', body: 'Superzappers are your panic button — one is stocked at the start of each level. Every few levels a bonus superzap drops from a killed enemy. Save them for fuseball swarms and spike-choked levels.' },
+  { heading: 'Scoring', body: 'Flipper = 150, Tanker = 100 (+bonus splits), Spiker = 50 + 1/segment of spike, Fuseball = 250-500 depending on speed. Extra life at 20,000.' },
+  { heading: 'Perspective', body: 'The tunnel is drawn as thin vector lines with a vanishing point at centre-screen. Depth z ∈ [0,1] scales enemies as they crawl up. Bullets travel from rim (z=1) inward.' },
+  { heading: 'Difficulty', body: 'Easy = slow enemies, wide beam, extra superzappers. Hard = fast enemies, thin beam, tight superzap cooldown. Custom exposes enemy speed multiplier, superzap cooldown, beam width, and rail count reference (visual only).' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { enemySpeed: 0.6, superzapCd: 0.5, beamWidth: 3.5, railHint: 16 },
+  Medium: { enemySpeed: 1.0, superzapCd: 1.0, beamWidth: 2.0, railHint: 16 },
+  Hard:   { enemySpeed: 1.5, superzapCd: 2.0, beamWidth: 1.2, railHint: 16 },
+}
+
+const CUSTOM_SCHEMA = {
+  enemySpeed:  { label: 'Enemy speed',    min: 0.4, max: 2.0, step: 0.1, default: 1.0 },
+  superzapCd:  { label: 'Zap cooldown',   min: 0.2, max: 3.0, step: 0.1, default: 1.0 },
+  beamWidth:   { label: 'Beam width',     min: 1.0, max: 5.0, step: 0.1, default: 2.0 },
+  railHint:    { label: 'Rails (visual)', min: 12,  max: 20,  step: 1,   default: 16 },
+}
+
 const CANVAS_W = 640
 const CANVAS_H = 480
 const CX = CANVAS_W / 2
@@ -102,6 +126,16 @@ export default function Tempest() {
   const [level, setLevel] = useState(1)
   const [lives, setLives] = useState(3)
   const [superzaps, setSuperzaps] = useState(1)
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState({
+    enemySpeed: CUSTOM_SCHEMA.enemySpeed.default,
+    superzapCd: CUSTOM_SCHEMA.superzapCd.default,
+    beamWidth: CUSTOM_SCHEMA.beamWidth.default,
+    railHint: CUSTOM_SCHEMA.railHint.default,
+  })
+  const cfg = difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty]
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
   const [soundOn, setSoundOn] = useState(true)
 
   const state = useRef(null)
@@ -163,6 +197,8 @@ export default function Tempest() {
   const superzap = useCallback(() => {
     const s = state.current; if (!s) return
     if (s.superzaps <= 0 || status !== 'playing') return
+    if ((s.superzapCd || 0) > 0) return
+    s.superzapCd = cfgRef.current.superzapCd
     s.superzaps--
     setSuperzaps(s.superzaps)
     for (const e of s.enemies) {
@@ -219,6 +255,7 @@ export default function Tempest() {
       if (s.startCountdown > 0) { s.startCountdown--; return }
 
       s.cooldown = Math.max(0, s.cooldown - 1)
+      s.superzapCd = Math.max(0, (s.superzapCd || 0) - dt)
 
       const railSpeed = 6 * dt
       if (keys.current.ArrowLeft || keys.current.a || keys.current.A) s.playerRail = (s.playerRail - railSpeed + RAILS) % RAILS
@@ -268,9 +305,10 @@ export default function Tempest() {
       s.bullets = s.bullets.filter(b => !b.dead)
 
       // Enemy updates
+      const enemySpeedMult = cfgRef.current.enemySpeed
       for (const e of s.enemies) {
         if (e.type === 'flipper') {
-          e.z += e.vz + s.level * 0.00005
+          e.z += (e.vz + s.level * 0.00005) * enemySpeedMult
           e.flipT += dt
           if (e.flipT > 1.2) {
             e.flipT = 0
@@ -278,9 +316,9 @@ export default function Tempest() {
             if (Math.random() < 0.3) e.flipDir *= -1
           }
         } else if (e.type === 'tanker') {
-          e.z += e.vz
+          e.z += e.vz * enemySpeedMult
         } else if (e.type === 'spiker') {
-          e.z += e.vz
+          e.z += e.vz * enemySpeedMult
           if (e.spiking) {
             const sp = s.spikes.get(e.rail) || { z: 0, growing: true }
             sp.growing = true
@@ -289,7 +327,7 @@ export default function Tempest() {
           if (e.z > 0.7) e.spiking = false
         } else if (e.type === 'fuseball') {
           e.wobble += dt
-          e.z += e.vz * (0.5 + Math.abs(Math.sin(e.wobble * 3)) * 0.8)
+          e.z += e.vz * (0.5 + Math.abs(Math.sin(e.wobble * 3)) * 0.8) * enemySpeedMult
           if (Math.random() < 0.02) e.rail = (e.rail + (Math.random() < 0.5 ? -1 : 1) + RAILS) % RAILS
         }
         // Reached the rim?
@@ -555,6 +593,12 @@ export default function Tempest() {
       onSoundToggle={() => setSoundOn(v => !v)}
       onPause={() => setStatus(p => p === 'paused' ? 'playing' : p === 'playing' ? 'paused' : p)}
       onRestart={reset}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       controls={[
         { key: '← →',   label: 'Rotate' },
         { key: 'Space', label: 'Fire' },

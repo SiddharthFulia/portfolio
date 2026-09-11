@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import GameShell from '../../components/arcade/GameShell'
 import { getSfx } from '../../components/arcade/sfx'
+import { RULES, DIFFICULTIES, CUSTOM_SCHEMA } from './mini-rts/rules'
 
 const COLS = 40
 const ROWS = 22
@@ -75,6 +76,16 @@ export default function MiniRts() {
   const [pop, setPop] = useState({ used: 2, cap: 6 })
   const [selBuilding, setSelBuilding] = useState(null)
   const [showFog, setShowFog] = useState(true)
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState({
+    startGold: CUSTOM_SCHEMA.startGold.default,
+    fogRadius: CUSTOM_SCHEMA.fogRadius.default,
+    aiAggro: CUSTOM_SCHEMA.aiAggro.default,
+    victoryHQOnly: CUSTOM_SCHEMA.victoryHQOnly.default,
+  })
+  const cfg = difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty]
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
 
   useEffect(() => { sfxRef.current.setEnabled(soundOn) }, [soundOn])
   useEffect(() => { try { setBest(Number(localStorage.getItem('sid-rts-best') || 0)) } catch {} }, [])
@@ -112,7 +123,7 @@ export default function MiniRts() {
       map, resNodes: seedResources(),
       units: [], buildings: [], projectiles: [], particles: [], damageNums: [],
       selection: new Set(), dragStart: null, dragEnd: null,
-      goldFloat: 120, woodFloat: 60,
+      goldFloat: cfgRef.current.startGold, woodFloat: Math.round(cfgRef.current.startGold * 0.5),
       enemyGold: 100, enemyWood: 60,
       running: true, paused: false,
       tick: 0, elapsed: 0,
@@ -124,7 +135,7 @@ export default function MiniRts() {
     addBuilding(stateRef.current, COLS - 5, ROWS - 5, 'townhall', 'enemy')
     for (let i = 0; i < 2; i++) addUnit(stateRef.current, 3 + i, 4, 'peasant', 'player')
     for (let i = 0; i < 3; i++) addUnit(stateRef.current, COLS - 6 + i, ROWS - 6, 'peasant', 'enemy')
-    setStatus('playing'); setGold(120); setWood(60); setSelBuilding(null)
+    setStatus('playing'); setGold(cfgRef.current.startGold); setWood(Math.round(cfgRef.current.startGold * 0.5)); setSelBuilding(null)
     setPop({ used: 2, cap: 6 })
   }, [])
 
@@ -317,7 +328,8 @@ export default function MiniRts() {
 
     const runAI = (s, dt) => {
       s.aiTimer += dt
-      if (s.aiTimer < 0.6) return
+      // Higher aggression = faster AI think cycle
+      if (s.aiTimer < 0.6 / Math.max(0.2, cfgRef.current.aiAggro)) return
       s.aiTimer = 0
       const enemyPeasants = s.units.filter((u) => u.side === 'enemy' && u.type === 'peasant')
       const enemyTH = s.buildings.find((b) => b.side === 'enemy' && b.type === 'townhall' && b.hp > 0)
@@ -380,11 +392,11 @@ export default function MiniRts() {
       for (let i = 0; i < s.fog.length; i++) if (s.fog[i] === 2) s.fog[i] = 1
       for (const u of s.units) {
         if (u.side !== 'player') continue
-        revealArea(s, u.x / TILE, u.y / TILE, 5)
+        revealArea(s, u.x / TILE, u.y / TILE, cfgRef.current.fogRadius)
       }
       for (const b of s.buildings) {
         if (b.side !== 'player' || b.hp <= 0) continue
-        revealArea(s, b.c + 1, b.r + 1, 6)
+        revealArea(s, b.c + 1, b.r + 1, cfgRef.current.fogRadius + 1)
       }
 
       // Buildings tick
@@ -740,6 +752,12 @@ export default function MiniRts() {
       onSoundToggle={() => setSoundOn((v) => !v)}
       onRestart={onRestart}
       onPause={onPause}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       extraStats={
         <>
           <div className="flex flex-col items-start">

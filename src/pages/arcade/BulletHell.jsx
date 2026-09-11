@@ -34,6 +34,30 @@ import GameShell from '../../components/arcade/GameShell'
 import { getSfx } from '../../components/arcade/sfx'
 
 const BEST_KEY = 'sid-arcade-bullethell-best'
+
+const RULES = [
+  { heading: 'Goal', body: 'Survive dense boss bullet patterns. Score climbs from bullets grazed and from the boss shot down. Losing all lives ends the run.' },
+  { heading: 'Controls', body: 'Arrow keys / WASD — move the plane.\nZ or fire button — shoot (auto-fires while held).\nShift — focus mode (half speed, hitbox indicator becomes visible, letting you thread tight gaps).\nSpace / bomb button — smart bomb (clears the screen + gives brief invincibility).' },
+  { heading: 'Hitbox convention', body: 'Your visual sprite is a plane, but the real hitbox is a 2 px circle at the centre. This is a classic danmaku trick — everything looks impossibly tight but is actually thread-able if you focus.' },
+  { heading: 'Graze', body: 'Every frame your plane is within ~24 px of a bullet but doesn\'t collide, you score +2 and the graze counter ticks up. Encourages you to weave close instead of retreating to the edge.' },
+  { heading: 'Boss patterns', body: 'Spiral — bullets radiate from the boss and rotate over time.\nWave — sinusoidal streams sweep left-right.\nAimed — bullets fire directly at your current position.\nBeam — a wide beam sweeps across the field, forcing dodges.' },
+  { heading: 'Perf', body: 'Bullets live in a typed-array pool (up to 1024 alive at once). If the engine detects >700 live bullets it cuts shadowBlur to keep the frame budget. On a mid-range laptop the game sustains 60 fps.' },
+  { heading: 'Difficulty', body: 'Easy = 4 px hitbox, 5 bombs, only spiral/wave patterns, 2× graze bonus. Hard = 2 px hitbox, 1 bomb, all 4 patterns unlocked, base graze bonus. Custom exposes hitbox size, bomb count, patterns unlocked, and graze multiplier.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { hitboxR: 4, bombCount: 5, patternsUnlocked: 2, grazeMult: 2.0 },
+  Medium: { hitboxR: 3, bombCount: 2, patternsUnlocked: 3, grazeMult: 1.0 },
+  Hard:   { hitboxR: 2, bombCount: 1, patternsUnlocked: 4, grazeMult: 0.5 },
+}
+
+const CUSTOM_SCHEMA = {
+  hitboxR:          { label: 'Hitbox radius',  min: 1,   max: 8,   step: 1,  default: 3 },
+  bombCount:        { label: 'Bomb count',     min: 0,   max: 6,   step: 1,  default: 2 },
+  patternsUnlocked: { label: 'Patterns (1-4)', min: 1,   max: 4,   step: 1,  default: 3 },
+  grazeMult:        { label: 'Graze multiplier', min: 0.2, max: 3.0, step: 0.1, default: 1.0 },
+}
+
 const MAX_BULLETS = 1024   // typed-array pool size — engine ceiling
 const FIELD_W = 480
 const FIELD_H = 720
@@ -74,6 +98,16 @@ export default function BulletHell() {
   const [maxBullets, setMaxBullets] = useState(0)
   const [shake, setShake] = useState(0)
   const [chromatic, setChromatic] = useState(0)  // 0..1 for death aberration
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState({
+    hitboxR: CUSTOM_SCHEMA.hitboxR.default,
+    bombCount: CUSTOM_SCHEMA.bombCount.default,
+    patternsUnlocked: CUSTOM_SCHEMA.patternsUnlocked.default,
+    grazeMult: CUSTOM_SCHEMA.grazeMult.default,
+  })
+  const cfg = difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty]
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
 
   // Non-reactive game state (mutated per-frame — kept out of React re-render)
   const g = useRef({
@@ -172,7 +206,7 @@ export default function BulletHell() {
     s.scoreAcc = 0
     s.peakBullets = 0
     s.grazedIds.clear()
-    setScore(0); setLives(START_LIVES); setBombs(START_BOMBS); setGraze(0); setWave(1); setMaxBullets(0)
+    setScore(0); setLives(START_LIVES); setBombs(cfgRef.current.bombCount); setGraze(0); setWave(1); setMaxBullets(0)
     setStatus('playing')
     setChromatic(0)
   }
@@ -202,8 +236,10 @@ export default function BulletHell() {
     b.y = 100 + Math.sin(t * 2) * 30
 
     if (b.patternT > 4000) {
-      // Rotate pattern
-      const patterns = ['spiral', 'wave', 'aimed', 'beam']
+      // Rotate pattern — pool limited by difficulty
+      const allPatterns = ['spiral', 'wave', 'aimed', 'beam']
+      const unlocked = Math.max(1, Math.min(4, cfgRef.current.patternsUnlocked))
+      const patterns = allPatterns.slice(0, unlocked)
       const idx = patterns.indexOf(b.pattern)
       b.pattern = patterns[(idx + 1) % patterns.length]
       b.patternT = 0
@@ -325,7 +361,7 @@ export default function BulletHell() {
       }
       live++
       const d = Math.hypot(s.bx[i] - s.px, s.by[i] - s.py)
-      if (d < s.br[i] + HITBOX_R && s.invuln <= 0) {
+      if (d < s.br[i] + cfgRef.current.hitboxR && s.invuln <= 0) {
         // HIT!
         s.balive[i] = 0
         s.invuln = 2000
@@ -347,7 +383,7 @@ export default function BulletHell() {
 
     if (s.grazeThisFrame > 0) {
       setGraze((g0) => g0 + s.grazeThisFrame)
-      s.scoreAcc += s.grazeThisFrame * 2
+      s.scoreAcc += s.grazeThisFrame * 2 * cfgRef.current.grazeMult
     }
 
     // Beam damage
@@ -700,6 +736,12 @@ export default function BulletHell() {
       onSoundToggle={() => setSoundOn((v) => !v)}
       onPause={() => setStatus((s) => s === 'playing' ? 'paused' : s === 'paused' ? 'playing' : s)}
       onRestart={start}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       controls={[
         { key: '← ↑ → ↓', label: 'Move' },
         { key: 'Space',   label: 'Fire' },

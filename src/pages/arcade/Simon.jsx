@@ -24,6 +24,29 @@ import { getSfx } from '../../components/arcade/sfx'
 
 const BEST_KEY = 'sid-arcade-simon-best'
 
+const RULES = [
+  { heading: 'Goal', body: 'Watch the sequence, then replay it. Every round adds one more note. Your score is the length of the longest sequence you\'ve completed.' },
+  { heading: 'Controls', body: 'Tap or click the pad that matches each colour/tone in the sequence. On desktop, the pointer registers on down (no click delay). Missing a pad or pressing the wrong one ends the run.' },
+  { heading: 'Musical', body: 'Each pad plays a distinct triangle-wave tone from a minor pentatonic scale — mashing them accidentally will still sound musical. AudioContext resumes on first tap (browser autoplay-policy compliant).' },
+  { heading: 'Tempo', body: 'Level 1 plays notes at 620 ms each. Every level tightens the note duration until floor of 220 ms at level 12+. Gap between notes is 40 % of the note length.' },
+  { heading: 'Modes', body: 'The classic mode uses 4 pads (red / green / blue / yellow). Hard mode adds violet and cyan for a 6-pad layout — sequences become much harder to memorise as the ear has to track more colours.' },
+  { heading: 'Streak', body: 'Streak = consecutive perfect rounds without a mistake. It resets to 0 on game over and is shown in the HUD alongside sequence length.' },
+  { heading: 'Difficulty', body: 'Easy = 4 pads, sequences begin at length 1, slow playback, forgiving error window. Hard = 6 pads, sequences begin at length 3, faster playback. Custom exposes sequence start length, playback speed, error tolerance, and pad count.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { startLen: 1, playbackMult: 1.5, errorTolerance: 300, padCount: 4 },
+  Medium: { startLen: 1, playbackMult: 1.0, errorTolerance: 120, padCount: 4 },
+  Hard:   { startLen: 3, playbackMult: 0.7, errorTolerance: 60,  padCount: 6 },
+}
+
+const CUSTOM_SCHEMA = {
+  startLen:       { label: 'Start length',    min: 1,   max: 6,   step: 1,  default: 1 },
+  playbackMult:   { label: 'Playback speed',  min: 0.4, max: 2.0, step: 0.1, default: 1.0 },
+  errorTolerance: { label: 'Error tolerance', min: 0,   max: 500, step: 20, default: 120 },
+  padCount:       { label: 'Pad count',       min: 4,   max: 6,   step: 2,  default: 4 },
+}
+
 // Notes tuned to a pentatonic scale — mashing feels musical.
 const PADS_4 = [
   { id: 'g', freq: 220.00, hex: '#22c55e', glow: '#86efac' },
@@ -43,8 +66,8 @@ const PADS_6 = [
 
 // Sequence playback tempo curve. Level 1 plays each note for 600ms;
 // level 12 down to ~220ms. Gap = 40% of the play length.
-const tempoFor = (level) => {
-  const dur = Math.max(220, 620 - level * 32)
+const tempoFor = (level, mult = 1) => {
+  const dur = Math.max(180, (620 - level * 32) * mult)
   return { dur, gap: Math.round(dur * 0.4) }
 }
 
@@ -53,8 +76,18 @@ export default function Simon() {
   const [soundOn, setSoundOn] = useState(true)
   useEffect(() => { sfx.setEnabled(soundOn) }, [soundOn, sfx])
 
-  const [mode, setMode] = useState('easy')  // easy | hard
-  const pads = mode === 'easy' ? PADS_4 : PADS_6
+  const [mode, setMode] = useState('easy')  // easy | hard (legacy pad switch)
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState({
+    startLen: CUSTOM_SCHEMA.startLen.default,
+    playbackMult: CUSTOM_SCHEMA.playbackMult.default,
+    errorTolerance: CUSTOM_SCHEMA.errorTolerance.default,
+    padCount: CUSTOM_SCHEMA.padCount.default,
+  })
+  const cfg = difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty]
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg; setMode(cfg.padCount >= 6 ? 'hard' : 'easy') }, [cfg])
+  const pads = (cfg.padCount >= 6 || mode !== 'easy') ? PADS_6 : PADS_4
   const [level, setLevel] = useState(1)
   const [score, setScore] = useState(0)
   const [best, setBest] = useState(() => Number(localStorage.getItem(BEST_KEY) || 0))
@@ -103,7 +136,7 @@ export default function Simon() {
 
   const playSequence = useCallback(async (arr) => {
     setPhase('showing')
-    const { dur, gap } = tempoFor(level)
+    const { dur, gap } = tempoFor(level, cfgRef.current.playbackMult)
     await new Promise((r) => setTimeout(r, 500))
     for (let i = 0; i < arr.length; i++) {
       const p = pads.find((x) => x.id === arr[i])
@@ -131,7 +164,11 @@ export default function Simon() {
     inputIdx.current = 0
     setLevel(1); setScore(0); setStreak(0)
     setStatus('playing')
-    setTimeout(() => { addToSequence(); playSequence([seq.current[0]]) }, 200)
+    setTimeout(() => {
+      const initialLen = Math.max(1, cfgRef.current.startLen)
+      for (let i = 0; i < initialLen; i++) addToSequence()
+      playSequence([...seq.current])
+    }, 200)
   }
 
   const gameOver = (padId) => {
@@ -242,6 +279,12 @@ export default function Simon() {
       onSoundToggle={() => setSoundOn((v) => !v)}
       onPause={() => {}}
       onRestart={start}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       controls={[{ key: 'Tap', label: 'Press pad' }]}
       overlay={overlay}
     >

@@ -25,7 +25,30 @@ const W2_SIZE = HIDDEN * OUTPUT    // 48
 const B2_SIZE = OUTPUT             // 4
 const GENOME = W1_SIZE + B1_SIZE + W2_SIZE + B2_SIZE
 
-const POP = 20
+const RULES = [
+  { heading: 'What is this?', body: 'A live genetic algorithm running 20 snakes in parallel. Each snake carries a tiny 2-layer neural net (24 → 12 tanh → 4 argmax). Every generation the top performers cross over and mutate to produce the next.' },
+  { heading: 'Reading the screen', body: 'The big centre board shows the current best snake. The strip of mini-boards is the rest of the population. When you see one collapse into a bounded shape it\'s found a hamiltonian-like path; when they thrash randomly the net is still untrained.' },
+  { heading: 'Neural net inputs', body: 'For each of 8 directions the snake sees: (a) 1 / distance to wall, (b) whether food is visible along that ray, (c) whether its own body is visible. 8 × 3 = 24 features feed into the hidden layer.' },
+  { heading: 'GA loop', body: '1. Simulate every snake until it dies (wall / self / starve @ 220 idle steps).\n2. Sort by fitness = 2^score + step_bonus − starve_penalty.\n3. Keep top 4 elite genomes untouched.\n4. Fill the rest with crossover(a, b) + mutation.\n5. Repeat.' },
+  { heading: 'Controls', body: 'This is a spectator sim — there\'s no player. Use the speed slider to step 1-30× faster. Space pauses the sim.' },
+  { heading: 'Difficulty', body: 'Easy = small population + low mutation, slow evolution but visible progress. Hard = large population + high mutation, chaotic but explores wider. Custom exposes population size, mutation rate, food count, and vision distance.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { popSize: 10, mutationRate: 0.02, foodCount: 3, visionDist: 15 },
+  Medium: { popSize: 20, mutationRate: 0.04, foodCount: 1, visionDist: 15 },
+  Hard:   { popSize: 40, mutationRate: 0.10, foodCount: 1, visionDist: 8 },
+}
+
+const CUSTOM_SCHEMA = {
+  popSize:      { label: 'Population',    min: 10,  max: 50,  step: 2,   default: 20 },
+  mutationRate: { label: 'Mutation rate', min: 0.01, max: 0.2, step: 0.01, default: 0.04 },
+  foodCount:    { label: 'Food count',    min: 1,   max: 5,   step: 1,   default: 1 },
+  visionDist:   { label: 'Vision distance', min: 5, max: 20,  step: 1,   default: 15 },
+}
+
+const POP_DEFAULT = 20
+let POP = POP_DEFAULT
 const BOARD = 15
 const CELL_MINI = 12
 const CELL_HERO = 22
@@ -183,6 +206,16 @@ export default function SnakeAi() {
   const [bestEver, setBestEver] = useState(0)
   const [speed, setSpeed] = useState(4)      // steps per frame multiplier
   const [status, setStatus] = useState('playing')
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState({
+    popSize: CUSTOM_SCHEMA.popSize.default,
+    mutationRate: CUSTOM_SCHEMA.mutationRate.default,
+    foodCount: CUSTOM_SCHEMA.foodCount.default,
+    visionDist: CUSTOM_SCHEMA.visionDist.default,
+  })
+  const cfg = difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty]
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg; POP = cfg.popSize }, [cfg])
 
   useEffect(() => { sfxRef.current.setEnabled(soundOn) }, [soundOn])
   useEffect(() => { try { setBestEver(Number(localStorage.getItem('sid-snake-best') || 0)) } catch {} }, [])
@@ -232,7 +265,7 @@ export default function SnakeAi() {
     while (nextPop.length < POP) {
       const a = parents[Math.floor(Math.random() * parents.length)]
       const b = parents[Math.floor(Math.random() * parents.length)]
-      const child = mutate(crossover(a, b))
+      const child = mutate(crossover(a, b), cfgRef.current.mutationRate)
       nextPop.push(newSnake(child))
     }
     s.pop = nextPop
@@ -435,6 +468,12 @@ export default function SnakeAi() {
       onSoundToggle={() => setSoundOn((v) => !v)}
       onRestart={onRestart}
       onPause={onPause}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       extraStats={
         <>
           <div className="flex flex-col items-start">

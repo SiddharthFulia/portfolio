@@ -33,6 +33,29 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import GameShell from '../../components/arcade/GameShell'
 import { getSfx } from '../../components/arcade/sfx'
 
+const RULES = [
+  { heading: 'Goal', body: 'Catch fish, level up your lure tier, unlock deeper zones, catalog rare species. There\'s no fixed win state — best score is total XP accumulated.' },
+  { heading: 'The four phases', body: '1) AIM — hold click to charge a power meter (0-1); release to cast. Power maps to cast depth.\n2) WAIT — the lure sits at your chosen depth while fish approach. When a fish\'s nose touches the lure and lingers >400 ms, it commits to biting.\n3) HOOK — a "!" indicator appears; you have 500 ms to click SET. Miss and the fish escapes.\n4) REEL — alternate left / right clicks to drag the fish in while managing line tension.' },
+  { heading: 'Tension physics', body: 'Reeling tightens the line; letting up loosens it. Too much tension → snap → fish gone. Too little tension → fish gets slack → escapes. A visible tension bar shows the safe green band.' },
+  { heading: 'Fish species', body: 'Ten species across four depth zones:\nShallow — Minnow, Perch.\nMid — Bass, Trout, Catfish.\nDeep — Tuna, Swordfish, Grouper, Shark.\nAbyss — Anglerfish (very rare).\nEach species has its own speed, weight range, XP value, and required bait level.' },
+  { heading: 'Lures & unlocks', body: 'Basic (default), Spinner (100 XP), Jig (400 XP), Deep-Sea (1200 XP). Higher lures attract more fish AND unlock higher bait tiers — some species will only bite on tier-3+ lures.' },
+  { heading: 'Encyclopedia', body: 'Every caught species is recorded: total count, rarest weight, first-catch zone. The side panel shows unlocked entries and mysterious silhouettes for undiscovered ones — collect them all.' },
+  { heading: 'Difficulty', body: 'Easy = wide cast power ceiling, forgiving line, all species visible from the start, common rare-fish. Hard = narrow power ceiling, tight line, only common species, rare rare-fish. Custom exposes cast power ceiling, line strength, fish variety, and rare-fish frequency.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { castCeiling: 1.0, lineStrength: 1.4, fishVariety: 10, rareFishRate: 2.0 },
+  Medium: { castCeiling: 0.9, lineStrength: 1.0, fishVariety: 10, rareFishRate: 1.0 },
+  Hard:   { castCeiling: 0.7, lineStrength: 0.7, fishVariety: 5,  rareFishRate: 0.5 },
+}
+
+const CUSTOM_SCHEMA = {
+  castCeiling:  { label: 'Cast power ceiling', min: 0.4, max: 1.0, step: 0.05, default: 0.9 },
+  lineStrength: { label: 'Line strength',      min: 0.5, max: 2.0, step: 0.1, default: 1.0 },
+  fishVariety:  { label: 'Fish variety',       min: 3,   max: 10,  step: 1,  default: 10 },
+  rareFishRate: { label: 'Rare-fish frequency', min: 0.1, max: 3.0, step: 0.1, default: 1.0 },
+}
+
 const WATER_TOP = 0.22             // fraction of canvas occupied by sky
 const CANVAS_W = 900
 const CANVAS_H = 560
@@ -115,6 +138,16 @@ export default function FishingSim() {
   const [lastCatch, setLastCatch]     = useState(null)
   const [flash, setFlash]             = useState(null)
   const [soundOn, setSoundOn]         = useState(true)
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState({
+    castCeiling: CUSTOM_SCHEMA.castCeiling.default,
+    lineStrength: CUSTOM_SCHEMA.lineStrength.default,
+    fishVariety: CUSTOM_SCHEMA.fishVariety.default,
+    rareFishRate: CUSTOM_SCHEMA.rareFishRate.default,
+  })
+  const cfg = difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty]
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
 
   const sfx = useMemo(() => getSfx(), [])
   useEffect(() => sfx.setEnabled(soundOn), [soundOn, sfx])
@@ -156,9 +189,10 @@ export default function FishingSim() {
     const loop = (t) => {
       const dt = (t - last) / 1000
       last = t
+      const ceiling = Math.min(1, cfgRef.current?.castCeiling ?? 1)
       setPower(p => {
         let np = p + dir * dt * 0.9
-        if (np > 1) { np = 1; dir = -1 }
+        if (np > ceiling) { np = ceiling; dir = -1 }
         else if (np < 0) { np = 0; dir = 1 }
         return np
       })
@@ -176,7 +210,9 @@ export default function FishingSim() {
     let sinkComplete = false
     const target = castPower
     const spawnFish = () => {
-      const zoneFish = SPECIES.filter(s => {
+      const varietyCap = cfgRef.current.fishVariety
+      const availableSpecies = SPECIES.slice(0, varietyCap)
+      const zoneFish = availableSpecies.filter(s => {
         const zone = ZONES.find(z => z.id === s.zone)
         return zone && target >= zone.min && target <= zone.max && s.bait <= lureObj.baitLevel
       })
@@ -455,6 +491,12 @@ export default function FishingSim() {
       onSoundToggle={() => setSoundOn(v => !v)}
       onPause={() => {}}
       onRestart={resetProgress}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       controls={[
         { key: 'Hold',    label: 'Charge cast power' },
         { key: 'Release', label: 'Cast the lure' },

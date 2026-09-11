@@ -17,6 +17,29 @@ import GameShell from '../../components/arcade/GameShell'
 import { getSfx } from '../../components/arcade/sfx'
 
 const BEST_KEY = 'arcade.doodle.best'
+
+const RULES = [
+  { heading: 'Goal', body: 'Climb as high as you can by bouncing on platforms. Score = highest metre reached. Falling off the bottom of the screen ends the run.' },
+  { heading: 'Controls', body: '← → or A / D — steer horizontally in mid-air. Jumping is automatic each time the doodle touches a platform from above. Wrap around the edges — leaving the left side puts you on the right. P pauses, R restarts.' },
+  { heading: 'Platforms', body: 'Green — static, always safe.\nBlue — moving, ping-pongs left/right.\nGrey — breakable, one landing then gone.\nYellow — spring, launches you much higher than a normal jump.\nWhite — cloud, disappears the moment you touch it.' },
+  { heading: 'Enemies', body: 'Monsters wander on some platforms. Jumping on the head kills them and pays a small point bonus. Touching them from the side or below is game over.' },
+  { heading: 'Power-ups', body: 'Rocket — huge vertical launch for ~3 s.\nPropeller — moderate ascent for ~4 s.\nJetpack — steady climb for ~5 s. All three make you invulnerable to monsters while active.' },
+  { heading: 'Scaling', body: 'Platforms get sparser and monsters more common as you climb. The gap between platforms grows with height, so mid-air steering becomes essential.' },
+  { heading: 'Difficulty', body: 'Easy = tighter platform spacing, rare monsters, softer gravity, bigger jump. Hard = wider spacing, common monsters, heavy gravity, low jump. Custom exposes density, monster rate, gravity, and jump velocity directly.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { platGap: 40, monsterChance: 0.03, gravity: 700,  jump: -600 },
+  Medium: { platGap: 55, monsterChance: 0.05, gravity: 900,  jump: -560 },
+  Hard:   { platGap: 75, monsterChance: 0.10, gravity: 1100, jump: -520 },
+}
+
+const CUSTOM_SCHEMA = {
+  platGap:       { label: 'Platform gap (px)', min: 30,  max: 100, step: 5,  default: 55 },
+  monsterChance: { label: 'Monster spawn %',   min: 0,   max: 0.25, step: 0.01, default: 0.05 },
+  gravity:       { label: 'Gravity',           min: 500, max: 1400, step: 25, default: 900 },
+  jump:          { label: 'Jump power',        min: -720, max: -420, step: 10, default: -560 },
+}
 const mulberry32 = (a) => () => {
   a |= 0; a = (a + 0x6D2B79F5) | 0
   let t = Math.imul(a ^ (a >>> 15), 1 | a)
@@ -51,6 +74,16 @@ export default function DoodleJump() {
   const [soundOn, setSoundOn] = useState(true)
   const [gameOver, setGameOver] = useState(null)
   const [powerup, setPowerup] = useState(null)
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState({
+    platGap: CUSTOM_SCHEMA.platGap.default,
+    monsterChance: CUSTOM_SCHEMA.monsterChance.default,
+    gravity: CUSTOM_SCHEMA.gravity.default,
+    jump: CUSTOM_SCHEMA.jump.default,
+  })
+  const cfg = difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty]
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
 
   const reducedRef = useRef(false)
   useEffect(() => {
@@ -174,7 +207,7 @@ export default function DoodleJump() {
     if (d.powerup === 'rocket')        d.vy = ROCKET_V
     else if (d.powerup === 'jetpack')  d.vy = -900
     else if (d.powerup === 'propeller') d.vy = Math.min(d.vy, -400)
-    else d.vy = Math.min(1400, d.vy + GRAV * dt)
+    else d.vy = Math.min(1400, d.vy + cfgRef.current.gravity * dt)
 
     d.x += d.vx * dt
     d.y += d.vy * dt
@@ -200,10 +233,11 @@ export default function DoodleJump() {
     }
 
     while (s.lastPlatY > -80) {
-      const gap = 55 + s.rand() * (30 + Math.min(60, s.score * 0.5))
+      const c = cfgRef.current
+      const gap = c.platGap + s.rand() * (30 + Math.min(60, s.score * 0.5))
       s.lastPlatY -= gap
       s.platforms.push(makePlatform(s.rand, s.lastPlatY, s.score))
-      if (s.rand() < 0.05 + Math.min(0.15, s.score * 0.002)) {
+      if (s.rand() < c.monsterChance + Math.min(0.15, s.score * 0.002)) {
         s.monsters.push({ x: 40 + s.rand() * (LOGICAL_W - 80), y: s.lastPlatY - 24, r: 16, dir: s.rand() > 0.5 ? 1 : -1, phase: s.rand() * 6.28, alive: true })
       }
       if (s.rand() < 0.06) {
@@ -234,7 +268,7 @@ export default function DoodleJump() {
         if (d.x > px - 6 && d.x < px + PLAT_W + 6 && d.y > py - 6 && d.y < py + PLAT_H + 6) {
           if (p.type === 'spring') { d.vy = SPRING_V; sfx.chirp() }
           else if (p.type === 'breakable') { p.alive = false; sfx.hit() }
-          else { d.vy = JUMP_V; sfx.jump() }
+          else { d.vy = cfgRef.current.jump; sfx.jump() }
           if (p.type === 'cloud') p.alive = false
           d.squash = 0.55
         }
@@ -248,7 +282,7 @@ export default function DoodleJump() {
       if (dx * dx + dy * dy < (m.r + 14) * (m.r + 14)) {
         if (d.vy > 40 && d.y < m.y - 4) {
           m.alive = false
-          d.vy = JUMP_V
+          d.vy = cfgRef.current.jump
           s.score += 20
           setScore(s.score)
           for (let k = 0; k < 8; k++) s.particles.push({ x: m.x, y: m.y, vx: (s.rand() - 0.5) * 200, vy: -100 - s.rand() * 100, t: 0, c: '#ef4444' })
@@ -326,6 +360,12 @@ export default function DoodleJump() {
       onSoundToggle={() => setSoundOn((v) => !v)}
       onPause={() => setStatus((p) => p === 'paused' ? 'playing' : p === 'playing' ? 'paused' : p)}
       onRestart={reset}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       overlay={overlay}
       extraStats={powerup ? (
         <div className="flex flex-col items-start">

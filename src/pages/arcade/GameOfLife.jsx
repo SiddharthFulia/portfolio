@@ -26,6 +26,29 @@ import GameShell from '../../components/arcade/GameShell'
 import { Slider } from '../../components/ui'
 import { getSfx } from '../../components/arcade/sfx'
 
+const RULES = [
+  { heading: 'What this is', body: 'Conway\'s Game of Life is a zero-player cellular automaton. You seed a starting configuration, and every generation the cells live, die, or spawn according to fixed rules. This is a sim — there\'s no winning or losing.' },
+  { heading: 'Controls', body: 'Click / drag on the grid to paint cells. Right-click erases. Touch-drag paints on mobile.\nPlay / pause with the button (or space).\n"Step" advances one generation.\n"Clear" wipes the grid.\n"Randomise" fills with random density.' },
+  { heading: 'Conway rules', body: 'Any live cell with 2 or 3 neighbours stays alive.\nAny dead cell with exactly 3 neighbours becomes alive.\nAll other cells die (of loneliness or overcrowding).\nThis is the "B3/S23" rule — the classic.' },
+  { heading: 'Rule variants', body: 'Highlife (B36/S23) — adds birth on 6 neighbours; supports the replicator pattern.\nSeeds (B2/S) — everything dies each generation; only births matter; explosive.\nBrian\'s Brain — 3-state cellular automaton (dead/alive/refractory); creates travelling waves.' },
+  { heading: 'Patterns', body: 'Arm a pattern (Glider, Glider Gun, Pulsar, Pentadecathlon, Acorn, R-pentomino) and click on the grid to stamp it. Great for exploring behaviours you couldn\'t draw by hand.' },
+  { heading: 'Sharing', body: 'Every visible state can be saved as a URL — the grid gets base64-packed into ?s= and appended. Copy the URL and any visitor lands on the same starting board.' },
+  { heading: 'Difficulty', body: 'Sim games don\'t have a fixed difficulty — treat these as presets. Easy = sparse initial density on 40×25 grid, Conway rules. Hard = dense fill on 120×75 grid, Highlife rules. Custom exposes initial density, rule variant, grid size and wrap-around toggle.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { initialDensity: 0.15, ruleVariant: 0, gridScale: 0.5, wrapToroidal: 1 },
+  Medium: { initialDensity: 0.30, ruleVariant: 0, gridScale: 1.0, wrapToroidal: 1 },
+  Hard:   { initialDensity: 0.45, ruleVariant: 1, gridScale: 1.5, wrapToroidal: 0 },
+}
+
+const CUSTOM_SCHEMA = {
+  initialDensity: { label: 'Initial density', min: 0.05, max: 0.80, step: 0.05, default: 0.30 },
+  ruleVariant:    { label: 'Rule (0-3)',      min: 0,   max: 3,   step: 1,  default: 0 },
+  gridScale:      { label: 'Grid scale',      min: 0.5, max: 2.0, step: 0.1, default: 1.0 },
+  wrapToroidal:   { label: 'Wrap (0/1)',      min: 0,   max: 1,   step: 1,  default: 1 },
+}
+
 const COLS = 80
 const ROWS = 50
 const CELL = 12                    // canvas cell size in CSS pixels
@@ -102,6 +125,19 @@ export default function GameOfLife() {
   const [population, setPop]  = useState(0)
   const [speed, setSpeed]     = useState(10)   // gens per second
   const [wrap, setWrap]       = useState(true)
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState({
+    initialDensity: CUSTOM_SCHEMA.initialDensity.default,
+    ruleVariant: CUSTOM_SCHEMA.ruleVariant.default,
+    gridScale: CUSTOM_SCHEMA.gridScale.default,
+    wrapToroidal: CUSTOM_SCHEMA.wrapToroidal.default,
+  })
+  const cfg = difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty]
+  const cfgRef = useRef(cfg)
+  useEffect(() => {
+    cfgRef.current = cfg
+    setWrap(!!cfg.wrapToroidal)
+  }, [cfg])
   const [soundOn, setSoundOn] = useState(true)
   const [armedPattern, setArmed] = useState(null)
   const [copied, setCopied]   = useState(false)
@@ -339,7 +375,7 @@ export default function GameOfLife() {
   const randomise = () => {
     const a = aliveRef.current, age = ageRef.current
     for (let i = 0; i < a.length; i++) {
-      a[i] = Math.random() < 0.32 ? 1 : 0
+      a[i] = Math.random() < cfgRef.current.initialDensity ? 1 : 0
       age[i] = a[i] ? 1 : 0
     }
     setPop(countPop())
@@ -375,6 +411,12 @@ export default function GameOfLife() {
       onSoundToggle={() => setSoundOn(v => !v)}
       onPause={() => setRunning(r => !r)}
       onRestart={clearAll}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       controls={[
         { key: 'L-click', label: 'Paint cell' },
         { key: 'R-click', label: 'Erase' },

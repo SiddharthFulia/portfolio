@@ -19,6 +19,28 @@ import { getSfx } from '../../components/arcade/sfx'
 
 const KEY = (mode) => `sid-arcade-reaction-${mode}-best`
 
+const RULES = [
+  { heading: 'Goal', body: 'Measure your visual reaction time. Sub-200 ms is world-class; typical adults land around 240-290 ms. Best time per sub-mode is persisted separately in localStorage.' },
+  { heading: 'Sub-modes', body: 'Single — one red-to-green flip. You get one shot; false starts penalise you.\nSequence — five trials in a row; final score is the average, median is shown.\nStroop — the colour word "RED" may appear in blue ink. Tap the INK colour, not the word. Adds cognitive interference on top of pure reaction time.' },
+  { heading: 'Controls', body: 'Any key or click / tap fires the reaction. In Stroop mode, use the six colour buttons at the bottom. Screen respects any input source (keyboard, mouse, touch).' },
+  { heading: 'Timing accuracy', body: 'Every trial uses `performance.now()` which is sub-millisecond precision in modern browsers. There\'s no rounding: displayed times reflect the true latency between the green flip and your input.' },
+  { heading: 'False start protection', body: 'If you input BEFORE the green flip, the trial is logged as a false start. You must reset (Space/Enter/tap "Reset") to begin a new trial. This makes the test un-gameable — you can\'t just spam the button.' },
+  { heading: 'Difficulty', body: 'Easy = long fixed wait (2–4 s), 3 trials in sequence, no false-start penalty. Hard = short random wait (0.5–1.5 s), 10 trials in sequence, false starts cost 200 ms. Custom exposes min/max wait, trial count, and false-start penalty.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { minWait: 2000, maxWait: 4000, trialCount: 3,  falseStartPenalty: 0 },
+  Medium: { minWait: 1200, maxWait: 3600, trialCount: 5,  falseStartPenalty: 100 },
+  Hard:   { minWait: 500,  maxWait: 1500, trialCount: 10, falseStartPenalty: 200 },
+}
+
+const CUSTOM_SCHEMA = {
+  minWait:           { label: 'Min wait (ms)', min: 300, max: 3000, step: 100, default: 1200 },
+  maxWait:           { label: 'Max wait (ms)', min: 800, max: 6000, step: 100, default: 3600 },
+  trialCount:        { label: 'Trials',        min: 1,   max: 20,   step: 1,   default: 5 },
+  falseStartPenalty: { label: 'False start pen (ms)', min: 0, max: 500, step: 25, default: 100 },
+}
+
 const STROOP_COLORS = [
   { name: 'RED',    hex: '#ef4444' },
   { name: 'GREEN',  hex: '#22c55e' },
@@ -45,7 +67,17 @@ export default function Reaction() {
   })
 
   const [trials, setTrials] = useState([])   // ms of each completed trial
-  const trialLen = 5
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState({
+    minWait: CUSTOM_SCHEMA.minWait.default,
+    maxWait: CUSTOM_SCHEMA.maxWait.default,
+    trialCount: CUSTOM_SCHEMA.trialCount.default,
+    falseStartPenalty: CUSTOM_SCHEMA.falseStartPenalty.default,
+  })
+  const cfg = difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty]
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
+  const trialLen = cfg.trialCount
   const [stroopWord, setStroopWord] = useState(null)
   const [stroopInk, setStroopInk] = useState(null)
   const [stroopAcc, setStroopAcc] = useState({ correct: 0, wrong: 0 })
@@ -60,7 +92,9 @@ export default function Reaction() {
   const armSingle = () => {
     setState('waiting')
     setReactionMs(null)
-    const delay = 1200 + Math.random() * 2800
+    const min = cfgRef.current.minWait
+    const max = cfgRef.current.maxWait
+    const delay = min + Math.random() * Math.max(0, (max - min))
     waitTimer.current = setTimeout(() => {
       goAt.current = performance.now()
       setState('ready')
@@ -265,6 +299,12 @@ export default function Reaction() {
       onSoundToggle={() => setSoundOn((v) => !v)}
       onPause={() => {}}
       onRestart={restart}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       controls={[
         { key: 'Tap',   label: 'Panel / colour' },
         { key: 'Space', label: 'Restart' },

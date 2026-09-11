@@ -25,6 +25,29 @@ import { getSfx } from '../../components/arcade/sfx'
 const CANVAS_W = 720
 const CANVAS_H = 480
 const WORLD_W = 3600
+
+const RULES = [
+  { heading: 'Goal', body: 'Defend the humans on the planet surface from descending landers. Each wave repopulates enemies; losing every human turns the world into a mutant-only bloodbath.' },
+  { heading: 'Controls', body: '← → / A D — face and thrust.\n↑ / ↓ — climb / dive.\nSpace / Z — fire forward.\nB — smart bomb (kills every enemy on-screen; limited).\nH — hyperspace (teleport to random location; small crash chance).' },
+  { heading: 'Enemies', body: 'Lander — descends toward a human and grabs it. Carries the human up; if it reaches the top, the human is converted into a mutant.\nMutant — fast swarm enemy with no grab behaviour, aims straight at the player.\nHuman — walks the surface. Waves arms when abducted. Dies from a fall of more than 3 tiles if you shot the carrying lander mid-air.' },
+  { heading: 'Radar', body: 'The strip at the top shows the entire world at reduced scale. Landers appear as red dots, mutants as pink, humans as amber, and your ship as a green triangle. Use it to spot abduction attempts far offscreen.' },
+  { heading: 'Scoring', body: 'Lander = 150. Mutant = 250. Rescue human (mid-air catch) = 500. Return human to ground = 250. Wave clear bonus grows each level.' },
+  { heading: 'Wave loop', body: 'A wave ends when every lander is dead. If all 10 humans are lost the planet "collapses" — all remaining enemies convert to mutants and stay that way for the whole run.' },
+  { heading: 'Difficulty', body: 'Easy = only 6 humans (spare to lose), slow landers, 5 smart bombs, generous warp. Hard = 10 humans, fast landers, 1 bomb, long warp cooldown. Custom exposes human count, lander speed, smart-bomb count, and warp cooldown.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { humanCount: 6,  landerSpeed: 0.3, smartBombs: 5, warpCd: 5 },
+  Medium: { humanCount: 10, landerSpeed: 0.4, smartBombs: 3, warpCd: 8 },
+  Hard:   { humanCount: 10, landerSpeed: 0.6, smartBombs: 1, warpCd: 15 },
+}
+
+const CUSTOM_SCHEMA = {
+  humanCount:  { label: 'Humans',       min: 4,   max: 14,  step: 1,   default: 10 },
+  landerSpeed: { label: 'Lander speed', min: 0.2, max: 0.9, step: 0.05, default: 0.4 },
+  smartBombs:  { label: 'Smart bombs',  min: 0,   max: 8,   step: 1,   default: 3 },
+  warpCd:      { label: 'Warp cooldown', min: 3,  max: 20,  step: 1,   default: 8 },
+}
 const GROUND_Y = 400
 const RADAR_H = 44
 
@@ -60,6 +83,16 @@ export default function Defender() {
   const [lives, setLives] = useState(3)
   const [bombs, setBombs] = useState(3)
   const [soundOn, setSoundOn] = useState(true)
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState({
+    humanCount: CUSTOM_SCHEMA.humanCount.default,
+    landerSpeed: CUSTOM_SCHEMA.landerSpeed.default,
+    smartBombs: CUSTOM_SCHEMA.smartBombs.default,
+    warpCd: CUSTOM_SCHEMA.warpCd.default,
+  })
+  const cfg = difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty]
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
 
   const state = useRef(null)
   const keys = useRef({})
@@ -71,10 +104,10 @@ export default function Defender() {
     s.humans.length = 0
     s.landers.length = 0
     s.mutants.length = 0
-    for (let i = 0; i < 10; i++)
+    for (let i = 0; i < cfgRef.current.humanCount; i++)
       s.humans.push({ x: Math.random() * WORLD_W, y: GROUND_Y - 10, dir: Math.random() < 0.5 ? -1 : 1, alive: true, grabbedBy: null, falling: false, fallStart: 0, waveArms: false })
     for (let i = 0; i < 5 + lvl * 2; i++)
-      s.landers.push({ x: Math.random() * WORLD_W, y: 60 + Math.random() * 120, vx: 0, vy: 0.4, state: 'seek', target: null })
+      s.landers.push({ x: Math.random() * WORLD_W, y: 60 + Math.random() * 120, vx: 0, vy: cfgRef.current.landerSpeed, state: 'seek', target: null })
   }, [])
 
   const reset = useCallback(() => {
@@ -87,8 +120,9 @@ export default function Defender() {
       bullets: [],
       enemyBullets: [],
       terrain: buildTerrain(),
-      bombs: 3,
+      bombs: cfgRef.current.smartBombs,
       hyperspace: 3,
+      warpCd: 0,
       score: 0,
       lives: 3,
       level: 1,
@@ -141,6 +175,8 @@ export default function Defender() {
   const hyperspace = useCallback(() => {
     const s = state.current; if (!s) return
     if (s.hyperspace <= 0 || !s.player.alive) return
+    if ((s.warpCd || 0) > 0) return
+    s.warpCd = cfgRef.current.warpCd
     s.hyperspace--
     if (Math.random() < 0.15) {
       s.player.alive = false
@@ -229,6 +265,7 @@ export default function Defender() {
       }
 
       s.cooldown = Math.max(0, s.cooldown - 1)
+      s.warpCd = Math.max(0, (s.warpCd || 0) - dt)
 
       const accel = 900
       if (keys.current.ArrowUp || keys.current.w || keys.current.W) s.player.vy -= accel * dt
@@ -631,6 +668,12 @@ export default function Defender() {
       onSoundToggle={() => setSoundOn(v => !v)}
       onPause={() => setStatus(p => p === 'paused' ? 'playing' : p === 'playing' ? 'paused' : p)}
       onRestart={reset}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       controls={[
         { key: 'Arrows', label: 'Fly' },
         { key: 'Space',  label: 'Fire' },

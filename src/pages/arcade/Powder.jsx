@@ -35,6 +35,29 @@ import GameShell from '../../components/arcade/GameShell'
 import { Slider } from '../../components/ui'
 import { getSfx } from '../../components/arcade/sfx'
 
+const RULES = [
+  { heading: 'What this is', body: 'A falling-sand cellular automaton. Every pixel in a 160×100 grid holds a material; a physics step moves them once per frame according to per-material rules and cross-material interactions.' },
+  { heading: 'Controls', body: 'Left-click / drag — paint the currently selected material.\nRight-click / drag — erase.\nMaterial palette in the panel — pick one.\nBrush slider — 1-12 px paint radius.\nSpace pauses; R clears the grid.' },
+  { heading: 'Materials', body: 'Sand — falls, piles at rest angle, displaces water.\nWater — falls, spreads sideways.\nFire — rises, decays with age, ignites plants/powder, evaporates water into steam.\nSteam — rises, occasionally condenses back into water.\nPlant — static, grows into adjacent damp cells.\nSalt — falls like sand, dissolves when touching water.\nWall — indestructible.\nPowder — lightweight sand, ignites on contact with fire.' },
+  { heading: 'Interactions', body: 'Fire + water → steam. Steam ceiling → drops back as water. Salt + water → both dissolve. Fire + plant → plant burns. Fire + powder → explosive burn (fast propagation).' },
+  { heading: 'Persistence', body: 'You can save the current canvas as base64 to localStorage — two named slots. Handy for building a complex fire-water-plant scene once and reloading it whenever.' },
+  { heading: 'Perf', body: 'The simulation writes to an ImageData buffer at 1 px-per-cell then blits once per frame with putImageData, CSS-scaled 5× for the visible view. That\'s vastly cheaper than 16,000 fillRect calls.' },
+  { heading: 'Difficulty', body: 'Sim games don\'t really "get harder" — treat presets as sandbox modes. Easy = big brush, full palette, half-speed. Hard = tiny brush, small palette, 2× sim speed. Custom exposes brush size, gravity strength, palette breadth, and simulation speed.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { brushSize: 8, gravity: 1.0, paletteWidth: 8, simSpeed: 0.5 },
+  Medium: { brushSize: 4, gravity: 1.0, paletteWidth: 8, simSpeed: 1.0 },
+  Hard:   { brushSize: 2, gravity: 1.5, paletteWidth: 5, simSpeed: 2.0 },
+}
+
+const CUSTOM_SCHEMA = {
+  brushSize:    { label: 'Brush size',   min: 1,   max: 12,  step: 1,  default: 4 },
+  gravity:      { label: 'Gravity',      min: 0.3, max: 2.0, step: 0.1, default: 1.0 },
+  paletteWidth: { label: 'Palette size', min: 3,   max: 8,   step: 1,  default: 8 },
+  simSpeed:     { label: 'Sim speed',    min: 0.3, max: 3.0, step: 0.1, default: 1.0 },
+}
+
 const COLS = 160
 const ROWS = 100
 const SIZE = COLS * ROWS
@@ -81,6 +104,19 @@ export default function Powder() {
 
   const [material, setMaterial] = useState(SAND)
   const [brush, setBrush]       = useState(4)
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState({
+    brushSize: CUSTOM_SCHEMA.brushSize.default,
+    gravity: CUSTOM_SCHEMA.gravity.default,
+    paletteWidth: CUSTOM_SCHEMA.paletteWidth.default,
+    simSpeed: CUSTOM_SCHEMA.simSpeed.default,
+  })
+  const cfg = difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty]
+  const cfgRef = useRef(cfg)
+  useEffect(() => {
+    cfgRef.current = cfg
+    setBrush(cfg.brushSize)
+  }, [cfg])
   const [running, setRunning]   = useState(true)
   const [soundOn, setSoundOn]   = useState(true)
   const [flash, setFlash]       = useState('')
@@ -369,6 +405,12 @@ export default function Powder() {
       onSoundToggle={() => setSoundOn(v => !v)}
       onPause={() => setRunning(r => !r)}
       onRestart={clearAll}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       controls={[
         { key: 'L-click', label: 'Paint material' },
         { key: 'R-click', label: 'Erase' },

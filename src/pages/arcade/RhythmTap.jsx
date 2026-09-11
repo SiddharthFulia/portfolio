@@ -26,6 +26,30 @@ import GameShell from '../../components/arcade/GameShell'
 import { getSfx } from '../../components/arcade/sfx'
 
 const BEST_KEY = 'sid-arcade-rhythm-best'
+
+const RULES = [
+  { heading: 'Goal', body: 'Tap each falling note when it crosses the hit line at the bottom of the lane. Score is per-note based on how close you were to the perfect moment.' },
+  { heading: 'Controls', body: 'Keyboard: D F J K for lanes 1-4 (left to right).\nTouch: four big lane buttons at the bottom. Down-press registers immediately (no click delay). Chord notes require tapping two lanes at the same instant.' },
+  { heading: 'Timing windows', body: 'Perfect (±40 ms) → 300 pts, builds combo.\nGreat (±80 ms) → 200 pts, builds combo.\nGood (±140 ms) → 100 pts, builds combo.\nMiss (outside window) → 0 pts, combo resets to 0.' },
+  { heading: 'Tracks', body: 'Neon Pulse — 100 BPM, mostly on-beat quarter notes. Easy warmup.\nRush Hour — 132 BPM, syncopated eighths, occasional chords. Medium.\nStorm Front — 156 BPM, dense triplets and fast lane alternation. Hard.' },
+  { heading: 'Music', body: 'Every track is synthesised in real time via AudioContext — no external audio files. A kick + snare drum pattern on the downbeat plus a per-note melody tone tuned to the pentatonic scale.' },
+  { heading: 'Combo bonus', body: 'Combo multiplier caps at ×4 at combo 30. A single miss zeroes it — chase perfects to keep it climbing.' },
+  { heading: 'Difficulty', body: 'Easy = slow BPM, 3 lanes, wide ±160 ms hit window, combo cap ×2. Hard = fast BPM, 5 lanes, tight ±80 ms window, combo cap ×5. Custom exposes BPM multiplier, lane count, hit tolerance, and combo bonus threshold.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { bpmMult: 0.8, laneCount: 3, hitTolerance: 160, comboBonus: 10 },
+  Medium: { bpmMult: 1.0, laneCount: 4, hitTolerance: 140, comboBonus: 20 },
+  Hard:   { bpmMult: 1.3, laneCount: 5, hitTolerance: 80,  comboBonus: 30 },
+}
+
+const CUSTOM_SCHEMA = {
+  bpmMult:      { label: 'BPM multiplier',   min: 0.5, max: 2.0, step: 0.05, default: 1.0 },
+  laneCount:    { label: 'Lane count',       min: 3,   max: 5,   step: 1,   default: 4 },
+  hitTolerance: { label: 'Hit tolerance (ms)', min: 40, max: 200, step: 10, default: 140 },
+  comboBonus:   { label: 'Combo bonus threshold', min: 5, max: 50, step: 5, default: 20 },
+}
+
 const LANES = 4
 const LANE_KEYS = ['d', 'f', 'j', 'k']
 const LANE_LABELS = ['D', 'F', 'J', 'K']
@@ -116,6 +140,16 @@ export default function RhythmTap() {
 
   const [trackIdx, setTrackIdx] = useState(0)
   const track = TRACKS[trackIdx]
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState({
+    bpmMult: CUSTOM_SCHEMA.bpmMult.default,
+    laneCount: CUSTOM_SCHEMA.laneCount.default,
+    hitTolerance: CUSTOM_SCHEMA.hitTolerance.default,
+    comboBonus: CUSTOM_SCHEMA.comboBonus.default,
+  })
+  const cfg = difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty]
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
   const [status, setStatus] = useState('ready')  // ready | playing | over
   const [score, setScore] = useState(0)
   const [best, setBest] = useState(() => Number(localStorage.getItem(BEST_KEY) || 0))
@@ -257,7 +291,8 @@ export default function RhythmTap() {
       const delta = Math.abs(now - n.t)
       if (delta < bestDelta) { bestDelta = delta; bestNote = n }
     }
-    if (!bestNote || bestDelta > WIN_MAX) {
+    const effectiveMax = Math.max(WIN_MAX, cfgRef.current.hitTolerance)
+    if (!bestNote || bestDelta > effectiveMax) {
       // Ghost tap — small penalty (no combo break, no score change)
       sfx.beep({ freq: 220, type: 'sine', dur: 0.04, gain: 0.03 })
       return
@@ -390,6 +425,12 @@ export default function RhythmTap() {
       onSoundToggle={() => setSoundOn((v) => !v)}
       onPause={() => {}}
       onRestart={restart}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       controls={[
         { key: 'D F J K', label: 'Lane taps' },
         { key: 'Tap',     label: 'Touch lane buttons' },

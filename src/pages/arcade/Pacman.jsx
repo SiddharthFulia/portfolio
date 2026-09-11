@@ -28,6 +28,29 @@ const COLS = 28
 const ROWS = 31
 const CELL = 16
 
+const RULES = [
+  { heading: 'Goal', body: 'Eat every dot and power pellet on the maze without being caught by a ghost. Clearing all dots advances to the next, faster level.' },
+  { heading: 'Controls', body: 'Arrow keys / WASD move Pac-Man. On mobile, swipe in the direction you want to travel. Pac-Man queues your next turn — pressing early is safe. Space pauses; R restarts.' },
+  { heading: 'Scoring', body: 'Dot = 10. Power pellet = 50. Fruit bonus = 100–500 depending on level. Eating ghosts while a power pellet is active pays 200 → 400 → 800 → 1600, so chaining all four is worth 3000 total.' },
+  { heading: 'Ghost AI', body: 'Blinky (red) chases Pac-Man\'s current tile.\nPinky (pink) targets 4 tiles ahead of your facing direction.\nInky (cyan) uses Blinky + a pivot 2 tiles in front of you to plot a mirror.\nClyde (orange) chases when far, scatters to bottom-left when within 8 tiles.' },
+  { heading: 'Modes', body: 'Ghosts alternate scatter (flee to corners) and chase (target you) every few seconds. Eating a power pellet flips them to Frightened — they reverse and turn edible for a shrinking window. Eaten ghosts revert to eye-only and route back to the house.' },
+  { heading: 'Extras', body: 'Row 14 has tunnels — leaving one side wraps to the other, faster than a ghost can follow. Extra life at 10,000 points. Speed and ghost mode timings tighten every level.' },
+  { heading: 'Difficulty', body: 'Easy slows ghosts, extends power-mode to 12 s, and releases the ghost house one at a time. Hard speeds ghosts, shortens power-mode to 4 s, and releases everyone almost immediately. Custom tunes ghost speed, pellet duration, and release delay.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { ghostSpeed: 5.2, powerDuration: 12, houseRelease: 60, dotCountMult: 1.0 },
+  Medium: { ghostSpeed: 6.5, powerDuration: 8,  houseRelease: 30, dotCountMult: 1.0 },
+  Hard:   { ghostSpeed: 7.8, powerDuration: 4,  houseRelease: 10, dotCountMult: 1.0 },
+}
+
+const CUSTOM_SCHEMA = {
+  ghostSpeed:    { label: 'Ghost speed',      min: 3.5, max: 9.0, step: 0.1, default: 6.5 },
+  powerDuration: { label: 'Power mode (s)',   min: 2,   max: 20,  step: 1,   default: 8 },
+  houseRelease: { label: 'House release (dots)', min: 0,  max: 100, step: 5,  default: 30 },
+  dotCountMult:  { label: 'Dot speed mult',   min: 0.5, max: 1.5, step: 0.05, default: 1.0 },
+}
+
 // Hand-authored maze. Symmetrical, with tunnels on row 14 (0-indexed).
 // #   = wall
 // .   = pellet
@@ -168,14 +191,15 @@ const initialPac = () => ({
   deathT: 0,
 })
 
-const newGhost = (name) => ({
+const newGhost = (name, baseRelease = 30) => ({
   name,
   x: GHOST_SPAWN[name].x,
   y: GHOST_SPAWN[name].y,
   dir: name === 'blinky' ? 'left' : 'up',
   mode: 'normal',
   inHouse: name !== 'blinky',
-  releaseAt: name === 'pinky' ? 0 : name === 'inky' ? 30 : name === 'clyde' ? 60 : 0,
+  // Pinky always leaves immediately; inky at 1×base; clyde at 2×base.
+  releaseAt: name === 'pinky' ? 0 : name === 'inky' ? baseRelease : name === 'clyde' ? baseRelease * 2 : 0,
   wobble: 0,
 })
 
@@ -189,6 +213,16 @@ export default function Pacman() {
   const [level, setLevel] = useState(1)
   const [lives, setLives] = useState(3)
   const [soundOn, setSoundOn] = useState(true)
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState({
+    ghostSpeed: CUSTOM_SCHEMA.ghostSpeed.default,
+    powerDuration: CUSTOM_SCHEMA.powerDuration.default,
+    houseRelease: CUSTOM_SCHEMA.houseRelease.default,
+    dotCountMult: CUSTOM_SCHEMA.dotCountMult.default,
+  })
+  const cfg = difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty]
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
 
   const state = useRef(null)
   const sfx = useMemo(() => getSfx(), [])
@@ -201,7 +235,7 @@ export default function Pacman() {
       totalPellets,
       pelletsLeft: totalPellets,
       pac: initialPac(),
-      ghosts: ['blinky', 'pinky', 'inky', 'clyde'].map(newGhost),
+      ghosts: ['blinky', 'pinky', 'inky', 'clyde'].map((n) => newGhost(n, cfgRef.current.houseRelease)),
       mode: 'chase',
       modeTimer: 0,
       frightTimer: 0,
@@ -233,7 +267,7 @@ export default function Pacman() {
     s.pelletsLeft = countPellets(grid)
     s.totalPellets = s.pelletsLeft
     s.pac = initialPac()
-    s.ghosts = ['blinky', 'pinky', 'inky', 'clyde'].map(newGhost)
+    s.ghosts = ['blinky', 'pinky', 'inky', 'clyde'].map((n) => newGhost(n, cfgRef.current.houseRelease))
     s.mode = 'chase'
     s.modeTimer = 0
     s.frightTimer = 0
@@ -329,7 +363,7 @@ export default function Pacman() {
             s.lives -= 1
             setLives(s.lives)
             s.pac = initialPac()
-            s.ghosts = ['blinky','pinky','inky','clyde'].map(newGhost)
+            s.ghosts = ['blinky','pinky','inky','clyde'].map((n) => newGhost(n, cfgRef.current.houseRelease))
             s.startCountdown = 60
             s.mode = 'chase'
             s.modeTimer = 0
@@ -377,7 +411,7 @@ export default function Pacman() {
           s.pelletsLeft--
           s.score += 50
           s.mode = 'frightened'
-          s.frightTimer = Math.max(2, 8 - s.level * 0.5)
+          s.frightTimer = Math.max(2, cfgRef.current.powerDuration - s.level * 0.5)
           s.chainMul = 1
           for (const g of s.ghosts) if (g.mode === 'normal') {
             g.mode = 'frightened'
@@ -416,9 +450,9 @@ export default function Pacman() {
           g.inHouse = false
           g.x = 13.5; g.y = 11; g.dir = 'left'
         }
-        const baseSpeed = g.mode === 'frightened' ? 4.5 :
+        const baseSpeed = g.mode === 'frightened' ? Math.max(3, cfgRef.current.ghostSpeed * 0.65) :
                           g.mode === 'eyes' ? 12 :
-                          6.5 + s.level * 0.12
+                          cfgRef.current.ghostSpeed + s.level * 0.12
         const gd = DIRS[g.dir]
         g.x += gd.dx * baseSpeed * dt
         g.y += gd.dy * baseSpeed * dt
@@ -656,6 +690,12 @@ export default function Pacman() {
       onSoundToggle={() => setSoundOn((v) => !v)}
       onPause={() => setStatus((prev) => prev === 'paused' ? 'playing' : prev === 'playing' ? 'paused' : prev)}
       onRestart={() => reset(false)}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       controls={[
         { key: 'Arrows', label: 'Move' },
         { key: 'WASD',   label: 'Move' },

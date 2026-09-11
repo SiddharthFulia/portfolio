@@ -18,6 +18,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import GameShell from '../../components/arcade/GameShell'
 import { getSfx } from '../../components/arcade/sfx'
+import { RULES, DIFFICULTIES, CUSTOM_SCHEMA } from './temple-runner/rules'
 
 const BEST_KEY = 'arcade.temple.best'
 const UPG_KEY = 'arcade.temple.upgrades'
@@ -86,6 +87,16 @@ export default function TempleRunner() {
   const [gameOver, setGameOver] = useState(null)
   const [missions, setMissions] = useState([])
   const [upgrades, setUpgrades] = useState(readUpg())
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState({
+    baseSpeed: CUSTOM_SCHEMA.baseSpeed.default,
+    turnRate: CUSTOM_SCHEMA.turnRate.default,
+    obstacleInterval: CUSTOM_SCHEMA.obstacleInterval.default,
+    sprintBonus: CUSTOM_SCHEMA.sprintBonus.default,
+  })
+  const cfg = difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty]
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
 
   const reducedRef = useRef(false)
   useEffect(() => {
@@ -274,7 +285,7 @@ export default function TempleRunner() {
 
     if (s.spawnZ <= 0) {
       spawnPattern(s)
-      s.spawnZ = 22 + s.rand() * 20 - Math.min(12, s.distance / 250)
+      s.spawnZ = cfgRef.current.obstacleInterval + s.rand() * 20 - Math.min(12, s.distance / 250)
     }
 
     // Turn management
@@ -286,7 +297,8 @@ export default function TempleRunner() {
       }
       // Otherwise, roll a new turn
       s.turnDir = s.rand() < 0.5 ? -1 : 1
-      s.turnAheadZ = 30 + s.rand() * 25
+      // Higher turnRate ⇒ shorter distance to next turn
+      s.turnAheadZ = (30 + s.rand() * 25) / Math.max(0.2, cfgRef.current.turnRate)
       // Give a lookahead arrow (implicit via draw)
     }
 
@@ -361,7 +373,7 @@ export default function TempleRunner() {
     setMissions([...m])
 
     // Speed ramp
-    s.speed = Math.min(560, 260 + s.distance * 0.14)
+    s.speed = Math.min(600, cfgRef.current.baseSpeed + s.distance * 0.14)
 
     // Score
     const newScore = Math.floor(s.distance)
@@ -442,6 +454,12 @@ export default function TempleRunner() {
       onSoundToggle={() => setSoundOn((v) => !v)}
       onPause={() => setStatus((p) => p === 'paused' ? 'playing' : p === 'playing' ? 'paused' : p)}
       onRestart={reset}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       overlay={overlay}
       extraStats={
         <>

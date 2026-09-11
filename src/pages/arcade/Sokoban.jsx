@@ -10,6 +10,29 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import GameShell from '../../components/arcade/GameShell'
 import { getSfx } from '../../components/arcade/sfx'
 
+const RULES = [
+  { heading: 'Goal', body: 'Push every box (yellow) onto every target (green outline). Boxes on targets fill in solid green. When every target is covered the level is cleared.' },
+  { heading: 'Controls', body: 'Arrows / WASD — move the player.\nZ — undo the last move.\nR — restart the current level.\nH — hint (BFS solver finds the next optimal push, may bail on the biggest levels).\nEsc — back to level select.' },
+  { heading: 'Rules', body: 'You can only push, never pull. Boxes cannot be pushed into walls or into another box. Getting a box stuck in a corner (not on a target) is unrecoverable — undo or restart.' },
+  { heading: 'Star rating', body: '1 star — solved.\n2 stars — solved within 110% of par moves.\n3 stars — solved within 75% of par moves.\nStars persist per level in localStorage.' },
+  { heading: 'Hints', body: 'The hint solver runs a bounded BFS over box-push states. For small levels it finds an optimal next push instantly; for large levels it may time out and say "too complex". You have a limited hint budget per level in higher difficulties.' },
+  { heading: 'Levels', body: '20 hand-crafted levels of ramping complexity. Custom level via ?lvl=<encoded-string> in the URL, or paste a level into the editor at the bottom.' },
+  { heading: 'Difficulty', body: 'Easy = 5 hints per level, undo history unlimited, par bumped by 30%. Hard = 1 hint per level, only 5 undos, par tightened by 20%. Custom exposes level pack (which subset to include), hint budget, move counter visibility, and undo history depth.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { hintBudget: 5, undoDepth: 999, showCounter: 1, parLenience: 1.3 },
+  Medium: { hintBudget: 3, undoDepth: 500, showCounter: 1, parLenience: 1.0 },
+  Hard:   { hintBudget: 1, undoDepth: 5,   showCounter: 1, parLenience: 0.8 },
+}
+
+const CUSTOM_SCHEMA = {
+  hintBudget:   { label: 'Hints per level', min: 0,  max: 10,  step: 1,  default: 3 },
+  undoDepth:    { label: 'Undo history',    min: 5,  max: 999, step: 5,  default: 500 },
+  showCounter:  { label: 'Move counter (0/1)', min: 0, max: 1, step: 1, default: 1 },
+  parLenience:  { label: 'Par leniency',    min: 0.5, max: 2.0, step: 0.05, default: 1.0 },
+}
+
 // ── Level format ─────────────────────────────────────────
 // Symbols: '#' wall, ' ' floor, '.' target, '$' box, '*' box on target,
 //          '@' player, '+' player on target.
@@ -271,6 +294,17 @@ export default function Sokoban() {
   const [hint, setHint] = useState(null)
   const [state, setState] = useState(() => parseLevel(RAW_LEVELS[0]))
   const historyRef = useRef([])
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState({
+    hintBudget: CUSTOM_SCHEMA.hintBudget.default,
+    undoDepth: CUSTOM_SCHEMA.undoDepth.default,
+    showCounter: CUSTOM_SCHEMA.showCounter.default,
+    parLenience: CUSTOM_SCHEMA.parLenience.default,
+  })
+  const cfg = difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty]
+  const cfgRef = useRef(cfg)
+  const [hintsUsed, setHintsUsed] = useState(0)
+  useEffect(() => { cfgRef.current = cfg; setHintsUsed(0) }, [cfg])
   const [playerFacing, setPlayerFacing] = useState('down')
   const boxSlideRef = useRef([])
 
@@ -346,7 +380,7 @@ export default function Sokoban() {
         state: { ...cur, boxes: cur.boxes.map((b) => [...b]), player: [...cur.player] },
         moves,
       })
-      if (historyRef.current.length > 500) historyRef.current.shift()
+      if (historyRef.current.length > cfgRef.current.undoDepth) historyRef.current.shift()
       const face = dx === 1 ? 'right' : dx === -1 ? 'left' : dy === 1 ? 'down' : 'up'
       setPlayerFacing(face)
       setMoves((m) => m + 1)
@@ -356,7 +390,7 @@ export default function Sokoban() {
         setStatus('won')
         sfxRef.current.win()
         if (levelIdx >= 0) {
-          const par = PAR[levelIdx] || 30
+          const par = (PAR[levelIdx] || 30) * cfgRef.current.parLenience
           const m = moves + 1
           const s = m <= par * 0.75 ? 3 : m <= par * 1.1 ? 2 : 1
           setStars((prev) => {
@@ -389,6 +423,10 @@ export default function Sokoban() {
 
   const runHint = () => {
     if (status === 'won') return
+    if (hintsUsed >= cfgRef.current.hintBudget) {
+      setHint({ err: `Out of hints for this level (${cfgRef.current.hintBudget} allowed).` })
+      return
+    }
     setHint({ loading: true })
     setTimeout(() => {
       const result = solveNext(state)
@@ -397,6 +435,7 @@ export default function Sokoban() {
       const dx = result.p[0] - px, dy = result.p[1] - py
       const dir = dx === 1 ? 'right' : dx === -1 ? 'left' : dy === 1 ? 'down' : 'up'
       setHint({ next: result.p, dir })
+      setHintsUsed((h) => h + 1)
     }, 20)
   }
 
@@ -546,6 +585,12 @@ export default function Sokoban() {
       onSoundToggle={() => setSoundOn((v) => !v)}
       onRestart={restart}
       onPause={() => setShowLevelSelect((v) => !v)}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       controls={[
         { key: 'Arrows / WASD', label: 'Push' },
         { key: 'Z', label: 'Undo' },

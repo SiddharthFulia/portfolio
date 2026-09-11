@@ -33,6 +33,29 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import GameShell from '../../components/arcade/GameShell'
 import { getSfx } from '../../components/arcade/sfx'
 
+const RULES = [
+  { heading: 'Goal', body: 'This is a classic idle-clicker. Click to earn gold, spend gold on upgrades, spend upgrades on generating more gold per second. Prestige when growth stalls to unlock a permanent multiplier and start again faster.' },
+  { heading: 'Controls', body: 'Left-click / tap the mineshaft — swing pickaxe, earn gold instantly. Auto-clickers do this for you in the background. Upgrade panel on the right shows what you can afford; click to buy.' },
+  { heading: 'Upgrade tiers', body: 'Wooden Pickaxe (15g) — 0.1 gold/sec.\nStone (100g) — 1/sec.\nIron (1.1K) — 8/sec.\nGold (12K) — 47/sec.\nDiamond (130K) — 260/sec.\n... up to Planetary Core (14T) — 65M/sec. Every purchase multiplies the tier\'s next cost by 1.15.' },
+  { heading: 'Prestige', body: 'When growth slows, hit Prestige. Everything resets: gold, upgrades, autoclickers. In exchange you get a permanent multiplier based on total gold ever earned (sqrt scale, so exponentially better on huge accounts).' },
+  { heading: 'Offline earnings', body: 'The game keeps ticking while you\'re away. On return, offline gold is credited based on the elapsed time × your last per-second rate. Capped at 12 hours to prevent overflow abuse.' },
+  { heading: 'Achievements', body: '9 milestones from "First Swing" to "Completionist (own every tier)". A toast pops on unlock. The side panel greys out anything not yet earned so you can see what\'s available to chase.' },
+  { heading: 'Difficulty', body: 'Easy = 500 starting gold, 1.10× cost growth (way easier), fast prestige threshold, 24 h offline cap. Hard = 0 starting gold, 1.20× cost growth (way steeper), high prestige threshold, 6 h offline cap. Custom exposes all four.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { startGold: 500, costMult: 1.10, prestigeThreshold: 1e8,  offlineCap: 24 },
+  Medium: { startGold: 0,   costMult: 1.15, prestigeThreshold: 1e10, offlineCap: 12 },
+  Hard:   { startGold: 0,   costMult: 1.20, prestigeThreshold: 1e12, offlineCap: 6 },
+}
+
+const CUSTOM_SCHEMA = {
+  startGold:         { label: 'Starting gold',       min: 0,    max: 5000,   step: 100, default: 0 },
+  costMult:          { label: 'Cost growth (1.10-1.20)', min: 1.05, max: 1.30, step: 0.01, default: 1.15 },
+  prestigeThreshold: { label: 'Prestige @ (log10)',  min: 6,    max: 15,     step: 1,  default: 10 },
+  offlineCap:        { label: 'Offline cap (hours)', min: 1,    max: 48,     step: 1,  default: 12 },
+}
+
 // ── Upgrade tiers ── 12 tiers. Costs scale on purchase via 1.15^owned.
 const TIERS = [
   { id: 'wooden',   name: 'Wooden Pickaxe',   baseCost: 15,        cps: 0.1,     icon: '⛏️' },
@@ -75,8 +98,8 @@ function fmt(n) {
   return `${n.toFixed(n < 10 ? 2 : n < 100 ? 1 : 0)}${units[u]}`
 }
 
-function costOf(tier, owned) {
-  return Math.ceil(tier.baseCost * Math.pow(1.15, owned))
+function costOf(tier, owned, mult = 1.15) {
+  return Math.ceil(tier.baseCost * Math.pow(mult, owned))
 }
 
 function cpsForOwned(owned) {
@@ -133,6 +156,16 @@ export default function IdleMiner() {
   const [floaters, setFloaters]   = useState([])         // +gold popups
   const [toast, setToast]         = useState(null)       // achievement unlock
   const [offlineMsg, setOffline]  = useState(initial.offlineEarnings > 1 ? initial.offlineEarnings : 0)
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState({
+    startGold: CUSTOM_SCHEMA.startGold.default,
+    costMult: CUSTOM_SCHEMA.costMult.default,
+    prestigeThreshold: CUSTOM_SCHEMA.prestigeThreshold.default,
+    offlineCap: CUSTOM_SCHEMA.offlineCap.default,
+  })
+  const cfg = difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty]
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
 
   const sfx = useMemo(() => getSfx(), [])
   useEffect(() => sfx.setEnabled(soundOn), [soundOn, sfx])
@@ -215,7 +248,7 @@ export default function IdleMiner() {
 
   const buy = useCallback((tier) => {
     const have = owned[tier.id] || 0
-    const cost = costOf(tier, have)
+    const cost = costOf(tier, have, cfgRef.current.costMult)
     if (gold < cost) return
     setGold(g => g - cost)
     setOwned(o => ({ ...o, [tier.id]: (o[tier.id] || 0) + 1 }))
@@ -260,6 +293,12 @@ export default function IdleMiner() {
       onSoundToggle={() => setSoundOn(v => !v)}
       onPause={() => {}}
       onRestart={resetAll}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       extraStats={
         <div className="flex flex-col items-start">
           <span className="text-[10px] uppercase tracking-widest text-white/40">Gold</span>

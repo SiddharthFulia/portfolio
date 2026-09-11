@@ -21,14 +21,36 @@ import GameShell from '../../components/arcade/GameShell'
 import { getSfx } from '../../components/arcade/sfx'
 
 const BEST_KEY = 'sid-arcade-whack-best'
-const GAME_LENGTH = 60_000 // 60s per round
+
+const RULES = [
+  { heading: 'Goal', body: 'Tap moles the instant they pop up. You have 60 seconds. The round ends when the timer runs out; score is the total mole count.' },
+  { heading: 'Controls', body: 'Tap or click each mole. Empty taps count as a whiff — they break your combo. On mobile every mole is a full-sized touch target with `touch-action: manipulation` for zero click delay.' },
+  { heading: 'Scoring', body: 'Regular mole hit = 10 × combo multiplier.\nGolden mole hit = 100 × combo (rare, ~every 15 spawns).\nMissing the mole (it retreats without a tap) or whiffing (tapping empty ground) resets combo to 0.' },
+  { heading: 'Difficulty ramp', body: 'Level ticks up every 10 hits. Each level shortens the spawn interval and the visible window. From level 6 onward the grid grows from 3×3 to 5×5.' },
+  { heading: 'Feel', body: 'Every hit spawns a burst of particles and a "+10" popup. Golden hits add a subtle screen shake (skipped if prefers-reduced-motion). Empty-tap "whiffs" have their own dry SFX so you know what went wrong.' },
+  { heading: 'Difficulty', body: 'Easy = long pop-ups (2 s), slow spawns (1.2 s), 20% golden rate, 90-second timer. Hard = 400 ms pop-ups, spawns every 350 ms, 3% golden rate, 45 s timer. Custom exposes pop duration, spawn frequency, golden rate, and game duration.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { popDuration: 2000, popFreq: 1200, goldenRate: 0.20, gameLen: 90 },
+  Medium: { popDuration: 1300, popFreq: 900,  goldenRate: 0.07, gameLen: 60 },
+  Hard:   { popDuration: 400,  popFreq: 350,  goldenRate: 0.03, gameLen: 45 },
+}
+
+const CUSTOM_SCHEMA = {
+  popDuration: { label: 'Pop duration (ms)', min: 300, max: 2500, step: 50, default: 1300 },
+  popFreq:     { label: 'Pop frequency (ms)', min: 250, max: 1500, step: 25, default: 900 },
+  goldenRate:  { label: 'Golden mole rate',  min: 0.0, max: 0.4, step: 0.02, default: 0.07 },
+  gameLen:     { label: 'Game length (s)',   min: 20,  max: 180, step: 5,   default: 60 },
+}
 
 // Level knobs — each level pushes spawns faster + shortens visible time.
 // Values are clamped so hard mode is punishing but not RNG-hostile.
-const levelTuning = (lvl) => {
-  const spawnEvery = Math.max(280, 900 - lvl * 65)  // ms between attempts
-  const visibleMs  = Math.max(500, 1300 - lvl * 90) // ms mole stays up
-  const cellCount  = lvl >= 6 ? 25 : 9              // 3x3 until L6, then 5x5
+// baseFreq / basePop come from the active difficulty preset.
+const levelTuning = (lvl, baseFreq = 900, basePop = 1300) => {
+  const spawnEvery = Math.max(200, baseFreq - lvl * 65)
+  const visibleMs  = Math.max(300, basePop - lvl * 90)
+  const cellCount  = lvl >= 6 ? 25 : 9
   return { spawnEvery, visibleMs, cellCount }
 }
 
@@ -121,8 +143,19 @@ export default function Whack() {
   const [hits, setHits] = useState(0)
   const [misses, setMisses] = useState(0)
   const [status, setStatus] = useState('ready')   // ready | playing | paused | over
-  const [timeLeft, setTimeLeft] = useState(GAME_LENGTH)
-  const { cellCount } = levelTuning(level)
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState({
+    popDuration: CUSTOM_SCHEMA.popDuration.default,
+    popFreq: CUSTOM_SCHEMA.popFreq.default,
+    goldenRate: CUSTOM_SCHEMA.goldenRate.default,
+    gameLen: CUSTOM_SCHEMA.gameLen.default,
+  })
+  const cfg = difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty]
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
+  const GAME_LENGTH = cfg.gameLen * 1000
+  const [timeLeft, setTimeLeft] = useState(cfg.gameLen * 1000)
+  const { cellCount } = levelTuning(level, cfgRef.current?.popFreq ?? 900, cfgRef.current?.popDuration ?? 1300)
   const gridSize = cellCount === 25 ? 5 : 3
 
   // active[i] describes the mole occupying cell i, or null.
@@ -152,7 +185,7 @@ export default function Whack() {
 
   const scheduleSpawn = useCallback(() => {
     if (status !== 'playing') return
-    const { spawnEvery } = levelTuning(level)
+    const { spawnEvery } = levelTuning(level, cfgRef.current?.popFreq ?? 900, cfgRef.current?.popDuration ?? 1300)
     // Jitter the interval so it doesn't feel metronomic.
     const jittered = spawnEvery * (0.6 + Math.random() * 0.7)
     spawnTimer.current = setTimeout(() => {
@@ -163,8 +196,8 @@ export default function Whack() {
         if (!empty.length) return prev
         const idx = empty[Math.floor(Math.random() * empty.length)]
         spawnCounter.current += 1
-        const golden = spawnCounter.current % goldenEvery === 0
-        const { visibleMs } = levelTuning(level)
+        const golden = Math.random() < (cfgRef.current?.goldenRate ?? 0.07)
+        const { visibleMs } = levelTuning(level, cfgRef.current?.popFreq ?? 900, cfgRef.current?.popDuration ?? 1300)
         const now = performance.now()
         const next = [...prev]
         next[idx] = {
@@ -349,6 +382,12 @@ export default function Whack() {
       onSoundToggle={() => setSoundOn((v) => !v)}
       onPause={togglePause}
       onRestart={restart}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       controls={[{ key: 'Tap', label: 'Whack mole' }, { key: 'P', label: 'Pause' }]}
       overlay={overlay}
     >

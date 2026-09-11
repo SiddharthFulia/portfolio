@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import GameShell from '../../components/arcade/GameShell'
 import { getSfx } from '../../components/arcade/sfx'
+import { RULES, DIFFICULTIES, CUSTOM_SCHEMA } from './subway-runner/rules'
 
 const BEST_KEY = 'arcade.subway.best'
 const mulberry32 = (a) => () => {
@@ -58,6 +59,16 @@ export default function SubwayRunner() {
   const [soundOn, setSoundOn] = useState(true)
   const [gameOver, setGameOver] = useState(null)
   const [powerup, setPowerup] = useState(null)
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState({
+    baseSpeed: CUSTOM_SCHEMA.baseSpeed.default,
+    spawnInterval: CUSTOM_SCHEMA.spawnInterval.default,
+    coinDensity: CUSTOM_SCHEMA.coinDensity.default,
+    powerupChance: CUSTOM_SCHEMA.powerupChance.default,
+  })
+  const cfg = difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty]
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
 
   const reducedRef = useRef(false)
   useEffect(() => {
@@ -83,7 +94,7 @@ export default function SubwayRunner() {
       coins: [],         // { lane, z, taken }
       pickups: [],       // { lane, z, type }
       distance: 0,       // metres travelled
-      speed: 220,        // z units per second — climbs with distance
+      speed: 220,        // z units per second — climbs with distance (init overwritten in loop)
       spawnZ: 60,        // when the next obstacle set spawns
       score: 0,
       coinCount: 0,
@@ -255,8 +266,8 @@ export default function SubwayRunner() {
     // Spawn a new lane pattern every so often (z units before player)
     s.spawnZ -= speed * dt * 0.02
     if (s.spawnZ <= 0) {
-      spawnPattern(s)
-      s.spawnZ = 25 + s.rand() * 20 - Math.min(15, s.distance / 200)
+      spawnPattern(s, cfgRef.current)
+      s.spawnZ = cfgRef.current.spawnInterval + s.rand() * 20 - Math.min(15, s.distance / 200)
     }
 
     // Cull passed
@@ -324,7 +335,7 @@ export default function SubwayRunner() {
     s.floaters = s.floaters.filter((fl) => fl.t < 0.9)
 
     // Speed ramp
-    s.speed = Math.min(520, 220 + s.distance * 0.14)
+    s.speed = Math.min(520, cfgRef.current.baseSpeed + s.distance * 0.14)
 
     // Score update
     const newScore = Math.floor(s.distance)
@@ -383,6 +394,12 @@ export default function SubwayRunner() {
       onSoundToggle={() => setSoundOn((v) => !v)}
       onPause={() => setStatus((p) => p === 'paused' ? 'playing' : p === 'playing' ? 'paused' : p)}
       onRestart={reset}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       overlay={overlay}
       extraStats={
         <>
@@ -417,40 +434,39 @@ export default function SubwayRunner() {
 }
 
 // ── Spawn helpers ──
-function spawnPattern(s) {
+function spawnPattern(s, cfg = { coinDensity: 1, powerupChance: 0.2 }) {
   const r = s.rand()
   const zStart = 40
+  const coinCount5 = Math.max(1, Math.round(5 * cfg.coinDensity))
+  const coinCount4 = Math.max(1, Math.round(4 * cfg.coinDensity))
+  const coinCount7 = Math.max(1, Math.round(7 * cfg.coinDensity))
   // pattern types: single-obstacle-random, three-of-three-with-hole, coin-arc, pickup
+  const pickupCutoff = 1 - cfg.powerupChance
   if (r < 0.35) {
     const lane = (s.rand() * 3) | 0
     const type = s.rand() < 0.5 ? 'low' : 'high'
     s.obstacles.push({ lane, z: zStart, type })
-    // Coin line ahead in a random lane
     const cLane = (s.rand() * 3) | 0
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < coinCount5; i++) {
       s.coins.push({ lane: cLane, z: zStart - 10 - i * 2, taken: false, h: 0 })
     }
   } else if (r < 0.6) {
-    // Two blockers, one lane open
     const openLane = (s.rand() * 3) | 0
     for (let l = 0; l < 3; l++) {
       if (l === openLane) continue
       s.obstacles.push({ lane: l, z: zStart, type: s.rand() < 0.5 ? 'low' : 'high' })
     }
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < coinCount4; i++) {
       s.coins.push({ lane: openLane, z: zStart - i * 2, taken: false, h: 0 })
     }
-  } else if (r < 0.8) {
-    // Coin arc (jump-over)
+  } else if (r < pickupCutoff) {
     const lane = (s.rand() * 3) | 0
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < coinCount7; i++) {
       const h = Math.sin((i / 6) * Math.PI) * 1.4
       s.coins.push({ lane, z: zStart - i * 1.5, taken: false, h })
     }
-    // Add a low barrier so you have to actually jump
     s.obstacles.push({ lane, z: zStart - 4, type: 'low' })
   } else {
-    // Pickup
     const lane = (s.rand() * 3) | 0
     const type = ['magnet', 'shield', 'multiplier'][(s.rand() * 3) | 0]
     s.pickups.push({ lane, z: zStart, type, taken: false })

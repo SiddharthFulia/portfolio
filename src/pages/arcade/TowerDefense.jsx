@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import GameShell from '../../components/arcade/GameShell'
 import { getSfx } from '../../components/arcade/sfx'
+import { RULES, DIFFICULTIES, CUSTOM_SCHEMA } from './tower-defense/rules'
 
 // ── Grid & path ────────────────────────────────────────────────
 const COLS = 20
@@ -105,8 +106,8 @@ const ENEMY_KINDS = {
   boss:     { hp: 900, speed: 0.8, gold: 80, color: '#ef4444', size: 18 },
 }
 
-function scaleEnemy(kind, wave) {
-  const s = 1 + Math.pow(wave, 1.35) * 0.055
+function scaleEnemy(kind, wave, hpScale = 1) {
+  const s = (1 + Math.pow(wave, 1.35) * 0.055) * hpScale
   return {
     hp: Math.round(kind.hp * s),
     maxHp: Math.round(kind.hp * s),
@@ -133,6 +134,16 @@ export default function TowerDefense() {
   const [soundOn, setSoundOn] = useState(true)
   const [inWave, setInWave] = useState(false)
   const [nextWavePreview, setNextWavePreview] = useState(buildWave(1))
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState({
+    startGold: CUSTOM_SCHEMA.startGold.default,
+    hpScale: CUSTOM_SCHEMA.hpScale.default,
+    waveInterval: CUSTOM_SCHEMA.waveInterval.default,
+    upgradeMult: CUSTOM_SCHEMA.upgradeMult.default,
+  })
+  const cfg = difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty]
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
 
   const stateRef = useRef({
     towers: [], enemies: [], projectiles: [], zaps: [],
@@ -159,11 +170,11 @@ export default function TowerDefense() {
     stateRef.current.damageNums = []
     stateRef.current.spawnQueue = []
     stateRef.current.waveT = 0
-    stateRef.current.goldFloat = 180
+    stateRef.current.goldFloat = cfgRef.current.startGold
     stateRef.current.livesFloat = 20
     stateRef.current.running = true
     stateRef.current.paused = false
-    setGold(180); setLives(20); setWave(0); setInWave(false)
+    setGold(cfgRef.current.startGold); setLives(20); setWave(0); setInWave(false)
     setSelectedTower(null); setStatus('ready')
     setNextWavePreview(buildWave(1))
   }, [])
@@ -184,8 +195,9 @@ export default function TowerDefense() {
     if (isOnPath(c, r)) return
     if (s.towers.some((t) => t.c === c && t.r === r)) return
     const info = TOWERS[selectedType].tiers[0]
-    if (s.goldFloat < info.cost) { sfxRef.current.hit(); return }
-    s.goldFloat -= info.cost
+    const cost = Math.round(info.cost * cfgRef.current.upgradeMult)
+    if (s.goldFloat < cost) { sfxRef.current.hit(); return }
+    s.goldFloat -= cost
     s.towers.push({ c, r, type: selectedType, tier: 0, cd: 0 })
     sfxRef.current.coin()
     setGold(Math.floor(s.goldFloat))
@@ -196,8 +208,9 @@ export default function TowerDefense() {
     const t = s.towers[idx]
     if (!t || t.tier >= 2) return
     const nextInfo = TOWERS[t.type].tiers[t.tier + 1]
-    if (s.goldFloat < nextInfo.cost) { sfxRef.current.hit(); return }
-    s.goldFloat -= nextInfo.cost
+    const cost = Math.round(nextInfo.cost * cfgRef.current.upgradeMult)
+    if (s.goldFloat < cost) { sfxRef.current.hit(); return }
+    s.goldFloat -= cost
     t.tier += 1
     sfxRef.current.coin()
     setGold(Math.floor(s.goldFloat))
@@ -278,7 +291,7 @@ export default function TowerDefense() {
       while (s.spawnQueue.length && s.spawnQueue[0].at <= s.waveT) {
         const spec = s.spawnQueue.shift()
         const kind = ENEMY_KINDS[spec.type]
-        const scaled = scaleEnemy(kind, wave)
+        const scaled = scaleEnemy(kind, wave, cfgRef.current.hpScale)
         s.enemies.push({
           pathIdx: 0, t: 0,
           x: PATH_POINTS[0].x, y: PATH_POINTS[0].y,
@@ -636,6 +649,12 @@ export default function TowerDefense() {
       onSoundToggle={() => setSoundOn((v) => !v)}
       onRestart={onRestart}
       onPause={onPause}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       extraStats={extraStats}
       controls={[
         { key: '1-4', label: 'Pick tower type' },

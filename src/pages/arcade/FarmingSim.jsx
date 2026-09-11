@@ -39,6 +39,29 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import GameShell from '../../components/arcade/GameShell'
 import { getSfx } from '../../components/arcade/sfx'
 
+const RULES = [
+  { heading: 'Goal', body: 'Grow crops, harvest them, sell them, buy more seeds. There\'s no fixed win state — best score is peak gold total. The clock ticks whether you\'re playing or not (with a save cap on offline time).' },
+  { heading: 'Controls', body: 'Click a tool from the tool bar. Click a tile to apply it.\n⛏️ Hoe — tills grass into soil.\n💧 Watering — waters a tilled tile.\n🌱 Plant — sows selected seed on a watered tile.\n🧺 Harvest — picks a ripe crop into inventory.\n🗑️ Clear — returns any tile to grass.' },
+  { heading: 'Crops', body: 'Seven crops with their own season / cost / growth time / sell price:\nTomato (spring/summer) — 8 → 22 in 12 h.\nCorn (summer) — 12 → 36 in 18 h.\nWheat (spring/autumn) — 5 → 14 in 8 h.\nPumpkin (autumn) — 20 → 80 in 30 h.\nBlueberry (summer/autumn) — 14 → 40 in 20 h.\nCarrot (spring) — 6 → 18 in 10 h.\nSunflower (summer) — 10 → 30 in 14 h.' },
+  { heading: 'Seasons', body: 'Spring → Summer → Autumn → Winter, each 5 in-game days. Winter is fallow (growth multiplier 0). Different crops only accept plants in their allowed seasons.' },
+  { heading: 'Weather', body: 'Rolled once per in-game day. Sunny (default) — normal growth. Rain — automatically waters every tile that day. Cloudy — 15% slower growth.' },
+  { heading: 'Persistence', body: 'The whole farm is saved to localStorage on every action (throttled). Close the tab, reopen it days later — everything is exactly where you left it, including partial growth stages.' },
+  { heading: 'Difficulty', body: 'Easy = 500 starting gold, short 12 s days (game moves fast), stable weather, cheap crop variety. Hard = 20 starting gold, long 60 s days, wild weather, only cheap crops. Custom exposes all four.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { startFunds: 500, dayLength: 12, weatherVariance: 0.2, cropCount: 7 },
+  Medium: { startFunds: 50,  dayLength: 24, weatherVariance: 1.0, cropCount: 7 },
+  Hard:   { startFunds: 20,  dayLength: 60, weatherVariance: 2.0, cropCount: 3 },
+}
+
+const CUSTOM_SCHEMA = {
+  startFunds:      { label: 'Starting gold',       min: 10,  max: 800, step: 10, default: 50 },
+  dayLength:       { label: 'Day length (s)',      min: 8,   max: 90,  step: 2,  default: 24 },
+  weatherVariance: { label: 'Weather variance',    min: 0.1, max: 3.0, step: 0.1, default: 1.0 },
+  cropCount:       { label: 'Crop variety',        min: 2,   max: 7,   step: 1,  default: 7 },
+}
+
 const ROWS = 6
 const COLS = 6
 const TILES = ROWS * COLS
@@ -83,12 +106,12 @@ const DAY_HOURS = 24
 
 const makeGrass = () => ({ kind: 'grass' })
 
-function initialState() {
+function initialState(startFunds = 50) {
   return {
     tiles: Array.from({ length: TILES }, makeGrass),
     inventory: {},                 // crop id → count
     seeds: { tomato: 5, wheat: 5 }, // starter seeds
-    gold: 50,
+    gold: startFunds,
     hour: 0,                       // total hours elapsed
     weather: 'sun',
     lastTs: Date.now(),
@@ -121,6 +144,16 @@ export default function FarmingSim() {
   const [inventory, setInventory]= useState(boot.inventory || {})
   const [seeds, setSeeds]        = useState(boot.seeds || {})
   const [gold, setGold]          = useState(boot.gold ?? 50)
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState({
+    startFunds: CUSTOM_SCHEMA.startFunds.default,
+    dayLength: CUSTOM_SCHEMA.dayLength.default,
+    weatherVariance: CUSTOM_SCHEMA.weatherVariance.default,
+    cropCount: CUSTOM_SCHEMA.cropCount.default,
+  })
+  const cfg = difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty]
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
   const [hour, setHour]          = useState(boot.hour || 0)
   const [weather, setWeather]    = useState(boot.weather || 'sun')
   const [tool, setTool]          = useState('hoe')
@@ -249,7 +282,7 @@ export default function FarmingSim() {
 
   const resetAll = () => {
     if (!confirm('Reset the farm? This wipes gold, tiles, and inventory.')) return
-    const fresh = initialState()
+    const fresh = initialState(cfgRef.current.startFunds)
     setTiles(fresh.tiles); setInventory({}); setSeeds(fresh.seeds)
     setGold(fresh.gold); setHour(0); setWeather('sun')
   }
@@ -276,6 +309,12 @@ export default function FarmingSim() {
       onSoundToggle={() => setSoundOn(v => !v)}
       onPause={() => {}}
       onRestart={resetAll}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       extraStats={
         <div className="flex gap-6">
           <div className="flex flex-col">

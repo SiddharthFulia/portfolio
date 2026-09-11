@@ -18,6 +18,29 @@ import { getSfx } from '../../components/arcade/sfx'
 
 const BEST_KEY = 'arcade.flappy.best'
 
+const RULES = [
+  { heading: 'Goal', body: 'Tap or press Space to flap; keep the bird alive by threading each pair of pipes. Every pipe passed scores +1. The run only ends when you hit a pipe, the ground, or the ceiling.' },
+  { heading: 'Controls', body: 'Space / ↑ / W / left-click / touch — flap. Every flap sets vertical velocity to a fixed upward number; gravity pulls the bird down between flaps. P pauses. R restarts.' },
+  { heading: 'Physics', body: 'Gravity accelerates you downward at ~1500 px/s². Each flap resets vertical velocity to a negative (upward) burst. Terminal fall speed is capped at 720 px/s so a long fall is still recoverable if you time the flap.' },
+  { heading: 'Pipes', body: 'Pipes spawn on a timer and scroll left at a constant speed. Every pipe has an opening of fixed height; hitting the pipe body, its rim, the ground, or the ceiling ends the run.' },
+  { heading: 'Scaling & phases', body: 'As your score climbs, pipes come faster (interval shrinks) and the gap tightens. The day / dusk / night / dawn palette also rotates every 100 pipes so long runs stay visually interesting.' },
+  { heading: 'Medals', body: 'Bronze at 4, Silver at 12, Gold at 25, Platinum at 40. Beating your local best is celebrated with a "New high score" flag on the game-over screen.' },
+  { heading: 'Difficulty', body: 'Easy widens the pipe gap to 210 px, thins pipes to one every 2 s, softens gravity, and beefs the flap. Hard tightens the gap to 130 px, spawns pipes every 1.2 s, and gives you a heavier bird. Custom exposes gap, spacing, gravity and flap strength directly.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { pipeGap: 210, pipeInterval: 2.0, gravity: 1200, flap: -380 },
+  Medium: { pipeGap: 165, pipeInterval: 1.55, gravity: 1500, flap: -420 },
+  Hard:   { pipeGap: 130, pipeInterval: 1.2, gravity: 1800, flap: -450 },
+}
+
+const CUSTOM_SCHEMA = {
+  pipeGap:      { label: 'Pipe gap (px)',       min: 100, max: 260, step: 5,  default: 165 },
+  pipeInterval: { label: 'Pipe spacing (s)',    min: 0.8, max: 3.0, step: 0.1, default: 1.55 },
+  gravity:      { label: 'Gravity (px/s²)',     min: 800, max: 2400, step: 50, default: 1500 },
+  flap:         { label: 'Flap strength',       min: -600, max: -260, step: 10, default: -420 },
+}
+
 // Deterministic PRNG so `Restart` gets a NEW seed (Math.random) but the
 // sequence THAT results is stable — helpful for debug replays.
 const mulberry32 = (a) => () => {
@@ -79,6 +102,16 @@ export default function Flappy() {
   const [status, setStatus] = useState('ready')
   const [soundOn, setSoundOn] = useState(true)
   const [gameOverInfo, setGameOverInfo] = useState(null)
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState({
+    pipeGap: CUSTOM_SCHEMA.pipeGap.default,
+    pipeInterval: CUSTOM_SCHEMA.pipeInterval.default,
+    gravity: CUSTOM_SCHEMA.gravity.default,
+    flap: CUSTOM_SCHEMA.flap.default,
+  })
+  const cfg = difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty]
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
 
   const reducedRef = useRef(false)
   useEffect(() => {
@@ -126,7 +159,7 @@ export default function Flappy() {
     if (status === 'over') { reset(); return }
     if (status === 'ready') setStatus('playing')
     if (status === 'paused') return
-    s.bird.vy = WORLD.flap
+    s.bird.vy = cfgRef.current.flap
     s.bird.wingTime = 0
     s.bird.wingFrame = 2
     sfx.pop()
@@ -189,15 +222,16 @@ export default function Flappy() {
         }
 
         if (running) {
-          s.bird.vy = Math.min(WORLD.maxFall, s.bird.vy + WORLD.gravity * dt)
+          const c = cfgRef.current
+          s.bird.vy = Math.min(WORLD.maxFall, s.bird.vy + c.gravity * dt)
           s.bird.y += s.bird.vy * dt
           s.bird.rot = Math.max(-0.6, Math.min(1.2, s.bird.vy * 0.0025))
 
           s.pipeTimer += dt
-          const interval = Math.max(1.0, WORLD.pipeInterval - s.score * 0.008)
+          const interval = Math.max(0.9, c.pipeInterval - s.score * 0.008)
           if (s.pipeTimer > interval) {
             s.pipeTimer = 0
-            const gap = Math.max(105, WORLD.pipeGap - s.gapShrink)
+            const gap = Math.max(90, c.pipeGap - s.gapShrink)
             const marginTop = 70, marginBot = WORLD.groundH + 60
             const gapY = marginTop + s.rand() * (LOGICAL_H - marginTop - marginBot - gap)
             s.pipes.push({ x: LOGICAL_W + 40, gapY, gap, passed: false })
@@ -242,7 +276,7 @@ export default function Flappy() {
           s.popups = s.popups.filter((p) => p.t < 0.9)
           s.shake = Math.max(0, s.shake - dt * 6)
         } else if (over) {
-          s.bird.vy = Math.min(WORLD.maxFall, s.bird.vy + WORLD.gravity * dt)
+          s.bird.vy = Math.min(WORLD.maxFall, s.bird.vy + cfgRef.current.gravity * dt)
           s.bird.y += s.bird.vy * dt
           if (s.bird.y + WORLD.birdR > LOGICAL_H - WORLD.groundH) {
             s.bird.y = LOGICAL_H - WORLD.groundH - WORLD.birdR
@@ -385,6 +419,12 @@ export default function Flappy() {
       onSoundToggle={() => setSoundOn((v) => !v)}
       onPause={() => setStatus((p) => p === 'paused' ? 'playing' : p === 'playing' ? 'paused' : p)}
       onRestart={reset}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       overlay={overlay}
       controls={[
         { key: 'Space', label: 'Flap' },

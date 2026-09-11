@@ -35,6 +35,29 @@ const CANVAS_W = 480
 const CANVAS_H = 640
 const FORMATION_COLS = 10
 const FORMATION_ROWS = 5
+
+const RULES = [
+  { heading: 'Goal', body: 'Shoot down every enemy in the formation before they wipe you out. Each stage refills the grid with a mix of bosses, fighters and drones.' },
+  { heading: 'Controls', body: '← → / A D — move the fighter left/right along the bottom of the screen.\nSpace / ↑ / W — fire (one bullet on-screen at a time unless dual-fighter is active).\nP pauses; R restarts.' },
+  { heading: 'Formation', body: 'Enemies enter along cubic bezier paths and settle into a 5×10 grid: row 0 is bosses (worth more, take 2 hits), rows 1-4 are fighters. The grid sways left/right hypnotically.' },
+  { heading: 'Dive attacks', body: 'From formation, enemies periodically break out and dive at you along a looping bezier trajectory. Diving enemies also drop bullets. Higher stages send more divers at once.' },
+  { heading: 'Tractor beam', body: 'A boss diving directly overhead may unfurl a green tractor beam. Getting caught costs a life but leaves your fighter captive above the boss. Shoot the captor boss to free the fighter — it docks with the survivor for a "dual fighter" wide shot.' },
+  { heading: 'Challenging stages', body: 'Every 4th stage is a bonus round. Enemies fly the formation paths without firing. Each hit scores double and clearing the entire wave grants a big sweep bonus.' },
+  { heading: 'Difficulty', body: 'Easy = slow dives, sparse dual-fighter drops, challenge stage every 3 rounds. Hard = frequent dives, common tractor beams, challenge stage every 8. Custom exposes dive frequency, dual-fighter chance, challenge cadence, and attack complexity.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { diveChance: 0.003, dualChance: 0.02, challengeEvery: 3, attackComplex: 0.7 },
+  Medium: { diveChance: 0.005, dualChance: 0.008, challengeEvery: 4, attackComplex: 1.0 },
+  Hard:   { diveChance: 0.008, dualChance: 0.02, challengeEvery: 8, attackComplex: 1.5 },
+}
+
+const CUSTOM_SCHEMA = {
+  diveChance:     { label: 'Dive frequency',   min: 0.001, max: 0.015, step: 0.001, default: 0.005 },
+  dualChance:     { label: 'Dual-fighter drop', min: 0.001, max: 0.05, step: 0.001, default: 0.008 },
+  challengeEvery: { label: 'Challenge every',  min: 2,   max: 10,  step: 1, default: 4 },
+  attackComplex:  { label: 'Attack complexity', min: 0.5, max: 2.0, step: 0.1, default: 1.0 },
+}
 const FORMATION_TOP = 90
 const FORMATION_LEFT = 60
 const CELL_W = 36
@@ -130,6 +153,16 @@ export default function Galaga() {
   const [stage, setStage] = useState(1)
   const [lives, setLives] = useState(3)
   const [soundOn, setSoundOn] = useState(true)
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState({
+    diveChance: CUSTOM_SCHEMA.diveChance.default,
+    dualChance: CUSTOM_SCHEMA.dualChance.default,
+    challengeEvery: CUSTOM_SCHEMA.challengeEvery.default,
+    attackComplex: CUSTOM_SCHEMA.attackComplex.default,
+  })
+  const cfg = difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty]
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
 
   const state = useRef(null)
   const keys = useRef({})
@@ -165,7 +198,7 @@ export default function Galaga() {
   const queueStage = (stg) => {
     const s = state.current
     s.stage = stg
-    s.isChallenging = stg % 4 === 0
+    s.isChallenging = stg % cfgRef.current.challengeEvery === 0
     s.challengeHits = 0
     s.stageIntroT = 90
     // Fill queue with { row, col, side }
@@ -333,7 +366,7 @@ export default function Galaga() {
           // Bosses may fire tractor beam during attack (once)
           if (e.state === 'attacking' && e.boss && !e.hasCaptive &&
               Math.abs(e.x - s.player.x) < 30 && e.y < s.player.y - 40 && !s.beam) {
-            if (Math.random() < 0.008) {
+            if (Math.random() < cfgRef.current.dualChance) {
               s.beam = { boss: e, alpha: 0 }
             }
           }
@@ -342,7 +375,7 @@ export default function Galaga() {
           e.x = fp.x; e.y = fp.y
           e.angle = Math.PI / 2 // point down
           e.cooldown -= dt
-          if (!s.isChallenging && e.cooldown <= 0 && Math.random() < 0.005 + s.stage * 0.001) {
+          if (!s.isChallenging && e.cooldown <= 0 && Math.random() < cfgRef.current.diveChance + s.stage * 0.001) {
             // Break out
             e.state = 'attacking'
             e.path = attackPath({ x: e.x, y: e.y }, s.player.x)
@@ -620,6 +653,12 @@ export default function Galaga() {
       onSoundToggle={() => setSoundOn(v => !v)}
       onPause={() => setStatus(p => p === 'paused' ? 'playing' : p === 'playing' ? 'paused' : p)}
       onRestart={reset}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       controls={[
         { key: '← →',   label: 'Move' },
         { key: 'Space', label: 'Fire' },

@@ -18,6 +18,29 @@ import GameShell from '../../components/arcade/GameShell'
 import { getSfx } from '../../components/arcade/sfx'
 
 const BEST_KEY = 'arcade.icy.best'
+
+const RULES = [
+  { heading: 'Goal', body: 'Climb the tower as high as you can by wall-jumping between the two icy walls. Your score is the highest floor reached; the fire crawling up from below ends the run if it catches you.' },
+  { heading: 'Controls', body: '← → / A D — steer.\n↑ / W / Space / tap — jump when touching a wall.\nP pauses; R restarts. On mobile, tap the left / right side to move and swipe up to jump.' },
+  { heading: 'Wall-jumping', body: 'Every wall touch registers as a kick — a horizontal shove away from the wall plus vertical lift. Alternating walls (left → right → left …) inside 1.2 s builds combo. Missing the timing resets combo to 0.' },
+  { heading: 'Combos', body: 'Consecutive alternating wall-kicks multiply floor points. A 5-combo scores 5× the floor value; combos over 10 unlock the yellow "chain" popup and are the main way to break high scores.' },
+  { heading: 'Rising fire', body: 'The floor of fire scrolls up at a base 30 px/s and accelerates as you climb (roughly +1.2 px/s per floor cleared). You can outrun it by chaining wall-kicks — a slow, careful climb will always lose.' },
+  { heading: 'Tiers', body: 'Every 40 floors the platform hue advances: cyan → violet → magenta → orange → gold. Repeated tiers signal you\'ve crossed a milestone.' },
+  { heading: 'Difficulty', body: 'Easy = slow scroll, low friction, generous 1.5 s combo window, powerful jump. Hard = fast scroll, sticky walls, 0.8 s combo window, weaker jump. Custom exposes scroll speed, wall friction, jump power, and combo timeout.' },
+]
+
+const DIFFICULTIES = {
+  Easy:   { scrollBase: 20, wallKick: 300, jump: -750, comboTimeout: 1.5 },
+  Medium: { scrollBase: 30, wallKick: 260, jump: -680, comboTimeout: 1.2 },
+  Hard:   { scrollBase: 45, wallKick: 210, jump: -620, comboTimeout: 0.8 },
+}
+
+const CUSTOM_SCHEMA = {
+  scrollBase:   { label: 'Scroll speed', min: 15, max: 80,  step: 1,  default: 30 },
+  wallKick:     { label: 'Wall friction (kick)', min: 150, max: 400, step: 10, default: 260 },
+  jump:         { label: 'Jump power',   min: -800, max: -500, step: 10, default: -680 },
+  comboTimeout: { label: 'Combo window (s)', min: 0.5, max: 2.0, step: 0.1, default: 1.2 },
+}
 const mulberry32 = (a) => () => {
   a |= 0; a = (a + 0x6D2B79F5) | 0
   let t = Math.imul(a ^ (a >>> 15), 1 | a)
@@ -55,6 +78,16 @@ export default function IcyTower() {
   const [status, setStatus] = useState('ready')
   const [soundOn, setSoundOn] = useState(true)
   const [gameOver, setGameOver] = useState(null)
+  const [difficulty, setDifficulty] = useState('Medium')
+  const [customValues, setCustomValues] = useState({
+    scrollBase: CUSTOM_SCHEMA.scrollBase.default,
+    wallKick: CUSTOM_SCHEMA.wallKick.default,
+    jump: CUSTOM_SCHEMA.jump.default,
+    comboTimeout: CUSTOM_SCHEMA.comboTimeout.default,
+  })
+  const cfg = difficulty === 'Custom' ? customValues : DIFFICULTIES[difficulty]
+  const cfgRef = useRef(cfg)
+  useEffect(() => { cfgRef.current = cfg }, [cfg])
 
   const reducedRef = useRef(false)
   useEffect(() => {
@@ -197,12 +230,12 @@ export default function IcyTower() {
     }
     if (hitWall && (kb.up || p.vy > 60)) {
       // wall-jump: kick off horizontally + upward burst
-      p.vx = -hitWall * WALL_KICK_H
-      p.vy = JUMP_V
+      p.vx = -hitWall * cfgRef.current.wallKick
+      p.vy = cfgRef.current.jump
       p.dir = -hitWall
       p.squash = 0.55
       // combo — chain if within 1.2s AND on the OPPOSITE wall
-      if (p.lastWall === -hitWall && s.comboT < 1.2) {
+      if (p.lastWall === -hitWall && s.comboT < cfgRef.current.comboTimeout) {
         s.combo += 1
       } else {
         s.combo = 1
@@ -225,7 +258,7 @@ export default function IcyTower() {
             p.squash = 0.6
             // Jump on landing if holding up
             if (kb.up) {
-              p.vy = JUMP_V * 0.9
+              p.vy = cfgRef.current.jump * 0.9
               sfx.pop()
             }
           }
@@ -234,7 +267,7 @@ export default function IcyTower() {
     }
     // Ground jump
     if (p.onGround && kb.up && p.vy >= 0) {
-      p.vy = JUMP_V
+      p.vy = cfgRef.current.jump
       p.onGround = false
       sfx.jump()
     }
@@ -272,7 +305,7 @@ export default function IcyTower() {
     // Increase difficulty
     s.floor = Math.floor(s.camY / 90)
     if (s.floor > s.score) { s.score = s.floor; setScore(s.floor) }
-    s.scrollSpeed = 30 + Math.min(140, s.floor * 1.2)
+    s.scrollSpeed = cfgRef.current.scrollBase + Math.min(140, s.floor * 1.2)
 
     // Fire death
     if (p.y > s.fireY) onDeath(s)
@@ -291,7 +324,7 @@ export default function IcyTower() {
 
     // Combo decay
     s.comboT += dt
-    if (s.comboT > 1.2 && s.combo > 0) { s.combo = 0; setCombo(0) }
+    if (s.comboT > cfgRef.current.comboTimeout && s.combo > 0) { s.combo = 0; setCombo(0) }
 
     // Floaters
     for (const fl of s.floaters) { fl.t += dt; fl.y -= 30 * dt }
@@ -347,6 +380,12 @@ export default function IcyTower() {
       onSoundToggle={() => setSoundOn((v) => !v)}
       onPause={() => setStatus((p) => p === 'paused' ? 'playing' : p === 'playing' ? 'paused' : p)}
       onRestart={reset}
+      rules={RULES}
+      difficulty={difficulty}
+      onDifficultyChange={setDifficulty}
+      customSchema={CUSTOM_SCHEMA}
+      customValues={customValues}
+      onCustomChange={setCustomValues}
       overlay={overlay}
       extraStats={combo > 1 ? (
         <div className="flex flex-col items-start">
