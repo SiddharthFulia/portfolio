@@ -199,4 +199,10 @@ export const ENDPOINTS = {
   // and returns 3-5 real place hints. FE then fuzzy-matches each name
   // against city_places for real coordinates, or geocodes as a fallback.
   PATHFINDING_RECOMMEND: '/api/pathfinding/recommend',
+
+  // Sandboxed code execution — powers the "Run" button on /algorithms.
+  // Body: { language, code, stdin? }. BE proxies to a hidden upstream
+  // sandbox, enforces 5s run / 15s compile / 256MB / 20KB source /
+  // 10-per-IP-per-minute limits, and caches identical runs for 15 min.
+  CODE_RUN: '/api/code/run',
 };
