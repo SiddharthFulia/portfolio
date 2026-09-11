@@ -1496,7 +1496,9 @@ export default function Pathfinding() {
   const [aiOpen, setAiOpen]             = useState(false)
   const [aiQuery, setAiQuery]           = useState('')
   const [aiLoading, setAiLoading]       = useState(false)
-  const [aiRecs, setAiRecs]             = useState([])          // [{name, kind, reason, area}]
+  const [aiRecs, setAiRecs]             = useState([])          // [{name, kind, reason, area, rating?, price?, url?, walking_minutes?}]
+  const [aiSources, setAiSources]       = useState([])          // [url, …] — cited by the AI's web search (empty if the fallback LLM path was used)
+  const [aiWebSearchUsed, setAiWebSearchUsed] = useState(false) // true when compound actually invoked its search tool — powers the 🌐 chip
   const [aiPickBusy, setAiPickBusy]     = useState({})          // { [idx_which]: true }
 
   // ── Live location (browser geolocation) ──
@@ -2865,14 +2867,20 @@ export default function Pathfinding() {
     }
     setAiLoading(true)
     setAiRecs([])
+    setAiSources([])
+    setAiWebSearchUsed(false)
     try {
       const cityName = currentCityLabel || citySlug || 'city'
       const res = await apiPost(ENDPOINTS.PATHFINDING_RECOMMEND, { city: cityName, query: q })
-      const list = res?.data?.recommendations || []
+      const list    = res?.data?.recommendations || []
+      const sources = Array.isArray(res?.data?.sources) ? res.data.sources : []
+      const webUsed = !!res?.data?.used_web_search
       if (!list.length) {
         notify.info('The recommender came back empty — try rephrasing.', { title: 'No matches', key: 'pf-ai-empty2' })
       }
       setAiRecs(list)
+      setAiSources(sources)
+      setAiWebSearchUsed(webUsed)
     } catch (e) {
       if (e?.status === 429) {
         notify.error('Too many requests — try again in a minute.', { title: 'Rate limited', key: 'pf-ai-429' })
@@ -3498,7 +3506,7 @@ export default function Pathfinding() {
                   </p>
                   <button
                     type='button'
-                    onClick={() => { setAiOpen(false); setAiRecs([]); }}
+                    onClick={() => { setAiOpen(false); setAiRecs([]); setAiSources([]); setAiWebSearchUsed(false); }}
                     className='text-fg-muted hover:text-white p-1 rounded'
                     title='Close'
                   >
@@ -3530,12 +3538,32 @@ export default function Pathfinding() {
                     icon={aiLoading ? <LoadingOutlined /> : <ThunderboltFilled />}
                     className='shrink-0 self-stretch sm:self-start'
                   >
-                    {aiLoading ? 'Thinking…' : 'Suggest'}
+                    {aiLoading ? 'Searching the web…' : 'Suggest'}
                   </Button>
                 </div>
 
                 {aiRecs.length > 0 && (
-                  <div className='grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3'>
+                  <div className='mt-3 mb-1.5 flex items-center gap-2 flex-wrap'>
+                    {aiWebSearchUsed ? (
+                      <span
+                        className='inline-flex items-center gap-1 rounded-full border border-cyan-400/40 bg-cyan-500/10 text-cyan-200 text-[10.5px] font-mono font-bold px-2 py-0.5'
+                        title='These places were verified against live web search results'
+                      >
+                        <span aria-hidden='true'>🌐</span> web-verified
+                      </span>
+                    ) : (
+                      <span
+                        className='inline-flex items-center gap-1 rounded-full border border-fg-muted/30 bg-white/5 text-fg-muted text-[10.5px] font-mono font-bold px-2 py-0.5'
+                        title='Search unavailable — these are from the model’s training knowledge, may be less current'
+                      >
+                        <span aria-hidden='true'>💭</span> from memory
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {aiRecs.length > 0 && (
+                  <div className='grid grid-cols-1 sm:grid-cols-2 gap-2'>
                     {aiRecs.map((r, i) => (
                       <div
                         key={`${r.name}-${i}`}
@@ -3544,12 +3572,48 @@ export default function Pathfinding() {
                         <div className='flex items-start gap-2 min-w-0'>
                           <span className='text-lg leading-none'>{KIND_ICON[r.kind] || '📍'}</span>
                           <div className='min-w-0 flex-1'>
-                            <div className='text-[13px] font-bold text-white truncate' title={r.name}>{r.name}</div>
-                            <div className='text-[10.5px] text-fg-muted uppercase tracking-wide font-mono flex items-center gap-1.5'>
+                            <div className='flex items-center gap-1.5 flex-wrap'>
+                              <span className='text-[13px] font-bold text-white truncate' title={r.name}>{r.name}</span>
+                              {typeof r.rating === 'number' && (
+                                <span
+                                  className='inline-flex items-center gap-0.5 rounded bg-amber-500/15 border border-amber-400/40 text-amber-200 text-[10px] font-mono font-bold px-1.5 py-0.5 leading-none'
+                                  title={`Rated ${r.rating.toFixed(1)} out of 5`}
+                                >
+                                  <span aria-hidden='true'>★</span>{r.rating.toFixed(1)}
+                                </span>
+                              )}
+                              {r.price && (
+                                <span
+                                  className='inline-flex items-center rounded bg-emerald-500/15 border border-emerald-400/40 text-emerald-200 text-[10px] font-mono font-bold px-1.5 py-0.5 leading-none'
+                                  title={`Price range: ${r.price}`}
+                                >
+                                  {r.price}
+                                </span>
+                              )}
+                            </div>
+                            <div className='text-[10.5px] text-fg-muted uppercase tracking-wide font-mono flex items-center gap-1.5 mt-0.5 flex-wrap'>
                               <span>{r.kind || 'place'}</span>
                               {r.area && <span className='text-fuchsia-300 normal-case'>· {r.area}</span>}
+                              {typeof r.walking_minutes === 'number' && (
+                                <span className='text-cyan-300 normal-case' title={`${r.walking_minutes} min walk`}>
+                                  · {r.walking_minutes}m walk
+                                </span>
+                              )}
                             </div>
                           </div>
+                          {r.url && (
+                            <a
+                              href={r.url}
+                              target='_blank'
+                              rel='noopener noreferrer'
+                              onClick={(e) => e.stopPropagation()}
+                              className='shrink-0 text-fg-muted hover:text-white p-1 rounded transition-colors'
+                              title={`Open reference: ${r.url}`}
+                              aria-label={`Open reference for ${r.name}`}
+                            >
+                              <span aria-hidden='true' className='text-[13px]'>↗</span>
+                            </a>
+                          )}
                         </div>
                         {r.reason && (
                           <p className='text-[11.5px] text-fg-muted leading-snug' title={r.reason}>
@@ -3582,8 +3646,48 @@ export default function Pathfinding() {
                     ))}
                   </div>
                 )}
+
+                {/* Sources strip — favicons + hostname chips linking to
+                    the pages the AI cited when it searched for these
+                    places. Hidden when the fallback LLM path was used
+                    (no web search → no sources). Wraps on mobile. */}
+                {aiSources.length > 0 && (
+                  <div className='mt-3 pt-2.5 border-t border-violet-500/20'>
+                    <p className='text-[10.5px] font-bold text-violet-200/80 uppercase tracking-wider font-mono mb-1.5'>
+                      Sources · verified with recent web data
+                    </p>
+                    <div className='flex flex-wrap gap-1.5'>
+                      {aiSources.map((url, i) => {
+                        let host = ''
+                        try { host = new URL(url).hostname.replace(/^www\./, '') } catch { host = url }
+                        return (
+                          <a
+                            key={`${url}-${i}`}
+                            href={url}
+                            target='_blank'
+                            rel='noopener noreferrer'
+                            className='inline-flex items-center gap-1.5 rounded-md border border-line/60 bg-black/30 hover:bg-black/50 hover:border-violet-400/50 transition-colors px-2 py-1 text-[11px] text-fg-muted hover:text-white font-mono max-w-full'
+                            title={url}
+                          >
+                            <img
+                              src={`https://www.google.com/s2/favicons?domain=${host}&sz=32`}
+                              alt=''
+                              width={12}
+                              height={12}
+                              loading='lazy'
+                              className='rounded-sm shrink-0'
+                              onError={(e) => { e.currentTarget.style.display = 'none' }}
+                            />
+                            <span className='truncate'>{host}</span>
+                          </a>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <p className='text-[10.5px] text-violet-200/70 leading-snug mt-2 font-mono'>
-                  Recommendations are AI hints — we then match each name against real neighbourhood places for accurate coordinates. Enter to submit · 10 requests/min.
+                  Recommendations are AI hints — we then match each name against real neighbourhood places for accurate coordinates. Enter to submit · 5 requests/min.
                 </p>
               </motion.div>
             )}
