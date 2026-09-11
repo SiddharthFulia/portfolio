@@ -111,7 +111,7 @@ const Navbar = () => {
       items: [
         { to: '/chess',       label: 'Chess Engine',  desc: 'Stockfish · clocks · saved games · piece themes' },
         { to: '/qr',          label: 'QR Compiler',   desc: 'Reed–Solomon ECC studio · artistic QRs · live scan-test · image bake-in' },
-        { to: '/simple-game', label: 'Simple Games',  desc: 'Snake · code + live game · pause · step through' },
+        { to: '/arcade',      label: 'Arcade',        desc: '50+ arcade-quality games · canvas rendered · real physics · Breakout, Tetris, Pac-Man & more' },
         { to: '/osint',       label: 'OSINT Powerhouse', desc: '150+ intel APIs · live earthquakes / fires / ISS / breaches' },
       ],
     },
@@ -120,7 +120,7 @@ const Navbar = () => {
       accent: 'text-rose-300',
       items: [
         { to: '/physics',     label: 'Double Pendulum', desc: 'Lagrangian chaos · phase portrait · Lyapunov · KaTeX equations' },
-        { to: '/pathfinding', label: 'City Router',     desc: 'Dijkstra · A* · BFS · DFS on live Bangalore road graph' },
+        { to: '/pathfinding', label: 'City Router',     desc: 'Dijkstra · A* · 12 algorithms · 154 Indian cities · POI labels · AI recommender' },
         { to: '/chernobyl',   label: 'Chernobyl RBMK',  desc: 'Point-kinetics · xenon poison · positive scram · AZ-5 button' },
         { to: '/atoms',       label: 'Atom Playground', desc: 'Bohr orbits · quantum clouds · α/β/γ decay · U-235 fission · C++ core' },
       ],

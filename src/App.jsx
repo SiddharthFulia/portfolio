@@ -147,6 +147,62 @@ const Osint               = lazyWithReload(() => import("./pages/OsintHub"));
 const QRCompiler          = lazyWithReload(() => import("./pages/QRCompiler"));
 const QRShare             = lazyWithReload(() => import("./pages/QRShare"));
 
+/* ── Arcade hub + 50 games ──
+ * The hub lives at /arcade. Each game gets its own /arcade/<slug> route.
+ * All games share the <GameShell> primitive from components/arcade/. */
+const Arcade = lazyWithReload(() => import("./pages/Arcade"));
+
+const ArcadeBreakout        = lazyWithReload(() => import("./pages/arcade/Breakout"));
+const ArcadeSpaceInvaders   = lazyWithReload(() => import("./pages/arcade/SpaceInvaders"));
+const ArcadeAsteroids       = lazyWithReload(() => import("./pages/arcade/Asteroids"));
+const ArcadeMissileCommand  = lazyWithReload(() => import("./pages/arcade/MissileCommand"));
+const ArcadeFrogger         = lazyWithReload(() => import("./pages/arcade/Frogger"));
+const ArcadeTetris          = lazyWithReload(() => import("./pages/arcade/Tetris"));
+const ArcadeTwenty48        = lazyWithReload(() => import("./pages/arcade/Twenty48"));
+const ArcadeSudoku          = lazyWithReload(() => import("./pages/arcade/Sudoku"));
+const ArcadeMinesweeper     = lazyWithReload(() => import("./pages/arcade/Minesweeper"));
+const ArcadeWordle          = lazyWithReload(() => import("./pages/arcade/Wordle"));
+const ArcadeSolitaire       = lazyWithReload(() => import("./pages/arcade/Solitaire"));
+const ArcadeBlackjack       = lazyWithReload(() => import("./pages/arcade/Blackjack"));
+const ArcadePoker           = lazyWithReload(() => import("./pages/arcade/Poker"));
+const ArcadeBaccarat        = lazyWithReload(() => import("./pages/arcade/Baccarat"));
+const ArcadeRummy           = lazyWithReload(() => import("./pages/arcade/Rummy"));
+const ArcadeConnectFour     = lazyWithReload(() => import("./pages/arcade/ConnectFour"));
+const ArcadeReversi         = lazyWithReload(() => import("./pages/arcade/Reversi"));
+const ArcadeCheckers        = lazyWithReload(() => import("./pages/arcade/Checkers"));
+const ArcadeNineMensMorris  = lazyWithReload(() => import("./pages/arcade/NineMensMorris"));
+const ArcadeChineseCheckers = lazyWithReload(() => import("./pages/arcade/ChineseCheckers"));
+const ArcadePinball         = lazyWithReload(() => import("./pages/arcade/Pinball"));
+const ArcadeGolf            = lazyWithReload(() => import("./pages/arcade/Golf"));
+const ArcadeAngrySlings     = lazyWithReload(() => import("./pages/arcade/AngrySlings"));
+const ArcadeRopeCutter      = lazyWithReload(() => import("./pages/arcade/RopeCutter"));
+const ArcadeLineRider       = lazyWithReload(() => import("./pages/arcade/LineRider"));
+const ArcadeFlappy          = lazyWithReload(() => import("./pages/arcade/Flappy"));
+const ArcadeDoodleJump      = lazyWithReload(() => import("./pages/arcade/DoodleJump"));
+const ArcadeIcyTower        = lazyWithReload(() => import("./pages/arcade/IcyTower"));
+const ArcadeSubwayRunner    = lazyWithReload(() => import("./pages/arcade/SubwayRunner"));
+const ArcadeTempleRunner    = lazyWithReload(() => import("./pages/arcade/TempleRunner"));
+const ArcadePacman          = lazyWithReload(() => import("./pages/arcade/Pacman"));
+const ArcadeCentipede       = lazyWithReload(() => import("./pages/arcade/Centipede"));
+const ArcadeTempest         = lazyWithReload(() => import("./pages/arcade/Tempest"));
+const ArcadeGalaga          = lazyWithReload(() => import("./pages/arcade/Galaga"));
+const ArcadeDefender        = lazyWithReload(() => import("./pages/arcade/Defender"));
+const ArcadeTowerDefense    = lazyWithReload(() => import("./pages/arcade/TowerDefense"));
+const ArcadeMiniRts         = lazyWithReload(() => import("./pages/arcade/MiniRts"));
+const ArcadeCityBuilder     = lazyWithReload(() => import("./pages/arcade/CityBuilder"));
+const ArcadeSnakeAi         = lazyWithReload(() => import("./pages/arcade/SnakeAi"));
+const ArcadeSokoban         = lazyWithReload(() => import("./pages/arcade/Sokoban"));
+const ArcadeWhack           = lazyWithReload(() => import("./pages/arcade/Whack"));
+const ArcadeSimon           = lazyWithReload(() => import("./pages/arcade/Simon"));
+const ArcadeReaction        = lazyWithReload(() => import("./pages/arcade/Reaction"));
+const ArcadeRhythmTap       = lazyWithReload(() => import("./pages/arcade/RhythmTap"));
+const ArcadeBulletHell      = lazyWithReload(() => import("./pages/arcade/BulletHell"));
+const ArcadeGameOfLife      = lazyWithReload(() => import("./pages/arcade/GameOfLife"));
+const ArcadePowder          = lazyWithReload(() => import("./pages/arcade/Powder"));
+const ArcadeIdleMiner       = lazyWithReload(() => import("./pages/arcade/IdleMiner"));
+const ArcadeFarmingSim      = lazyWithReload(() => import("./pages/arcade/FarmingSim"));
+const ArcadeFishingSim      = lazyWithReload(() => import("./pages/arcade/FishingSim"));
+
 import GlassFilter from './components/GlassFilter';
 
 /* ── Skeleton building blocks ──
@@ -339,6 +395,7 @@ const ROUTE_TITLES = {
   '/tools'           : 'OSINT Powerhouse · Sid',
   '/qr'              : 'QR Compiler · Sid',
   '/qr/s'            : 'Scan · Sid',
+  '/arcade'          : 'Arcade · 50 games · Sid',
 };
 const DEFAULT_TITLE = 'Siddharth Fulia · AI Engineer';
 const TitleManager = () => {
@@ -541,6 +598,61 @@ const App = () => {
           <Route path='/realism'           element={<Suspense fallback={<PageBoot />}><Realism        /></Suspense>} />
           <Route path='/realism/library'   element={<Suspense fallback={<PageBoot />}><RealismLibrary /></Suspense>} />
           <Route path='/realism/job/:jobId' element={<Suspense fallback={<PageBoot />}><RealismJob    /></Suspense>} />
+
+          {/* Arcade — hub grid + 50 individual game routes. Every game
+              is a lazy chunk so /arcade itself stays lean; only the
+              clicked game's code loads. */}
+          <Route path='/arcade'                    element={<Suspense fallback={<PageBoot />}><Arcade                /></Suspense>} />
+          <Route path='/arcade/breakout'           element={<Suspense fallback={<PageBoot />}><ArcadeBreakout        /></Suspense>} />
+          <Route path='/arcade/space-invaders'     element={<Suspense fallback={<PageBoot />}><ArcadeSpaceInvaders   /></Suspense>} />
+          <Route path='/arcade/asteroids'          element={<Suspense fallback={<PageBoot />}><ArcadeAsteroids       /></Suspense>} />
+          <Route path='/arcade/missile-command'    element={<Suspense fallback={<PageBoot />}><ArcadeMissileCommand  /></Suspense>} />
+          <Route path='/arcade/frogger'            element={<Suspense fallback={<PageBoot />}><ArcadeFrogger         /></Suspense>} />
+          <Route path='/arcade/tetris'             element={<Suspense fallback={<PageBoot />}><ArcadeTetris          /></Suspense>} />
+          <Route path='/arcade/twenty48'           element={<Suspense fallback={<PageBoot />}><ArcadeTwenty48        /></Suspense>} />
+          <Route path='/arcade/sudoku'             element={<Suspense fallback={<PageBoot />}><ArcadeSudoku          /></Suspense>} />
+          <Route path='/arcade/minesweeper'        element={<Suspense fallback={<PageBoot />}><ArcadeMinesweeper     /></Suspense>} />
+          <Route path='/arcade/wordle'             element={<Suspense fallback={<PageBoot />}><ArcadeWordle          /></Suspense>} />
+          <Route path='/arcade/solitaire'          element={<Suspense fallback={<PageBoot />}><ArcadeSolitaire       /></Suspense>} />
+          <Route path='/arcade/blackjack'          element={<Suspense fallback={<PageBoot />}><ArcadeBlackjack       /></Suspense>} />
+          <Route path='/arcade/poker'              element={<Suspense fallback={<PageBoot />}><ArcadePoker           /></Suspense>} />
+          <Route path='/arcade/baccarat'           element={<Suspense fallback={<PageBoot />}><ArcadeBaccarat        /></Suspense>} />
+          <Route path='/arcade/rummy'              element={<Suspense fallback={<PageBoot />}><ArcadeRummy           /></Suspense>} />
+          <Route path='/arcade/connect-four'       element={<Suspense fallback={<PageBoot />}><ArcadeConnectFour     /></Suspense>} />
+          <Route path='/arcade/reversi'            element={<Suspense fallback={<PageBoot />}><ArcadeReversi         /></Suspense>} />
+          <Route path='/arcade/checkers'           element={<Suspense fallback={<PageBoot />}><ArcadeCheckers        /></Suspense>} />
+          <Route path='/arcade/nine-mens-morris'   element={<Suspense fallback={<PageBoot />}><ArcadeNineMensMorris  /></Suspense>} />
+          <Route path='/arcade/chinese-checkers'   element={<Suspense fallback={<PageBoot />}><ArcadeChineseCheckers /></Suspense>} />
+          <Route path='/arcade/pinball'            element={<Suspense fallback={<PageBoot />}><ArcadePinball         /></Suspense>} />
+          <Route path='/arcade/golf'               element={<Suspense fallback={<PageBoot />}><ArcadeGolf            /></Suspense>} />
+          <Route path='/arcade/angry-slings'       element={<Suspense fallback={<PageBoot />}><ArcadeAngrySlings     /></Suspense>} />
+          <Route path='/arcade/rope-cutter'        element={<Suspense fallback={<PageBoot />}><ArcadeRopeCutter      /></Suspense>} />
+          <Route path='/arcade/line-rider'         element={<Suspense fallback={<PageBoot />}><ArcadeLineRider       /></Suspense>} />
+          <Route path='/arcade/flappy'             element={<Suspense fallback={<PageBoot />}><ArcadeFlappy          /></Suspense>} />
+          <Route path='/arcade/doodle-jump'        element={<Suspense fallback={<PageBoot />}><ArcadeDoodleJump      /></Suspense>} />
+          <Route path='/arcade/icy-tower'          element={<Suspense fallback={<PageBoot />}><ArcadeIcyTower        /></Suspense>} />
+          <Route path='/arcade/subway-runner'      element={<Suspense fallback={<PageBoot />}><ArcadeSubwayRunner    /></Suspense>} />
+          <Route path='/arcade/temple-runner'      element={<Suspense fallback={<PageBoot />}><ArcadeTempleRunner    /></Suspense>} />
+          <Route path='/arcade/pacman'             element={<Suspense fallback={<PageBoot />}><ArcadePacman          /></Suspense>} />
+          <Route path='/arcade/centipede'          element={<Suspense fallback={<PageBoot />}><ArcadeCentipede       /></Suspense>} />
+          <Route path='/arcade/tempest'            element={<Suspense fallback={<PageBoot />}><ArcadeTempest         /></Suspense>} />
+          <Route path='/arcade/galaga'             element={<Suspense fallback={<PageBoot />}><ArcadeGalaga          /></Suspense>} />
+          <Route path='/arcade/defender'           element={<Suspense fallback={<PageBoot />}><ArcadeDefender        /></Suspense>} />
+          <Route path='/arcade/tower-defense'      element={<Suspense fallback={<PageBoot />}><ArcadeTowerDefense    /></Suspense>} />
+          <Route path='/arcade/mini-rts'           element={<Suspense fallback={<PageBoot />}><ArcadeMiniRts         /></Suspense>} />
+          <Route path='/arcade/city-builder'       element={<Suspense fallback={<PageBoot />}><ArcadeCityBuilder     /></Suspense>} />
+          <Route path='/arcade/snake-ai'           element={<Suspense fallback={<PageBoot />}><ArcadeSnakeAi         /></Suspense>} />
+          <Route path='/arcade/sokoban'            element={<Suspense fallback={<PageBoot />}><ArcadeSokoban         /></Suspense>} />
+          <Route path='/arcade/whack'              element={<Suspense fallback={<PageBoot />}><ArcadeWhack           /></Suspense>} />
+          <Route path='/arcade/simon'              element={<Suspense fallback={<PageBoot />}><ArcadeSimon           /></Suspense>} />
+          <Route path='/arcade/reaction'           element={<Suspense fallback={<PageBoot />}><ArcadeReaction        /></Suspense>} />
+          <Route path='/arcade/rhythm-tap'         element={<Suspense fallback={<PageBoot />}><ArcadeRhythmTap       /></Suspense>} />
+          <Route path='/arcade/bullet-hell'        element={<Suspense fallback={<PageBoot />}><ArcadeBulletHell      /></Suspense>} />
+          <Route path='/arcade/game-of-life'       element={<Suspense fallback={<PageBoot />}><ArcadeGameOfLife      /></Suspense>} />
+          <Route path='/arcade/powder'             element={<Suspense fallback={<PageBoot />}><ArcadePowder          /></Suspense>} />
+          <Route path='/arcade/idle-miner'         element={<Suspense fallback={<PageBoot />}><ArcadeIdleMiner       /></Suspense>} />
+          <Route path='/arcade/farming-sim'        element={<Suspense fallback={<PageBoot />}><ArcadeFarmingSim      /></Suspense>} />
+          <Route path='/arcade/fishing-sim'        element={<Suspense fallback={<PageBoot />}><ArcadeFishingSim      /></Suspense>} />
 
           {/* Catch-all — any unknown URL bounces to home instead of 404.
               Visitors fat-fingering /settngs or /chses end up somewhere

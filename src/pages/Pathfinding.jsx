@@ -1301,7 +1301,7 @@ function runAlgoAsync(key, graph, revAdj, src, dst, timeBudgetMs = 30000, signal
 }
 
 // Default city — first metro in the catalogue.
-const DEFAULT_CITY = 'bangalore'
+const DEFAULT_CITY = 'mumbai'
 
 // Trending cities — surfaced at the top of the command palette when the
 // user hasn't typed anything yet. These are the 5 metros with the
