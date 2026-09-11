@@ -61,7 +61,7 @@ const GROUPS = [
     items: [
       { to: "/chess",       label: "Chess Engine",  desc: "Stockfish · clocks · saved games · piece themes" },
       { to: "/qr",          label: "QR Compiler",   desc: "Reed–Solomon ECC studio · artistic QRs · live scan-test · image bake-in" },
-      { to: "/arcade",      label: "Arcade",        desc: "50+ arcade-quality games · canvas rendered · real physics · Breakout, Tetris, Pac-Man & more" },
+      { to: "/codex",       label: "Codex",         desc: "50 hand-coded games · rulebooks · difficulty modes · real AI" },
       { to: "/osint",       label: "OSINT Powerhouse", desc: "150+ intel APIs · live earthquakes / fires / ISS / breaches" },
     ],
   },

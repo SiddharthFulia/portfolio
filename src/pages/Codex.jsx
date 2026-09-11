@@ -1,4 +1,12 @@
-// Arcade — hub page for the 50-game expansion.
+// Codex — hub page for the 50-game expansion.
+//
+// (Formerly "Arcade" — renamed 2026-09 because the name should reflect
+// "games coded in an amazing way", NOT a generic gaming-site vibe.
+// Codex = a curated collection of expert-crafted things. Matches the
+// short one-word energy of sibling groups: Simulations · Engineered ·
+// Toolbox · Workbench. Files on disk still live under src/pages/arcade/
+// and src/components/arcade/ — user-visible strings only were renamed
+// so we didn't churn 60+ filenames.)
 //
 // Layout (mirrors Lab / Science / Explore playbook):
 //   1. Hero strip     — gradient title, eyebrow, subtitle, live pill
@@ -6,7 +14,7 @@
 //   3. Search box     — filters by title (case-insensitive substring)
 //   4. Grid           — 2 / 3 / 4 / 5 columns, GameCard per entry
 //
-// Clicking a card navigates to /arcade/:slug. Each game is a placeholder
+// Clicking a card navigates to /codex/:slug. Each game is a placeholder
 // stub in this drop — sibling agents will replace them in parallel.
 
 import { useMemo, useState } from 'react'
@@ -38,7 +46,7 @@ function GameCard({ game }) {
   const gradient = CATEGORY_GRADIENTS[game.category] || CATEGORY_GRADIENTS.Arcade
   return (
     <Link
-      to={`/arcade/${game.slug}`}
+      to={`/codex/${game.slug}`}
       className={`group relative flex flex-col rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:bg-white/[0.04] ${accent.ring}`}
     >
       {/* Thumbnail */}
@@ -78,7 +86,7 @@ function GameCard({ game }) {
   )
 }
 
-export default function Arcade() {
+export default function Codex() {
   const [activeCat, setActiveCat] = useState('All')
   const [query, setQuery] = useState('')
 
@@ -109,15 +117,16 @@ export default function Arcade() {
         <div className="mb-10 max-w-3xl">
           <p className="eyebrow-mono mb-4 flex items-center gap-2 text-amber-300/90">
             <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            {GAMES.length} games · canvas rendered
+            {GAMES.length} games · engineered from scratch
           </p>
           <h1 className="font-poppins font-black tracking-tight leading-[0.95] text-5xl sm:text-6xl md:text-7xl bg-gradient-to-r from-amber-300 via-rose-300 to-fuchsia-400 bg-clip-text text-transparent">
-            Arcade
+            Codex
           </h1>
           <p className="mt-5 text-white/70 text-base sm:text-lg leading-relaxed">
-            50+ browser games — canvas-rendered, real physics, real graphics.
-            No emulators, no iframes. Every game is a first-class page with
-            keyboard + touch controls and localStorage high scores.
+            50 games — engineered from scratch. Real AI, real physics,
+            real graphics. No emulators, no iframes. Every entry is a
+            first-class page with rulebook, difficulty modes, keyboard
+            + touch controls, and localStorage high scores.
           </p>
         </div>
 

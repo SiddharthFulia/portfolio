@@ -1,18 +1,37 @@
-// <GameShell> — shared wrapper for all arcade games.
+// <GameShell> — shared wrapper for all Codex games.
+//
+// (Codex = the site-wide rename of "Arcade" — see the note at the top
+// of src/pages/Codex.jsx. Component files still live under
+// src/components/arcade/ so we didn't churn 60+ filenames, but every
+// user-visible link and label reads "Codex" and routes at /codex/*.)
 //
 // Provides:
 //   • Full-bleed dark section with the site's signature amber → rose title
-//   • Top bar     : back to /arcade · title (gradient) · category chip ·
+//   • Top bar     : back to /codex · title (gradient) · category chip ·
+//                   difficulty pill (if `difficulty` prop passed) ·
+//                   rules ? button (if `rules` prop passed) ·
 //                   sound toggle · pause button
 //   • Left rail   : score (big) / best / level / status indicator.
+//                   Difficulty picker (segmented + optional custom
+//                   sliders) below the stat block when the caller
+//                   passes `difficulty` + `onDifficultyChange`.
 //     (desktop)     Collapses to a horizontal HUD strip below `lg`.
 //   • Center      : `children` — the actual <canvas> or DOM game viewport.
 //   • Bottom bar  : keyboard shortcuts row + Restart. Sticks on mobile.
 //   • Overlays    : paused ("Paused — Space to resume") and game-over
 //                   ("Score: N · Best: M · New high score!" + Restart).
+//   • Rulebook    : optional `rules={[{heading, body}]}` prop. When set,
+//                   a `?` button appears in the top bar and opens a
+//                   <GameRules> modal (desktop) / bottom-sheet (mobile).
 //   • Persistence : best score auto-persists to localStorage under
-//                   `arcade.<slug>.best`. Shell auto-tracks it — pages
-//                   pass current `score` and receive game-over UX for free.
+//                   `codex.<slug>.best`. Difficulty + custom values
+//                   under `codex.<slug>.difficulty` and
+//                   `codex.<slug>.custom`. Shell auto-tracks all three
+//                   — pages just pass current `score` and receive
+//                   game-over UX for free. On first read of a slug
+//                   the shell transparently migrates any legacy
+//                   `arcade.<slug>.*` entries into the new `codex.*`
+//                   keys so existing users don't lose progress.
 //   • a11y        : prefers-reduced-motion respected — no flashes / pulses
 //                   / entry animations on overlays.
 //   • Mobile      : optional `mobile` prop for touch controls (e.g. D-pad).
@@ -24,17 +43,33 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { CATEGORY_ACCENTS } from './gameRegistry'
+import GameRules from './GameRules'
+import DifficultySelect from './DifficultySelect'
 
 /* ── localStorage helpers ──────────────────────────────
- * All arcade high scores share a common namespace so we can wipe them
- * in one shot if we ever need to reset. Wrapped in try/catch so
- * private-mode Safari (throws on writes) doesn't crash the shell. */
-const bestKey = (slug) => `arcade.${slug}.best`
+ * All Codex high scores share a common `codex.*` namespace so we can
+ * wipe them in one shot if we ever need to reset. Wrapped in try/catch
+ * so private-mode Safari (throws on writes) doesn't crash the shell.
+ *
+ * MIGRATION: pre-2026-09 keys used `arcade.<slug>.best`. On first read
+ * for a slug, if the new `codex.<slug>.best` is missing but the legacy
+ * key exists, copy it forward transparently. Existing users keep their
+ * high scores through the rename. Same trick applies to the difficulty
+ * and custom-values keys further down. */
+const bestKey = (slug) => `codex.${slug}.best`
+const legacyBestKey = (slug) => `arcade.${slug}.best`
 
 function readBest(slug) {
   if (!slug) return 0
   try {
-    const raw = localStorage.getItem(bestKey(slug))
+    let raw = localStorage.getItem(bestKey(slug))
+    if (raw === null || raw === '') {
+      const legacy = localStorage.getItem(legacyBestKey(slug))
+      if (legacy !== null && legacy !== '') {
+        try { localStorage.setItem(bestKey(slug), legacy) } catch { /* private mode */ }
+        raw = legacy
+      }
+    }
     if (!raw) return 0
     const n = Number(raw)
     return Number.isFinite(n) ? n : 0
@@ -69,15 +104,18 @@ function usePrefersReducedMotion() {
 
 /* ── Slug inference ──────────────────────────────────
  * The shell needs a slug to namespace localStorage. If the page doesn't
- * pass one, derive it from the URL (/arcade/xyz → 'xyz') or fall back
- * to a lowercased title so different games don't clobber each other's
- * best-score entry. */
+ * pass one, derive it from the URL (/codex/xyz or the legacy /arcade/xyz
+ * → 'xyz') or fall back to a lowercased title so different games don't
+ * clobber each other's best-score entry. We keep the /arcade regex so
+ * anything still linked at the old path resolves its slug correctly. */
 function useResolvedSlug(explicit, title) {
   const { pathname } = useLocation()
   return useMemo(() => {
     if (explicit) return explicit
-    const m = pathname && pathname.match(/\/arcade\/([^/]+)/)
-    if (m) return m[1]
+    const codex = pathname && pathname.match(/\/codex\/([^/]+)/)
+    if (codex) return codex[1]
+    const legacy = pathname && pathname.match(/\/arcade\/([^/]+)/)
+    if (legacy) return legacy[1]
     return (title || 'unknown').toLowerCase().replace(/[^a-z0-9]+/g, '-')
   }, [explicit, pathname, title])
 }
@@ -150,10 +188,48 @@ const IconSoundOff = () => (<svg viewBox="0 0 24 24" width="16" height="16" fill
 const IconPause    = () => (<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>)
 const IconPlay     = () => (<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>)
 const IconReload   = () => (<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4a8 8 0 1 0 7.74 10h-2.09A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>)
+const IconHelp     = () => (<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7"/><line x1="12" y1="17" x2="12" y2="17"/></svg>)
+
+const DIFFICULTY_KEY        = (slug) => `codex.${slug}.difficulty`
+const CUSTOM_KEY            = (slug) => `codex.${slug}.custom`
+const LEGACY_DIFFICULTY_KEY = (slug) => `arcade.${slug}.difficulty`
+const LEGACY_CUSTOM_KEY     = (slug) => `arcade.${slug}.custom`
+
+function readJSON(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key)
+    if (!raw) return fallback
+    return JSON.parse(raw)
+  } catch { return fallback }
+}
+function writeJSON(key, val) {
+  try { localStorage.setItem(key, JSON.stringify(val)) } catch { /* private mode */ }
+}
+
+/* Migrate an `arcade.*` JSON entry to the equivalent `codex.*` key if
+ * the new one is empty. Returns the parsed value (from either key) or
+ * null if neither is present. Only runs once per slug via the boot
+ * effect below. */
+function readJSONWithMigration(newKey, legacyKey, fallback) {
+  try {
+    const rawNew = localStorage.getItem(newKey)
+    if (rawNew !== null && rawNew !== '') {
+      return JSON.parse(rawNew)
+    }
+    const rawLegacy = localStorage.getItem(legacyKey)
+    if (rawLegacy !== null && rawLegacy !== '') {
+      try { localStorage.setItem(newKey, rawLegacy) } catch { /* private mode */ }
+      return JSON.parse(rawLegacy)
+    }
+    return fallback
+  } catch {
+    return fallback
+  }
+}
 
 /* ── Main component ──────────────────────────────── */
 export default function GameShell({
-  slug,                      // optional — auto-derived from /arcade/:slug URL
+  slug,                      // optional — auto-derived from /codex/:slug URL
   title = 'Game',
   category = 'Arcade',       // one of gameRegistry.CATEGORIES
   score = 0,
@@ -170,6 +246,13 @@ export default function GameShell({
   overlay = null,            // optional custom overlay (renders above viewport)
   footer = null,             // optional extra footer content
   subtitle,                  // optional line under the title
+  rules = null,              // [{ heading, body }] — surfaces a "?" button
+  difficulty,                // current mode string; if omitted, picker is hidden
+  onDifficultyChange,        // (mode) => void
+  difficultyModes = ['Easy', 'Medium', 'Hard', 'Custom'],
+  customSchema = null,       // { key: { label, min, max, step, default } }
+  customValues = {},         // { key: value }
+  onCustomChange,            // (values) => void
   children,
 }) {
   const resolvedSlug = useResolvedSlug(slug, title)
@@ -227,6 +310,57 @@ export default function GameShell({
   const showPausedOverlay   = status === 'paused'
   const showGameOverOverlay = status === 'over' || status === 'won'
 
+  const [rulesOpen, setRulesOpen] = useState(false)
+  const hasRules = Array.isArray(rules) && rules.length > 0
+  const hasDifficulty = typeof difficulty === 'string' && typeof onDifficultyChange === 'function'
+
+  // Persist difficulty + custom values per slug. Migrates any legacy
+  // `arcade.<slug>.difficulty` / `arcade.<slug>.custom` entry forward
+  // to the `codex.*` namespace transparently on first mount.
+  const bootRef = useRef(false)
+  useEffect(() => {
+    if (bootRef.current || !resolvedSlug) return
+    bootRef.current = true
+    if (hasDifficulty) {
+      const stored = readJSONWithMigration(
+        DIFFICULTY_KEY(resolvedSlug),
+        LEGACY_DIFFICULTY_KEY(resolvedSlug),
+        null
+      )
+      if (stored && stored !== difficulty && difficultyModes.includes(stored)) {
+        onDifficultyChange(stored)
+      }
+      if (onCustomChange && customSchema) {
+        const storedCustom = readJSONWithMigration(
+          CUSTOM_KEY(resolvedSlug),
+          LEGACY_CUSTOM_KEY(resolvedSlug),
+          null
+        )
+        if (storedCustom && typeof storedCustom === 'object') {
+          // merge only known keys — schema is source of truth so
+          // stale keys from an older customSchema get dropped
+          const filtered = {}
+          for (const k of Object.keys(customSchema)) {
+            if (k in storedCustom) filtered[k] = storedCustom[k]
+            else filtered[k] = customValues[k] ?? customSchema[k].default
+          }
+          onCustomChange(filtered)
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolvedSlug])
+
+  useEffect(() => {
+    if (!resolvedSlug || !hasDifficulty) return
+    writeJSON(DIFFICULTY_KEY(resolvedSlug), difficulty)
+  }, [resolvedSlug, difficulty, hasDifficulty])
+
+  useEffect(() => {
+    if (!resolvedSlug || !customSchema) return
+    writeJSON(CUSTOM_KEY(resolvedSlug), customValues)
+  }, [resolvedSlug, customValues, customSchema])
+
   const scoreStr = typeof score === 'number' ? score.toLocaleString() : String(score ?? 0)
   const bestStr  = typeof displayBest === 'number' ? displayBest.toLocaleString() : String(displayBest ?? 0)
 
@@ -240,11 +374,11 @@ export default function GameShell({
       <header className="sticky top-0 z-30 backdrop-blur-md bg-black/50 border-b border-white/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
           <Link
-            to="/arcade"
+            to="/codex"
             className="inline-flex items-center gap-1.5 text-white/60 hover:text-white transition-colors text-sm"
           >
             <IconChevron />
-            <span className="hidden sm:inline">Arcade</span>
+            <span className="hidden sm:inline">Codex</span>
           </Link>
 
           <div className="h-4 w-px bg-white/10 mx-1" />
@@ -258,8 +392,23 @@ export default function GameShell({
             {category}
           </span>
 
+          {hasDifficulty && (
+            <span
+              className="hidden md:inline-flex items-center gap-1.5 text-[11px] font-medium border border-white/15 bg-white/[0.04] text-white/80 rounded-full px-2.5 py-0.5"
+              title={`Difficulty: ${difficulty}`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-fuchsia-400" />
+              {difficulty}
+            </span>
+          )}
+
           <div className="flex-1" />
 
+          {hasRules && (
+            <IconBtn onClick={() => setRulesOpen(true)} title="How to play" ariaLabel="Show rules">
+              <IconHelp />
+            </IconBtn>
+          )}
           {onSoundToggle && (
             <IconBtn onClick={onSoundToggle} title={soundOn ? 'Mute' : 'Unmute'}>
               {soundOn ? <IconSoundOn /> : <IconSoundOff />}
@@ -272,6 +421,15 @@ export default function GameShell({
           )}
         </div>
       </header>
+
+      {hasRules && (
+        <GameRules
+          open={rulesOpen}
+          onClose={() => setRulesOpen(false)}
+          title={`${title} — How to play`}
+          sections={rules}
+        />
+      )}
 
       {/* ── Body: rail + viewport ─────────────────── */}
       <div className="flex-1 flex flex-col lg:flex-row max-w-7xl w-full mx-auto px-4 sm:px-6 py-5 gap-5">
@@ -286,6 +444,21 @@ export default function GameShell({
               <StatusPill status={status} reducedMotion={reducedMotion} />
             </div>
           </div>
+          {hasDifficulty && (
+            <div className="mt-3">
+              <div className="text-[10px] uppercase tracking-widest text-white/40 font-mono mb-1.5 px-1">
+                Difficulty
+              </div>
+              <DifficultySelect
+                modes={difficultyModes}
+                value={difficulty}
+                onChange={(m) => { onDifficultyChange(m); onRestart?.() }}
+                customSchema={customSchema}
+                customValues={customValues}
+                onCustomChange={onCustomChange}
+              />
+            </div>
+          )}
           {subtitle && (
             <p className="mt-3 hidden lg:block text-xs text-white/50 leading-relaxed px-1">
               {subtitle}

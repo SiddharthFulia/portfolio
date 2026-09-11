@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from "react";
-import { Route, BrowserRouter as Router, Routes, useLocation, Navigate } from "react-router-dom";
+import { Route, BrowserRouter as Router, Routes, useLocation, useParams, Navigate } from "react-router-dom";
 import { ConfigProvider, theme } from "antd";
 import { Footer, Navbar } from "./components";
 import BackToTop from './components/BackToTop';
@@ -147,10 +147,14 @@ const Osint               = lazyWithReload(() => import("./pages/OsintHub"));
 const QRCompiler          = lazyWithReload(() => import("./pages/QRCompiler"));
 const QRShare             = lazyWithReload(() => import("./pages/QRShare"));
 
-/* ── Arcade hub + 50 games ──
- * The hub lives at /arcade. Each game gets its own /arcade/<slug> route.
- * All games share the <GameShell> primitive from components/arcade/. */
-const Arcade = lazyWithReload(() => import("./pages/Arcade"));
+/* ── Codex hub + 50 games ──
+ * (Formerly "/arcade" — renamed 2026-09 to reflect a curated, expert-
+ * crafted collection rather than a generic arcade site. The hub lives
+ * at /codex; each game gets its own /codex/<slug> route. Old /arcade
+ * URLs redirect to /codex so shared links keep working. Files on disk
+ * still live under src/pages/arcade/ + src/components/arcade/ — we
+ * only renamed the hub file (Codex.jsx) to avoid churning 60+ others.) */
+const Codex = lazyWithReload(() => import("./pages/Codex"));
 
 const ArcadeBreakout        = lazyWithReload(() => import("./pages/arcade/Breakout"));
 const ArcadeSpaceInvaders   = lazyWithReload(() => import("./pages/arcade/SpaceInvaders"));
@@ -327,6 +331,16 @@ const ContactSkeleton = () => (
   </div>
 );
 
+/* ── Legacy /arcade/<slug> → /codex/<slug> redirect helper ──
+ * The site's game hub was renamed from /arcade to /codex in 2026-09.
+ * Preserving the slug through the redirect (rather than dumping every
+ * legacy URL onto /codex) means old bookmarks and shared game links
+ * still land on the specific game they used to point at. */
+const ArcadeSlugRedirect = () => {
+  const { slug } = useParams();
+  return <Navigate to={`/codex/${slug || ''}`} replace />;
+};
+
 /* ── Conditional footer (hidden on home) ── */
 const ConditionalFooter = () => {
   const { pathname } = useLocation();
@@ -395,7 +409,8 @@ const ROUTE_TITLES = {
   '/tools'           : 'OSINT Powerhouse · Sid',
   '/qr'              : 'QR Compiler · Sid',
   '/qr/s'            : 'Scan · Sid',
-  '/arcade'          : 'Arcade · 50 games · Sid',
+  '/codex'           : 'Codex · 50 games · Sid',
+  '/arcade'          : 'Codex · 50 games · Sid',
 };
 const DEFAULT_TITLE = 'Siddharth Fulia · AI Engineer';
 const TitleManager = () => {
@@ -599,60 +614,68 @@ const App = () => {
           <Route path='/realism/library'   element={<Suspense fallback={<PageBoot />}><RealismLibrary /></Suspense>} />
           <Route path='/realism/job/:jobId' element={<Suspense fallback={<PageBoot />}><RealismJob    /></Suspense>} />
 
-          {/* Arcade — hub grid + 50 individual game routes. Every game
-              is a lazy chunk so /arcade itself stays lean; only the
-              clicked game's code loads. */}
-          <Route path='/arcade'                    element={<Suspense fallback={<PageBoot />}><Arcade                /></Suspense>} />
-          <Route path='/arcade/breakout'           element={<Suspense fallback={<PageBoot />}><ArcadeBreakout        /></Suspense>} />
-          <Route path='/arcade/space-invaders'     element={<Suspense fallback={<PageBoot />}><ArcadeSpaceInvaders   /></Suspense>} />
-          <Route path='/arcade/asteroids'          element={<Suspense fallback={<PageBoot />}><ArcadeAsteroids       /></Suspense>} />
-          <Route path='/arcade/missile-command'    element={<Suspense fallback={<PageBoot />}><ArcadeMissileCommand  /></Suspense>} />
-          <Route path='/arcade/frogger'            element={<Suspense fallback={<PageBoot />}><ArcadeFrogger         /></Suspense>} />
-          <Route path='/arcade/tetris'             element={<Suspense fallback={<PageBoot />}><ArcadeTetris          /></Suspense>} />
-          <Route path='/arcade/twenty48'           element={<Suspense fallback={<PageBoot />}><ArcadeTwenty48        /></Suspense>} />
-          <Route path='/arcade/sudoku'             element={<Suspense fallback={<PageBoot />}><ArcadeSudoku          /></Suspense>} />
-          <Route path='/arcade/minesweeper'        element={<Suspense fallback={<PageBoot />}><ArcadeMinesweeper     /></Suspense>} />
-          <Route path='/arcade/wordle'             element={<Suspense fallback={<PageBoot />}><ArcadeWordle          /></Suspense>} />
-          <Route path='/arcade/solitaire'          element={<Suspense fallback={<PageBoot />}><ArcadeSolitaire       /></Suspense>} />
-          <Route path='/arcade/blackjack'          element={<Suspense fallback={<PageBoot />}><ArcadeBlackjack       /></Suspense>} />
-          <Route path='/arcade/poker'              element={<Suspense fallback={<PageBoot />}><ArcadePoker           /></Suspense>} />
-          <Route path='/arcade/baccarat'           element={<Suspense fallback={<PageBoot />}><ArcadeBaccarat        /></Suspense>} />
-          <Route path='/arcade/rummy'              element={<Suspense fallback={<PageBoot />}><ArcadeRummy           /></Suspense>} />
-          <Route path='/arcade/connect-four'       element={<Suspense fallback={<PageBoot />}><ArcadeConnectFour     /></Suspense>} />
-          <Route path='/arcade/reversi'            element={<Suspense fallback={<PageBoot />}><ArcadeReversi         /></Suspense>} />
-          <Route path='/arcade/checkers'           element={<Suspense fallback={<PageBoot />}><ArcadeCheckers        /></Suspense>} />
-          <Route path='/arcade/nine-mens-morris'   element={<Suspense fallback={<PageBoot />}><ArcadeNineMensMorris  /></Suspense>} />
-          <Route path='/arcade/chinese-checkers'   element={<Suspense fallback={<PageBoot />}><ArcadeChineseCheckers /></Suspense>} />
-          <Route path='/arcade/pinball'            element={<Suspense fallback={<PageBoot />}><ArcadePinball         /></Suspense>} />
-          <Route path='/arcade/golf'               element={<Suspense fallback={<PageBoot />}><ArcadeGolf            /></Suspense>} />
-          <Route path='/arcade/angry-slings'       element={<Suspense fallback={<PageBoot />}><ArcadeAngrySlings     /></Suspense>} />
-          <Route path='/arcade/rope-cutter'        element={<Suspense fallback={<PageBoot />}><ArcadeRopeCutter      /></Suspense>} />
-          <Route path='/arcade/line-rider'         element={<Suspense fallback={<PageBoot />}><ArcadeLineRider       /></Suspense>} />
-          <Route path='/arcade/flappy'             element={<Suspense fallback={<PageBoot />}><ArcadeFlappy          /></Suspense>} />
-          <Route path='/arcade/doodle-jump'        element={<Suspense fallback={<PageBoot />}><ArcadeDoodleJump      /></Suspense>} />
-          <Route path='/arcade/icy-tower'          element={<Suspense fallback={<PageBoot />}><ArcadeIcyTower        /></Suspense>} />
-          <Route path='/arcade/subway-runner'      element={<Suspense fallback={<PageBoot />}><ArcadeSubwayRunner    /></Suspense>} />
-          <Route path='/arcade/temple-runner'      element={<Suspense fallback={<PageBoot />}><ArcadeTempleRunner    /></Suspense>} />
-          <Route path='/arcade/pacman'             element={<Suspense fallback={<PageBoot />}><ArcadePacman          /></Suspense>} />
-          <Route path='/arcade/centipede'          element={<Suspense fallback={<PageBoot />}><ArcadeCentipede       /></Suspense>} />
-          <Route path='/arcade/tempest'            element={<Suspense fallback={<PageBoot />}><ArcadeTempest         /></Suspense>} />
-          <Route path='/arcade/galaga'             element={<Suspense fallback={<PageBoot />}><ArcadeGalaga          /></Suspense>} />
-          <Route path='/arcade/defender'           element={<Suspense fallback={<PageBoot />}><ArcadeDefender        /></Suspense>} />
-          <Route path='/arcade/tower-defense'      element={<Suspense fallback={<PageBoot />}><ArcadeTowerDefense    /></Suspense>} />
-          <Route path='/arcade/mini-rts'           element={<Suspense fallback={<PageBoot />}><ArcadeMiniRts         /></Suspense>} />
-          <Route path='/arcade/city-builder'       element={<Suspense fallback={<PageBoot />}><ArcadeCityBuilder     /></Suspense>} />
-          <Route path='/arcade/snake-ai'           element={<Suspense fallback={<PageBoot />}><ArcadeSnakeAi         /></Suspense>} />
-          <Route path='/arcade/sokoban'            element={<Suspense fallback={<PageBoot />}><ArcadeSokoban         /></Suspense>} />
-          <Route path='/arcade/whack'              element={<Suspense fallback={<PageBoot />}><ArcadeWhack           /></Suspense>} />
-          <Route path='/arcade/simon'              element={<Suspense fallback={<PageBoot />}><ArcadeSimon           /></Suspense>} />
-          <Route path='/arcade/reaction'           element={<Suspense fallback={<PageBoot />}><ArcadeReaction        /></Suspense>} />
-          <Route path='/arcade/rhythm-tap'         element={<Suspense fallback={<PageBoot />}><ArcadeRhythmTap       /></Suspense>} />
-          <Route path='/arcade/bullet-hell'        element={<Suspense fallback={<PageBoot />}><ArcadeBulletHell      /></Suspense>} />
-          <Route path='/arcade/game-of-life'       element={<Suspense fallback={<PageBoot />}><ArcadeGameOfLife      /></Suspense>} />
-          <Route path='/arcade/powder'             element={<Suspense fallback={<PageBoot />}><ArcadePowder          /></Suspense>} />
-          <Route path='/arcade/idle-miner'         element={<Suspense fallback={<PageBoot />}><ArcadeIdleMiner       /></Suspense>} />
-          <Route path='/arcade/farming-sim'        element={<Suspense fallback={<PageBoot />}><ArcadeFarmingSim      /></Suspense>} />
-          <Route path='/arcade/fishing-sim'        element={<Suspense fallback={<PageBoot />}><ArcadeFishingSim      /></Suspense>} />
+          {/* Codex — hub grid + 50 individual game routes. Every game
+              is a lazy chunk so /codex itself stays lean; only the
+              clicked game's code loads. Was formerly "/arcade" — the
+              catch-all `/arcade/*` route below now redirects into
+              `/codex/*` so bookmarks and shared links still resolve. */}
+          <Route path='/codex'                    element={<Suspense fallback={<PageBoot />}><Codex                 /></Suspense>} />
+          <Route path='/codex/breakout'           element={<Suspense fallback={<PageBoot />}><ArcadeBreakout        /></Suspense>} />
+          <Route path='/codex/space-invaders'     element={<Suspense fallback={<PageBoot />}><ArcadeSpaceInvaders   /></Suspense>} />
+          <Route path='/codex/asteroids'          element={<Suspense fallback={<PageBoot />}><ArcadeAsteroids       /></Suspense>} />
+          <Route path='/codex/missile-command'    element={<Suspense fallback={<PageBoot />}><ArcadeMissileCommand  /></Suspense>} />
+          <Route path='/codex/frogger'            element={<Suspense fallback={<PageBoot />}><ArcadeFrogger         /></Suspense>} />
+          <Route path='/codex/tetris'             element={<Suspense fallback={<PageBoot />}><ArcadeTetris          /></Suspense>} />
+          <Route path='/codex/twenty48'           element={<Suspense fallback={<PageBoot />}><ArcadeTwenty48        /></Suspense>} />
+          <Route path='/codex/sudoku'             element={<Suspense fallback={<PageBoot />}><ArcadeSudoku          /></Suspense>} />
+          <Route path='/codex/minesweeper'        element={<Suspense fallback={<PageBoot />}><ArcadeMinesweeper     /></Suspense>} />
+          <Route path='/codex/wordle'             element={<Suspense fallback={<PageBoot />}><ArcadeWordle          /></Suspense>} />
+          <Route path='/codex/solitaire'          element={<Suspense fallback={<PageBoot />}><ArcadeSolitaire       /></Suspense>} />
+          <Route path='/codex/blackjack'          element={<Suspense fallback={<PageBoot />}><ArcadeBlackjack       /></Suspense>} />
+          <Route path='/codex/poker'              element={<Suspense fallback={<PageBoot />}><ArcadePoker           /></Suspense>} />
+          <Route path='/codex/baccarat'           element={<Suspense fallback={<PageBoot />}><ArcadeBaccarat        /></Suspense>} />
+          <Route path='/codex/rummy'              element={<Suspense fallback={<PageBoot />}><ArcadeRummy           /></Suspense>} />
+          <Route path='/codex/connect-four'       element={<Suspense fallback={<PageBoot />}><ArcadeConnectFour     /></Suspense>} />
+          <Route path='/codex/reversi'            element={<Suspense fallback={<PageBoot />}><ArcadeReversi         /></Suspense>} />
+          <Route path='/codex/checkers'           element={<Suspense fallback={<PageBoot />}><ArcadeCheckers        /></Suspense>} />
+          <Route path='/codex/nine-mens-morris'   element={<Suspense fallback={<PageBoot />}><ArcadeNineMensMorris  /></Suspense>} />
+          <Route path='/codex/chinese-checkers'   element={<Suspense fallback={<PageBoot />}><ArcadeChineseCheckers /></Suspense>} />
+          <Route path='/codex/pinball'            element={<Suspense fallback={<PageBoot />}><ArcadePinball         /></Suspense>} />
+          <Route path='/codex/golf'               element={<Suspense fallback={<PageBoot />}><ArcadeGolf            /></Suspense>} />
+          <Route path='/codex/angry-slings'       element={<Suspense fallback={<PageBoot />}><ArcadeAngrySlings     /></Suspense>} />
+          <Route path='/codex/rope-cutter'        element={<Suspense fallback={<PageBoot />}><ArcadeRopeCutter      /></Suspense>} />
+          <Route path='/codex/line-rider'         element={<Suspense fallback={<PageBoot />}><ArcadeLineRider       /></Suspense>} />
+          <Route path='/codex/flappy'             element={<Suspense fallback={<PageBoot />}><ArcadeFlappy          /></Suspense>} />
+          <Route path='/codex/doodle-jump'        element={<Suspense fallback={<PageBoot />}><ArcadeDoodleJump      /></Suspense>} />
+          <Route path='/codex/icy-tower'          element={<Suspense fallback={<PageBoot />}><ArcadeIcyTower        /></Suspense>} />
+          <Route path='/codex/subway-runner'      element={<Suspense fallback={<PageBoot />}><ArcadeSubwayRunner    /></Suspense>} />
+          <Route path='/codex/temple-runner'      element={<Suspense fallback={<PageBoot />}><ArcadeTempleRunner    /></Suspense>} />
+          <Route path='/codex/pacman'             element={<Suspense fallback={<PageBoot />}><ArcadePacman          /></Suspense>} />
+          <Route path='/codex/centipede'          element={<Suspense fallback={<PageBoot />}><ArcadeCentipede       /></Suspense>} />
+          <Route path='/codex/tempest'            element={<Suspense fallback={<PageBoot />}><ArcadeTempest         /></Suspense>} />
+          <Route path='/codex/galaga'             element={<Suspense fallback={<PageBoot />}><ArcadeGalaga          /></Suspense>} />
+          <Route path='/codex/defender'           element={<Suspense fallback={<PageBoot />}><ArcadeDefender        /></Suspense>} />
+          <Route path='/codex/tower-defense'      element={<Suspense fallback={<PageBoot />}><ArcadeTowerDefense    /></Suspense>} />
+          <Route path='/codex/mini-rts'           element={<Suspense fallback={<PageBoot />}><ArcadeMiniRts         /></Suspense>} />
+          <Route path='/codex/city-builder'       element={<Suspense fallback={<PageBoot />}><ArcadeCityBuilder     /></Suspense>} />
+          <Route path='/codex/snake-ai'           element={<Suspense fallback={<PageBoot />}><ArcadeSnakeAi         /></Suspense>} />
+          <Route path='/codex/sokoban'            element={<Suspense fallback={<PageBoot />}><ArcadeSokoban         /></Suspense>} />
+          <Route path='/codex/whack'              element={<Suspense fallback={<PageBoot />}><ArcadeWhack           /></Suspense>} />
+          <Route path='/codex/simon'              element={<Suspense fallback={<PageBoot />}><ArcadeSimon           /></Suspense>} />
+          <Route path='/codex/reaction'           element={<Suspense fallback={<PageBoot />}><ArcadeReaction        /></Suspense>} />
+          <Route path='/codex/rhythm-tap'         element={<Suspense fallback={<PageBoot />}><ArcadeRhythmTap       /></Suspense>} />
+          <Route path='/codex/bullet-hell'        element={<Suspense fallback={<PageBoot />}><ArcadeBulletHell      /></Suspense>} />
+          <Route path='/codex/game-of-life'       element={<Suspense fallback={<PageBoot />}><ArcadeGameOfLife      /></Suspense>} />
+          <Route path='/codex/powder'             element={<Suspense fallback={<PageBoot />}><ArcadePowder          /></Suspense>} />
+          <Route path='/codex/idle-miner'         element={<Suspense fallback={<PageBoot />}><ArcadeIdleMiner       /></Suspense>} />
+          <Route path='/codex/farming-sim'        element={<Suspense fallback={<PageBoot />}><ArcadeFarmingSim      /></Suspense>} />
+          <Route path='/codex/fishing-sim'        element={<Suspense fallback={<PageBoot />}><ArcadeFishingSim      /></Suspense>} />
+
+          {/* Legacy /arcade redirects — bookmarks and shared links pre-
+              2026-09 rename still resolve. `/arcade` → `/codex`, and
+              any `/arcade/<slug>` walks the same slug into `/codex`. */}
+          <Route path='/arcade'        element={<Navigate to='/codex' replace />} />
+          <Route path='/arcade/:slug'  element={<ArcadeSlugRedirect />} />
 
           {/* Catch-all — any unknown URL bounces to home instead of 404.
               Visitors fat-fingering /settngs or /chses end up somewhere
