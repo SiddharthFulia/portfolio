@@ -2875,8 +2875,11 @@ export default function Pathfinding() {
       const list    = res?.data?.recommendations || []
       const sources = Array.isArray(res?.data?.sources) ? res.data.sources : []
       const webUsed = !!res?.data?.used_web_search
+      const backendMsg = res?.data?.message
       if (!list.length) {
-        notify.info('The recommender came back empty — try rephrasing.', { title: 'No matches', key: 'pf-ai-empty2' })
+        // BE now degrades to 200 + empty list with a helpful `message`
+        // instead of 502'ing. Surface the BE's coaching text verbatim.
+        notify.info(backendMsg || 'The recommender came back empty — try rephrasing.', { title: 'No matches', key: 'pf-ai-empty2' })
       }
       setAiRecs(list)
       setAiSources(sources)
