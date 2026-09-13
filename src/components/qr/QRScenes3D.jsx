@@ -795,18 +795,24 @@ function buildSceneData(matrix, N, theme, season, maskGrid = null, externalPalet
 const SCAN_KEYS = new Set(['scanDark', 'scanLight', 'scanQuiet'])
 
 // ─── Three renderer — wires up scene / camera / lights / instances. ───
-function buildThreeScene(canvas, sceneData, theme, season, N, matrix) {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2)
+function buildThreeScene(canvas, sceneData, theme, season, N, matrix, opts = {}) {
+  const dpr = Math.min(window.devicePixelRatio || 1, opts.lowPower ? 1 : 2)
   const w = canvas.clientWidth || 640
   const h = canvas.clientHeight || 640
-  const renderer = new THREE.WebGLRenderer({
-    canvas, antialias: true, alpha: false, preserveDrawingBuffer: true,
-  })
+  // Renderer config — low-power fallback drops antialias + preserveDrawingBuffer
+  // to cut GPU memory in half. Used when the first init attempt fails
+  // (mobile context limit, integrated GPU, low VRAM).
+  const rendererOpts = opts.lowPower
+    ? { canvas, antialias: false, alpha: false, preserveDrawingBuffer: false, powerPreference: 'low-power', failIfMajorPerformanceCaveat: false }
+    : { canvas, antialias: true,  alpha: false, preserveDrawingBuffer: true,  powerPreference: 'high-performance' }
+  const renderer = new THREE.WebGLRenderer(rendererOpts)
   renderer.setPixelRatio(dpr)
   renderer.setSize(w, h, false)
   // PCFSoftShadowMap enables the soft-drop-shadow reading on the tree
   // trunk + tiles for Tree Garden. Other themes ignore it (nothing casts).
-  renderer.shadowMap.enabled = true
+  // Low-power mode disables shadows entirely — softens visual quality but
+  // saves a full shadow-map pass per frame.
+  renderer.shadowMap.enabled = !opts.lowPower
   renderer.shadowMap.type = THREE.PCFSoftShadowMap
 
   const scene = new THREE.Scene()
@@ -1162,8 +1168,10 @@ export default function QRScenes3D({ matrixData, ecc, payload, silhouetteMask = 
 
   // WebGL failure state — surfaces a friendly panel instead of crashing
   // the whole page when the browser can't allocate a WebGL context (mobile
-  // context limit, WebGL disabled, headless env, etc.).
+  // context limit, WebGL disabled, headless env, etc.). `webglRetry` is a
+  // counter the "Retry" button bumps to trigger a fresh init attempt.
   const [webglError, setWebglError] = useState(null)
+  const [webglRetry, setWebglRetry] = useState(0)
 
   // three.js refs — persist across renders without triggering React.
   const canvasRef = useRef(null)
@@ -1230,14 +1238,24 @@ export default function QRScenes3D({ matrixData, ecc, payload, silhouetteMask = 
       )
       setWebglError(null)
     } catch (err) {
-      // Most common: "Error creating WebGL context" when the browser hits
-      // its per-tab WebGL context limit or WebGL is disabled. Recover
-      // gracefully — the page stays usable, user can still hit the 2D
-      // editor from the tab switcher.
-      console.warn('QRScenes3D: WebGL init failed —', err?.message || err)
-      setWebglError(err?.message || 'WebGL is unavailable on this device')
-      setScenePresent(false)
-      return
+      console.warn('QRScenes3D: WebGL init failed (high-perf) —', err?.message || err)
+      // Second chance: retry with a leaner renderer (no antialias, no shadow
+      // map, no preserveDrawingBuffer, powerPreference=low-power, DPR=1).
+      // Cuts GPU memory roughly in half — often gets us past the browser's
+      // WebGL context budget on mobile / integrated GPUs.
+      try {
+        built = buildThreeScene(
+          canvas, sceneData, theme, season, matrixData.N, matrixData.matrix,
+          { lowPower: true },
+        )
+        setWebglError(null)
+        console.info('QRScenes3D: recovered via low-power renderer')
+      } catch (err2) {
+        console.warn('QRScenes3D: WebGL init failed (low-power) —', err2?.message || err2)
+        setWebglError(err2?.message || err?.message || 'WebGL is unavailable on this device')
+        setScenePresent(false)
+        return
+      }
     }
     stateRef.current.renderer = built.renderer
     stateRef.current.scene = built.scene
@@ -1266,7 +1284,7 @@ export default function QRScenes3D({ matrixData, ecc, payload, silhouetteMask = 
     stateRef.current.transition = null
     setTransitionPct(0)
     setScenePresent(true)
-  }, [matrixData, theme, season, maskGrid, palette])
+  }, [matrixData, theme, season, maskGrid, palette, webglRetry])
 
   // Keep the refs' latest view/autoRotate in sync without recreating the RAF.
   useEffect(() => { stateRef.current.view = view }, [view])
@@ -1736,13 +1754,27 @@ export default function QRScenes3D({ matrixData, ecc, payload, silhouetteMask = 
             </div>
           )}
           {webglError && (
-            <div className='absolute inset-0 flex flex-col items-center justify-center gap-3 text-center px-6'>
+            <div className='absolute inset-0 flex flex-col items-center justify-center gap-3 text-center px-6 py-8 overflow-auto'>
               <div className='text-4xl'>{'◇'}</div>
-              <div className='font-bold text-base'>3D isn't available on this device</div>
+              <div className='font-bold text-base'>3D isn't available right now</div>
               <div className='text-fg-muted text-xs max-w-sm leading-snug'>
-                Your browser couldn't allocate a WebGL context — this usually happens on older mobile browsers or when too many WebGL tabs are open. The 2D Editor still works fully; use it to design and download your QR.
+                Your browser couldn't start a WebGL renderer. Common causes:
               </div>
-              <div className='text-[10px] text-fg-muted font-mono opacity-60'>{webglError}</div>
+              <ul className='text-fg-muted text-[11px] max-w-sm leading-snug text-left list-disc pl-6 space-y-1'>
+                <li>Too many tabs open with 3D/games — close a few and retry.</li>
+                <li>Hardware acceleration is off — check <span className='font-mono'>chrome://settings/system</span>.</li>
+                <li>Private / incognito mode with strict GPU blocking.</li>
+                <li>Older mobile browser without WebGL2.</li>
+              </ul>
+              <div className='flex flex-wrap gap-2 justify-center mt-2'>
+                <Button variant='primary' size='small' onClick={() => setWebglRetry((n) => n + 1)}>
+                  Retry
+                </Button>
+                <Button variant='ghost' size='small' onClick={() => window.location.reload()}>
+                  Full reload
+                </Button>
+              </div>
+              <div className='text-[10px] text-fg-muted font-mono opacity-60 max-w-sm break-all'>{webglError}</div>
             </div>
           )}
           {transitionPct > 0 && (
