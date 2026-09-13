@@ -927,37 +927,36 @@ export default function Atoms() {
         {/* ── Row: canvas + right column ───────────────── */}
         <div className='grid grid-cols-1 xl:grid-cols-3 gap-4 mb-4'>
           {/* Bohr / cloud canvas */}
-          <div className='xl:col-span-2 luxe-glass p-3'>
+          <div className='xl:col-span-2 luxe-glass p-3 min-w-0'>
             <div className='flex items-center gap-2 mb-2 flex-wrap'>
               <ThunderboltFilled className='text-cyan-300' />
               <p className='eyebrow-mono font-bold text-cyan-300/80'>{mode === 'cloud' ? 'Quantum probability cloud' : 'Bohr model'}  ·  {element?.symbol}-{A}</p>
-              <span className='ml-auto flex items-center gap-2'>
-                <Segmented
-                  size='small'
-                  value={mode}
-                  onChange={setMode}
-                  options={[
-                    { label: 'Bohr orbits', value: 'bohr' },
-                    { label: 'Quantum cloud', value: 'cloud' },
-                  ]}
-                />
-                <button
-                  onClick={() => setRun(r => !r)}
-                  className='luxe-btn luxe-btn-secondary text-xs'
-                  aria-label={running ? 'Pause' : 'Play'}
-                >
-                  {running ? <><PauseCircleFilled /> Pause</> : <><PlayCircleFilled /> Play</>}
-                </button>
-                <button
-                  onClick={() => {
-                    emissionsRef.current = []
-                    fissionRef.current.grid = null
-                    setEvents([])
-                  }}
-                  className='luxe-btn luxe-btn-secondary text-xs'>
-                  <ReloadOutlined /> Clear
-                </button>
-              </span>
+              <Segmented
+                className='sm:ml-auto'
+                size='small'
+                value={mode}
+                onChange={setMode}
+                options={[
+                  { label: 'Bohr orbits', value: 'bohr' },
+                  { label: 'Quantum cloud', value: 'cloud' },
+                ]}
+              />
+              <button
+                onClick={() => setRun(r => !r)}
+                className='luxe-btn luxe-btn-secondary text-xs'
+                aria-label={running ? 'Pause' : 'Play'}
+              >
+                {running ? <><PauseCircleFilled /> Pause</> : <><PlayCircleFilled /> Play</>}
+              </button>
+              <button
+                onClick={() => {
+                  emissionsRef.current = []
+                  fissionRef.current.grid = null
+                  setEvents([])
+                }}
+                className='luxe-btn luxe-btn-secondary text-xs'>
+                <ReloadOutlined /> Clear
+              </button>
             </div>
             <div style={{ aspectRatio: '1 / 1' }} className='w-full max-w-[720px] mx-auto relative'>
               <canvas
@@ -1158,7 +1157,7 @@ export default function Atoms() {
           </div>
 
           {/* Decay chain explorer */}
-          <div className='luxe-glass p-4 lg:col-span-2'>
+          <div className='luxe-glass p-4 lg:col-span-2 min-w-0'>
             <div className='flex items-center gap-2 mb-3 flex-wrap'>
               <p className='eyebrow-mono font-bold text-fuchsia-300/80'>Decay chain explorer</p>
               <Segmented

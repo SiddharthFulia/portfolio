@@ -60,9 +60,9 @@ export default function DifficultySelect({
               role="tab"
               aria-selected={active}
               onClick={() => onChange?.(m)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-[background-color,color,box-shadow,transform] duration-200 ease-out active:scale-[0.97] motion-reduce:active:scale-100 motion-reduce:transition-none ${
                 active
-                  ? 'bg-gradient-to-r from-amber-500 via-rose-500 to-fuchsia-500 text-black shadow'
+                  ? 'bg-gradient-to-r from-amber-500 via-rose-500 to-fuchsia-500 text-black shadow-[0_4px_14px_-4px_rgba(251,191,36,0.55)]'
                   : 'text-white/70 hover:text-white hover:bg-white/5'
               }`}
             >
