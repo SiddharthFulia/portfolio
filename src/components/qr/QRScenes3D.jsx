@@ -46,13 +46,18 @@ import * as THREE from 'three'
 import jsQR from 'jsqr'
 
 // ─── Theme + season catalogue ─────────────────────────────────────────
-export const THEMES = ['Tree Garden', 'Voxel City', 'Crystal Cave', 'Fractal Forest']
+export const THEMES = ['Tree Garden', 'Voxel City', 'Crystal Cave', 'Fractal Forest', 'Tattoo Bloom']
 
 const SEASONS = {
   'Tree Garden':    ['Spring', 'Summer', 'Autumn', 'Winter'],
   'Voxel City':     ['Day', 'Sunset', 'Night'],
   'Crystal Cave':   ['Amethyst', 'Emerald', 'Sapphire'],
   'Fractal Forest': ['Spring', 'Summer', 'Autumn', 'Winter'],
+  // Tattoo Bloom — three moods. Palette hexes get overridden at scene-build
+  // time from the actual tattoo palette prop; season only picks the
+  // atmosphere (sky, ambient warmth) and the neutral fallback tones the
+  // scene shows when no palette has been supplied yet.
+  'Tattoo Bloom':   ['Ink', 'Blossom', 'Noir'],
 }
 
 // Palettes — each theme × season maps to a small set of colour tokens.
@@ -145,6 +150,34 @@ const PALETTES = {
       treeLeaf: '#ffffff', treeWood: '#3b2b1e', ambient: 0.65, sunColor: '#d0d9e5', ground: '#e7eef7',
     },
   },
+  // Tattoo Bloom — the palette tokens act as *fallbacks*. When the caller
+  // supplies a real palette (from BE deep-vision), buildSceneDataTattoo
+  // overrides skin/ink/bloomTop/bloomStub with the palette's brightest hex,
+  // its darkest hex, its most saturated hex, and a mid accent — so every
+  // tattoo drives its own unique bloom colouring.
+  'Tattoo Bloom': {
+    Ink: {
+      // Warm skin-tone floor, black ink, magenta/violet accents.
+      sky: '#f4e2d3', tileDark: '#1a1a20', tileLight: '#f2d5b8',
+      skin: '#f2d5b8', ink: '#141418',
+      bloomTop: '#d946ef', bloomStub: '#fb7185',
+      ground: '#e8c4a2', ambient: 0.55, sunColor: '#fff1d8',
+    },
+    Blossom: {
+      // Cream skin, deep charcoal ink, rose + peach bloom.
+      sky: '#fdeef1', tileDark: '#232028', tileLight: '#fbe0e6',
+      skin: '#fbe0e6', ink: '#1b1720',
+      bloomTop: '#f472b6', bloomStub: '#fca5a5',
+      ground: '#f5cdd2', ambient: 0.6, sunColor: '#ffe4ec',
+    },
+    Noir: {
+      // Cool low-key mood — pale bluish skin, jet ink, cyan/amber accents.
+      sky: '#dfe5ef', tileDark: '#0f1218', tileLight: '#c9d3e0',
+      skin: '#c9d3e0', ink: '#0b0d13',
+      bloomTop: '#22d3ee', bloomStub: '#fbbf24',
+      ground: '#a7b3c2', ambient: 0.4, sunColor: '#e0e8f2',
+    },
+  },
 }
 
 // Mesh keys that represent "artistic" geometry — everything that must be
@@ -157,6 +190,10 @@ const ARTISTIC_KEYS = new Set([
                                     // — light plazas are also raised blocks that
                                     // would occlude the flat scan grid)
   'crystal',                    // Crystal Cave columns
+  'tattooBloomTower',           // Tattoo Bloom tall silhouette columns
+  'tattooBloomStub',            // Tattoo Bloom mid-height silhouette stubs
+  'tattooFloor',                // Tattoo Bloom raised QR floor cells (dark)
+  'tattooGround',               // Tattoo Bloom flat skin ground (light)
   'ground',                     // Big fog-tinted under-plate
 ])
 
@@ -196,6 +233,48 @@ function jitterColor(hex, rng, satJ = 0.1, lightJ = 0.1) {
 const easeInOutCubic = (t) => (t < 0.5
   ? 4 * t * t * t
   : 1 - Math.pow(-2 * t + 2, 3) / 2)
+
+// ─── Tattoo Bloom palette derivation ──────────────────────────────────
+// Take a BE-supplied palette (array of { hex, weight }) and pick out four
+// semantic slots:
+//   • skin     — the brightest (highest luminance) entry, used as the flat
+//                ground the QR sits on
+//   • ink      — the darkest entry (already used as tileDark)
+//   • bloomTop — the most saturated entry, used to tint tall bloom towers
+//   • bloomStub — the second-most-saturated entry, used for shorter stubs
+// If the palette is missing or too small, callers get null slots and the
+// existing per-season fallback palette handles it.
+function resolveTattooPalette(basePalette, external) {
+  if (!Array.isArray(external) || external.length === 0) return basePalette
+  const hexes = external.map((c) => (c?.hex || '').trim()).filter(Boolean)
+  if (hexes.length === 0) return basePalette
+  const stats = hexes.map((hex) => {
+    const rgb = [0, 0, 0]
+    const s = hex.replace('#', '')
+    const n = parseInt(s.length === 3 ? s.split('').map((c) => c + c).join('') : s, 16)
+    rgb[0] = (n >> 16) & 255; rgb[1] = (n >> 8) & 255; rgb[2] = n & 255
+    const lum = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255
+    const max = Math.max(rgb[0], rgb[1], rgb[2])
+    const min = Math.min(rgb[0], rgb[1], rgb[2])
+    const sat = max === 0 ? 0 : (max - min) / max
+    return { hex, lum, sat }
+  })
+  const brightest = [...stats].sort((a, b) => b.lum - a.lum)[0]
+  const darkest   = [...stats].sort((a, b) => a.lum - b.lum)[0]
+  const bySat     = [...stats].sort((a, b) => b.sat - a.sat)
+  const bloomTop  = bySat[0]
+  const bloomStub = bySat[1] || bySat[0]
+  return {
+    ...basePalette,
+    skin:      brightest?.hex || basePalette.skin,
+    tileLight: brightest?.hex || basePalette.tileLight,
+    ground:    brightest?.hex || basePalette.ground,
+    ink:       darkest?.hex   || basePalette.ink,
+    tileDark:  darkest?.hex   || basePalette.tileDark,
+    bloomTop:  bloomTop?.hex  || basePalette.bloomTop,
+    bloomStub: bloomStub?.hex || basePalette.bloomStub,
+  }
+}
 
 // ─── Tree Garden — hand-crafted centrepiece tree ──────────────────────
 // Returns a THREE.Group with a tapered LatheGeometry trunk, 4-5 tapered
@@ -514,14 +593,19 @@ function buildForestTree(cx, cz, seed) {
 // so we can toggle them independently of the artistic geometry.
 //
 // Returns { instances: { key: { color, transforms: [] } }, meta: { counts } }
-function buildSceneData(matrix, N, theme, season) {
+function buildSceneData(matrix, N, theme, season, maskGrid = null, externalPalette = null) {
   // Defensive resolve — when the user switches theme, `season` may be stale
   // for one render (e.g. Tree Garden's "Autumn" → Voxel City which only has
   // Day/Sunset/Night). The season-sync useEffect corrects this on the next
   // paint, but scene rebuild fires first. Fall back to the theme's first
   // season if the pair is missing.
   const themePalette = PALETTES[theme] || PALETTES[THEMES[0]]
-  const palette = themePalette[season] || themePalette[Object.keys(themePalette)[0]]
+  let palette = themePalette[season] || themePalette[Object.keys(themePalette)[0]]
+  // Tattoo Bloom takes an external palette from the BE and re-derives
+  // skin/ink/bloom hexes from it, so every tattoo drives its own bloom.
+  if (theme === 'Tattoo Bloom') {
+    palette = resolveTattooPalette(palette, externalPalette)
+  }
   const inst = {}
   const push = (key, mat, transform) => {
     if (!inst[key]) inst[key] = { material: mat, transforms: [] }
@@ -619,6 +703,43 @@ function buildSceneData(matrix, N, theme, season) {
         } else {
           push('tileLight', { color: palette.tileLight, roughness: 0.95 },
             { pos: [x, 0.05, z], scale: [1, 0.1, 1] })
+        }
+      } else if (theme === 'Tattoo Bloom') {
+        // Tattoo Bloom — every module is a column whose height is chosen
+        // from four tiers based on (dark? ink-mask?):
+        //   dark + ink  → tallest, bloom top colour   (y_top = 1.9)
+        //   light + ink → mid, bloom stub colour      (y_top = 1.2)
+        //   dark + ¬ink → QR floor, dark charcoal     (y_top = 0.4)
+        //   light + ¬ink → flat skin ground           (y_top = 0)
+        // The four tiers become four InstancedMesh buckets so counts stay
+        // low. Silhouette rises out of the QR floor as a topo bloom.
+        const inMask = maskGrid && maskGrid[r * N + c] === 1
+        if (dark && inMask) {
+          // Bloom tower — tall column tinted by the palette's dominant
+          // saturated colour. Slight per-instance shade variance so the
+          // silhouette reads as an organic surface, not a solid slab.
+          const h1 = hash2(r + 71, c + 13)
+          const height = 1.7 + h1 * 0.4
+          push('tattooBloomTower', {
+            color: palette.bloomTop, roughness: 0.55, metalness: 0.05,
+          }, { pos: [x, height / 2, z], scale: [0.94, height, 0.94], shade: 0.9 + h1 * 0.2 })
+        } else if (!dark && inMask) {
+          // Bloom stub — shorter, uses the secondary palette accent.
+          const h1 = hash2(r + 41, c + 61)
+          const height = 1.0 + h1 * 0.4
+          push('tattooBloomStub', {
+            color: palette.bloomStub, roughness: 0.7, metalness: 0.0,
+          }, { pos: [x, height / 2, z], scale: [0.9, height, 0.9], shade: 0.9 + h1 * 0.2 })
+        } else if (dark) {
+          // Plain QR floor (dark cell, no ink) — flat charcoal, y = 0.4.
+          push('tattooFloor', {
+            color: palette.ink, roughness: 0.9,
+          }, { pos: [x, 0.2, z], scale: [1, 0.4, 1] })
+        } else {
+          // Bare skin — thin flat tile at y ≈ 0.
+          push('tattooGround', {
+            color: palette.skin, roughness: 0.95,
+          }, { pos: [x, 0.05, z], scale: [1, 0.1, 1], shade: 0.94 + hash2(r + 3, c + 7) * 0.12 })
         }
       }
     }
@@ -951,7 +1072,7 @@ function decodeWithRotations(img, expected) {
 }
 
 // ─── The React component ──────────────────────────────────────────────
-export default function QRScenes3D({ matrixData, ecc, payload }) {
+export default function QRScenes3D({ matrixData, ecc, payload, silhouetteMask = null, palette = null }) {
   const [theme, setTheme] = useState('Tree Garden')
   const [season, setSeason] = useState('Summer')
   const [view, setView] = useState('Iso')      // 'Iso' | 'Top'
@@ -961,6 +1082,61 @@ export default function QRScenes3D({ matrixData, ecc, payload }) {
   // scanRes: { ok, data, rot, reason?, contrast?, pxPerModule? }
   const [scanRes, setScanRes] = useState({ ok: false, data: '', reason: 'pending' })
   const [debugPngUrl, setDebugPngUrl] = useState(null)
+
+  // ─── Tattoo Bloom mask → N×N grid ─────────────────────────────────
+  // Sibling BE agent's /api/vision/extract-subject endpoint returns a
+  // 1-bit PNG of the tattoo silhouette (data URL). We resample it to the
+  // QR module grid (N×N) so every cell knows whether it's under ink.
+  // Uses the red channel (mask is grayscale) — a value > 128 marks ink.
+  //
+  // Edge cases handled:
+  //   • mask=null → maskGrid=null (Tattoo Bloom still renders as a flat QR
+  //     floor since the buildSceneData branch treats `!maskGrid` as no bloom)
+  //   • mask smaller than QR grid → drawImage stretches it, mask quality
+  //     degrades but rendering still works
+  //   • mask empty (all zeros) → no bloom towers/stubs are pushed, scene
+  //     reads as plain QR floor + skin ground
+  //   • image load errors → maskGrid stays null; console warns once
+  const [maskGrid, setMaskGrid] = useState(null)
+  useEffect(() => {
+    if (!silhouetteMask || !matrixData?.N) { setMaskGrid(null); return }
+    let cancelled = false
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      if (cancelled) return
+      try {
+        const N = matrixData.N
+        const off = document.createElement('canvas')
+        off.width = N
+        off.height = N
+        const ctx = off.getContext('2d')
+        // Fill with black first so any transparent pixels count as "not ink".
+        ctx.fillStyle = '#000000'
+        ctx.fillRect(0, 0, N, N)
+        ctx.drawImage(img, 0, 0, N, N)
+        const px = ctx.getImageData(0, 0, N, N).data
+        const grid = new Uint8Array(N * N)
+        for (let i = 0; i < grid.length; i++) {
+          // Red channel > 128 = ink. Standard grayscale mask convention.
+          grid[i] = px[i * 4] > 128 ? 1 : 0
+        }
+        setMaskGrid(grid)
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn('[QRScenes3D] silhouette mask decode failed', err)
+        setMaskGrid(null)
+      }
+    }
+    img.onerror = () => {
+      if (cancelled) return
+      // eslint-disable-next-line no-console
+      console.warn('[QRScenes3D] silhouette mask load failed')
+      setMaskGrid(null)
+    }
+    img.src = silhouetteMask
+    return () => { cancelled = true }
+  }, [silhouetteMask, matrixData?.N])
 
   // Keep season valid whenever theme changes.
   useEffect(() => {
@@ -1024,7 +1200,9 @@ export default function QRScenes3D({ matrixData, ecc, payload }) {
         else im.material.dispose()
       }
     }
-    const sceneData = buildSceneData(matrixData.matrix, matrixData.N, theme, season)
+    const sceneData = buildSceneData(
+      matrixData.matrix, matrixData.N, theme, season, maskGrid, palette,
+    )
     setInstanceTotal(sceneData.meta.total)
     const built = buildThreeScene(
       canvas, sceneData, theme, season, matrixData.N, matrixData.matrix,
@@ -1056,7 +1234,7 @@ export default function QRScenes3D({ matrixData, ecc, payload }) {
     stateRef.current.transition = null
     setTransitionPct(0)
     setScenePresent(true)
-  }, [matrixData, theme, season])
+  }, [matrixData, theme, season, maskGrid, palette])
 
   // Keep the refs' latest view/autoRotate in sync without recreating the RAF.
   useEffect(() => { stateRef.current.view = view }, [view])
@@ -1413,8 +1591,15 @@ export default function QRScenes3D({ matrixData, ecc, payload }) {
         </div>
         <Segmented block value={theme} onChange={setTheme} options={THEMES} />
         <p className='text-[11px] text-fg-muted mt-2 leading-snug'>
-          Tree Garden raises stone tiles from the QR grid; Voxel City builds towers from dark cells; Crystal Cave forests them with glowing columns; Fractal Forest sprouts low-poly trees.
+          Tree Garden raises stone tiles from the QR grid; Voxel City builds towers from dark cells; Crystal Cave forests them with glowing columns; Fractal Forest sprouts low-poly trees; Tattoo Bloom extrudes a tattoo silhouette out of the QR floor, coloured by the tattoo&apos;s own palette.
         </p>
+        {theme === 'Tattoo Bloom' && !silhouetteMask && (
+          <div className='mt-2 rounded-md border border-fuchsia-400/25 bg-fuchsia-400/[0.06] px-3 py-2'>
+            <p className='text-[11px] leading-snug text-fuchsia-100'>
+              <span className='font-bold'>No silhouette yet.</span> Upload a tattoo in Vision Studio and hit &ldquo;Use this style&rdquo; — the extracted mask will extrude here as a topographical bloom. Right now the scene renders as a plain QR floor.
+            </p>
+          </div>
+        )}
 
         <div className='mt-4'>
           <h3 className='font-bold text-sm mb-2'>Season / mood</h3>

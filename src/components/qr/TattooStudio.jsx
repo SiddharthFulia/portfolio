@@ -290,10 +290,20 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
   const applyStyle = () => {
     const state = toEditorState(analysis)
     if (!state) return
+    // dominant_colors on the analysis object is a plain hex array; the
+    // parent expects the BE-style [{ hex, weight }] shape so the 3D
+    // "Tattoo Bloom" theme can rank saturation / luminance. Wrap it here.
+    const dominant = Array.isArray(analysis.dominant_colors)
+      ? analysis.dominant_colors.map((hex, i) => ({
+          hex,
+          weight: Math.max(0.05, 1 - i * 0.15),
+        }))
+      : null
     onApplyStyle?.(state, {
       payload: usePayload ? analysis.suggested_qr_payload : null,
       image: preview || null,
       silhouetteMask: extraction?.mask?.png_data_url || null,
+      palette: dominant,
     })
     notice.success('Style + tattoo image pushed to editor')
   }
