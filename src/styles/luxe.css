@@ -681,7 +681,9 @@ body.theme-light .gradient-text-cyan  { color: #0e7490 !important; }
   overflow-x: auto;
   scrollbar-width: thin;
 }
-.ant-tabs-nav::-webkit-scrollbar { height: 4px; }
+/* Opt out of the global scrollbar-hide (index.css) for the tab strip —
+   the horizontal thumb signals "there's more, scroll →". */
+.ant-tabs-nav::-webkit-scrollbar { height: 4px; display: block; }
 .ant-tabs-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
 
 .ant-radio-button-wrapper {
@@ -822,7 +824,9 @@ button:focus-visible:not(:disabled) {
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 12px;
 }
-.ant-segmented::-webkit-scrollbar { height: 4px; }
+/* Opt out of the global scrollbar-hide (index.css) — the horizontal
+   segmented control uses a visible thumb to signal overflow. */
+.ant-segmented::-webkit-scrollbar { height: 4px; display: block; }
 .ant-segmented::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
 .ant-segmented.ant-segmented-block { display: flex; width: 100%; }
 

@@ -213,42 +213,66 @@ body:has(.card[data-color="green"]:hover) {
     0.65vmin 1vmin #d2e4ff, 1vmin 0.65vmin #d2e4ff;
 }
 
-/* ── Thin, auto-fading scrollbars (site-wide) ──
- * Default state: invisible thumb on transparent track — no visible
- * scrollbar at rest. On hover/focus of a scrollable region, the thumb
- * fades in as a 6px subtle pill. Firefox uses the modern `scrollbar-*`
- * properties; WebKit (Chrome/Edge/Safari) uses ::-webkit-scrollbar.
+/* ── Hidden scrollbars (site-wide) ──
+ * Scrollbar chrome is fully hidden by default while scrolling stays
+ * fully functional (wheel, touch, keyboard: space / PgUp / PgDn /
+ * arrows / Home / End). Firefox uses `scrollbar-width: none`; WebKit
+ * (Chrome / Edge / Safari) hides via `::-webkit-scrollbar { display:none }`;
+ * old Edge / IE use `-ms-overflow-style: none`.
+ *
+ * OPT-IN: any element that INTENTIONALLY shows its scrollbar (chat
+ * sidebars, log panels, horizontally-scrolling segmented controls,
+ * Monaco gutters, etc.) should add `className="show-scrollbar"`.
  */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
+html, body {
+  scrollbar-width: none;              /* Firefox */
+  -ms-overflow-style: none;           /* IE 10+ / old Edge */
 }
-*:hover,
-*:focus,
-*:focus-within {
-  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;                      /* Safari / Chrome / new Edge */
+}
+
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 *::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-  background: transparent;
+  width: 0;
+  height: 0;
+  display: none;
 }
-*::-webkit-scrollbar-track {
-  background: transparent;
-}
-*::-webkit-scrollbar-thumb {
-  background: transparent;
-  border-radius: 999px;
-  transition: background 0.25s ease;
-}
-*:hover::-webkit-scrollbar-thumb,
-*:focus::-webkit-scrollbar-thumb,
-*:focus-within::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.35);
-}
-*::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.55);
-}
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-thumb,
 *::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+/* ── Opt-in visible scrollbar ──
+ * Add `className="show-scrollbar"` to any scroll container that
+ * benefits from a visible affordance (chat lists, run logs, horizontal
+ * segmented controls, code gutters, etc.). Wins over the global hide
+ * rules via `!important`.
+ */
+.show-scrollbar {
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  -ms-overflow-style: auto !important;
+}
+.show-scrollbar::-webkit-scrollbar {
+  width: 6px !important;
+  height: 6px !important;
+  display: block !important;
+}
+.show-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.show-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+.show-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
