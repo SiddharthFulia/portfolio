@@ -32,6 +32,7 @@ import {
 import { notice } from '../lib/notice'
 import QRScenes3D from '../components/qr/QRScenes3D'
 import TattooStudio from '../components/qr/TattooStudio'
+import VisionStudio from '../components/qr/VisionStudio'
 
 // ─── KaTeX helpers (identical shape to PhysicsLab / Atoms) ─────────
 function renderTex(src, opts = {}) {
@@ -1468,10 +1469,10 @@ ${inner}
             block
             value={topTab}
             onChange={setTopTab}
-            options={['2D Editor', '3D Scenes', 'Tattoo Studio']}
+            options={['2D Editor', '3D Scenes', 'Tattoo Studio', 'Vision Studio']}
           />
           <p className='text-[11px] text-fg-muted mt-2 leading-snug px-1'>
-            2D Editor gives you every classic knob — cell shapes, gradients, ECC, logo overlay, damage sim. 3D Scenes reinterprets the same matrix as an isometric world. Tattoo Studio reads a tattoo photo with Gemini Vision and auto-styles a QR from its palette, motifs, and energy.
+            2D Editor gives you every classic knob — cell shapes, gradients, ECC, logo overlay, damage sim. 3D Scenes reinterprets the same matrix as an isometric world. Tattoo Studio reads a tattoo photo with Gemini Vision and auto-styles a QR from its palette, motifs, and energy. Vision Studio scans any image entirely offline — dominant colours, OCR text, composition metadata — and auto-fills the editor from what it sees.
           </p>
         </div>
       </div>
@@ -1513,6 +1514,37 @@ ${inner}
               // Just swap the payload without switching tabs.
               setPayloadKind('URL')
               setFields((f) => ({ ...f, url: p, text: p }))
+            }}
+          />
+        </div>
+      )}
+
+      {topTab === 'Vision Studio' && (
+        <div className='max-w-7xl mx-auto px-4 md:px-6 pb-16'>
+          <VisionStudio
+            currentPayload={payload}
+            onApplyStyle={(state, opts) => {
+              // Same wiring as Tattoo Studio's onApplyStyle — the shape is
+              // identical so both tabs share the parent's editor state.
+              if (state.cellShape)     setCellShape(state.cellShape)
+              if (state.eyeShape)      setEyeShape(state.eyeShape)
+              if (state.eyeInnerShape) setEyeInnerShape(state.eyeInnerShape)
+              if (state.fgColor)       setFgColor(state.fgColor)
+              if (state.fgColor2)      setFgColor2(state.fgColor2)
+              if (state.bgColor)       setBgColor(state.bgColor)
+              if (typeof state.gradientOn === 'boolean') setGradientOn(state.gradientOn)
+              if (state.gradientType)  setGradientType(state.gradientType)
+              if (state.gradientAngle != null) setGradientAngle(state.gradientAngle)
+              if (state.ecc)           setEcc(state.ecc)
+              if (opts?.payload) {
+                // OCR payloads are almost always text — if they look like
+                // a URL we still route through the URL slot so the editor's
+                // qr-string type is a canonical URL.
+                const looksLikeUrl = /^https?:\/\//i.test(opts.payload)
+                setPayloadKind(looksLikeUrl ? 'URL' : 'Text')
+                setFields((f) => ({ ...f, url: opts.payload, text: opts.payload }))
+              }
+              setTopTab('2D Editor')
             }}
           />
         </div>

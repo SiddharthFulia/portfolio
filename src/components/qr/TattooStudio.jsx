@@ -40,6 +40,9 @@ import { analyzeTattoo, checkTattooHealth } from '../../api/tattoo'
 import { createQrSave, listQrSaves, deleteQrSave } from '../../api/qrSaves'
 import { notice } from '../../lib/notice'
 import { LuxeLoader } from '../loaders'
+import {
+  loadImage, toImageData, extractDominantColors, imageMetadata, runOcr,
+} from '../../lib/imageAnalysis'
 
 // FE-facing shape constants (mirror QRCompiler). Keep in sync manually if
 // they ever change on the editor side.
@@ -104,11 +107,13 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
   const [file, setFile]           = useState(null)      // File / Blob from Upload
   const [preview, setPreview]     = useState('')        // data URL for thumbnail
   const [analyzing, setAnalyzing] = useState(false)
-  const [analysis, setAnalysis]   = useState(null)      // Gemini response
-  const [meta, setMeta]           = useState(null)      // { cached, elapsedMs, modelId }
+  const [analysis, setAnalysis]   = useState(null)      // Gemini response OR offline synthesis
+  const [meta, setMeta]           = useState(null)      // { cached, elapsedMs, modelId, backend }
   const [error, setError]         = useState('')
+  const [errorStatus, setErrorStatus] = useState(null)  // HTTP status of last analyze error
   const [usePayload, setUsePayload] = useState(true)
   const [saving, setSaving]       = useState(false)
+  const [offlineRunning, setOfflineRunning] = useState(false)
 
   // Health probe — surfaces a friendly banner when Gemini isn't configured
   // on this BE, so users don't spend time uploading only to hit a 503.
@@ -165,17 +170,83 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
   // ─── Analyze click ────────────────────────────────────────────
   const runAnalyze = async () => {
     if (!file) { notice.warning('Drop or pick a tattoo photo first'); return }
-    setAnalyzing(true); setError('')
+    setAnalyzing(true); setError(''); setErrorStatus(null)
     try {
       const data = await analyzeTattoo(file)
       setAnalysis(data.analysis)
-      setMeta({ cached: !!data.cached, elapsedMs: data.elapsedMs, modelId: data.modelId })
+      // The BE may hand us `backend: 'offline'` on the top-level envelope
+      // OR nested in the analysis payload — respect either shape.
+      const backend = data.backend || data.analysis?.backend || 'gemini'
+      setMeta({
+        cached: !!data.cached,
+        elapsedMs: data.elapsedMs,
+        modelId: data.modelId,
+        backend,
+      })
       if (data.cached) notice.info('Loaded from cache')
+      else if (backend === 'offline') notice.info('Analysed with offline vision')
       else notice.success('Analysis complete')
     } catch (e) {
       setError(e.message || 'Analysis failed')
+      setErrorStatus(e.status || null)
       notice.error(e.message || 'Analysis failed')
     } finally { setAnalyzing(false) }
+  }
+
+  // ─── Fully in-browser fallback ────────────────────────────────
+  // When the BE returns 503 (Gemini not configured AND the offline BE
+  // fallback isn't set up), we still let the user get value out of this
+  // tab by running the exact Vision Studio pipeline in the browser.
+  // Skipping style/subject classification since offline models can't
+  // reliably tell "traditional" from "neo-traditional" from a photo.
+  const runOfflineAnalyze = async () => {
+    if (!file) { notice.warning('Drop a photo first'); return }
+    setOfflineRunning(true); setError(''); setErrorStatus(null)
+    try {
+      const img = await loadImage(file)
+      const colourBuf = toImageData(img, 64)
+      const analysisBuf = toImageData(img, 1024)
+      const palette = extractDominantColors(colourBuf, 6)
+      const met = imageMetadata(analysisBuf)
+      let ocr = { text: '', lines: [] }
+      try { ocr = await runOcr(file) } catch {}
+
+      // Pick the two most-weighted swatches for the QR gradient.
+      const primary   = palette[0]?.hex || '#0a0a0e'
+      const secondary = palette[1]?.hex || '#e879f9'
+      // Compose a subject line from OCR or fall back to a summary.
+      const inferredSubject = (ocr.lines?.[0] || 'Offline reading').slice(0, 60)
+      const suggestedPayload = ocr.text?.trim()
+        ? (ocr.text.trim().slice(0, 200))
+        : `Ink · ${met.orientation} · ${primary}`
+
+      const synth = {
+        subject: inferredSubject,
+        style: 'unknown (offline)',
+        motifs: [],
+        dominant_colors: palette.slice(0, 5).map((c) => c.hex),
+        line_weight: met.textureBusy > 0.4 ? 'bold' : 'fine',
+        complexity: met.textureBusy > 0.5 ? 'high' : met.textureBusy > 0.25 ? 'medium' : 'low',
+        energy: met.saturation > 0.5 ? 'high' : met.saturation > 0.25 ? 'medium' : 'calm',
+        suggested_qr_payload: suggestedPayload,
+        suggested_qr_style: {
+          cell_shape: met.textureBusy > 0.35 ? 'square' : 'rounded',
+          eye_shape: met.textureBusy > 0.35 ? 'rounded' : 'circle',
+          primary_color: primary,
+          secondary_color: secondary,
+          gradient_direction: 135,
+          ecc_level: 'H',
+        },
+        confidence: 0.5,
+        backend: 'offline-browser',
+      }
+      setAnalysis(synth)
+      setMeta({ cached: false, elapsedMs: null, modelId: 'in-browser', backend: 'offline-browser' })
+      notice.success('Offline reading complete')
+    } catch (e) {
+      setError(e.message || 'Offline analysis failed')
+      notice.error(e.message || 'Offline analysis failed')
+    } finally { setOfflineRunning(false) }
   }
 
   // ─── Apply suggested style ───────────────────────────────────
@@ -250,21 +321,37 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
   }
 
   const hasEditorState = useMemo(() => !!toEditorState(analysis), [analysis])
-  const badgeHelper = health && !health.ok
-    ? 'Gemini isn\'t configured on the current backend. Analyses will fail until GEMINI_ENABLED=1 + a valid GEMINI_API_KEY are set on the BE.'
-    : ''
+  const usingOfflineBackend =
+    meta?.backend === 'offline' || meta?.backend === 'offline-browser'
+
+  // Health-derived banner state:
+  //   • Gemini configured           → no banner
+  //   • Gemini off, BE has fallback → subtle amber "analysing offline" heads-up
+  //   • Gemini off, no fallback     → same banner + note that analyze may 503
+  // The BE's /tattoo/health now returns `offlineFallback` when the sibling
+  // agent's fallback ships — we degrade gracefully if that field is missing.
+  const showHealthBanner = health && !health.ok
+  const offlineFallbackReady = !!health?.offlineFallback
 
   return (
     <div className='space-y-4'>
-      {/* Gemini-not-configured banner. Non-blocking — user can still upload
-          + preview, they'll just hit a 503 on analyze. */}
-      {health && !health.ok && (
+      {/* Health banner — subtle amber, non-blocking. Copy adapts to whether
+          the BE has an offline pipeline already or the FE will need to do it. */}
+      {showHealthBanner && (
         <div className='luxe-glass p-4 border border-amber-400/30 bg-amber-400/5'>
           <div className='flex items-start gap-3'>
             <InfoCircleOutlined className='text-amber-300 text-lg mt-0.5' />
             <div>
-              <div className='font-bold text-sm text-amber-200'>Vision service not configured</div>
-              <FieldHelp>{badgeHelper}</FieldHelp>
+              <div className='font-bold text-sm text-amber-200'>
+                {offlineFallbackReady
+                  ? 'Analysing with offline vision'
+                  : 'Vision service not configured'}
+              </div>
+              <FieldHelp>
+                {offlineFallbackReady
+                  ? 'Install Gemini for richer style detection (subject, motifs, energy). Colours + composition still work fully offline.'
+                  : 'Gemini isn\'t configured on this backend. You can still run the analysis fully in your browser — see the button below after uploading.'}
+              </FieldHelp>
             </div>
           </div>
         </div>
@@ -320,8 +407,30 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
 
         {error && (
           <div className='mt-4 rounded-lg border border-rose-400/40 bg-rose-500/10 p-3 text-sm'>
-            <CloseCircleFilled className='text-rose-300 mr-2' />
-            {error}
+            <div className='flex items-start gap-2'>
+              <CloseCircleFilled className='text-rose-300 mt-0.5' />
+              <div className='flex-1'>
+                <div>{error}</div>
+                {/* 503 = Gemini not configured — offer the FE-only fallback.
+                    We show the same button when the BE is unreachable so users
+                    on flaky networks still get useful colour + composition data. */}
+                {(errorStatus === 503 || errorStatus == null) && (
+                  <div className='mt-3'>
+                    <Button
+                      size='small'
+                      variant='ghost'
+                      icon={<ExperimentOutlined />}
+                      loading={offlineRunning}
+                      onClick={runOfflineAnalyze}>
+                      Analyse offline in browser
+                    </Button>
+                    <FieldHelp>
+                      Runs the same colour + composition + OCR pipeline entirely on this device. Style / subject classification is skipped — offline models can't reliably classify tattoo style from a photo.
+                    </FieldHelp>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -359,6 +468,11 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
               <h2 className='font-bold text-lg'>2. Analysis</h2>
               <div className='flex items-center gap-2 text-[11px] text-fg-muted'>
                 {meta?.cached && <span className='px-2 py-0.5 rounded-full bg-white/5'>cached</span>}
+                {usingOfflineBackend && (
+                  <span className='px-2 py-0.5 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-200'>
+                    offline
+                  </span>
+                )}
                 {meta?.modelId && <span className='px-2 py-0.5 rounded-full bg-white/5'>{meta.modelId}</span>}
                 {meta?.elapsedMs != null && <span>{(meta.elapsedMs / 1000).toFixed(1)}s</span>}
               </div>
