@@ -313,8 +313,14 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
 
   const applySuggested = () => {
     if (!suggested?.state) return
-    onApplyStyle?.(suggested.state, { payload: suggested.payload })
-    notice.success('Style + payload pushed to editor')
+    // Push style + payload + the original image so the 2D editor can bake
+    // the actual picture into the QR (halftone into ECC waste + centred
+    // logo overlay). Both live-scan-test-friendly modes handled parent-side.
+    onApplyStyle?.(suggested.state, {
+      payload: suggested.payload,
+      image: preview || null,       // data URL — parent wires it into logoImg + bakeImg
+    })
+    notice.success('Style, payload, and image pushed to editor')
   }
 
   const copyLine = (line) => {

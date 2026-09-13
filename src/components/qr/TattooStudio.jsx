@@ -272,8 +272,9 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
     if (!state) return
     onApplyStyle?.(state, {
       payload: usePayload ? analysis.suggested_qr_payload : null,
+      image: preview || null,
     })
-    notice.success('Style pushed to editor')
+    notice.success('Style + tattoo image pushed to editor')
   }
 
   // ─── Use suggested payload (without switching tabs) ──────────

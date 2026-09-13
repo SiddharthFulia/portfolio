@@ -1507,6 +1507,21 @@ ${inner}
                 setPayloadKind('URL')
                 setFields((f) => ({ ...f, url: opts.payload, text: opts.payload }))
               }
+              // Bake the tattoo image into the QR — logo overlay + halftone
+              // through ECC waste. Same treatment as Vision Studio.
+              if (opts?.image) {
+                const img = new Image()
+                img.onload = () => {
+                  setLogoOn(true)
+                  setLogoImg(img)
+                  setLogoPct(22)
+                  setLogoRound(true)
+                  setLogoPad(true)
+                  setBakeImg(img)
+                  setBakeInfluence(55)
+                }
+                img.src = opts.image
+              }
               // Jump back to the 2D editor so the redraw is visible.
               setTopTab('2D Editor')
             }}
@@ -1543,6 +1558,26 @@ ${inner}
                 const looksLikeUrl = /^https?:\/\//i.test(opts.payload)
                 setPayloadKind(looksLikeUrl ? 'URL' : 'Text')
                 setFields((f) => ({ ...f, url: opts.payload, text: opts.payload }))
+              }
+              // Load the actual image the user uploaded to Vision Studio
+              // into BOTH the centre logo overlay AND the image bake-in
+              // machinery. The centre logo gives the strong visual anchor;
+              // the halftone bake spreads the image ink through the ECC
+              // waste pixels so the QR reads as the picture even at a
+              // glance. Both are protected by ECC H (30% redundancy) which
+              // is what the suggested state pins by default.
+              if (opts?.image) {
+                const img = new Image()
+                img.onload = () => {
+                  setLogoOn(true)
+                  setLogoImg(img)
+                  setLogoPct(22)      // slightly bigger than the default
+                  setLogoRound(true)
+                  setLogoPad(true)
+                  setBakeImg(img)
+                  setBakeInfluence(55) // moderate — leaves finder patterns intact
+                }
+                img.src = opts.image
               }
               setTopTab('2D Editor')
             }}
