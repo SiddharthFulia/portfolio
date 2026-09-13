@@ -558,19 +558,26 @@ function renderQR(canvas, cfg, matrixData, bgImg, logoImg) {
       }
       if (!dark) continue
 
-      // Silhouette gate — outside the silhouette we skip everything
-      // EXCEPT structural cells the decoder needs. isReservedCell
-      // covers finders + separators + timing + alignment + version info.
-      if (silhouetteGrid && silhouetteGrid[idx] === 0 && !isReservedCell(r, c, N)) {
-        continue
-      }
-
       const inFinderRing  = isFinderRing(r, c, N)
       const inFinderInner = isFinderInner(r, c, N)
       const inFinder      = isFinderModule(r, c, N)
 
       const x = originX + c * cellSize
       const y = originY + r * cellSize
+
+      // Silhouette gate — outside the silhouette we still paint the cell
+      // (so the QR remains scannable — every data module has to be
+      // readable by jsQR / ZXing) but we shrink it to ~50% size and
+      // centre it. Visually reads as "hollow" outside the tattoo shape;
+      // decoders still see a dark centre and pass. Reserved structural
+      // cells (finder / alignment / timing) always render full-size.
+      if (silhouetteGrid && silhouetteGrid[idx] === 0 && !isReservedCell(r, c, N) && !inFinder) {
+        const shrink = 0.5
+        const smallS = cellSize * shrink
+        const offset = (cellSize - smallS) / 2
+        drawModule(ctx, x + offset, y + offset, smallS, cfg.cellShape, cfg.radius, cfg.gap)
+        continue
+      }
 
       if (inFinder) {
         // Skip individual modules of the finder ring/inner — we draw them

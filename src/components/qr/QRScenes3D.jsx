@@ -794,27 +794,31 @@ function buildSceneData(matrix, N, theme, season, maskGrid = null, externalPalet
 // during the snapshot.
 const SCAN_KEYS = new Set(['scanDark', 'scanLight', 'scanQuiet'])
 
-// ─── Three renderer — wires up scene / camera / lights / instances. ───
-function buildThreeScene(canvas, sceneData, theme, season, N, matrix, opts = {}) {
+// ─── Renderer init — the ONLY place a WebGL context gets allocated. ───
+// Called ONCE per component mount. All scene rebuilds reuse the same
+// renderer so we never leak WebGL contexts across theme/season/mask
+// changes. Browsers cap contexts at ~8-16 per tab — recreating the
+// renderer on every state change quickly blows that budget.
+function initRenderer(canvas, opts = {}) {
   const dpr = Math.min(window.devicePixelRatio || 1, opts.lowPower ? 1 : 2)
   const w = canvas.clientWidth || 640
   const h = canvas.clientHeight || 640
-  // Renderer config — low-power fallback drops antialias + preserveDrawingBuffer
-  // to cut GPU memory in half. Used when the first init attempt fails
-  // (mobile context limit, integrated GPU, low VRAM).
   const rendererOpts = opts.lowPower
     ? { canvas, antialias: false, alpha: false, preserveDrawingBuffer: false, powerPreference: 'low-power', failIfMajorPerformanceCaveat: false }
     : { canvas, antialias: true,  alpha: false, preserveDrawingBuffer: true,  powerPreference: 'high-performance' }
   const renderer = new THREE.WebGLRenderer(rendererOpts)
   renderer.setPixelRatio(dpr)
   renderer.setSize(w, h, false)
-  // PCFSoftShadowMap enables the soft-drop-shadow reading on the tree
-  // trunk + tiles for Tree Garden. Other themes ignore it (nothing casts).
-  // Low-power mode disables shadows entirely — softens visual quality but
-  // saves a full shadow-map pass per frame.
   renderer.shadowMap.enabled = !opts.lowPower
   renderer.shadowMap.type = THREE.PCFSoftShadowMap
+  return renderer
+}
 
+// ─── Scene graph — cheap to build/dispose, no WebGL context involved. ───
+// Called on every matrix/theme/season/mask/palette change. Old scene
+// children are disposed (geometries + materials release GPU memory) but
+// the RENDERER stays alive.
+function buildSceneGraph(sceneData, theme, season, N, matrix) {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(sceneData.meta.palette.sky)
   scene.fog = new THREE.Fog(sceneData.meta.palette.sky, N * 1.5, N * 4)
@@ -933,9 +937,25 @@ function buildThreeScene(canvas, sceneData, theme, season, N, matrix, opts = {})
   }
 
   return {
-    renderer, scene, isoCam, topCam, liveCam, meshes,
+    scene, isoCam, topCam, liveCam, meshes,
     treeOverlay, groundOverlay,
     lights: { ambient, sun, fill, hemi },
+  }
+}
+
+// Fully dispose a scene graph's GPU resources without touching the renderer.
+// Called before every scene rebuild so old geometries/materials release
+// their VRAM. The renderer keeps its WebGL context.
+function disposeSceneGraph(graph) {
+  if (!graph) return
+  const scene = graph.scene
+  if (scene) {
+    scene.traverse((obj) => {
+      if (obj.geometry) obj.geometry.dispose?.()
+      if (Array.isArray(obj.material)) obj.material.forEach((m) => m.dispose?.())
+      else if (obj.material) obj.material.dispose?.()
+    })
+    while (scene.children.length) scene.remove(scene.children[0])
   }
 }
 
@@ -951,17 +971,31 @@ function buildThreeScene(canvas, sceneData, theme, season, N, matrix, opts = {})
 // `toDataURL` both work on `outCanvas`.
 function renderTopDownFrame(state, outCanvas) {
   const size = outCanvas.width
-  // Dedicated WebGL canvas — kept off-DOM. One per call is fine; renderer
-  // + context are cheap at 720² and immediately disposed.
-  const glCanvas = document.createElement('canvas')
-  glCanvas.width = size
-  glCanvas.height = size
-  const snap = new THREE.WebGLRenderer({
-    canvas: glCanvas, antialias: false, preserveDrawingBuffer: true, alpha: false,
-  })
-  snap.setPixelRatio(1)
-  snap.setSize(size, size, false)
-  snap.setClearColor(new THREE.Color('#ffffff'), 1)  // white quiet zone
+  // Lazily create ONE snap renderer per component lifetime — reuse across
+  // every scan. Recreating a WebGLRenderer on every scan tick leaked
+  // contexts fast (Chrome caps ~16, Safari ~8) and eventually blew the
+  // browser's WebGL budget. Cached on state so it lives with the main
+  // renderer and disposes on unmount.
+  if (!state.snapRenderer) {
+    const glCanvas = document.createElement('canvas')
+    glCanvas.width = size
+    glCanvas.height = size
+    state.snapCanvas = glCanvas
+    state.snapRenderer = new THREE.WebGLRenderer({
+      canvas: glCanvas, antialias: false, preserveDrawingBuffer: true, alpha: false,
+      powerPreference: 'low-power',
+    })
+    state.snapRenderer.setPixelRatio(1)
+    state.snapRenderer.setSize(size, size, false)
+    state.snapRenderer.setClearColor(new THREE.Color('#ffffff'), 1)
+  } else if (state.snapCanvas.width !== size) {
+    // Payload got longer → module count grew → snap canvas needs resize.
+    state.snapCanvas.width = size
+    state.snapCanvas.height = size
+    state.snapRenderer.setSize(size, size, false)
+  }
+  const snap = state.snapRenderer
+  const glCanvas = state.snapCanvas
 
   // Stash + swap: hide artistic meshes, show scan meshes.
   const prevVis = {}
@@ -1005,7 +1039,8 @@ function renderTopDownFrame(state, outCanvas) {
   state.scene.background = prevBg
   state.scene.fog = prevFog
 
-  snap.dispose()
+  // NOT disposed — reused across every scan for the lifetime of the
+  // component. Cleanup happens in the mount effect's unmount handler.
   return img
 }
 
@@ -1184,70 +1219,30 @@ export default function QRScenes3D({ matrixData, ecc, payload, silhouetteMask = 
     // Cached offscreen scan canvas — 720 px gives ~24 px/module on a
     // 30-module QR, plenty of headroom for jsQR's ≥10 px/module target.
     scanCanvas: null,
+    // Reusable snap renderer + its WebGL canvas — created once per
+    // component mount, disposed on unmount. See renderTopDownFrame().
+    snapRenderer: null, snapCanvas: null,
     // Camera easing state. `transition` is null when settled, otherwise
     // holds { fromPos, fromUp, toPos, toUp, targetMode, start, dur }.
     // `currentMode` is where we're settled ('Iso' or 'Top').
     transition: null, currentMode: 'Iso',
   })
 
-  // Cleanup on unmount — release the WebGL context and cancel any RAF.
-  useEffect(() => {
-    return () => {
-      const s = stateRef.current
-      if (s.raf) cancelAnimationFrame(s.raf)
-      if (s.renderer) {
-        for (const key of Object.keys(s.meshes)) {
-          const im = s.meshes[key]
-          im.geometry.dispose()
-          if (Array.isArray(im.material)) im.material.forEach((m) => m.dispose())
-          else im.material.dispose()
-        }
-        s.renderer.dispose()
-      }
-    }
-  }, [])
-
-  // Rebuild scene whenever matrix / theme / season changes.
+  // ─── Renderer init — ONE WebGL context per component mount ────────
+  // Runs exactly once (or once more if the user hits Retry via webglRetry).
+  // Never re-fires on scene/theme/mask changes. Cleanup on unmount
+  // disposes the renderer (which releases the WebGL context) + any RAF.
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    if (!matrixData) {
-      setScenePresent(false)
-      setInstanceTotal(0)
-      return
-    }
-    // Dispose the old scene.
-    if (stateRef.current.renderer) {
-      stateRef.current.renderer.dispose()
-      // Dispose old geometries / materials to release GPU memory.
-      for (const key of Object.keys(stateRef.current.meshes)) {
-        const im = stateRef.current.meshes[key]
-        im.geometry.dispose()
-        if (Array.isArray(im.material)) im.material.forEach((m) => m.dispose())
-        else im.material.dispose()
-      }
-    }
-    const sceneData = buildSceneData(
-      matrixData.matrix, matrixData.N, theme, season, maskGrid, palette,
-    )
-    setInstanceTotal(sceneData.meta.total)
-    let built
+    let renderer
     try {
-      built = buildThreeScene(
-        canvas, sceneData, theme, season, matrixData.N, matrixData.matrix,
-      )
+      renderer = initRenderer(canvas)
       setWebglError(null)
     } catch (err) {
       console.warn('QRScenes3D: WebGL init failed (high-perf) —', err?.message || err)
-      // Second chance: retry with a leaner renderer (no antialias, no shadow
-      // map, no preserveDrawingBuffer, powerPreference=low-power, DPR=1).
-      // Cuts GPU memory roughly in half — often gets us past the browser's
-      // WebGL context budget on mobile / integrated GPUs.
       try {
-        built = buildThreeScene(
-          canvas, sceneData, theme, season, matrixData.N, matrixData.matrix,
-          { lowPower: true },
-        )
+        renderer = initRenderer(canvas, { lowPower: true })
         setWebglError(null)
         console.info('QRScenes3D: recovered via low-power renderer')
       } catch (err2) {
@@ -1257,7 +1252,35 @@ export default function QRScenes3D({ matrixData, ecc, payload, silhouetteMask = 
         return
       }
     }
-    stateRef.current.renderer = built.renderer
+    stateRef.current.renderer = renderer
+    return () => {
+      const s = stateRef.current
+      if (s.raf) cancelAnimationFrame(s.raf)
+      disposeSceneGraph({ scene: s.scene })
+      if (s.snapRenderer) { s.snapRenderer.dispose(); s.snapRenderer = null }
+      if (s.renderer) { s.renderer.dispose(); s.renderer = null }
+    }
+  }, [webglRetry])
+
+  // ─── Scene rebuild — reuses the renderer, only rebuilds meshes ────
+  // Fires on matrix / theme / season / mask / palette change. Disposes
+  // old scene GPU resources (geometries + materials) but the WebGLRenderer
+  // stays alive.
+  useEffect(() => {
+    if (!stateRef.current.renderer) return
+    if (!matrixData) {
+      setScenePresent(false)
+      setInstanceTotal(0)
+      return
+    }
+    disposeSceneGraph({ scene: stateRef.current.scene })
+    const sceneData = buildSceneData(
+      matrixData.matrix, matrixData.N, theme, season, maskGrid, palette,
+    )
+    setInstanceTotal(sceneData.meta.total)
+    const built = buildSceneGraph(
+      sceneData, theme, season, matrixData.N, matrixData.matrix,
+    )
     stateRef.current.scene = built.scene
     stateRef.current.isoCam = built.isoCam
     stateRef.current.topCam = built.topCam
@@ -1284,7 +1307,7 @@ export default function QRScenes3D({ matrixData, ecc, payload, silhouetteMask = 
     stateRef.current.transition = null
     setTransitionPct(0)
     setScenePresent(true)
-  }, [matrixData, theme, season, maskGrid, palette, webglRetry])
+  }, [matrixData, theme, season, maskGrid, palette])
 
   // Keep the refs' latest view/autoRotate in sync without recreating the RAF.
   useEffect(() => { stateRef.current.view = view }, [view])
