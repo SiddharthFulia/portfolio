@@ -124,6 +124,7 @@ export const ENDPOINTS = {
   FACE_ANALYZE: '/api/face-analyze',
   DETECT_OBJECTS: '/api/detect-objects',
   FACE_HEALTH: '/api/face-health',
+  VISION_DEEP_ANALYZE: '/api/vision/deep-analyze',
 
   // NASA — direct proxied endpoints (api.nasa.gov/*)
   APOD: '/api/nasa/planetary/apod',

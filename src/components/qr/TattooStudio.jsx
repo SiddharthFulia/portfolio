@@ -2,22 +2,25 @@
 //
 // Flow:
 //   1. User drops a tattoo photo into the antd Upload.Dragger.
-//   2. FE previews the thumbnail, POSTs to /api/tattoo/analyze.
-//   3. Gemini Vision returns { subject, style, motifs, dominant_colors,
+//   2. FE previews the thumbnail, POSTs to the tattoo analyse endpoint.
+//   3. The service returns { subject, style, motifs, dominant_colors,
 //      line_weight, complexity, energy, suggested_qr_payload,
 //      suggested_qr_style, confidence }.
 //   4. FE renders a rich analysis card — big subject line, style badge,
 //      motif chips, five colour swatches, three little stat tiles, and a
 //      confidence bar.
-//   5. "Apply suggested style" wires the BE's suggested_qr_style values
-//      into the parent QRCompiler's editor state and switches back to the
-//      2D Editor tab so the user immediately sees the live QR redraw.
+//   5. "Apply suggested style" wires the suggested_qr_style values into
+//      the parent QRCompiler's editor state and switches back to the 2D
+//      Editor tab so the user immediately sees the live QR redraw.
 //   6. "Use suggested payload" pre-fills the URL / text field with the
 //      thematic payload the model suggested.
 //   7. "Save this tattoo QR" hits /api/qr-saves with source_kind='tattoo'
 //      and the full analysis as source_meta.
 //   8. A gallery of past tattoo QRs sits below (server-filtered by
 //      source_kind=tattoo).
+//   9. If the primary analyser is unavailable, "Analyse with deep vision"
+//      falls back to the general-purpose deep vision endpoint (same one
+//      Vision Studio uses) so users still get palette + tags + caption.
 //
 // UX notes:
 //   • Every panel title is bold (font-bold) with no leading em-dash.
@@ -38,11 +41,9 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import { analyzeTattoo, checkTattooHealth } from '../../api/tattoo'
 import { createQrSave, listQrSaves, deleteQrSave } from '../../api/qrSaves'
+import { deepAnalyzeImage } from '../../api/vision'
 import { notice } from '../../lib/notice'
 import { LuxeLoader } from '../loaders'
-import {
-  loadImage, toImageData, extractDominantColors, imageMetadata, runOcr,
-} from '../../lib/imageAnalysis'
 
 // FE-facing shape constants (mirror QRCompiler). Keep in sync manually if
 // they ever change on the editor side.
@@ -107,16 +108,16 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
   const [file, setFile]           = useState(null)      // File / Blob from Upload
   const [preview, setPreview]     = useState('')        // data URL for thumbnail
   const [analyzing, setAnalyzing] = useState(false)
-  const [analysis, setAnalysis]   = useState(null)      // Gemini response OR offline synthesis
-  const [meta, setMeta]           = useState(null)      // { cached, elapsedMs, modelId, backend }
+  const [analysis, setAnalysis]   = useState(null)      // BE analysis payload or deep-vision synthesis
+  const [meta, setMeta]           = useState(null)      // { cached, elapsedMs, backend }
   const [error, setError]         = useState('')
   const [errorStatus, setErrorStatus] = useState(null)  // HTTP status of last analyze error
   const [usePayload, setUsePayload] = useState(true)
   const [saving, setSaving]       = useState(false)
   const [offlineRunning, setOfflineRunning] = useState(false)
 
-  // Health probe — surfaces a friendly banner when Gemini isn't configured
-  // on this BE, so users don't spend time uploading only to hit a 503.
+  // Health probe — surfaces a friendly banner when the analyser isn't
+  // available, so users don't spend time uploading only to hit a 503.
   const [health, setHealth] = useState(null)
   useEffect(() => {
     checkTattooHealth().then(setHealth).catch(() => setHealth({ ok: false, unreachable: true }))
@@ -174,17 +175,15 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
     try {
       const data = await analyzeTattoo(file)
       setAnalysis(data.analysis)
-      // The BE may hand us `backend: 'offline'` on the top-level envelope
-      // OR nested in the analysis payload — respect either shape.
-      const backend = data.backend || data.analysis?.backend || 'gemini'
+      // The BE tags where the analysis came from, but users don't need
+      // to see the plumbing — we only use `backend` internally.
+      const backend = data.backend || data.analysis?.backend || 'primary'
       setMeta({
         cached: !!data.cached,
         elapsedMs: data.elapsedMs,
-        modelId: data.modelId,
         backend,
       })
       if (data.cached) notice.info('Loaded from cache')
-      else if (backend === 'offline') notice.info('Analysed with offline vision')
       else notice.success('Analysis complete')
     } catch (e) {
       setError(e.message || 'Analysis failed')
@@ -193,59 +192,77 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
     } finally { setAnalyzing(false) }
   }
 
-  // ─── Fully in-browser fallback ────────────────────────────────
-  // When the BE returns 503 (Gemini not configured AND the offline BE
-  // fallback isn't set up), we still let the user get value out of this
-  // tab by running the exact Vision Studio pipeline in the browser.
-  // Skipping style/subject classification since offline models can't
-  // reliably tell "traditional" from "neo-traditional" from a photo.
+  // ─── Deep-vision fallback ─────────────────────────────────────
+  // When the primary tattoo endpoint is unavailable (503 = analyser not
+  // configured, or network-level failure), we fall back to the general
+  // deep-vision endpoint. Subject / style / motif classification runs on
+  // the caption + tag output the deep vision service returns.
   const runOfflineAnalyze = async () => {
     if (!file) { notice.warning('Drop a photo first'); return }
     setOfflineRunning(true); setError(''); setErrorStatus(null)
     try {
-      const img = await loadImage(file)
-      const colourBuf = toImageData(img, 64)
-      const analysisBuf = toImageData(img, 1024)
-      const palette = extractDominantColors(colourBuf, 6)
-      const met = imageMetadata(analysisBuf)
-      let ocr = { text: '', lines: [] }
-      try { ocr = await runOcr(file) } catch {}
-
-      // Pick the two most-weighted swatches for the QR gradient.
+      const data = await deepAnalyzeImage(file)
+      const palette = Array.isArray(data.palette) ? data.palette : []
       const primary   = palette[0]?.hex || '#0a0a0e'
       const secondary = palette[1]?.hex || '#e879f9'
-      // Compose a subject line from OCR or fall back to a summary.
-      const inferredSubject = (ocr.lines?.[0] || 'Offline reading').slice(0, 60)
-      const suggestedPayload = ocr.text?.trim()
-        ? (ocr.text.trim().slice(0, 200))
-        : `Ink · ${met.orientation} · ${primary}`
+      const caption   = (data.caption || '').trim()
+      const ocrLines  = Array.isArray(data.ocr?.lines) ? data.ocr.lines : []
+      const ocrText   = (data.ocr?.text || '').trim()
+      const inferredSubject = (caption || ocrLines[0] || 'Ink reading').slice(0, 80)
+
+      // Motifs = top-4 semantic tags, subjects = detected subjects.
+      const tags = Array.isArray(data.tags) ? data.tags : []
+      const subjects = Array.isArray(data.subjects) ? data.subjects : []
+      const motifs = [
+        ...tags.slice(0, 4).map((t) => t.label),
+        ...subjects.slice(0, 2).map((s) => s.label),
+      ].filter(Boolean)
+
+      const suggestedPayload = caption
+        ? caption.slice(0, 200)
+        : (ocrText ? ocrText.slice(0, 200) : `Ink · ${primary}`)
+
+      // Aesthetic hints from the BE seed the style heuristic — same
+      // busy → square / calm → rounded rule as Vision Studio.
+      const busy = Number(data.aesthetic?.busyness) || 0
+      const saturation = Number(data.aesthetic?.saturation) || 0
 
       const synth = {
         subject: inferredSubject,
-        style: 'unknown (offline)',
-        motifs: [],
+        style: 'deep vision',
+        motifs,
         dominant_colors: palette.slice(0, 5).map((c) => c.hex),
-        line_weight: met.textureBusy > 0.4 ? 'bold' : 'fine',
-        complexity: met.textureBusy > 0.5 ? 'high' : met.textureBusy > 0.25 ? 'medium' : 'low',
-        energy: met.saturation > 0.5 ? 'high' : met.saturation > 0.25 ? 'medium' : 'calm',
+        line_weight: busy > 0.4 ? 'bold' : 'fine',
+        complexity: busy > 0.5 ? 'high' : busy > 0.25 ? 'medium' : 'low',
+        energy: saturation > 0.5 ? 'high' : saturation > 0.25 ? 'medium' : 'calm',
         suggested_qr_payload: suggestedPayload,
         suggested_qr_style: {
-          cell_shape: met.textureBusy > 0.35 ? 'square' : 'rounded',
-          eye_shape: met.textureBusy > 0.35 ? 'rounded' : 'circle',
+          cell_shape: busy > 0.35 ? 'square' : 'rounded',
+          eye_shape: busy > 0.35 ? 'rounded' : 'circle',
           primary_color: primary,
           secondary_color: secondary,
           gradient_direction: 135,
           ecc_level: 'H',
         },
-        confidence: 0.5,
-        backend: 'offline-browser',
+        confidence: tags[0]?.score != null ? Math.max(0.5, tags[0].score) : 0.7,
+        backend: 'deep-vision',
       }
       setAnalysis(synth)
-      setMeta({ cached: false, elapsedMs: null, modelId: 'in-browser', backend: 'offline-browser' })
-      notice.success('Offline reading complete')
+      setMeta({ cached: false, elapsedMs: data.elapsedMs ?? null, backend: 'deep-vision' })
+      if (Array.isArray(data.warnings) && data.warnings.length) {
+        notice.warning(data.warnings.join(' · '))
+      } else {
+        notice.success('Analysis complete')
+      }
     } catch (e) {
-      setError(e.message || 'Offline analysis failed')
-      notice.error(e.message || 'Offline analysis failed')
+      const status = e?.status
+      const msg =
+        status === 429 ? 'Analysing too fast — try again in a minute' :
+        status === 503 ? 'The analysis engine is warming up — try again in ~30s' :
+        status === 502 ? 'Analysis is temporarily unavailable — try again in a moment' :
+        (e?.message || 'Analysis failed')
+      setError(msg)
+      notice.error(msg)
     } finally { setOfflineRunning(false) }
   }
 
@@ -322,35 +339,26 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
 
   const hasEditorState = useMemo(() => !!toEditorState(analysis), [analysis])
   const usingOfflineBackend =
-    meta?.backend === 'offline' || meta?.backend === 'offline-browser'
+    meta?.backend === 'offline' || meta?.backend === 'offline-browser' || meta?.backend === 'deep-vision'
 
-  // Health-derived banner state:
-  //   • Gemini configured           → no banner
-  //   • Gemini off, BE has fallback → subtle amber "analysing offline" heads-up
-  //   • Gemini off, no fallback     → same banner + note that analyze may 503
-  // The BE's /tattoo/health now returns `offlineFallback` when the sibling
-  // agent's fallback ships — we degrade gracefully if that field is missing.
+  // Health-derived banner state. When the primary tattoo analyser is off,
+  // we degrade to the general deep-vision endpoint. The banner just tells
+  // the user analysis will still work — no implementation details.
   const showHealthBanner = health && !health.ok
-  const offlineFallbackReady = !!health?.offlineFallback
 
   return (
     <div className='space-y-4'>
-      {/* Health banner — subtle amber, non-blocking. Copy adapts to whether
-          the BE has an offline pipeline already or the FE will need to do it. */}
+      {/* Health banner — subtle amber, non-blocking. Same wording either
+          way; the fallback is silent behind the "Analyse with deep vision"
+          button that appears on error. */}
       {showHealthBanner && (
         <div className='luxe-glass p-4 border border-amber-400/30 bg-amber-400/5'>
           <div className='flex items-start gap-3'>
             <InfoCircleOutlined className='text-amber-300 text-lg mt-0.5' />
             <div>
-              <div className='font-bold text-sm text-amber-200'>
-                {offlineFallbackReady
-                  ? 'Analysing with offline vision'
-                  : 'Vision service not configured'}
-              </div>
+              <div className='font-bold text-sm text-amber-200'>Analysing with deep vision</div>
               <FieldHelp>
-                {offlineFallbackReady
-                  ? 'Install Gemini for richer style detection (subject, motifs, energy). Colours + composition still work fully offline.'
-                  : 'Gemini isn\'t configured on this backend. You can still run the analysis fully in your browser — see the button below after uploading.'}
+                Style + motifs are inferred from a general vision pass. Colours, composition, and text still come through.
               </FieldHelp>
             </div>
           </div>
@@ -377,7 +385,7 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
               </p>
             </Upload.Dragger>
             <FieldHelp>
-              Your photo is base64-encoded, sent once to Gemini Vision, cached by SHA-256 hash for 24 hours, then discarded. Nothing is written to disk.
+              Your photo is analysed once, cached by content hash for 24 hours, then discarded. Nothing is written to disk.
             </FieldHelp>
           </div>
 
@@ -397,10 +405,10 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
               disabled={!file}
               onClick={runAnalyze}
               block>
-              {analyzing ? 'Reading the ink…' : 'Analyze tattoo'}
+              {analyzing ? 'Analysing with deep vision…' : 'Analyze tattoo'}
             </Button>
             <FieldHelp>
-              Uses Gemini Vision to identify subject, style, motifs, colors. Takes ~5 s. First run is a real call; retries within 24 h are cached and instant.
+              Identifies subject, style, motifs, and colours. Takes ~5 s. Retries within 24 h are cached and instant.
             </FieldHelp>
           </div>
         </div>
@@ -411,10 +419,10 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
               <CloseCircleFilled className='text-rose-300 mt-0.5' />
               <div className='flex-1'>
                 <div>{error}</div>
-                {/* 503 = Gemini not configured — offer the FE-only fallback.
-                    We show the same button when the BE is unreachable so users
-                    on flaky networks still get useful colour + composition data. */}
-                {(errorStatus === 503 || errorStatus == null) && (
+                {/* Fallback path — hits the general deep-vision endpoint so
+                    users still get palette + tags + caption when the primary
+                    tattoo analyser is unavailable. */}
+                {(errorStatus === 503 || errorStatus === 502 || errorStatus == null) && (
                   <div className='mt-3'>
                     <Button
                       size='small'
@@ -422,10 +430,10 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
                       icon={<ExperimentOutlined />}
                       loading={offlineRunning}
                       onClick={runOfflineAnalyze}>
-                      Analyse offline in browser
+                      Analyse with deep vision
                     </Button>
                     <FieldHelp>
-                      Runs the same colour + composition + OCR pipeline entirely on this device. Style / subject classification is skipped — offline models can't reliably classify tattoo style from a photo.
+                      Runs a general-purpose vision pass. You still get caption, colours, tags, and text — style / subject buckets are approximated.
                     </FieldHelp>
                   </div>
                 )}
@@ -436,12 +444,12 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
       </div>
 
       {/* Loading state */}
-      {analyzing && (
+      {(analyzing || offlineRunning) && (
         <div className='luxe-glass p-6'>
           <div className='flex items-center gap-4 mb-4'>
-            <LuxeLoader variant='tattoo' size='md' label='Reading the ink…' />
+            <LuxeLoader variant='tattoo' size='md' label='Analysing with deep vision…' />
             <div className='flex-1 min-w-0'>
-              <div className='font-bold text-amber-200'>Reading the ink…</div>
+              <div className='font-bold text-amber-200'>Analysing with deep vision…</div>
               <FieldHelp>Identifying subject, style, motifs, palette, complexity.</FieldHelp>
             </div>
           </div>
@@ -469,11 +477,10 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
               <div className='flex items-center gap-2 text-[11px] text-fg-muted'>
                 {meta?.cached && <span className='px-2 py-0.5 rounded-full bg-white/5'>cached</span>}
                 {usingOfflineBackend && (
-                  <span className='px-2 py-0.5 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-200'>
-                    offline
+                  <span className='px-2 py-0.5 rounded-full bg-fuchsia-400/10 border border-fuchsia-400/30 text-fuchsia-200'>
+                    deep vision
                   </span>
                 )}
-                {meta?.modelId && <span className='px-2 py-0.5 rounded-full bg-white/5'>{meta.modelId}</span>}
                 {meta?.elapsedMs != null && <span>{(meta.elapsedMs / 1000).toFixed(1)}s</span>}
               </div>
             </div>

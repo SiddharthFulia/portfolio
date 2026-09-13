@@ -1,63 +1,33 @@
 // VisionStudio — fourth top-level tab on /qr.
 //
-// Fully client-side vision pipeline that inspects any uploaded / captured
-// image and auto-generates a QR from the extracted metadata. No BE calls.
-// The primary pipeline is:
-//
-//   1. User drops / captures / pastes an image.
-//   2. We render it to a hidden canvas → ImageData at ≤ 1024 px on the
-//      longest edge (analysis buffer) + a 64×64 buffer (colour pass).
-//   3. Run extractDominantColors (k-means, ~10 ms) and imageMetadata (loop
-//      over the analysis buffer, ~5 ms) synchronously.
-//   4. Run runOcr (lazy Tesseract.js — first call downloads ~4 MB of
-//      language + WASM, subsequent calls are cached). Reports progress.
-//   5. Show a Result panel: OCR text lines (copyable), palette swatches,
-//      metadata tiles. Below it a "Suggested QR" card that says exactly
-//      what payload + style we'd inject.
-//   6. "Use this style" pushes the editor state into the parent
-//      QRCompiler + swaps back to the 2D Editor tab.
-//   7. Bonus: multi-image ZIP export. User drops N images, each produces
-//      a rendered QR PNG using the derived style + payload. Downloads a
-//      client-generated ZIP (uncompressed stored entries, no lib needed).
+// Drop / capture / paste an image → the BE runs a deep vision pass and
+// hands back caption, semantic tags, subjects, OCR, palette, faces, depth,
+// and aesthetic hints. We render a rich result card and let the user
+// convert any of it into a QR (URL / text / vCard payload) styled from
+// the extracted palette.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Upload, Progress, Tag } from 'antd'
+import { Upload, Tag } from 'antd'
 import { Button } from '../ui'
 import {
   InboxOutlined, ThunderboltFilled, CameraOutlined, PictureOutlined,
-  CopyOutlined, DownloadOutlined, ReloadOutlined, FileZipOutlined,
-  CheckCircleFilled, InfoCircleOutlined, CloseCircleOutlined,
+  CopyOutlined, DownloadOutlined, ReloadOutlined,
+  CheckCircleFilled, CloseCircleOutlined, LinkOutlined, IdcardOutlined,
 } from '@ant-design/icons'
 import { motion, AnimatePresence } from 'framer-motion'
 import qrcode from 'qrcode-generator'
-import {
-  loadImage, toImageData, toDataUrl,
-  extractDominantColors, imageMetadata, runOcr,
-  paletteToEditorState,
-} from '../../lib/imageAnalysis'
+import { loadImage, toDataUrl, paletteToEditorState } from '../../lib/imageAnalysis'
+import { deepAnalyzeImage } from '../../api/vision'
 import { notice } from '../../lib/notice'
+import { LuxeLoader } from '../loaders'
 
 function FieldHelp({ children }) {
   return <p className='text-[11px] text-fg-muted mt-1 leading-snug'>{children}</p>
 }
 
-// Truncate + collapse whitespace so we never inject a giant OCR blob as
-// the QR payload. 200 chars fits comfortably in an H-level version 10-ish
-// QR, which is still a nice tight matrix.
-function derivePayload(ocr, meta, palette) {
-  const trimmed = (ocr?.text || '').replace(/\s+/g, ' ').trim()
-  if (trimmed && trimmed.length > 8) {
-    return trimmed.length > 200 ? trimmed.slice(0, 197) + '…' : trimmed
-  }
-  // Fallback: JSON summary of colours + orientation, so the QR still has
-  // something meaningful when the image has no text.
-  const colours = (palette || []).slice(0, 3).map((c) => c.hex).join(',')
-  return `vision:${meta?.orientation || 'unknown'} ${colours}`
-}
-
-// Render a QR onto a canvas using the supplied style. Used both in the
-// preview + the batch ZIP. Stripped-down copy of QRCompiler's core paint
-// path — we only need square/rounded cells for the batch preview.
+// Render a QR onto a canvas using the supplied style. Stripped-down copy
+// of QRCompiler's core paint path — we only need square / rounded cells
+// for the suggested-QR preview.
 function renderQrToCanvas(payload, style, size = 512) {
   const ecc = style.ecc || 'H'
   const qr = qrcode(0, ecc)
@@ -69,14 +39,12 @@ function renderQrToCanvas(payload, style, size = 512) {
   canvas.height = size
   const ctx = canvas.getContext('2d')
 
-  // Background
   ctx.fillStyle = style.bgColor || '#ffffff'
   ctx.fillRect(0, 0, size, size)
 
   const margin = Math.round(size * 0.06)
   const cell = (size - margin * 2) / N
 
-  // Gradient fg
   let fill
   if (style.gradientOn && style.fgColor2) {
     const g = ctx.createLinearGradient(0, 0, size, size)
@@ -112,87 +80,50 @@ function renderQrToCanvas(payload, style, size = 512) {
   return canvas
 }
 
-// ─── ZIP writer (STORE, no compression) ───────────────────────────────
-// We ship a hand-rolled writer instead of pulling in JSZip (~140KB) just
-// for this bonus feature. Uncompressed local file headers + a central
-// directory are enough — most OS unzips handle STORE entries fine.
-function crc32(buf) {
-  let c
-  const table = crc32._t || (crc32._t = (() => {
-    const t = new Uint32Array(256)
-    for (let n = 0; n < 256; n++) {
-      c = n
-      for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1)
-      t[n] = c >>> 0
-    }
-    return t
-  })())
-  c = 0xffffffff
-  for (let i = 0; i < buf.length; i++) c = table[(c ^ buf[i]) & 0xff] ^ (c >>> 8)
-  return (c ^ 0xffffffff) >>> 0
-}
-function writeZip(entries) {
-  // entries: [{ name, data: Uint8Array }]
-  const encoder = new TextEncoder()
-  const parts = []
-  const central = []
-  let offset = 0
-  for (const e of entries) {
-    const nameBytes = encoder.encode(e.name)
-    const crc = crc32(e.data)
-    const size = e.data.length
-    // Local file header (30 + name + data)
-    const lfh = new DataView(new ArrayBuffer(30))
-    lfh.setUint32(0, 0x04034b50, true)   // signature
-    lfh.setUint16(4, 20, true)           // version
-    lfh.setUint16(6, 0, true)            // flags
-    lfh.setUint16(8, 0, true)            // method = STORE
-    lfh.setUint16(10, 0, true); lfh.setUint16(12, 0, true) // time/date
-    lfh.setUint32(14, crc, true)
-    lfh.setUint32(18, size, true)
-    lfh.setUint32(22, size, true)
-    lfh.setUint16(26, nameBytes.length, true)
-    lfh.setUint16(28, 0, true)           // extra length
-    parts.push(new Uint8Array(lfh.buffer), nameBytes, e.data)
+// Compose a vCard 3.0 payload from a caption / OCR line. Best-effort — we
+// only look for an obvious "Name / Title / email / phone / url" split so
+// scans of physical business cards yield a real contact.
+function buildVCard({ caption, ocrLines = [] }) {
+  const lines = [caption, ...ocrLines].filter(Boolean).map((l) => l.trim())
+  const email = lines.find((l) => /^\S+@\S+\.\S+$/.test(l)) || ''
+  const phone = lines.find((l) => /^[+()\d\s.-]{7,}$/.test(l)) || ''
+  const url   = lines.find((l) => /^https?:\/\//i.test(l)) || ''
+  // Name = first line that isn't email / phone / url. Fallback: caption.
+  const name = lines.find((l) => l !== email && l !== phone && l !== url) || caption || 'Contact'
 
-    // Central directory entry (46 + name)
-    const cdh = new DataView(new ArrayBuffer(46))
-    cdh.setUint32(0, 0x02014b50, true)
-    cdh.setUint16(4, 20, true); cdh.setUint16(6, 20, true)
-    cdh.setUint16(8, 0, true); cdh.setUint16(10, 0, true)
-    cdh.setUint16(12, 0, true); cdh.setUint16(14, 0, true)
-    cdh.setUint32(16, crc, true)
-    cdh.setUint32(20, size, true); cdh.setUint32(24, size, true)
-    cdh.setUint16(28, nameBytes.length, true)
-    cdh.setUint16(30, 0, true); cdh.setUint16(32, 0, true)
-    cdh.setUint16(34, 0, true); cdh.setUint16(36, 0, true)
-    cdh.setUint32(38, 0, true)
-    cdh.setUint32(42, offset, true)
-    central.push(new Uint8Array(cdh.buffer), nameBytes)
-    offset += 30 + nameBytes.length + size
-  }
-  const centralStart = offset
-  let centralSize = 0
-  for (const b of central) centralSize += b.length
-
-  const eocd = new DataView(new ArrayBuffer(22))
-  eocd.setUint32(0, 0x06054b50, true)
-  eocd.setUint16(4, 0, true); eocd.setUint16(6, 0, true)
-  eocd.setUint16(8, entries.length, true); eocd.setUint16(10, entries.length, true)
-  eocd.setUint32(12, centralSize, true)
-  eocd.setUint32(16, centralStart, true)
-  eocd.setUint16(20, 0, true)
-
-  const blobParts = [...parts, ...central, new Uint8Array(eocd.buffer)]
-  return new Blob(blobParts, { type: 'application/zip' })
+  const escape = (s) => String(s).replace(/([,;\\])/g, '\\$1').replace(/\r?\n/g, '\\n')
+  const parts = [
+    'BEGIN:VCARD',
+    'VERSION:3.0',
+    `FN:${escape(name)}`,
+    email && `EMAIL;TYPE=INTERNET:${escape(email)}`,
+    phone && `TEL;TYPE=CELL:${escape(phone)}`,
+    url   && `URL:${escape(url)}`,
+    'END:VCARD',
+  ].filter(Boolean)
+  return parts.join('\n')
 }
 
-function dataUrlToBytes(dataUrl) {
-  const [, b64] = dataUrl.split(',')
-  const bin = atob(b64)
-  const arr = new Uint8Array(bin.length)
-  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
-  return arr
+// Cosmetic status ticker while the BE crunches. These messages loop on a
+// timer — the BE runs everything atomically, this is purely UX filler so
+// the user has something to read during the 3-8s wait.
+const STATUS_MESSAGES = [
+  'Understanding scene…',
+  'Reading text…',
+  'Extracting colours…',
+  'Detecting subjects…',
+  'Sizing up faces…',
+  'Mapping depth…',
+]
+
+// Map BE HTTP status → friendly toast copy. Keeps error branches out of the
+// render body.
+function toastForError(err) {
+  const status = err?.status
+  if (status === 429) return 'Analysing too fast — try again in a minute'
+  if (status === 503) return 'The analysis engine is warming up — try again in ~30s'
+  if (status === 502) return 'Analysis is temporarily unavailable — try again in a moment'
+  return err?.message || 'Analysis failed'
 }
 
 // ─── Main component ────────────────────────────────────────────────────
@@ -200,15 +131,17 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
   const [file, setFile]           = useState(null)
   const [preview, setPreview]     = useState('')
   const [analyzing, setAnalyzing] = useState(false)
-  const [stage, setStage]         = useState('')
-  const [progress, setProgress]   = useState(0)
-  const [result, setResult]       = useState(null)   // { palette, meta, ocr, dataUrl }
+  const [statusIdx, setStatusIdx] = useState(0)
+  const [elapsedSec, setElapsedSec] = useState(0)
+  const [result, setResult]       = useState(null)   // full BE response
   const [error, setError]         = useState('')
 
-  // Batch
-  const [batchFiles, setBatchFiles] = useState([])
-  const [batchRunning, setBatchRunning] = useState(false)
-  const [batchProgress, setBatchProgress] = useState(0)
+  // What kind of QR payload to encode. Users can flip between:
+  //   auto   — caption or top OCR line
+  //   url    — top URL detected in OCR (or manual paste)
+  //   vcard  — vCard synthesised from caption + OCR
+  const [payloadMode, setPayloadMode] = useState('auto')
+  const [manualUrl, setManualUrl]     = useState('')
 
   // Camera
   const videoRef = useRef(null)
@@ -224,7 +157,7 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
       streamRef.current = stream
       if (videoRef.current) videoRef.current.srcObject = stream
       setCameraOn(true)
-    } catch (e) {
+    } catch {
       notice.error('Could not access the camera')
     }
   }
@@ -290,76 +223,76 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
     },
   }
 
-  // Multi-file uploader for the batch section.
-  const batchUploadProps = {
-    name: 'images',
-    multiple: true,
-    accept: 'image/jpeg,image/png,image/webp',
-    showUploadList: false,
-    beforeUpload: (f, list) => {
-      setBatchFiles((prev) => {
-        // antd calls beforeUpload once per file; collapse into a single set.
-        const next = [...prev]
-        if (!next.includes(f)) next.push(f)
-        return next.slice(0, 20)   // safety cap
-      })
-      return false
-    },
-  }
+  // While analyzing, rotate the status ticker + count elapsed seconds so
+  // the UI stays alive without any real progress signal from the BE.
+  useEffect(() => {
+    if (!analyzing) { setStatusIdx(0); setElapsedSec(0); return }
+    const start = Date.now()
+    const tick = setInterval(() => {
+      setStatusIdx((i) => (i + 1) % STATUS_MESSAGES.length)
+      setElapsedSec(Math.floor((Date.now() - start) / 1000))
+    }, 1200)
+    return () => clearInterval(tick)
+  }, [analyzing])
 
-  const runScan = async () => {
+  const runAnalyze = async () => {
     if (!file) { notice.warning('Drop or capture an image first'); return }
-    setAnalyzing(true); setError(''); setResult(null); setProgress(0)
+    setAnalyzing(true); setError(''); setResult(null)
     try {
-      setStage('Decoding image…')
-      const img = await loadImage(file)
-
-      setStage('Extracting colours…')
-      const colorBuf = toImageData(img, 64)
-      const palette = extractDominantColors(colorBuf, 6)
-      setProgress(15)
-
-      setStage('Analysing composition…')
-      const analysisBuf = toImageData(img, 1024)
-      const meta = imageMetadata(analysisBuf)
-      setProgress(30)
-
-      setStage('Reading text…')
-      let ocr = { text: '', lines: [], confidence: null, wordCount: 0 }
+      const data = await deepAnalyzeImage(file)
+      // Attach a preview data URL so the render path doesn't need the
+      // original File / blob.
+      let dataUrl = preview
       try {
-        ocr = await runOcr(file, (m) => {
-          if (m.status === 'recognizing text' && typeof m.progress === 'number') {
-            setProgress(30 + Math.round(m.progress * 60))
-          } else if (m.status && m.progress != null) {
-            // Loading model / initialising — nudge the bar so it doesn't stall.
-            setProgress(Math.min(28, Math.round(m.progress * 28)))
-          }
-        })
-      } catch (e) {
-        // OCR failure isn't fatal — colour + metadata are still useful.
-        console.warn('OCR failed', e)
+        const img = await loadImage(file)
+        dataUrl = toDataUrl(img, 800, 'image/jpeg', 0.85)
+      } catch {}
+      setResult({ ...data, dataUrl })
+      // Surface any BE-side warnings as an amber toast, non-fatal.
+      if (Array.isArray(data.warnings) && data.warnings.length) {
+        notice.warning(data.warnings.join(' · '))
+      } else {
+        notice.success('Analysis complete')
       }
-      setProgress(95)
-
-      const dataUrl = toDataUrl(img, 800, 'image/jpeg', 0.85)
-      setResult({ palette, meta, ocr, dataUrl })
-      setProgress(100)
-      setStage('Done')
-      notice.success('Scan complete')
     } catch (e) {
-      setError(e.message || 'Scan failed')
-      notice.error(e.message || 'Scan failed')
+      const msg = toastForError(e)
+      setError(msg)
+      notice.error(msg)
     } finally {
       setAnalyzing(false)
     }
   }
 
+  // Derive the QR payload based on the user's mode toggle.
+  const derivedPayload = useMemo(() => {
+    if (!result) return ''
+    const caption = (result.caption || '').trim()
+    const ocrLines = Array.isArray(result.ocr?.lines) ? result.ocr.lines : []
+    const ocrText  = (result.ocr?.text || '').replace(/\s+/g, ' ').trim()
+    if (payloadMode === 'url') {
+      if (manualUrl.trim()) return manualUrl.trim()
+      const url = ocrLines.find((l) => /^https?:\/\//i.test(l))
+      return url || caption || 'https://siddharthfulia.com/qr'
+    }
+    if (payloadMode === 'vcard') {
+      return buildVCard({ caption, ocrLines })
+    }
+    // auto: caption preferred, else top OCR line, else short summary.
+    if (caption) {
+      return caption.length > 200 ? caption.slice(0, 197) + '…' : caption
+    }
+    if (ocrText.length > 8) {
+      return ocrText.length > 200 ? ocrText.slice(0, 197) + '…' : ocrText
+    }
+    const colours = (result.palette || []).slice(0, 3).map((c) => c.hex).join(',')
+    return `vision:${colours}`
+  }, [result, payloadMode, manualUrl])
+
   const suggested = useMemo(() => {
     if (!result) return null
-    const state = paletteToEditorState(result.palette, result.meta)
-    const payload = derivePayload(result.ocr, result.meta, result.palette)
-    return { state, payload }
-  }, [result])
+    const state = paletteToEditorState(result.palette, result.aesthetic || {})
+    return { state, payload: derivedPayload }
+  }, [result, derivedPayload])
 
   const suggestedQrCanvas = useMemo(() => {
     if (!suggested?.state) return null
@@ -367,7 +300,7 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
   }, [suggested])
 
   // Mount the suggested QR canvas into a preview div (React can't render a
-  // detached <canvas> as JSX, but we can slot it into a ref-held container).
+  // detached <canvas> as JSX).
   const previewRef = useRef(null)
   useEffect(() => {
     if (!previewRef.current) return
@@ -399,71 +332,16 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
     a.click()
   }
 
-  // ─── Batch mode ─────────────────────────────────────────────────────
-  const runBatch = async () => {
-    if (!batchFiles.length) { notice.warning('Drop some images first'); return }
-    setBatchRunning(true); setBatchProgress(0)
-    try {
-      const entries = []
-      let idx = 0
-      for (const f of batchFiles) {
-        idx++
-        setBatchProgress(Math.round(((idx - 1) / batchFiles.length) * 100))
-        const img = await loadImage(f)
-        const colorBuf = toImageData(img, 64)
-        const analysisBuf = toImageData(img, 512)
-        const palette = extractDominantColors(colorBuf, 6)
-        const meta = imageMetadata(analysisBuf)
-        let ocr = { text: '', lines: [] }
-        try {
-          ocr = await runOcr(f)
-        } catch {}
-        const state = paletteToEditorState(palette, meta)
-        const payload = derivePayload(ocr, meta, palette)
-        const canvas = renderQrToCanvas(payload, state, 640)
-        const dataUrl = canvas.toDataURL('image/png')
-        const bytes = dataUrlToBytes(dataUrl)
-        const safeName = (f.name || `img-${idx}`).replace(/[^a-z0-9._-]/gi, '_')
-        entries.push({ name: `${idx.toString().padStart(2, '0')}_${safeName}.qr.png`, data: bytes })
-
-        // Also drop a small JSON with the extracted metadata for the user.
-        const summary = {
-          source: f.name,
-          payload,
-          palette: palette.map((c) => ({ hex: c.hex, weight: c.weight })),
-          meta,
-          ocrTop: (ocr.lines || []).slice(0, 5),
-        }
-        const jsonBytes = new TextEncoder().encode(JSON.stringify(summary, null, 2))
-        entries.push({ name: `${idx.toString().padStart(2, '0')}_${safeName}.json`, data: jsonBytes })
-      }
-      setBatchProgress(100)
-      const blob = writeZip(entries)
-      const a = document.createElement('a')
-      a.href = URL.createObjectURL(blob)
-      a.download = `vision-qr-batch-${Date.now()}.zip`
-      a.click()
-      notice.success(`ZIP ready — ${batchFiles.length} image${batchFiles.length === 1 ? '' : 's'}`)
-    } catch (e) {
-      notice.error(e.message || 'Batch failed')
-    } finally {
-      setBatchRunning(false)
-    }
-  }
-
-  const removeBatchFile = (f) => setBatchFiles((prev) => prev.filter((x) => x !== f))
-  const clearBatch = () => setBatchFiles([])
-
   return (
     <div className='space-y-4'>
-      {/* Intro / privacy note */}
-      <div className='luxe-glass p-4 border border-emerald-400/20 bg-emerald-400/[0.03]'>
+      {/* Intro */}
+      <div className='luxe-glass p-4 border border-fuchsia-400/20 bg-fuchsia-400/[0.03]'>
         <div className='flex items-start gap-3'>
-          <InfoCircleOutlined className='text-emerald-300 text-lg mt-0.5' />
+          <ThunderboltFilled className='text-fuchsia-300 text-lg mt-0.5' />
           <div>
-            <div className='font-bold text-sm text-emerald-200'>Fully offline vision</div>
+            <div className='font-bold text-sm text-fuchsia-200'>Deep vision analysis</div>
             <FieldHelp>
-              Everything below runs in your browser. OCR uses Tesseract.js (lazy-loaded ~4 MB the first time), colour extraction uses a hand-rolled k-means on a 64×64 downsample, and metadata comes from a single loop over the image data. No pixel leaves the device.
+              Caption, palette, text, and semantic tags for any image.
             </FieldHelp>
           </div>
         </div>
@@ -490,7 +368,7 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
                   Drop, click, or paste. Anything visual.
                 </p>
                 <p className='ant-upload-hint !text-fg-muted'>
-                  JPEG / PNG / WebP · everything runs client-side.
+                  JPEG / PNG / WebP · up to 8 MB.
                 </p>
               </Upload.Dragger>
             )}
@@ -532,24 +410,27 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
               variant='primary'
               icon={<ThunderboltFilled />}
               loading={analyzing}
-              disabled={!file}
-              onClick={runScan}
+              disabled={!file || analyzing}
+              onClick={runAnalyze}
               block>
-              {analyzing ? 'Scanning…' : 'Scan image'}
+              {analyzing ? 'Analysing…' : 'Analyse'}
             </Button>
             <FieldHelp>
-              Colours + metadata are instant. OCR takes 2–8 s and lazy-loads the recogniser on first use.
+              One click to caption, colour-sample, read text, and detect subjects in the image.
             </FieldHelp>
           </div>
         </div>
 
+        {/* Progressive loader */}
         {analyzing && (
-          <div className='mt-4'>
-            <div className='flex items-center justify-between text-[11px] text-fg-muted mb-1'>
-              <span>{stage}</span>
-              <span>{progress}%</span>
+          <div className='mt-4 rounded-xl border border-white/10 bg-black/30 p-5 flex flex-col items-center gap-3'>
+            <LuxeLoader variant='cosmos' size='md' />
+            <div className='text-center'>
+              <div className='font-bold text-fuchsia-200 text-sm'>{STATUS_MESSAGES[statusIdx]}</div>
+              {elapsedSec >= 2 && (
+                <FieldHelp>This usually takes 3–5 seconds.</FieldHelp>
+              )}
             </div>
-            <Progress percent={progress} showInfo={false} strokeColor={{ from: '#fbbf24', to: '#e879f9' }} />
           </div>
         )}
 
@@ -573,57 +454,83 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
             className='luxe-glass p-5'>
             <div className='flex items-center justify-between mb-4'>
               <h2 className='font-bold text-lg'>2. What we saw</h2>
-              <div className='text-[11px] text-fg-muted'>
-                {result.meta?.width}×{result.meta?.height} · {result.meta?.orientation}
-              </div>
+              {result.elapsedMs != null && (
+                <div className='text-[11px] text-fg-muted'>{(result.elapsedMs / 1000).toFixed(1)}s</div>
+              )}
             </div>
 
-            {/* Palette */}
-            <div className='mb-5'>
-              <div className='text-[10px] uppercase tracking-widest text-fg-muted font-bold mb-2'>Dominant palette</div>
-              <div className='flex flex-wrap gap-3'>
-                {result.palette.map((c, i) => (
-                  <div key={i} className='flex flex-col items-center gap-1'>
-                    <button
-                      type='button'
-                      onClick={() => copyLine(c.hex)}
-                      className='w-14 h-14 rounded-full shadow-inner ring-1 ring-white/20 hover:ring-amber-300/60 transition'
-                      style={{ background: c.hex }}
-                      title={`${c.hex} · ${Math.round(c.weight * 100)}%`}
-                    />
-                    <span className='font-mono text-[10px] text-fg-muted uppercase'>{c.hex}</span>
-                    <span className='text-[10px] text-fg-muted'>{Math.round(c.weight * 100)}%</span>
-                  </div>
+            {/* Warnings (soft, amber, non-blocking) */}
+            {Array.isArray(result.warnings) && result.warnings.length > 0 && (
+              <div className='flex flex-wrap gap-2 mb-4'>
+                {result.warnings.map((w, i) => (
+                  <span
+                    key={i}
+                    className='px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-200 text-[11px]'>
+                    {w}
+                  </span>
                 ))}
               </div>
-              <FieldHelp>Click a swatch to copy its hex. Weights sum to 1.0 — the top two drive the QR gradient.</FieldHelp>
-            </div>
+            )}
 
-            {/* Metadata tiles */}
-            <div className='grid grid-cols-2 md:grid-cols-4 gap-2 mb-5'>
-              <MetaTile label='Brightness' value={pct(result.meta?.brightness)} />
-              <MetaTile label='Contrast'   value={pct(result.meta?.contrast)} />
-              <MetaTile label='Saturation' value={pct(result.meta?.saturation)} />
-              <MetaTile label='Busyness'   value={pct(result.meta?.textureBusy)} />
-            </div>
+            {/* Caption */}
+            {result.caption && (
+              <div className='mb-5'>
+                <div className='text-[10px] uppercase tracking-widest text-amber-300 font-bold mb-1'>Caption</div>
+                <div className='text-xl md:text-2xl font-bold bg-gradient-to-r from-amber-300 via-rose-300 to-fuchsia-400 bg-clip-text text-transparent leading-tight'>
+                  {result.caption}
+                </div>
+              </div>
+            )}
 
-            {/* OCR */}
-            <div className='mb-5'>
-              <div className='flex items-center justify-between mb-2'>
-                <div className='text-[10px] uppercase tracking-widest text-fg-muted font-bold'>
-                  Extracted text {result.ocr?.confidence != null && (
-                    <span className='ml-2 text-fg-muted normal-case'>
-                      confidence {Math.round(result.ocr.confidence * 100)}%
+            {/* Semantic tags */}
+            {Array.isArray(result.tags) && result.tags.length > 0 && (
+              <div className='mb-5'>
+                <div className='text-[10px] uppercase tracking-widest text-fg-muted font-bold mb-2'>Semantic tags</div>
+                <div className='flex flex-col gap-1'>
+                  {result.tags.slice(0, 5).map((t, i) => (
+                    <TagBar key={i} label={t.label} score={t.score} />
+                  ))}
+                </div>
+                <FieldHelp>Top matches ranked by confidence.</FieldHelp>
+              </div>
+            )}
+
+            {/* Detected subjects */}
+            {Array.isArray(result.subjects) && result.subjects.length > 0 && (
+              <div className='mb-5'>
+                <div className='text-[10px] uppercase tracking-widest text-fg-muted font-bold mb-2'>Detected subjects</div>
+                <div className='flex flex-wrap gap-1'>
+                  {result.subjects.map((s, i) => (
+                    <span
+                      key={i}
+                      className='px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[12px]'
+                      title={s.score != null ? `${Math.round(s.score * 100)}%` : ''}>
+                      {s.label}{s.score != null && (
+                        <span className='ml-1 text-fg-muted'>{Math.round(s.score * 100)}%</span>
+                      )}
                     </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Extracted text */}
+            {Array.isArray(result.ocr?.lines) && result.ocr.lines.length > 0 && (
+              <div className='mb-5'>
+                <div className='flex items-center justify-between mb-2'>
+                  <div className='text-[10px] uppercase tracking-widest text-fg-muted font-bold'>
+                    Extracted text {result.ocr?.confidence != null && (
+                      <span className='ml-2 text-fg-muted normal-case'>
+                        confidence {Math.round(result.ocr.confidence * 100)}%
+                      </span>
+                    )}
+                  </div>
+                  {result.ocr?.text && (
+                    <Button size='small' variant='ghost' icon={<CopyOutlined />} onClick={() => copyLine(result.ocr.text)}>
+                      Copy all
+                    </Button>
                   )}
                 </div>
-                {result.ocr?.text && (
-                  <Button size='small' variant='ghost' icon={<CopyOutlined />} onClick={() => copyLine(result.ocr.text)}>
-                    Copy all
-                  </Button>
-                )}
-              </div>
-              {result.ocr?.lines?.length ? (
                 <div className='rounded-lg border border-white/10 bg-black/30 divide-y divide-white/5 max-h-56 overflow-y-auto'>
                   {result.ocr.lines.map((line, i) => (
                     <div key={i} className='flex items-center gap-2 px-3 py-2 text-sm'>
@@ -638,11 +545,86 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
                     </div>
                   ))}
                 </div>
-              ) : (
-                <div className='text-sm text-fg-muted italic'>No text detected — palette + metadata still drive the QR below.</div>
-              )}
-              <FieldHelp>OCR uses Tesseract.js in-browser. Best on high-contrast prints. First run downloads the English model.</FieldHelp>
-            </div>
+              </div>
+            )}
+
+            {/* Palette */}
+            {Array.isArray(result.palette) && result.palette.length > 0 && (
+              <div className='mb-5'>
+                <div className='text-[10px] uppercase tracking-widest text-fg-muted font-bold mb-2'>Dominant palette</div>
+                <div className='flex flex-wrap gap-3'>
+                  {result.palette.slice(0, 6).map((c, i) => (
+                    <div key={i} className='flex flex-col items-center gap-1'>
+                      <button
+                        type='button'
+                        onClick={() => copyLine(c.hex)}
+                        className='w-14 h-14 rounded-full shadow-inner ring-1 ring-white/20 hover:ring-amber-300/60 transition'
+                        style={{ background: c.hex }}
+                        title={`${c.hex} · ${Math.round((c.weight || 0) * 100)}%`}
+                      />
+                      <span className='font-mono text-[10px] text-fg-muted uppercase'>{c.hex}</span>
+                      {c.weight != null && (
+                        <span className='text-[10px] text-fg-muted'>{Math.round(c.weight * 100)}%</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <FieldHelp>Click a swatch to copy its hex. The top two drive the QR gradient below.</FieldHelp>
+              </div>
+            )}
+
+            {/* Face insights */}
+            {result.faces && result.faces.count > 0 && (
+              <div className='mb-5'>
+                <div className='text-[10px] uppercase tracking-widest text-fg-muted font-bold mb-2'>
+                  Face insights <span className='ml-2 text-fg-muted normal-case'>{result.faces.count} detected</span>
+                </div>
+                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2'>
+                  {(result.faces.items || []).slice(0, 6).map((f, i) => (
+                    <div key={i} className='luxe-glass-soft p-3 flex items-center gap-3'>
+                      <div className='w-10 h-10 rounded-full bg-gradient-to-br from-fuchsia-500/30 to-amber-400/30 border border-white/10 flex items-center justify-center font-bold text-sm'>
+                        {i + 1}
+                      </div>
+                      <div className='flex-1 min-w-0'>
+                        <div className='text-sm font-bold capitalize'>{f.emotion || 'neutral'}</div>
+                        <div className='text-[11px] text-fg-muted'>
+                          {[f.gender, f.age != null ? `~${Math.round(f.age)} yrs` : null].filter(Boolean).join(' · ')}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Depth preview */}
+            {result.depth?.dataUrl && (
+              <div className='mb-5'>
+                <div className='text-[10px] uppercase tracking-widest text-fg-muted font-bold mb-2'>Depth</div>
+                <div className='rounded-lg overflow-hidden border border-white/10 bg-black/30 inline-block'>
+                  <img src={result.depth.dataUrl} alt='Depth map' className='max-w-[240px] max-h-[240px] object-contain' />
+                </div>
+                <FieldHelp>Brighter areas are closer to the camera.</FieldHelp>
+              </div>
+            )}
+
+            {/* Aesthetic pills */}
+            {result.aesthetic && (
+              <div className='mb-2'>
+                <div className='text-[10px] uppercase tracking-widest text-fg-muted font-bold mb-2'>Aesthetic</div>
+                <div className='flex flex-wrap gap-2'>
+                  {result.aesthetic.warmth != null && (
+                    <AestheticPill label={result.aesthetic.warmth > 0.5 ? 'warm' : 'cool'} />
+                  )}
+                  {result.aesthetic.brightness != null && (
+                    <AestheticPill label={result.aesthetic.brightness > 0.5 ? 'bright' : 'dim'} />
+                  )}
+                  {result.aesthetic.saturation != null && (
+                    <AestheticPill label={result.aesthetic.saturation > 0.5 ? 'high saturation' : 'low saturation'} />
+                  )}
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -661,6 +643,42 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
               <Tag color='gold' className='!rounded-full'>auto</Tag>
             </div>
 
+            {/* Payload mode toggle */}
+            <div className='flex flex-wrap gap-2 mb-4'>
+              <PayloadModeButton
+                active={payloadMode === 'auto'}
+                onClick={() => setPayloadMode('auto')}
+                icon={<ThunderboltFilled />}
+                label='Auto'
+              />
+              <PayloadModeButton
+                active={payloadMode === 'url'}
+                onClick={() => setPayloadMode('url')}
+                icon={<LinkOutlined />}
+                label='Encode as URL'
+              />
+              <PayloadModeButton
+                active={payloadMode === 'vcard'}
+                onClick={() => setPayloadMode('vcard')}
+                icon={<IdcardOutlined />}
+                label='Encode as vCard'
+              />
+            </div>
+
+            {/* Manual URL input when the mode is URL */}
+            {payloadMode === 'url' && (
+              <div className='mb-4'>
+                <input
+                  type='url'
+                  value={manualUrl}
+                  onChange={(e) => setManualUrl(e.target.value)}
+                  placeholder='https://…  (leave blank to use a URL detected in the image)'
+                  className='w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-amber-300/60 transition'
+                />
+                <FieldHelp>Falls back to the first URL found in the image text.</FieldHelp>
+              </div>
+            )}
+
             <div className='grid grid-cols-1 md:grid-cols-2 gap-5'>
               {/* Preview */}
               <div>
@@ -674,10 +692,9 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
               <div className='space-y-3'>
                 <div>
                   <div className='text-[10px] uppercase tracking-widest text-fg-muted font-bold mb-1'>Payload</div>
-                  <div className='rounded-lg border border-white/10 bg-black/30 p-3 font-mono text-[12px] break-all'>
+                  <div className='rounded-lg border border-white/10 bg-black/30 p-3 font-mono text-[12px] break-all max-h-32 overflow-y-auto'>
                     {suggested.payload}
                   </div>
-                  <FieldHelp>Extracted OCR text (top ~200 chars), or a compact vision summary when the image is text-free.</FieldHelp>
                 </div>
                 <div className='grid grid-cols-2 gap-2'>
                   <StyleChip label='Cell' value={suggested.state.cellShape} />
@@ -707,92 +724,27 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
                 <FieldHelp>"Use this style" pushes cell + eye shapes, both gradient stops, angle, and ECC into the 2D Editor and swaps to that tab.</FieldHelp>
               </div>
             </div>
-
-            {/* Raw JSON */}
-            <details className='mt-5'>
-              <summary className='cursor-pointer text-[11px] text-fg-muted hover:text-amber-300 select-none'>
-                Raw extraction JSON
-              </summary>
-              <pre className='mt-2 rounded-lg border border-white/10 bg-black/40 p-3 text-[11px] overflow-x-auto max-h-64'>
-{JSON.stringify({ meta: result.meta, palette: result.palette, ocr: result.ocr, suggested }, null, 2)}
-              </pre>
-            </details>
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Batch mode */}
-      <div className='luxe-glass p-5'>
-        <div className='flex items-center gap-2 mb-3'>
-          <h2 className='font-bold text-lg'>4. Batch mode</h2>
-          <Tag color='purple' className='!rounded-full'>bonus</Tag>
-        </div>
-        <FieldHelp>Drop up to 20 images. Each is scanned offline and rendered as a QR encoding its palette + top OCR text. You get a ZIP of PNGs + JSON summaries.</FieldHelp>
-
-        <div className='grid grid-cols-1 md:grid-cols-3 gap-4 mt-3'>
-          <div className='md:col-span-2'>
-            <Upload.Dragger {...batchUploadProps} disabled={batchRunning}
-              className='!bg-white/[0.02] !border-white/10'>
-              <p className='ant-upload-drag-icon'>
-                <FileZipOutlined style={{ color: '#a78bfa' }} />
-              </p>
-              <p className='ant-upload-text !text-fg-primary font-bold'>
-                Drop many images. Get one ZIP.
-              </p>
-              <p className='ant-upload-hint !text-fg-muted'>
-                Up to 20 · same pipeline as the single-image flow.
-              </p>
-            </Upload.Dragger>
-          </div>
-          <div className='flex flex-col gap-3'>
-            <div className='rounded-lg border border-white/10 bg-black/30 p-3 min-h-[120px] max-h-[220px] overflow-y-auto text-[12px]'>
-              {batchFiles.length
-                ? batchFiles.map((f, i) => (
-                    <div key={i} className='flex items-center justify-between gap-2 py-1'>
-                      <span className='truncate' title={f.name}>{f.name}</span>
-                      <button
-                        type='button'
-                        className='text-fg-muted hover:text-rose-300 transition text-[11px]'
-                        disabled={batchRunning}
-                        onClick={() => removeBatchFile(f)}>
-                        remove
-                      </button>
-                    </div>
-                  ))
-                : <div className='text-fg-muted text-center py-6'>Queue is empty.</div>}
-            </div>
-            <div className='flex gap-2'>
-              <Button
-                variant='primary'
-                icon={<FileZipOutlined />}
-                loading={batchRunning}
-                disabled={!batchFiles.length}
-                onClick={runBatch}
-                block>
-                {batchRunning ? `Working ${batchProgress}%` : `Zip ${batchFiles.length || ''}`}
-              </Button>
-              <Button variant='ghost' disabled={!batchFiles.length || batchRunning} onClick={clearBatch}>
-                Clear
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {batchRunning && (
-          <div className='mt-3'>
-            <Progress percent={batchProgress} showInfo={false} strokeColor={{ from: '#a78bfa', to: '#e879f9' }} />
-          </div>
-        )}
-      </div>
     </div>
   )
 }
 
-function MetaTile({ label, value }) {
+// ─── Sub-components ────────────────────────────────────────────────────
+
+function TagBar({ label, score = 0 }) {
+  const pct = Math.max(0, Math.min(100, Math.round(score * 100)))
   return (
-    <div className='luxe-glass-soft p-3 text-center'>
-      <div className='text-[10px] uppercase tracking-widest text-fg-muted font-bold'>{label}</div>
-      <div className='text-sm font-bold text-amber-200 mt-1'>{value}</div>
+    <div className='flex items-center gap-3'>
+      <span className='text-sm font-bold capitalize min-w-[7rem] truncate' title={label}>{label}</span>
+      <div className='flex-1 h-2 rounded-full bg-white/5 overflow-hidden'>
+        <div
+          className='h-full bg-gradient-to-r from-amber-300 via-rose-300 to-fuchsia-400'
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span className='font-mono text-[11px] text-fg-muted min-w-[2.5rem] text-right'>{pct}%</span>
     </div>
   )
 }
@@ -806,7 +758,27 @@ function StyleChip({ label, value }) {
   )
 }
 
-function pct(v) {
-  if (v == null) return '—'
-  return `${Math.round(v * 100)}%`
+function AestheticPill({ label }) {
+  return (
+    <span className='px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[12px] capitalize'>
+      {label}
+    </span>
+  )
+}
+
+function PayloadModeButton({ active, onClick, icon, label }) {
+  return (
+    <button
+      type='button'
+      onClick={onClick}
+      className={
+        'inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[12px] font-bold border transition ' +
+        (active
+          ? 'bg-gradient-to-r from-amber-400/20 to-fuchsia-400/20 border-amber-300/50 text-amber-100'
+          : 'bg-white/[0.03] border-white/10 text-fg-muted hover:text-fg-primary hover:border-white/25')
+      }>
+      {icon}
+      {label}
+    </button>
+  )
 }
