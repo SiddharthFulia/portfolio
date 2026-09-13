@@ -577,12 +577,17 @@ function renderQR(canvas, cfg, matrixData, bgImg, logoImg) {
 
       // Silhouette gate — outside the silhouette we still paint the cell
       // (so the QR remains scannable — every data module has to be
-      // readable by jsQR / ZXing) but we shrink it to ~50% size and
-      // centre it. Visually reads as "hollow" outside the tattoo shape;
-      // decoders still see a dark centre and pass. Reserved structural
-      // cells (finder / alignment / timing) always render full-size.
+      // readable by jsQR / ZXing) but we shrink it so it reads visually
+      // as "hollow" outside the tattoo shape while decoders still see a
+      // dark centre and pass. Reserved structural cells (finder /
+      // alignment / timing) always render full-size.
+      //
+      // Shrink is version-adaptive: high-version QRs (small modules) need
+      // more coverage or jsQR's binariser averages the cell to light and
+      // reads it as a light module. v1-5 → 55%; v6+ → 70%.
       if (silhouetteGrid && silhouetteGrid[idx] === 0 && !isReservedCell(r, c, N) && !inFinder) {
-        const shrink = 0.5
+        const qrVersion = (N - 17) / 4
+        const shrink = qrVersion >= 6 ? 0.7 : 0.55
         const smallS = cellSize * shrink
         const offset = (cellSize - smallS) / 2
         drawModule(ctx, x + offset, y + offset, smallS, cfg.cellShape, cfg.radius, cfg.gap)

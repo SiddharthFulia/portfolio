@@ -1844,8 +1844,20 @@ export default function QRScenes3D({ matrixData, ecc, payload, silhouetteMask = 
       }
       if (s.treeOverlay) s.treeOverlay.visible = mode === 'iso'
       if (s.groundOverlay) s.groundOverlay.visible = mode === 'iso'
-      // Ink Relief tattoo background stays visible in top-down too.
-      if (s.inkReliefBackground) s.inkReliefBackground.visible = isInkRelief || mode === 'iso'
+      // Ink Relief tattoo background stays visible in top-down too — but
+      // fades to a subtle watermark (opacity 0.3) so QR module contrast
+      // stays high enough for camera phones to decode. In iso, back to
+      // full opacity for the strong artistic read.
+      if (s.inkReliefBackground) {
+        s.inkReliefBackground.visible = isInkRelief || mode === 'iso'
+        if (isInkRelief) {
+          const targetOpacity = mode === 'top' ? 0.28 : 1
+          for (const m of (s.inkReliefBackground.userData?.fadeMaterials || [])) {
+            m.transparent = true
+            m.opacity = targetOpacity
+          }
+        }
+      }
     }
 
     // During a transition we keep artistic geometry visible but crossfade
@@ -2069,13 +2081,26 @@ export default function QRScenes3D({ matrixData, ecc, payload, silhouetteMask = 
     return () => clearTimeout(t)
   }, [scenePresent, matrixData, theme, season, payload])
 
-  // ─── Download PNG snapshot of current camera at 2× DPR ────────────────
+  // ─── Download PNG — smart per theme ───────────────────────────────
+  // For Ink Relief the on-canvas composition (tattoo + raised pillars)
+  // is artistic — great to look at but harder for camera phones to
+  // decode reliably. Export the clean top-down scan frame instead so
+  // the downloaded PNG is always guaranteed scannable. Other themes
+  // fall back to a straight canvas.toDataURL — their top-down view is
+  // already the clean scan tiles.
   const download = () => {
     const s = stateRef.current
     if (!s.renderer) return
+    if (theme === 'Ink Relief' && s.scanCanvas && s.scene && s.topCam) {
+      renderTopDownFrame(s, s.scanCanvas)
+      const url = s.scanCanvas.toDataURL('image/png')
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `qr-${theme.replace(/\s+/g, '-').toLowerCase()}-${season.toLowerCase()}-${Date.now()}.png`
+      document.body.appendChild(a); a.click(); a.remove()
+      return
+    }
     const canvas = canvasRef.current
-    // Because we render every frame with preserveDrawingBuffer:true, the
-    // canvas backing store already has the current frame. Read it out.
     const url = canvas.toDataURL('image/png')
     const a = document.createElement('a')
     a.href = url
