@@ -28,6 +28,59 @@ function FieldHelp({ children }) {
 // Render a QR onto a canvas using the supplied style. Stripped-down copy
 // of QRCompiler's core paint path — we only need square / rounded cells
 // for the suggested-QR preview.
+// Paint an image over the centre of a QR canvas at ~24% side length with a
+// small white pad + rounded corners — same treatment the 2D editor uses on
+// apply. `logoDataUrl` is optional; when set the QR reads as a picture at
+// a glance (the image sits over the payload, ECC H covers the ~30% area).
+function paintLogo(canvas, logoDataUrl, opts = {}) {
+  return new Promise((resolve) => {
+    if (!logoDataUrl) return resolve()
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      const ctx = canvas.getContext('2d')
+      const size = canvas.width
+      const pct = opts.pct ?? 0.22
+      const w = Math.round(size * pct)
+      const x = Math.round((size - w) / 2)
+      const y = x
+      const pad = Math.round(w * 0.08)
+      // White pad behind so it looks like a badge, not a bleed
+      ctx.save()
+      const r = Math.round(w * 0.16)
+      ctx.beginPath()
+      ctx.moveTo(x - pad + r, y - pad)
+      ctx.arcTo(x + w + pad, y - pad, x + w + pad, y + w + pad, r)
+      ctx.arcTo(x + w + pad, y + w + pad, x - pad, y + w + pad, r)
+      ctx.arcTo(x - pad, y + w + pad, x - pad, y - pad, r)
+      ctx.arcTo(x - pad, y - pad, x + w + pad, y - pad, r)
+      ctx.closePath()
+      ctx.fillStyle = '#ffffff'
+      ctx.shadowColor = 'rgba(0,0,0,0.18)'
+      ctx.shadowBlur = 12
+      ctx.shadowOffsetY = 3
+      ctx.fill()
+      ctx.restore()
+      // Rounded-clip the image
+      ctx.save()
+      ctx.beginPath()
+      const rr = Math.round(w * 0.12)
+      ctx.moveTo(x + rr, y)
+      ctx.arcTo(x + w, y, x + w, y + w, rr)
+      ctx.arcTo(x + w, y + w, x, y + w, rr)
+      ctx.arcTo(x, y + w, x, y, rr)
+      ctx.arcTo(x, y, x + w, y, rr)
+      ctx.closePath()
+      ctx.clip()
+      ctx.drawImage(img, x, y, w, w)
+      ctx.restore()
+      resolve()
+    }
+    img.onerror = () => resolve()
+    img.src = logoDataUrl
+  })
+}
+
 function renderQrToCanvas(payload, style, size = 512) {
   const ecc = style.ecc || 'H'
   const qr = qrcode(0, ecc)
@@ -300,16 +353,19 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
   }, [suggested])
 
   // Mount the suggested QR canvas into a preview div (React can't render a
-  // detached <canvas> as JSX).
+  // detached <canvas> as JSX). Also paint the source image over the centre
+  // with the same treatment the 2D editor uses — this gives the user a
+  // true "what the QR will look like" preview instead of a blank QR body.
   const previewRef = useRef(null)
   useEffect(() => {
     if (!previewRef.current) return
     previewRef.current.innerHTML = ''
-    if (suggestedQrCanvas) {
-      suggestedQrCanvas.className = 'w-full h-auto rounded-lg'
-      previewRef.current.appendChild(suggestedQrCanvas)
-    }
-  }, [suggestedQrCanvas])
+    if (!suggestedQrCanvas) return
+    suggestedQrCanvas.className = 'w-full h-auto rounded-lg'
+    previewRef.current.appendChild(suggestedQrCanvas)
+    // Fire-and-forget logo paint over the mounted canvas.
+    paintLogo(suggestedQrCanvas, preview || null, { pct: 0.24 })
+  }, [suggestedQrCanvas, preview])
 
   const applySuggested = () => {
     if (!suggested?.state) return
