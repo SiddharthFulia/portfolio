@@ -102,37 +102,132 @@
 /* ── Luxe-glass — refractive Apple/iOS-style surface ────────────── */
 /* Uses the <GlassFilter/> SVG mounted at the app root (id=luxe-glass-filter).
    Combined with backdrop-blur + saturate this reads as actual glass, not
-   flat frosted plastic. `-webkit-` prefix keeps Safari happy. */
+   flat frosted plastic. `-webkit-` prefix keeps Safari happy.
+
+   PERF (2026-09-13):
+   - Blur dropped 14px → 8px (visually near-identical, ~45% cheaper to
+     composite on every scroll frame — backdrop-filter cost scales
+     roughly linearly with blur radius).
+   - SVG `url(#luxe-glass-filter)` displacement removed from the default
+     backdrop stack — it forced every scroll frame to re-run turbulence
+     + displacement on the compositor. The visual delta is invisible on
+     dark backgrounds but the cost is huge. Kept opt-in via
+     `.luxe-glass-refractive` for hero surfaces that truly need it.
+   - `contain: paint layout` + `transform: translateZ(0)` promote each
+     glass panel to its own compositor layer so scrolling doesn't
+     re-paint the entire page behind it — the browser reuses the cached
+     layer bitmap and only re-composites its position.
+   - Outer shadow blur dropped 40px → 24px (still reads as elevation,
+     costs roughly half the fill-rate to redraw). */
 .luxe-glass {
   position: relative;
   background: rgba(17, 17, 26, 0.35);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--luxe-radius-lg);
-  backdrop-filter: url(#luxe-glass-filter) blur(14px) saturate(160%);
-  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  backdrop-filter: blur(8px) saturate(150%);
+  -webkit-backdrop-filter: blur(8px) saturate(150%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    0 12px 40px rgba(0, 0, 0, 0.32);
+    0 8px 24px rgba(0, 0, 0, 0.28);
   transition:
     border-color var(--luxe-dur-base) var(--luxe-easing),
     box-shadow   var(--luxe-dur-base) var(--luxe-easing);
+  /* Layer promotion — makes scroll cheap. */
+  contain: paint layout;
+  transform: translateZ(0);
 }
 .luxe-glass:hover {
   border-color: rgba(255, 255, 255, 0.16);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    0 16px 48px rgba(0, 0, 0, 0.4);
+    0 10px 28px rgba(0, 0, 0, 0.36);
+}
+
+/* Opt-in refractive variant — for hero / one-off surfaces that genuinely
+   need SVG displacement (Home hero, luxury landing chrome). Add both
+   classes on the same element:  `<div class="luxe-glass luxe-glass-refractive">`
+   so nothing else has to change. */
+.luxe-glass-refractive {
+  backdrop-filter: url(#luxe-glass-filter) blur(10px) saturate(160%);
+  -webkit-backdrop-filter: blur(10px) saturate(160%);
 }
 
 /* Softer variant — for chrome that sits on top of hero video / imagery
-   where full glass would over-distort. Same class, no displacement. */
+   where full glass would over-distort. Same class, no displacement.
+   Blur dropped 20px → 10px. */
 .luxe-glass-soft {
   background: rgba(17, 17, 26, 0.55);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--luxe-radius-lg);
-  backdrop-filter: blur(20px) saturate(140%);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  contain: paint layout;
+  transform: translateZ(0);
+}
+
+/* ── Scroll performance helpers ─────────────────────────────────
+   Apply `.scroll-perf-panel` on any large panel that lives below the
+   fold or in a long scrolling grid (cards on /codex, /algorithms,
+   /projects). The browser skips paint + layout for off-screen
+   subtrees, which massively reduces scroll cost on pages with 30-50
+   cards.
+
+   `contain-intrinsic-size` reserves layout space so the scrollbar
+   thumb doesn't jitter as panels enter/leave the viewport. Tune
+   per-page if the cards are notably taller than the default. */
+.scroll-perf-panel {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 280px;
+}
+
+/* Larger reserved size for pages with tall cards (Projects, Codex). */
+.scroll-perf-card-lg {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 420px;
+}
+
+/* Reduce blur / drop backdrop-filter on the mobile viewport where the
+   fill-rate cost is prohibitive on mid-range Android GPUs. Visual
+   delta is minimal — bg-opacity carries the glass read. */
+@media (max-width: 640px) {
+  .luxe-glass,
+  .luxe-glass-soft {
+    backdrop-filter: blur(4px) saturate(120%);
+    -webkit-backdrop-filter: blur(4px) saturate(120%);
+  }
+  .luxe-glass-refractive {
+    /* Drop SVG displacement on mobile — never worth the cost. */
+    backdrop-filter: blur(6px) saturate(130%);
+    -webkit-backdrop-filter: blur(6px) saturate(130%);
+  }
+}
+
+/* Users who enabled OS reduce-transparency (Safari 17+, WebKit 616+)
+   get flat opaque surfaces. Falls back gracefully in browsers without
+   the media query. */
+@media (prefers-reduced-transparency: reduce) {
+  .luxe-glass,
+  .luxe-glass-soft,
+  .luxe-glass-refractive {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--luxe-surface);
+  }
+}
+
+/* ── Fixed navbar — layerise so scroll doesn't repaint the page ────
+   The .header rule in index.css positions the top nav `absolute top-0`
+   and Navbar.jsx flips it to `bg-gray-950/80 backdrop-blur-md` on the
+   dark routes. Without a layer boundary, every scroll frame invalidates
+   the entire page behind that translucent strip (because the browser
+   has to re-blur it against the new content). Forcing it into its own
+   compositor layer means the layer's bitmap is cached and only the
+   Y-offset moves — much cheaper. */
+.header {
+  transform: translateZ(0);
+  will-change: transform;
+  contain: layout style;
 }
 
 /* Glow-on-hover border — no-op'd. */
@@ -217,6 +312,11 @@
   }
   .luxe-cta,
   .luxe-press {
+    transition: none !important;
+  }
+  /* Also drop the luxe-glass hover shadow transition — one less thing
+     to animate on hover for users who opted out. */
+  .luxe-glass {
     transition: none !important;
   }
 }

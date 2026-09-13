@@ -276,7 +276,7 @@ const Projects = () => {
 
           {LIVE_PROJECTS.map(proj => (
             <motion.div key={proj.title} variants={fadeUp}>
-              <div className="luxe-glass luxe-card-hover overflow-hidden flex flex-col h-full">
+              <div className="scroll-perf-card-lg luxe-glass luxe-card-hover overflow-hidden flex flex-col h-full">
                 {/* Left content */}
                 <div className="flex-1 p-5 sm:p-6">
                   <div className="flex items-center gap-2 flex-wrap mb-2">
@@ -395,7 +395,7 @@ const Projects = () => {
           {shown.map((project) => {
             const isChess = project.name === 'Chess Engine';
             const cardInner = (
-              <div className="luxe-glass luxe-card-hover overflow-hidden flex flex-col h-full">
+              <div className="scroll-perf-card-lg luxe-glass luxe-card-hover overflow-hidden flex flex-col h-full">
                 {/* Left content */}
                 <div className="flex-1 p-5 sm:p-6">
                   <div className="flex items-center gap-2 flex-wrap mb-2">

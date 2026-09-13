@@ -43,7 +43,7 @@ function TopicCard({ topic }) {
   return (
     <Link
       to={`/algorithms/${topic.slug}`}
-      className={`group relative flex flex-col rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-5 transition-colors ${a.hover}`}
+      className={`scroll-perf-panel group relative flex flex-col rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-5 transition-colors ${a.hover}`}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 min-w-0">

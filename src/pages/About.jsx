@@ -174,7 +174,7 @@ const SKILL_GROUPS = [
 
 function SkillGroupCard({ group }) {
   return (
-    <motion.div variants={fadeUp} className="luxe-glass luxe-card-hover p-5">
+    <motion.div variants={fadeUp} className="scroll-perf-panel luxe-glass luxe-card-hover p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="luxe-eyebrow text-amber-300/80">{group.key}</p>
@@ -394,7 +394,7 @@ const About = () => {
                       className="absolute -left-5 top-5 w-3 h-3 rounded-full bg-surface-elevated border-2"
                       style={{ borderColor: '#fbbf24' }}
                     />
-                    <div className="luxe-glass luxe-card-hover p-5 sm:p-6">
+                    <div className="scroll-perf-card-lg luxe-glass luxe-card-hover p-5 sm:p-6">
                       <div className="flex items-start justify-between gap-3 flex-wrap">
                         <a
                           href={exp.company_link}

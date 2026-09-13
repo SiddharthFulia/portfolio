@@ -47,7 +47,7 @@ function GameCard({ game }) {
   return (
     <Link
       to={`/codex/${game.slug}`}
-      className={`group relative flex flex-col rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:bg-white/[0.04] ${accent.ring}`}
+      className={`scroll-perf-panel group relative flex flex-col rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:bg-white/[0.04] ${accent.ring}`}
     >
       {/* Thumbnail */}
       <div

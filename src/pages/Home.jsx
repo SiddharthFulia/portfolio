@@ -199,7 +199,7 @@ const Home = () => {
           {/* Tools grid — every AI lane + engineered build + tool, grouped. */}
           <div className="mt-14 sm:mt-16 space-y-8 sm:space-y-10">
             {GROUPS.map((g) => (
-              <div key={g.title}>
+              <div key={g.title} className="scroll-perf-panel">
                 <p className={`text-[11px] uppercase tracking-[0.22em] font-bold mb-3 sm:mb-4 ${g.accent}`}>
                   {g.title}
                 </p>
