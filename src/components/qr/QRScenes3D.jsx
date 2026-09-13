@@ -1821,15 +1821,31 @@ export default function QRScenes3D({ matrixData, ecc, payload, silhouetteMask = 
     const whiteBg = new THREE.Color('#ffffff')
 
     // Snap mesh visibility for a settled mode.
+    // Ink Relief keeps its ARTISTIC composition visible in top-down too
+    // (tattoo background + raised pillars + finder tiles) — the user asked
+    // for the tattoo to remain the QR background even at scan angle.
+    // Scan tiles for that theme are only used inside the off-DOM snap pass
+    // (see renderTopDownFrame), which stashes+swaps visibility temporarily
+    // so jsQR still sees a clean B/W QR for decoding.
     const settleMeshVisibility = (mode) => {
+      const isInkRelief = theme === 'Ink Relief'
       for (const key of Object.keys(s.meshes)) {
         const im = s.meshes[key]
-        if (SCAN_KEYS.has(key)) im.visible = mode === 'top'
-        else im.visible = mode === 'iso'
+        if (SCAN_KEYS.has(key)) {
+          // Scan tiles: Ink Relief keeps them hidden always (its own raised
+          // pillars carry the QR pattern in top-down). Other themes reveal
+          // scan tiles in top-down as the primary QR read.
+          im.visible = isInkRelief ? false : mode === 'top'
+        } else {
+          // Non-scan (artistic): Ink Relief keeps them visible in both
+          // modes; other themes hide them in top-down.
+          im.visible = isInkRelief ? true : mode === 'iso'
+        }
       }
       if (s.treeOverlay) s.treeOverlay.visible = mode === 'iso'
       if (s.groundOverlay) s.groundOverlay.visible = mode === 'iso'
-      if (s.inkReliefBackground) s.inkReliefBackground.visible = mode === 'iso'
+      // Ink Relief tattoo background stays visible in top-down too.
+      if (s.inkReliefBackground) s.inkReliefBackground.visible = isInkRelief || mode === 'iso'
     }
 
     // During a transition we keep artistic geometry visible but crossfade
