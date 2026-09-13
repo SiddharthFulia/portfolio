@@ -97,16 +97,28 @@ export function paletteToEditorState(palette, aesthetic = {}) {
       ecc: 'H',
     }
   }
-  const pair = pickContrastPair(palette) || {
-    a: palette[0],
-    b: palette[1] || palette[0],
-  }
+  // Compute relative luminance per WCAG (0..1). QR scanners need the dark
+  // modules ≤ ~40% luminance against a white background, otherwise the
+  // decoder rejects the finder patterns as "not enough contrast".
   const rgbOf = (c) => c.rgb || hexToRgb(c.hex)
-  const lum = (rgb) => 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]
-  const [fg, bg] = lum(rgbOf(pair.a)) <= lum(rgbOf(pair.b))
-    ? [pair.a, pair.b]
-    : [pair.b, pair.a]
-  const accent = palette.find((c) => c.hex !== fg.hex && c.hex !== bg.hex) || pair.b
+  const lum01 = (c) => {
+    const rgb = rgbOf(c)
+    return (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255
+  }
+  // Pick the DARKEST palette colour as the foreground. If nothing in the
+  // palette is dark enough for a scannable QR (all-warm skin tones on the
+  // tattoo image were the trigger for this fix), replace fg with a safe
+  // near-black — the accent still comes from the palette so the QR still
+  // "feels" like the image, just with a scannable primary.
+  const bg = { hex: '#ffffff' }
+  const darkest = [...palette].sort((a, b) => lum01(a) - lum01(b))[0]
+  const DARK_ENOUGH = 0.40
+  const fg = lum01(darkest) <= DARK_ENOUGH ? darkest : { hex: '#0a0a0e' }
+  // Accent = brightest palette entry that isn't fg. Falls back to amber
+  // if the whole palette is dark (rare — mostly night-mode photos).
+  const accent = [...palette]
+    .sort((a, b) => lum01(b) - lum01(a))
+    .find((c) => c.hex !== fg.hex) || { hex: '#f59e0b' }
 
   const busy = Number(aesthetic?.busyness) || 0
   const cellShape = busy > 0.35 ? 'Square' : 'Rounded'
@@ -118,7 +130,7 @@ export function paletteToEditorState(palette, aesthetic = {}) {
     eyeInnerShape: eyeShape,
     fgColor: fg.hex,
     fgColor2: accent.hex,
-    bgColor: '#ffffff',
+    bgColor: bg.hex,
     gradientOn: true,
     gradientType: 'linear',
     gradientAngle: 135,
