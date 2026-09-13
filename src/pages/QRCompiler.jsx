@@ -174,6 +174,108 @@ function isFinderInner(r, c, N) {
   return dr >= 2 && dr <= 4 && dc >= 2 && dc <= 4
 }
 
+// ─── Reserved-cell guard for silhouette mode ────────────────────────
+// The silhouette mask MUST NOT hide the QR's structural patterns —
+// finders, alignment markers, timing rows/cols, and their separators.
+// isReservedCell returns true for any cell the mask must leave alone.
+//
+// - Finder patterns: 7×7 in TL / TR / BL corners plus a 1-cell separator
+//   (so 8×8 blocks). This also covers the format-info strip that hugs
+//   each finder.
+// - Timing: row 6 + column 6, from module 8 to N-8.
+// - Alignment: from QR spec table §Annex E — one 5×5 pattern for
+//   versions 2..6 (centred at (N-7, N-7)), more for higher versions.
+//   For coverage without table lookup we reserve a small halo around any
+//   version's alignment centres by using the well-known formula
+//   (spec position tables) for versions 2–20 (portfolio users rarely
+//   generate beyond v20 with H-level ECC).
+const QR_ALIGN_POS = [
+  [],                                 // v1 (none)
+  [6, 18],                            // v2
+  [6, 22],                            // v3
+  [6, 26],                            // v4
+  [6, 30],                            // v5
+  [6, 34],                            // v6
+  [6, 22, 38],                        // v7
+  [6, 24, 42],                        // v8
+  [6, 26, 46],                        // v9
+  [6, 28, 50],                        // v10
+  [6, 30, 54],                        // v11
+  [6, 32, 58],                        // v12
+  [6, 34, 62],                        // v13
+  [6, 26, 46, 66],                    // v14
+  [6, 26, 48, 70],                    // v15
+  [6, 26, 50, 74],                    // v16
+  [6, 30, 54, 78],                    // v17
+  [6, 30, 56, 82],                    // v18
+  [6, 30, 58, 86],                    // v19
+  [6, 34, 62, 90],                    // v20
+]
+function isReservedCell(r, c, N) {
+  // Version from module count. QR spec: N = 4v + 17.
+  const version = (N - 17) / 4
+  // Finder patterns + their 1-cell separators. 8×8 exclusion zones cover
+  // the finder ring (7×7) plus the mandatory quiet-cell separator.
+  if (r < 8 && c < 8) return true
+  if (r < 8 && c >= N - 8) return true
+  if (r >= N - 8 && c < 8) return true
+  // Timing pattern: row 6 + column 6 (across the whole strip).
+  if (r === 6 || c === 6) return true
+  // Format info: 1-cell strip beside each finder — already covered by the
+  // 8×8 blocks above.
+  // Alignment patterns: 5×5 concentric squares. Reserve a 5×5 halo around
+  // each centre listed in the table. Version 1 has none.
+  const positions = version >= 1 && version <= QR_ALIGN_POS.length
+    ? QR_ALIGN_POS[version - 1]
+    : []
+  for (let i = 0; i < positions.length; i++) {
+    for (let j = 0; j < positions.length; j++) {
+      const cr = positions[i]
+      const cc = positions[j]
+      // Skip alignment patterns that would overlap the finders.
+      if (cr <= 8 && cc <= 8) continue
+      if (cr <= 8 && cc >= N - 8) continue
+      if (cr >= N - 8 && cc <= 8) continue
+      if (Math.abs(r - cr) <= 2 && Math.abs(c - cc) <= 2) return true
+    }
+  }
+  // Version info blocks (v7+): 6×3 strip near TR + BL finders.
+  if (version >= 7) {
+    if (r < 6 && c >= N - 11 && c < N - 8) return true
+    if (c < 6 && r >= N - 11 && r < N - 8) return true
+  }
+  return false
+}
+
+// Sample a silhouette mask image to an N×N grid of 0/1. 1 = dark = paint.
+// We draw the image into an offscreen canvas at N×N cover-fit, read out
+// alpha + luminance, and threshold. Handles PNGs with transparent bg
+// (alpha < 128 = not-mask) and solid-black-on-white PNGs (luma < 128 = mask).
+function sampleMaskGrid(img, N) {
+  const off = document.createElement('canvas')
+  off.width = N; off.height = N
+  const c = off.getContext('2d')
+  // Transparent bg so alpha-only PNGs read correctly.
+  c.clearRect(0, 0, N, N)
+  const iw = img.width || img.naturalWidth
+  const ih = img.height || img.naturalHeight
+  // "Contain" fit — pad rather than crop, so the silhouette stays whole.
+  const scale = Math.min(N / iw, N / ih)
+  const w = iw * scale, h = ih * scale
+  c.drawImage(img, (N - w) / 2, (N - h) / 2, w, h)
+  const data = c.getImageData(0, 0, N, N).data
+  const grid = new Uint8Array(N * N)
+  for (let i = 0; i < N * N; i++) {
+    const r = data[i * 4], g = data[i * 4 + 1], b = data[i * 4 + 2], a = data[i * 4 + 3]
+    // Pixel is "mask" if it is visible AND darker than mid-grey. Alpha-only
+    // silhouettes read as visible + black.
+    if (a < 32) { grid[i] = 0; continue }
+    const luma = (r * 299 + g * 587 + b * 114) / 1000
+    grid[i] = luma < 128 ? 1 : 0
+  }
+  return grid
+}
+
 // ─── Deterministic PRNG for the damage sim ──────────────────────────
 function mulberry32(seed) {
   let a = seed >>> 0
@@ -437,6 +539,11 @@ function renderQR(canvas, cfg, matrixData, bgImg, logoImg) {
   // positions. Only body cells (not finders/timing) are eligible.
   const bake = cfg.bakeMask || null
 
+  // Silhouette mask — N×N grid of 0/1. When present, ONLY paint cells
+  // whose corresponding mask pixel is dark; reserved cells (finder /
+  // alignment / timing) always paint so decoding still works.
+  const silhouetteGrid = cfg.silhouetteGrid || null
+
   const originX = margin * cellSize
   const originY = margin * cellSize
 
@@ -450,6 +557,13 @@ function renderQR(canvas, cfg, matrixData, bgImg, logoImg) {
         dark = bake[idx] === 1
       }
       if (!dark) continue
+
+      // Silhouette gate — outside the silhouette we skip everything
+      // EXCEPT structural cells the decoder needs. isReservedCell
+      // covers finders + separators + timing + alignment + version info.
+      if (silhouetteGrid && silhouetteGrid[idx] === 0 && !isReservedCell(r, c, N)) {
+        continue
+      }
 
       const inFinderRing  = isFinderRing(r, c, N)
       const inFinderInner = isFinderInner(r, c, N)
@@ -795,6 +909,20 @@ export default function QRCompiler() {
   const [bakeImg, setBakeImg] = useState(null)
   const [bakeInfluence, setBakeInfluence] = useState(60) // 0..100 (%)
 
+  // Silhouette mode — the extracted subject silhouette (from Vision Studio
+  // or Tattoo Studio's parallel subject-extract call) becomes the OUTLINE
+  // of the QR. Modules only render where the mask is dark; finder +
+  // alignment + timing cells always render so decoding still works.
+  // `silhouetteMask` is a data URL. `silhouetteMaskGrid` is the sampled
+  // N×N array of 0/1 built once per matrix version.
+  const [silhouetteMask, setSilhouetteMask] = useState(null)
+  const [silhouetteOn, setSilhouetteOn]     = useState(false)
+  // Dominant palette from the last vision / tattoo analysis. Kept as
+  // [{ hex, weight }] (BE shape) so downstream components can pick their
+  // own semantic slots — the 3D "Tattoo Bloom" theme, for instance, picks
+  // brightest = skin, darkest = ink, most-saturated = bloom tint.
+  const [tattooPalette, setTattooPalette] = useState(null)
+
   // Damage sim
   const [damagePct, setDamagePct] = useState(0)
   const [damageSeed, setDamageSeed] = useState(1337)
@@ -859,6 +987,33 @@ export default function QRCompiler() {
     return computeBakeMask(matrixData.matrix, matrixData.N, ecc, grey, bakeInfluence / 100)
   }, [bakeImg, matrixData, bakeInfluence, ecc])
 
+  // Decode the silhouette mask data URL once into an HTMLImageElement, then
+  // sample to an N×N grid whenever the QR module count changes. Guarded so
+  // an empty / broken mask silently disables the toggle instead of throwing.
+  const [silhouetteImg, setSilhouetteImg] = useState(null)
+  useEffect(() => {
+    if (!silhouetteMask) { setSilhouetteImg(null); return }
+    const img = new Image()
+    img.onload = () => setSilhouetteImg(img)
+    img.onerror = () => setSilhouetteImg(null)
+    img.src = silhouetteMask
+  }, [silhouetteMask])
+  const silhouetteGrid = useMemo(() => {
+    if (!silhouetteOn || !silhouetteImg || !matrixData) return null
+    try {
+      const grid = sampleMaskGrid(silhouetteImg, matrixData.N)
+      // Edge case: mask that's all-black or all-white against reserved
+      // cells will render either a full QR (mask all 1s → same as off) or
+      // ONLY the finder patterns (mask all 0s → unscannable). We fall back
+      // to a no-op when the coverage is degenerate on either end.
+      let ones = 0
+      for (let i = 0; i < grid.length; i++) if (grid[i] === 1) ones++
+      const frac = ones / grid.length
+      if (frac < 0.03 || frac > 0.97) return null
+      return grid
+    } catch { return null }
+  }, [silhouetteOn, silhouetteImg, matrixData])
+
   // Renderer — re-draws canvas + runs scan test on every relevant change.
   useEffect(() => {
     const canvas = canvasRef.current
@@ -888,6 +1043,7 @@ export default function QRCompiler() {
       bgImageOn, bgImageAlpha, blendMode,
       logoOn, logoPct, logoPad, logoRound,
       bakeMask,
+      silhouetteGrid,
     }
     renderQR(canvas, cfg, matrixData, bgImage, logoImg)
     if (damagePct > 0) applyDamage(canvas, damagePct, damageSeed)
@@ -901,6 +1057,7 @@ export default function QRCompiler() {
     bgImageOn, bgImageAlpha, blendMode, bgImage,
     logoOn, logoPct, logoPad, logoRound, logoImg,
     bakeMask,
+    silhouetteGrid,
     damagePct, damageSeed,
   ])
 
@@ -934,6 +1091,7 @@ export default function QRCompiler() {
       bgImageOn: false, bgImageAlpha, blendMode,
       logoOn, logoPct, logoPad, logoRound,
       bakeMask,
+      silhouetteGrid,
     }
     // Match device-pixel scaling so scanCanvas has enough resolution.
     const dpr = 2
@@ -955,7 +1113,7 @@ export default function QRCompiler() {
     matrixData, cellShape, eyeShape, eyeInnerShape,
     fgColor, bgColor, gradientOn, gradientType, gradientAngle, fgColor2,
     gap, radius, bgImageAlpha, blendMode, logoOn, logoPct, logoPad, logoRound,
-    logoImg, bakeMask, damageSeed,
+    logoImg, bakeMask, silhouetteGrid, damageSeed,
   ])
 
   function drawSweep(pts) {
@@ -1068,6 +1226,7 @@ export default function QRCompiler() {
       bgImageOn, bgImageAlpha, blendMode,
       logoOn, logoPct, logoPad, logoRound,
       bakeMask,
+      silhouetteGrid,
     }
     renderQR(off, cfg, matrixData, bgImage, logoImg)
     downloadDataURL(off.toDataURL('image/png'), `qr-${Date.now()}-${scaleMul}x.png`)
@@ -1075,7 +1234,7 @@ export default function QRCompiler() {
     matrixData, pxSize, cellShape, eyeShape, eyeInnerShape,
     fgColor, bgColor, gradientOn, gradientType, gradientAngle, fgColor2,
     gap, radius, bgImageOn, bgImageAlpha, blendMode, bgImage,
-    logoOn, logoPct, logoPad, logoRound, logoImg, bakeMask,
+    logoOn, logoPct, logoPad, logoRound, logoImg, bakeMask, silhouetteGrid,
   ])
 
   const downloadSVG = useCallback(() => {
@@ -1129,6 +1288,7 @@ ${inner}
       bgImageOn, bgImageAlpha, blendMode,
       logoOn, logoPct, logoPad, logoRound,
       bakeMask,
+      silhouetteGrid,
     }
     renderQR(off, cfg, matrixData, bgImage, logoImg)
     // Try PNG first; if we blow the size cap, fall back to JPEG.
@@ -1142,7 +1302,7 @@ ${inner}
     matrixData, cellShape, eyeShape, eyeInnerShape,
     fgColor, bgColor, gradientOn, gradientType, gradientAngle, fgColor2,
     gap, radius, bgImageOn, bgImageAlpha, blendMode, bgImage,
-    logoOn, logoPct, logoPad, logoRound, logoImg, bakeMask,
+    logoOn, logoPct, logoPad, logoRound, logoImg, bakeMask, silhouetteGrid,
   ])
 
   const styleConfigSnapshot = useCallback(() => ({
@@ -1479,7 +1639,13 @@ ${inner}
 
       {topTab === '3D Scenes' && (
         <div className='max-w-7xl mx-auto px-4 md:px-6 pb-16'>
-          <QRScenes3D matrixData={matrixData} ecc={ecc} payload={payload} />
+          <QRScenes3D
+            matrixData={matrixData}
+            ecc={ecc}
+            payload={payload}
+            silhouetteMask={silhouetteMask}
+            palette={tattooPalette}
+          />
         </div>
       )}
 
@@ -1522,6 +1688,18 @@ ${inner}
                 }
                 img.src = opts.image
               }
+              // Silhouette mask — when present, the QR takes the SHAPE of
+              // the extracted subject. Toggle flips on automatically; the
+              // panel in the 2D editor lets the user disable it.
+              if (opts?.silhouetteMask) {
+                setSilhouetteMask(opts.silhouetteMask)
+                setSilhouetteOn(true)
+              } else {
+                setSilhouetteOn(false)
+              }
+              // Stash the palette so the 3D "Tattoo Bloom" theme can tint
+              // its bloom columns with the tattoo's own dominant colours.
+              if (Array.isArray(opts?.palette)) setTattooPalette(opts.palette)
               // Jump back to the 2D editor so the redraw is visible.
               setTopTab('2D Editor')
             }}
@@ -1579,6 +1757,13 @@ ${inner}
                 }
                 img.src = opts.image
               }
+              if (opts?.silhouetteMask) {
+                setSilhouetteMask(opts.silhouetteMask)
+                setSilhouetteOn(true)
+              } else {
+                setSilhouetteOn(false)
+              }
+              if (Array.isArray(opts?.palette)) setTattooPalette(opts.palette)
               setTopTab('2D Editor')
             }}
           />
@@ -1678,6 +1863,34 @@ ${inner}
                 <SliderNum min={5} max={40} value={logoPct} onChange={setLogoPct} accent='amber' />
               </div>
               <FieldHelp>Size %. Stay ≤ {(ECC_BUDGET[ecc] * 100).toFixed(0)}% for the current ECC ({ecc}) or bump ECC.</FieldHelp>
+            </Row>
+
+            <Row label='Silhouette mask' help='Extract a subject silhouette from Vision or Tattoo Studio, then clip the QR to that shape. Finder / alignment / timing modules always render so the code still scans.'>
+              <div className='flex items-center gap-3'>
+                <Switch checked={silhouetteOn} onChange={setSilhouetteOn} disabled={!silhouetteMask} />
+                <span className='text-xs text-fg-muted'>
+                  {silhouetteMask
+                    ? 'Constrain QR modules to the extracted subject shape'
+                    : 'Analyse an image in Vision or Tattoo Studio first'}
+                </span>
+              </div>
+              {silhouetteMask && (
+                <div className='mt-2 flex items-center gap-3'>
+                  <img
+                    src={silhouetteMask}
+                    className='w-24 h-24 rounded border border-white/10 bg-black/40 object-contain'
+                    alt='Silhouette mask'
+                  />
+                  <Button
+                    size='small'
+                    variant='ghost'
+                    icon={<DeleteOutlined />}
+                    onClick={() => { setSilhouetteMask(null); setSilhouetteOn(false) }}>
+                    Clear
+                  </Button>
+                </div>
+              )}
+              <FieldHelp>Modules render only where the mask is dark. Finder + alignment patterns always render so the QR still scans.</FieldHelp>
             </Row>
 
             <Row label='QR version (0 = auto)' tex='v' help={HELP.ver}>

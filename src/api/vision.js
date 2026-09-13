@@ -75,3 +75,47 @@ export async function deepAnalyzeImage(file, { signal } = {}) {
     clearTimeout(timeoutId);
   }
 }
+
+/**
+ * Extract the subject silhouette from an image. Runs in parallel with the
+ * deep-analyze pass — we use the returned mask to constrain QR modules to
+ * the shape of the extracted subject (silhouette-mode rendering).
+ *
+ * Response envelope (unwrapped):
+ *   {
+ *     mask: { png_data_url, coverage, bbox, centroid },
+ *     subject_thumbnail_url: string,   // data URL of subject on transparent bg
+ *     backend: string,                 // e.g. 'opencv-otsu'
+ *   }
+ *
+ * Throws with `err.status` set. Callers should treat failures as non-fatal —
+ * the toggle simply stays disabled and the rest of the analysis continues.
+ */
+export async function extractSubject(file, { signal } = {}) {
+  if (!file) throw new Error('Pick an image first');
+  const fd = new FormData();
+  fd.append('image', file);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort('timeout'), 60_000);
+  if (signal) {
+    if (signal.aborted) controller.abort(signal.reason);
+    else signal.addEventListener('abort', () => controller.abort(signal.reason));
+  }
+
+  try {
+    const res = await fetch(`${BE_URL}/api/vision/extract-subject`, {
+      method: 'POST',
+      body: fd,
+      signal: controller.signal,
+    });
+    return await unwrap(res);
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      throw new Error('Subject extraction timed out.');
+    }
+    throw e;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}

@@ -41,7 +41,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import { analyzeTattoo, checkTattooHealth } from '../../api/tattoo'
 import { createQrSave, listQrSaves, deleteQrSave } from '../../api/qrSaves'
-import { deepAnalyzeImage } from '../../api/vision'
+import { deepAnalyzeImage, extractSubject } from '../../api/vision'
 import { notice } from '../../lib/notice'
 import { LuxeLoader } from '../loaders'
 
@@ -109,6 +109,7 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
   const [preview, setPreview]     = useState('')        // data URL for thumbnail
   const [analyzing, setAnalyzing] = useState(false)
   const [analysis, setAnalysis]   = useState(null)      // BE analysis payload or deep-vision synthesis
+  const [extraction, setExtraction] = useState(null)    // subject-extract response
   const [meta, setMeta]           = useState(null)      // { cached, elapsedMs, backend }
   const [error, setError]         = useState('')
   const [errorStatus, setErrorStatus] = useState(null)  // HTTP status of last analyze error
@@ -158,6 +159,7 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
       }
       setFile(f)
       setAnalysis(null)
+      setExtraction(null)
       setMeta(null)
       setError('')
       try {
@@ -171,9 +173,16 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
   // ─── Analyze click ────────────────────────────────────────────
   const runAnalyze = async () => {
     if (!file) { notice.warning('Drop or pick a tattoo photo first'); return }
-    setAnalyzing(true); setError(''); setErrorStatus(null)
+    setAnalyzing(true); setError(''); setErrorStatus(null); setExtraction(null)
     try {
-      const data = await analyzeTattoo(file)
+      // Fire the tattoo analyse + subject-extract in parallel. The mask
+      // flows through onApplyStyle so the QR takes the SHAPE of the tattoo.
+      const [dataRes, extractRes] = await Promise.allSettled([
+        analyzeTattoo(file),
+        extractSubject(file),
+      ])
+      if (dataRes.status === 'rejected') throw dataRes.reason
+      const data = dataRes.value
       setAnalysis(data.analysis)
       // The BE tags where the analysis came from, but users don't need
       // to see the plumbing — we only use `backend` internally.
@@ -183,6 +192,9 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
         elapsedMs: data.elapsedMs,
         backend,
       })
+      if (extractRes.status === 'fulfilled' && extractRes.value?.mask?.png_data_url) {
+        setExtraction(extractRes.value)
+      }
       if (data.cached) notice.info('Loaded from cache')
       else notice.success('Analysis complete')
     } catch (e) {
@@ -199,9 +211,17 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
   // the caption + tag output the deep vision service returns.
   const runOfflineAnalyze = async () => {
     if (!file) { notice.warning('Drop a photo first'); return }
-    setOfflineRunning(true); setError(''); setErrorStatus(null)
+    setOfflineRunning(true); setError(''); setErrorStatus(null); setExtraction(null)
     try {
-      const data = await deepAnalyzeImage(file)
+      const [dataRes, extractRes] = await Promise.allSettled([
+        deepAnalyzeImage(file),
+        extractSubject(file),
+      ])
+      if (dataRes.status === 'rejected') throw dataRes.reason
+      const data = dataRes.value
+      if (extractRes.status === 'fulfilled' && extractRes.value?.mask?.png_data_url) {
+        setExtraction(extractRes.value)
+      }
       const palette = Array.isArray(data.palette) ? data.palette : []
       const primary   = palette[0]?.hex || '#0a0a0e'
       const secondary = palette[1]?.hex || '#e879f9'
@@ -273,6 +293,7 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
     onApplyStyle?.(state, {
       payload: usePayload ? analysis.suggested_qr_payload : null,
       image: preview || null,
+      silhouetteMask: extraction?.mask?.png_data_url || null,
     })
     notice.success('Style + tattoo image pushed to editor')
   }
@@ -556,6 +577,47 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
               />
               <FieldHelp>How sure the model is about the classification. Low = the tattoo photo may be blurry, cropped, or off-style.</FieldHelp>
             </div>
+
+            {/* Extracted subject — silhouette + thumbnail from the parallel
+                subject-extract pass. Feeds silhouette-mode rendering: QR
+                modules take the SHAPE of the tattoo, not just its palette. */}
+            {extraction?.mask?.png_data_url && (
+              <div className='mb-4'>
+                <div className='text-[10px] uppercase tracking-widest text-fg-muted font-bold mb-2'>
+                  Extracted subject
+                  {extraction.mask.coverage != null && (
+                    <span className='ml-2 text-fg-muted normal-case'>
+                      {Math.round(extraction.mask.coverage * 100)}% coverage
+                    </span>
+                  )}
+                </div>
+                <div className='flex flex-wrap gap-3 items-start'>
+                  {extraction.subject_thumbnail_url && (
+                    <div className='flex flex-col items-center gap-1'>
+                      <div className='rounded-lg border border-white/10 bg-[repeating-conic-gradient(#1a1a20_0deg_90deg,#0a0a0e_90deg_180deg)] bg-[length:12px_12px] overflow-hidden'>
+                        <img
+                          src={extraction.subject_thumbnail_url}
+                          alt='Extracted subject on transparent background'
+                          className='w-24 h-24 object-contain'
+                        />
+                      </div>
+                      <span className='text-[10px] text-fg-muted'>subject</span>
+                    </div>
+                  )}
+                  <div className='flex flex-col items-center gap-1'>
+                    <div className='rounded-lg border border-white/10 bg-black/40 overflow-hidden'>
+                      <img
+                        src={extraction.mask.png_data_url}
+                        alt='Binary silhouette mask'
+                        className='w-24 h-24 object-contain'
+                      />
+                    </div>
+                    <span className='text-[10px] text-fg-muted'>silhouette mask</span>
+                  </div>
+                </div>
+                <FieldHelp>Apply the suggested style to render the QR in the shape of this silhouette.</FieldHelp>
+              </div>
+            )}
 
             {/* Suggested payload */}
             <div className='mb-4 rounded-lg border border-white/10 bg-white/[0.03] p-3'>

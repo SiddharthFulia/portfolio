@@ -17,7 +17,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import qrcode from 'qrcode-generator'
 import { loadImage, toDataUrl, paletteToEditorState } from '../../lib/imageAnalysis'
-import { deepAnalyzeImage } from '../../api/vision'
+import { deepAnalyzeImage, extractSubject } from '../../api/vision'
 import { notice } from '../../lib/notice'
 import { LuxeLoader } from '../loaders'
 
@@ -187,6 +187,7 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
   const [statusIdx, setStatusIdx] = useState(0)
   const [elapsedSec, setElapsedSec] = useState(0)
   const [result, setResult]       = useState(null)   // full BE response
+  const [extraction, setExtraction] = useState(null) // subject-extract response
   const [error, setError]         = useState('')
 
   // What kind of QR payload to encode. Users can flip between:
@@ -233,6 +234,7 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
       const f = new File([blob], `capture-${Date.now()}.png`, { type: 'image/png' })
       setFile(f)
       setResult(null)
+      setExtraction(null)
       setError('')
       const url = URL.createObjectURL(blob)
       setPreview(url)
@@ -251,6 +253,7 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
           if (f) {
             setFile(f)
             setResult(null)
+            setExtraction(null)
             setError('')
             setPreview(URL.createObjectURL(f))
             notice.info('Pasted image from clipboard')
@@ -270,6 +273,7 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
     beforeUpload: (f) => {
       setFile(f)
       setResult(null)
+      setExtraction(null)
       setError('')
       setPreview(URL.createObjectURL(f))
       return false
@@ -290,9 +294,18 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
 
   const runAnalyze = async () => {
     if (!file) { notice.warning('Drop or capture an image first'); return }
-    setAnalyzing(true); setError(''); setResult(null)
+    setAnalyzing(true); setError(''); setResult(null); setExtraction(null)
     try {
-      const data = await deepAnalyzeImage(file)
+      // Fire the deep-analyze + subject-extract in parallel. The mask is
+      // used to constrain QR modules to the shape of the extracted subject
+      // (silhouette mode). If extraction fails we still ship the analysis —
+      // the silhouette toggle just stays greyed out.
+      const [dataRes, extractRes] = await Promise.allSettled([
+        deepAnalyzeImage(file),
+        extractSubject(file),
+      ])
+      if (dataRes.status === 'rejected') throw dataRes.reason
+      const data = dataRes.value
       // Attach a preview data URL so the render path doesn't need the
       // original File / blob.
       let dataUrl = preview
@@ -301,6 +314,9 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
         dataUrl = toDataUrl(img, 800, 'image/jpeg', 0.85)
       } catch {}
       setResult({ ...data, dataUrl })
+      if (extractRes.status === 'fulfilled' && extractRes.value?.mask?.png_data_url) {
+        setExtraction(extractRes.value)
+      }
       // Surface any BE-side warnings as an amber toast, non-fatal.
       if (Array.isArray(data.warnings) && data.warnings.length) {
         notice.warning(data.warnings.join(' · '))
@@ -372,9 +388,16 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
     // Push style + payload + the original image so the 2D editor can bake
     // the actual picture into the QR (halftone into ECC waste + centred
     // logo overlay). Both live-scan-test-friendly modes handled parent-side.
+    // Also ships the silhouette mask when we have one — QR modules are then
+    // clipped to the shape of the extracted subject in the 2D editor, AND
+    // extruded as a topographical bloom by the 3D Scenes "Tattoo Bloom"
+    // theme. Also ships the full BE palette so the bloom towers/stubs can
+    // tint themselves with the tattoo&apos;s own dominant colours.
     onApplyStyle?.(suggested.state, {
       payload: suggested.payload,
       image: preview || null,       // data URL — parent wires it into logoImg + bakeImg
+      silhouetteMask: extraction?.mask?.png_data_url || null,
+      palette: Array.isArray(result?.palette) ? result.palette : null,
     })
     notice.success('Style, payload, and image pushed to editor')
   }
@@ -451,7 +474,7 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
                 <Button
                   variant='ghost'
                   icon={<ReloadOutlined />}
-                  onClick={() => { setFile(null); setPreview(''); setResult(null); setError('') }}>
+                  onClick={() => { setFile(null); setPreview(''); setResult(null); setExtraction(null); setError('') }}>
                   Clear
                 </Button>
               )}
@@ -667,6 +690,48 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
                   <img src={result.depth.dataUrl} alt='Depth map' className='max-w-[240px] max-h-[240px] object-contain' />
                 </div>
                 <FieldHelp>Brighter areas are closer to the camera.</FieldHelp>
+              </div>
+            )}
+
+            {/* Extracted subject — silhouette + thumbnail from the parallel
+                subject-extract pass. Small preview so users see the extraction
+                worked; the actual mask flows into the 2D editor when they
+                click "Use this style". */}
+            {extraction?.mask?.png_data_url && (
+              <div className='mb-5'>
+                <div className='text-[10px] uppercase tracking-widest text-fg-muted font-bold mb-2'>
+                  Extracted subject
+                  {extraction.mask.coverage != null && (
+                    <span className='ml-2 text-fg-muted normal-case'>
+                      {Math.round(extraction.mask.coverage * 100)}% coverage
+                    </span>
+                  )}
+                </div>
+                <div className='flex flex-wrap gap-3 items-start'>
+                  {extraction.subject_thumbnail_url && (
+                    <div className='flex flex-col items-center gap-1'>
+                      <div className='rounded-lg border border-white/10 bg-[repeating-conic-gradient(#1a1a20_0deg_90deg,#0a0a0e_90deg_180deg)] bg-[length:12px_12px] overflow-hidden'>
+                        <img
+                          src={extraction.subject_thumbnail_url}
+                          alt='Extracted subject on transparent background'
+                          className='w-24 h-24 object-contain'
+                        />
+                      </div>
+                      <span className='text-[10px] text-fg-muted'>subject</span>
+                    </div>
+                  )}
+                  <div className='flex flex-col items-center gap-1'>
+                    <div className='rounded-lg border border-white/10 bg-black/40 overflow-hidden'>
+                      <img
+                        src={extraction.mask.png_data_url}
+                        alt='Binary silhouette mask'
+                        className='w-24 h-24 object-contain'
+                      />
+                    </div>
+                    <span className='text-[10px] text-fg-muted'>silhouette mask</span>
+                  </div>
+                </div>
+                <FieldHelp>Apply the suggested style to constrain QR modules to this shape.</FieldHelp>
               </div>
             )}
 
