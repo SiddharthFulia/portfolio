@@ -308,6 +308,30 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
     notice.success('Style + tattoo image pushed to editor')
   }
 
+  // Ship silhouette + palette straight to 3D Scenes → Tattoo Bloom. No
+  // logo pasted on the QR, the tattoo IS the 3D scene.
+  const viewSilhouetteIn3D = () => {
+    const mask = extraction?.mask?.png_data_url
+    if (!mask) return
+    const dominant = Array.isArray(analysis?.dominant_colors)
+      ? analysis.dominant_colors.map((hex, i) => ({ hex, weight: Math.max(0.05, 1 - i * 0.15) }))
+      : null
+    onApplyStyle?.({}, {
+      silhouetteMask: mask,
+      palette: dominant,
+      jumpTo: '3D Scenes',
+    })
+    notice.success('Tattoo pushed to 3D — Tattoo Bloom theme')
+  }
+
+  // Silhouette-only apply for users who want to stay in the 2D editor.
+  const applySilhouetteOnly = () => {
+    const mask = extraction?.mask?.png_data_url
+    if (!mask) return
+    onApplyStyle?.({}, { silhouetteMask: mask })
+    notice.success('Silhouette applied — QR now traces the tattoo shape')
+  }
+
   // ─── Use suggested payload (without switching tabs) ──────────
   const usePayloadNow = () => {
     if (!analysis?.suggested_qr_payload) return
@@ -625,7 +649,15 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
                     <span className='text-[10px] text-fg-muted'>silhouette mask</span>
                   </div>
                 </div>
-                <FieldHelp>Apply the suggested style to render the QR in the shape of this silhouette.</FieldHelp>
+                <div className='flex flex-wrap gap-2 mt-3'>
+                  <Button variant='primary' icon={<ThunderboltFilled />} onClick={viewSilhouetteIn3D}>
+                    View as 3D scene
+                  </Button>
+                  <Button variant='ghost' icon={<PictureOutlined />} onClick={applySilhouetteOnly}>
+                    Apply to 2D editor
+                  </Button>
+                </div>
+                <FieldHelp>"View as 3D scene" jumps to 3D Scenes → Tattoo Bloom — dark cells rise into ink columns tinted by the tattoo's palette. Finder + timing patterns stay intact so it still scans.</FieldHelp>
               </div>
             )}
 

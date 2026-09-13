@@ -1700,8 +1700,9 @@ ${inner}
               // Stash the palette so the 3D "Tattoo Bloom" theme can tint
               // its bloom columns with the tattoo's own dominant colours.
               if (Array.isArray(opts?.palette)) setTattooPalette(opts.palette)
-              // Jump back to the 2D editor so the redraw is visible.
-              setTopTab('2D Editor')
+              // Jump to whichever surface the caller asked for. Defaults to
+              // the 2D editor so the redraw is visible.
+              setTopTab(opts?.jumpTo === '3D Scenes' ? '3D Scenes' : '2D Editor')
             }}
             onUsePayload={(p) => {
               // Just swap the payload without switching tabs.
@@ -1764,7 +1765,7 @@ ${inner}
                 setSilhouetteOn(false)
               }
               if (Array.isArray(opts?.palette)) setTattooPalette(opts.palette)
-              setTopTab('2D Editor')
+              setTopTab(opts?.jumpTo === '3D Scenes' ? '3D Scenes' : '2D Editor')
             }}
           />
         </div>

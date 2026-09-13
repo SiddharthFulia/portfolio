@@ -1074,6 +1074,20 @@ function decodeWithRotations(img, expected) {
 // ─── The React component ──────────────────────────────────────────────
 export default function QRScenes3D({ matrixData, ecc, payload, silhouetteMask = null, palette = null }) {
   const [theme, setTheme] = useState('Tree Garden')
+
+  // When a silhouette mask arrives (user clicked "View as 3D scene" in
+  // Vision or Tattoo Studio), auto-flip to Tattoo Bloom so the tattoo is
+  // immediately visible as the topographical bloom. Users can switch back
+  // to any other theme after — this only fires on the mask flipping from
+  // null to a data URL, so it doesn't fight the user's manual choice.
+  const prevMaskRef = useRef(null)
+  useEffect(() => {
+    if (silhouetteMask && silhouetteMask !== prevMaskRef.current) {
+      setTheme('Tattoo Bloom')
+    }
+    prevMaskRef.current = silhouetteMask
+  }, [silhouetteMask])
+
   const [season, setSeason] = useState('Summer')
   const [view, setView] = useState('Iso')      // 'Iso' | 'Top'
   const [autoRotate, setAutoRotate] = useState(true)

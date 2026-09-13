@@ -383,6 +383,28 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
     paintLogo(suggestedQrCanvas, preview || null, { pct: 0.24 })
   }, [suggestedQrCanvas, preview])
 
+  // Ship the silhouette + palette straight to the 3D Scenes tab so the
+  // extracted tattoo renders as a topographical bloom — no image pasted
+  // onto the QR body, the tattoo IS the 3D scene.
+  const viewSilhouetteIn3D = () => {
+    const mask = extraction?.mask?.png_data_url
+    if (!mask) return
+    onApplyStyle?.({}, {
+      silhouetteMask: mask,
+      palette: Array.isArray(result?.palette) ? result.palette : null,
+      jumpTo: '3D Scenes',
+    })
+    notice.success('Tattoo pushed to 3D — Tattoo Bloom theme')
+  }
+
+  // Silhouette-only apply for users who want to stay in the 2D editor.
+  const applySilhouetteOnly = () => {
+    const mask = extraction?.mask?.png_data_url
+    if (!mask) return
+    onApplyStyle?.({}, { silhouetteMask: mask })
+    notice.success('Silhouette applied — QR now traces the tattoo shape')
+  }
+
   const applySuggested = () => {
     if (!suggested?.state) return
     // Push style + payload + the original image so the 2D editor can bake
@@ -731,7 +753,15 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
                     <span className='text-[10px] text-fg-muted'>silhouette mask</span>
                   </div>
                 </div>
-                <FieldHelp>Apply the suggested style to constrain QR modules to this shape.</FieldHelp>
+                <div className='flex flex-wrap gap-2 mt-3'>
+                  <Button variant='primary' icon={<ThunderboltFilled />} onClick={viewSilhouetteIn3D}>
+                    View as 3D scene
+                  </Button>
+                  <Button variant='ghost' icon={<PictureOutlined />} onClick={applySilhouetteOnly}>
+                    Apply to 2D editor
+                  </Button>
+                </div>
+                <FieldHelp>"View as 3D scene" jumps to 3D Scenes → Tattoo Bloom — dark cells rise into ink columns tinted by the tattoo's palette. Finder + timing patterns stay intact so it still scans.</FieldHelp>
               </div>
             )}
 
