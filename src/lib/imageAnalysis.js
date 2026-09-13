@@ -80,7 +80,23 @@ export function pickContrastPair(colors) {
 // aesthetic: { busyness?, saturation?, brightness? } — optional; drives
 //            the cell / eye shape choice (busy = square, calm = rounded).
 export function paletteToEditorState(palette, aesthetic = {}) {
-  if (!palette || palette.length === 0) return null
+  // Empty palette → safe default (charcoal + amber) so the caller still
+  // gets a working style. Guarded downstream too, but this stops callers
+  // from having to null-check every time.
+  if (!palette || palette.length === 0) {
+    return {
+      cellShape: 'Rounded',
+      eyeShape: 'Rounded',
+      eyeInnerShape: 'Rounded',
+      fgColor: '#0a0a0e',
+      fgColor2: '#f59e0b',
+      bgColor: '#ffffff',
+      gradientOn: true,
+      gradientType: 'linear',
+      gradientAngle: 135,
+      ecc: 'H',
+    }
+  }
   const pair = pickContrastPair(palette) || {
     a: palette[0],
     b: palette[1] || palette[0],

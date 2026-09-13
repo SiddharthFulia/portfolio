@@ -629,9 +629,11 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
         )}
       </AnimatePresence>
 
-      {/* Suggested QR */}
+      {/* Suggested QR — only when we actually derived a style + payload.
+          `suggested.state` can be null when the palette came back empty
+          (e.g. all-black photos) — in that case we skip the whole card. */}
       <AnimatePresence>
-        {suggested && (
+        {suggested?.state && (
           <motion.div
             key='suggested'
             initial={{ opacity: 0, y: 12 }}
