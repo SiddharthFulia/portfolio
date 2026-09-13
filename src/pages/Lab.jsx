@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, lazy, Suspense } from 'react'
 import { Link } from 'react-router-dom'
 import AnimatedCard from '../components/explore/AnimatedCard'
 import ShaderAnimation from '../components/luxe/ShaderAnimation'
+import useQueryState from '../hooks/useQueryState'
 
 /* ─────────────────────────────────────────────────────────────────
  * Merged Lab page — was two pages (/lab + /creative). Now one home
@@ -169,9 +170,17 @@ const PreviewTile = ({ demo }) => {
  * Main Lab page
  * ─────────────────────────────────────────────────────────────── */
 const Lab = () => {
-  const [activeCat, setActiveCat] = useState('all')
+  // Category filter + which demo is open both survive reload via ?cat=&exp=.
+  // `query` is transient search-box text and stays local — no URL noise.
+  const CAT_IDS  = useMemo(() => ['all', ...CATEGORIES.map(c => c.id)], [])
+  const DEMO_IDS = useMemo(() => DEMOS.map(d => d.id), [])
+  const [activeCat, setActiveCat] = useQueryState('cat', 'all', { allowed: CAT_IDS })
   const [query, setQuery]         = useState('')
-  const [openId, setOpenId]       = useState(null)
+  const [openId, setOpenId]       = useQueryState('exp', null, {
+    allowed: DEMO_IDS,
+    parse: (s) => s,
+    serialize: (v) => v == null ? '' : String(v),
+  })
   const contentRef = useRef(null)
 
   const filtered = useMemo(() => {

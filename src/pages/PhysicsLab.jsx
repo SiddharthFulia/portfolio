@@ -26,6 +26,19 @@ import {
   simulatePendulum, phasePendulum, lyapunovPendulum,
 } from '../api/physics'
 import { LuxeLoader } from '../components/loaders'
+import useQueryState from '../hooks/useQueryState'
+
+// Compact float serializer for URL params — trims trailing zeros so
+// e.g. 1.0 → "1", 1.20 → "1.2", and NaN falls back to default.
+const parseNum = (s) => {
+  const n = Number(s)
+  return Number.isFinite(n) ? n : NaN
+}
+const serializeNum = (v) => {
+  const n = Number(v)
+  if (!Number.isFinite(n)) return ''
+  return Number(n.toFixed(4)).toString()
+}
 
 const DEG = Math.PI / 180
 
@@ -182,9 +195,10 @@ function Sym({ tex, help, className = '' }) {
 }
 
 export default function PhysicsLab() {
-  // Params
-  const [L1, setL1]           = useState(1.0)
-  const [L2, setL2]           = useState(1.0)
+  // Params — arm lengths L1, L2 mirror into ?L1= / ?L2= so the geometry
+  // survives reload. Masses / g / damping stay local (rare tweaks).
+  const [L1, setL1]           = useQueryState('L1', 1.0, { parse: parseNum, serialize: serializeNum })
+  const [L2, setL2]           = useQueryState('L2', 1.0, { parse: parseNum, serialize: serializeNum })
   const [m1, setM1]           = useState(1.0)
   const [m2, setM2]           = useState(1.0)
   const [g, setG]             = useState(9.81)
@@ -197,10 +211,11 @@ export default function PhysicsLab() {
   const [rainbow, setRainbow]     = useState(true)
   const [showForces, setShowForces] = useState(true)
 
-  // Initial conditions
+  // Initial conditions — the two starting angles are the whole point of
+  // the chaos demo; sync them so a shared URL reproduces the run.
   const [preset, setPreset]  = useState('chaos')
-  const [ic1Deg, setIc1Deg]  = useState(120)  // θ₁ initial (degrees)
-  const [ic2Deg, setIc2Deg]  = useState(-10)  // θ₂ initial (degrees)
+  const [ic1Deg, setIc1Deg]  = useQueryState('a1', 120, { parse: parseNum, serialize: serializeNum })  // θ₁ initial (degrees)
+  const [ic2Deg, setIc2Deg]  = useQueryState('a2', -10, { parse: parseNum, serialize: serializeNum })  // θ₂ initial (degrees)
   const [ico1, setIco1]      = useState(0)    // ω₁ initial (rad/s)
   const [ico2, setIco2]      = useState(0)    // ω₂ initial (rad/s)
 

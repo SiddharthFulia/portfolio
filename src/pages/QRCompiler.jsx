@@ -33,6 +33,16 @@ import { notice } from '../lib/notice'
 import QRScenes3D from '../components/qr/QRScenes3D'
 import TattooStudio from '../components/qr/TattooStudio'
 import VisionStudio from '../components/qr/VisionStudio'
+import useQueryState from '../hooks/useQueryState'
+
+// URL-safe slug helpers for the top-level tab + payload kind. Segmented
+// values include spaces / mixed-case — the URL wants kebab-case.
+const TOP_TABS_LIST = ['2D Editor', '3D Scenes', 'Tattoo Studio', 'Vision Studio']
+const slugTab   = (t) => t.toLowerCase().replace(/\s+/g, '-')
+const unslugTab = (s) => TOP_TABS_LIST.find(t => slugTab(t) === s) || '2D Editor'
+const PAYLOAD_TYPE_LIST = ['URL', 'Text', 'Wi-Fi', 'vCard', 'SMS', 'Email', 'Geo', 'UPI']
+const slugPayload   = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+const unslugPayload = (s) => PAYLOAD_TYPE_LIST.find(t => slugPayload(t) === s) || 'URL'
 
 // ─── KaTeX helpers (identical shape to PhysicsLab / Atoms) ─────────
 function renderTex(src, opts = {}) {
@@ -852,10 +862,18 @@ const KIND_FROM_BE = Object.fromEntries(
 export default function QRCompiler() {
   // Top-level tab — 2D editor (all the classic controls) vs 3D scenes.
   // Payload input is shared, so switching tabs keeps whatever was typed.
-  const [topTab, setTopTab] = useState('2D Editor')
+  // topTab + payloadKind + ecc mirror into ?tab= / ?payload= / ?ecc= so
+  // reloading (and shared deep-links) land on the same tab + payload kind.
+  const [topTab, setTopTab] = useQueryState('tab', '2D Editor', {
+    parse: unslugTab,
+    serialize: slugTab,
+  })
 
   // Payload
-  const [payloadKind, setPayloadKind] = useState('URL')
+  const [payloadKind, setPayloadKind] = useQueryState('payload', 'URL', {
+    parse: unslugPayload,
+    serialize: slugPayload,
+  })
   const [fields, setFields] = useState({
     url:  'https://siddharthfulia.com/qr',
     text: 'Hello — this is a Reed-Solomon-safe QR playground.',
@@ -885,7 +903,7 @@ export default function QRCompiler() {
 
   // QR params
   const [version, setVersion] = useState(0)   // 0 = auto
-  const [ecc, setEcc]         = useState('H')
+  const [ecc, setEcc]         = useQueryState('ecc', 'H', { allowed: ['L', 'M', 'Q', 'H'] })
   // NOTE: qrcode-generator picks the mask itself. We store an intended
   // mask index for UI purposes only. If the user wants "Auto", value=-1.
   const [maskChoice, setMaskChoice] = useState(-1)
@@ -924,6 +942,11 @@ export default function QRCompiler() {
   // N×N array of 0/1 built once per matrix version.
   const [silhouetteMask, setSilhouetteMask] = useState(null)
   const [silhouetteOn, setSilhouetteOn]     = useState(false)
+  // `subjectThumbnail` is the RGBA data URL of the subject on transparent bg,
+  // returned by BE /api/vision/extract-subject as subject_thumbnail_url. Fed
+  // to the 3D "Ink Relief" theme where it textures the background plane with
+  // a real-photo tattoo cutout, displaced by the mask.
+  const [subjectThumbnail, setSubjectThumbnail] = useState(null)
   // Dominant palette from the last vision / tattoo analysis. Kept as
   // [{ hex, weight }] (BE shape) so downstream components can pick their
   // own semantic slots — the 3D "Tattoo Bloom" theme, for instance, picks
@@ -1651,6 +1674,7 @@ ${inner}
             ecc={ecc}
             payload={payload}
             silhouetteMask={silhouetteMask}
+            subjectThumbnail={subjectThumbnail}
             palette={tattooPalette}
           />
         </div>
@@ -1704,6 +1728,9 @@ ${inner}
               } else {
                 setSilhouetteOn(false)
               }
+              // Subject thumbnail — RGBA cutout on transparent BG. Feeds the
+              // 3D "Ink Relief" theme's tattoo background plane texture.
+              if (opts?.subjectThumbnail) setSubjectThumbnail(opts.subjectThumbnail)
               // Stash the palette so the 3D "Tattoo Bloom" theme can tint
               // its bloom columns with the tattoo's own dominant colours.
               if (Array.isArray(opts?.palette)) setTattooPalette(opts.palette)
@@ -1771,6 +1798,7 @@ ${inner}
               } else {
                 setSilhouetteOn(false)
               }
+              if (opts?.subjectThumbnail) setSubjectThumbnail(opts.subjectThumbnail)
               if (Array.isArray(opts?.palette)) setTattooPalette(opts.palette)
               setTopTab(opts?.jumpTo === '3D Scenes' ? '3D Scenes' : '2D Editor')
             }}

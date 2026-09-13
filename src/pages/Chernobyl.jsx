@@ -23,6 +23,18 @@ import {
   RadarChartOutlined, ExperimentOutlined,
 } from '@ant-design/icons'
 import katex from 'katex'
+import useQueryState from '../hooks/useQueryState'
+
+// URL-safe numeric serialize (trim trailing zeros) so ?rod=60 stays clean.
+const parseNumChernobyl = (s) => {
+  const n = Number(s)
+  return Number.isFinite(n) ? n : NaN
+}
+const serializeNumChernobyl = (v) => {
+  const n = Number(v)
+  if (!Number.isFinite(n)) return ''
+  return Number(n.toFixed(4)).toString()
+}
 import { LuxeLoader } from '../components/loaders'
 
 const BE_URL = import.meta.env.VITE_BE_URL || 'http://localhost:4001'
@@ -1233,8 +1245,10 @@ export default function Chernobyl() {
   // Scenario preset — snaps sliders to preset values.
   const [scenario, setScenario] = useState('nominal')
 
-  const [rod, setRod]           = useState(60)
-  const [flow, setFlow]         = useState(8000)
+  // rod position + coolant flow survive reload — the two knobs anyone
+  // would want to share via URL to reproduce a scenario.
+  const [rod, setRod]           = useQueryState('rod',  60,   { parse: parseNumChernobyl, serialize: serializeNumChernobyl })
+  const [flow, setFlow]         = useQueryState('flow', 8000, { parse: parseNumChernobyl, serialize: serializeNumChernobyl })
   const [powerSet, setPowerSet] = useState(3200)
   const [xenon0, setXenon0]     = useState(1.0)
   const [duration, setDuration] = useState(60)
