@@ -303,6 +303,7 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
       payload: usePayload ? analysis.suggested_qr_payload : null,
       image: preview || null,
       silhouetteMask: extraction?.mask?.png_data_url || null,
+      subjectThumbnail: extraction?.subject_thumbnail_url || null,
       palette: dominant,
     })
     notice.success('Style + tattoo image pushed to editor')
@@ -318,17 +319,21 @@ export default function TattooStudio({ onApplyStyle, onUsePayload, currentPayloa
       : null
     onApplyStyle?.({}, {
       silhouetteMask: mask,
+      subjectThumbnail: extraction?.subject_thumbnail_url || null,
       palette: dominant,
       jumpTo: '3D Scenes',
     })
-    notice.success('Tattoo pushed to 3D — Tattoo Bloom theme')
+    notice.success('Tattoo pushed to 3D — Ink Relief theme')
   }
 
   // Silhouette-only apply for users who want to stay in the 2D editor.
   const applySilhouetteOnly = () => {
     const mask = extraction?.mask?.png_data_url
     if (!mask) return
-    onApplyStyle?.({}, { silhouetteMask: mask })
+    onApplyStyle?.({}, {
+      silhouetteMask: mask,
+      subjectThumbnail: extraction?.subject_thumbnail_url || null,
+    })
     notice.success('Silhouette applied — QR now traces the tattoo shape')
   }
 

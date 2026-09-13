@@ -391,17 +391,21 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
     if (!mask) return
     onApplyStyle?.({}, {
       silhouetteMask: mask,
+      subjectThumbnail: extraction?.subject_thumbnail_url || null,
       palette: Array.isArray(result?.palette) ? result.palette : null,
       jumpTo: '3D Scenes',
     })
-    notice.success('Tattoo pushed to 3D — Tattoo Bloom theme')
+    notice.success('Tattoo pushed to 3D — Ink Relief theme')
   }
 
   // Silhouette-only apply for users who want to stay in the 2D editor.
   const applySilhouetteOnly = () => {
     const mask = extraction?.mask?.png_data_url
     if (!mask) return
-    onApplyStyle?.({}, { silhouetteMask: mask })
+    onApplyStyle?.({}, {
+      silhouetteMask: mask,
+      subjectThumbnail: extraction?.subject_thumbnail_url || null,
+    })
     notice.success('Silhouette applied — QR now traces the tattoo shape')
   }
 
@@ -419,6 +423,7 @@ export default function VisionStudio({ onApplyStyle, currentPayload }) {
       payload: suggested.payload,
       image: preview || null,       // data URL — parent wires it into logoImg + bakeImg
       silhouetteMask: extraction?.mask?.png_data_url || null,
+      subjectThumbnail: extraction?.subject_thumbnail_url || null,
       palette: Array.isArray(result?.palette) ? result.palette : null,
     })
     notice.success('Style, payload, and image pushed to editor')

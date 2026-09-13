@@ -46,7 +46,7 @@ import * as THREE from 'three'
 import jsQR from 'jsqr'
 
 // ─── Theme + season catalogue ─────────────────────────────────────────
-export const THEMES = ['Tree Garden', 'Voxel City', 'Crystal Cave', 'Fractal Forest', 'Tattoo Bloom']
+export const THEMES = ['Tree Garden', 'Voxel City', 'Crystal Cave', 'Fractal Forest', 'Tattoo Bloom', 'Ink Relief']
 
 const SEASONS = {
   'Tree Garden':    ['Spring', 'Summer', 'Autumn', 'Winter'],
@@ -58,6 +58,12 @@ const SEASONS = {
   // atmosphere (sky, ambient warmth) and the neutral fallback tones the
   // scene shows when no palette has been supplied yet.
   'Tattoo Bloom':   ['Ink', 'Blossom', 'Noir'],
+  // Ink Relief — layered composition. The tattoo cutout textures a
+  // displaced background plane; QR modules float above it as raised
+  // pillars casting shadows onto the tattoo below. Three seasons pick
+  // the lighting mood: Bronze (warm amber key), Ivory (neutral warm
+  // key), Noir (cold cinematic key).
+  'Ink Relief':     ['Bronze', 'Ivory', 'Noir'],
 }
 
 // Palettes — each theme × season maps to a small set of colour tokens.
@@ -178,6 +184,36 @@ const PALETTES = {
       ground: '#a7b3c2', ambient: 0.4, sunColor: '#e0e8f2',
     },
   },
+  // Ink Relief — the "artistic background" theme. The subjectThumbnail
+  // (RGBA cutout on transparent bg) textures a displaced plane at z=0;
+  // QR pillars stand above at z≈0.7 and cast soft shadows. Palette
+  // slots: `paperTone` = brightest palette entry (paper/skin canvas),
+  // `moduleColor` = darkest palette entry (QR pillars), `inkTone` =
+  // most-saturated palette entry (subtle chromatic boost to displacement).
+  // Season only shifts lighting mood + sky/ambient.
+  'Ink Relief': {
+    Bronze: {
+      // Warm gallery light — amber directional key, bronze paper.
+      sky: '#f2e4cf', paperTone: '#f4e2c6', moduleColor: '#141418',
+      inkTone: '#b45309',
+      ambient: 0.35, ambientColor: '#fff2d8', sunColor: '#ffb347',
+      fillColor: '#ffd28a', ground: '#e4cfae',
+    },
+    Ivory: {
+      // Neutral portfolio white — soft warm key, cream paper.
+      sky: '#faf6ef', paperTone: '#fbf6ec', moduleColor: '#0a0a0e',
+      inkTone: '#5b21b6',
+      ambient: 0.4, ambientColor: '#ffffff', sunColor: '#fff2cc',
+      fillColor: '#f0e6d2', ground: '#f0ead9',
+    },
+    Noir: {
+      // Cool dramatic light — icy key, dim ambient, high-contrast paper.
+      sky: '#d0d6de', paperTone: '#e2e4e8', moduleColor: '#050609',
+      inkTone: '#0369a1',
+      ambient: 0.28, ambientColor: '#d8dee6', sunColor: '#c8d8ea',
+      fillColor: '#96a3b3', ground: '#b7bec7',
+    },
+  },
 }
 
 // Mesh keys that represent "artistic" geometry — everything that must be
@@ -194,6 +230,10 @@ const ARTISTIC_KEYS = new Set([
   'tattooBloomStub',            // Tattoo Bloom mid-height silhouette stubs
   'tattooFloor',                // Tattoo Bloom raised QR floor cells (dark)
   'tattooGround',               // Tattoo Bloom flat skin ground (light)
+  'inkReliefQuiet',             // Ink Relief white quiet-zone plane (small — safe under snap either way)
+  'inkReliefModule',            // Ink Relief raised QR pillars (dark data cells)
+  'inkReliefContrast',          // Ink Relief pale contrast discs under low-luminance ink
+  'inkReliefFinder',            // Ink Relief flat finder+alignment+timing tiles
   'ground',                     // Big fog-tinted under-plate
 ])
 
@@ -274,6 +314,125 @@ function resolveTattooPalette(basePalette, external) {
     bloomTop:  bloomTop?.hex  || basePalette.bloomTop,
     bloomStub: bloomStub?.hex || basePalette.bloomStub,
   }
+}
+
+// ─── Ink Relief — palette derivation ──────────────────────────────────
+// Same idea as resolveTattooPalette but picks three slots:
+//   • paperTone     — brightest palette entry (canvas / skin)
+//   • moduleColor   — darkest palette entry (QR pillars)
+//   • inkTone       — most saturated entry (chromatic boost on relief)
+// The season provides fallbacks + lighting mood.
+function resolveInkReliefPalette(basePalette, external) {
+  if (!Array.isArray(external) || external.length === 0) return basePalette
+  const hexes = external.map((c) => (c?.hex || '').trim()).filter(Boolean)
+  if (hexes.length === 0) return basePalette
+  const stats = hexes.map((hex) => {
+    const s = hex.replace('#', '')
+    const n = parseInt(s.length === 3 ? s.split('').map((c) => c + c).join('') : s, 16)
+    const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255
+    const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+    const max = Math.max(r, g, b), min = Math.min(r, g, b)
+    const sat = max === 0 ? 0 : (max - min) / max
+    return { hex, lum, sat }
+  })
+  const brightest = [...stats].sort((a, b) => b.lum - a.lum)[0]
+  const darkest   = [...stats].sort((a, b) => a.lum - b.lum)[0]
+  const mostSat   = [...stats].sort((a, b) => b.sat - a.sat)[0]
+  return {
+    ...basePalette,
+    paperTone:   brightest?.hex || basePalette.paperTone,
+    moduleColor: darkest?.hex   || basePalette.moduleColor,
+    inkTone:     mostSat?.hex   || basePalette.inkTone,
+  }
+}
+
+// ─── Ink Relief — distance-transform displacement map ─────────────────
+// Given a mask (Uint8Array of length w*h, > 128 = ink), compute a 2-pass
+// chamfer distance transform so pixels far outside the mask read as "flat"
+// and pixels inside the mask read as "tall". Result is normalised to
+// [0, 255] and returned as Uint8Array — ready to wrap in a DataTexture.
+//
+// Ink = tall (255), skin = flat (0). ~5-15ms on a 256×256 mask.
+function distanceTransformHeightMap(mask, w, h) {
+  const INF = w + h
+  const d = new Float32Array(w * h)
+  for (let i = 0; i < w * h; i++) d[i] = mask[i] > 128 ? 0 : INF
+  // Forward pass
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x
+      if (d[i] === 0) continue
+      if (x > 0) d[i] = Math.min(d[i], d[i - 1] + 1)
+      if (y > 0) d[i] = Math.min(d[i], d[i - w] + 1)
+    }
+  }
+  // Backward pass
+  for (let y = h - 1; y >= 0; y--) {
+    for (let x = w - 1; x >= 0; x--) {
+      const i = y * w + x
+      if (x < w - 1) d[i] = Math.min(d[i], d[i + 1] + 1)
+      if (y < h - 1) d[i] = Math.min(d[i], d[i + w] + 1)
+    }
+  }
+  // Normalise + invert (ink = tall). Clamp max distance so the falloff
+  // stays local — pixels very far from any ink drop straight to 0 fast.
+  let max = 0
+  for (let i = 0; i < d.length; i++) {
+    if (d[i] < INF && d[i] > max) max = d[i]
+  }
+  // Cap the falloff radius at ~16 px so the relief hugs the tattoo silhouette
+  // instead of blending into a big mound. Values past the cap flatten to 0.
+  const cap = Math.min(max || 1, 16)
+  const out = new Uint8Array(w * h)
+  for (let i = 0; i < d.length; i++) {
+    if (d[i] >= INF || d[i] >= cap) { out[i] = 0; continue }
+    out[i] = Math.round(255 * (1 - d[i] / cap))
+  }
+  // Cheap 3-tap box blur — kills the jagged edge of stroke ends.
+  const blurred = new Uint8Array(w * h)
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let s = 0, n = 0
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx, ny = y + dy
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue
+          s += out[ny * w + nx]; n++
+        }
+      }
+      blurred[y * w + x] = Math.round(s / n)
+    }
+  }
+  return blurred
+}
+
+// Sample a single pixel's grayscale luminance (0..1) from a decoded
+// Uint8ClampedArray (RGBA) at (u, v) ∈ [0, 1]². Uses nearest-neighbour —
+// good enough for the "is the tattoo already bright here?" check we run
+// before deciding whether to place a contrast disc under a module.
+function sampleThumbLuminance(rgba, w, h, u, v) {
+  const x = Math.max(0, Math.min(w - 1, Math.floor(u * w)))
+  const y = Math.max(0, Math.min(h - 1, Math.floor(v * h)))
+  const i = (y * w + x) * 4
+  const alpha = rgba[i + 3] / 255
+  if (alpha < 0.15) return 1  // transparent = paper (bright)
+  return ((0.2126 * rgba[i] + 0.7152 * rgba[i + 1] + 0.0722 * rgba[i + 2]) / 255)
+}
+
+// Classify a QR cell as "structural" — finder pattern, its separator, or
+// timing pattern. These cells stay flat white/dark (MeshBasic, unlit) in
+// Ink Relief so scanners see clean high-contrast edges regardless of the
+// artistic lighting. Alignment patterns are v2+ only — for simplicity we
+// leave them as regular data cells; the ~5×5 patches are small enough that
+// missing the flat treatment doesn't hurt jsQR's scan.
+function isStructuralQrCell(r, c, N) {
+  // Three 8×8 corner blocks (7×7 finder + 1-cell separator on inner sides).
+  if (r < 8 && c < 8) return true
+  if (r < 8 && c >= N - 8) return true
+  if (r >= N - 8 && c < 8) return true
+  // Timing patterns — row 6, col 6.
+  if (r === 6 || c === 6) return true
+  return false
 }
 
 // ─── Tree Garden — hand-crafted centrepiece tree ──────────────────────
@@ -593,7 +752,7 @@ function buildForestTree(cx, cz, seed) {
 // so we can toggle them independently of the artistic geometry.
 //
 // Returns { instances: { key: { color, transforms: [] } }, meta: { counts } }
-function buildSceneData(matrix, N, theme, season, maskGrid = null, externalPalette = null) {
+function buildSceneData(matrix, N, theme, season, maskGrid = null, externalPalette = null, thumbData = null) {
   // Defensive resolve — when the user switches theme, `season` may be stale
   // for one render (e.g. Tree Garden's "Autumn" → Voxel City which only has
   // Day/Sunset/Night). The season-sync useEffect corrects this on the next
@@ -605,6 +764,10 @@ function buildSceneData(matrix, N, theme, season, maskGrid = null, externalPalet
   // skin/ink/bloom hexes from it, so every tattoo drives its own bloom.
   if (theme === 'Tattoo Bloom') {
     palette = resolveTattooPalette(palette, externalPalette)
+  }
+  // Ink Relief — same story, three slots: paperTone / moduleColor / inkTone.
+  if (theme === 'Ink Relief') {
+    palette = resolveInkReliefPalette(palette, externalPalette)
   }
   const inst = {}
   const push = (key, mat, transform) => {
@@ -704,6 +867,44 @@ function buildSceneData(matrix, N, theme, season, maskGrid = null, externalPalet
           push('tileLight', { color: palette.tileLight, roughness: 0.95 },
             { pos: [x, 0.05, z], scale: [1, 0.1, 1] })
         }
+      } else if (theme === 'Ink Relief') {
+        // Ink Relief — layered composition:
+        //   Layer 0: quiet-zone plane (pushed once at loop end)
+        //   Layer 1: tattoo displacement plane (side-channel — see meta.inkRelief)
+        //   Layer 2: contrast protection disc (per module, only where tattoo
+        //            is darker than the module colour)
+        //   Layer 3: raised pillar (dark data cells)
+        //   Layer 4: flat structural tile (finder + timing — dark or white)
+        const structural = isStructuralQrCell(r, c, N)
+        if (structural) {
+          // Finder + timing — flat unlit MeshBasic. Scanners see hard edges.
+          push('inkReliefFinder', {
+            color: dark ? palette.moduleColor : palette.paperTone,
+            basic: true,   // signal to buildSceneGraph → MeshBasicMaterial
+          }, { pos: [x, dark ? 0.9 : 0.88, z], scale: [1, dark ? 0.5 : 0.46, 1] })
+        } else if (dark) {
+          // Contrast protection disc — checks local tattoo luminance under
+          // this cell. If the tattoo is already brighter than 0.7, skip.
+          if (thumbData) {
+            // (r, c) → UV. Row 0 = top of QR = top of texture.
+            const u = (c + 0.5) / N
+            const v = (r + 0.5) / N
+            const lum = sampleThumbLuminance(
+              thumbData.rgba, thumbData.w, thumbData.h, u, v,
+            )
+            if (lum < 0.7) {
+              push('inkReliefContrast', {
+                color: palette.paperTone, basic: true,
+              }, { pos: [x, 0.48, z], scale: [0.98, 0.04, 0.98] })
+            }
+          }
+          // Raised data pillar — 1 × 1 × 0.4, z-centre at 0.7.
+          push('inkReliefModule', {
+            color: palette.moduleColor, roughness: 0.55, metalness: 0.05,
+          }, { pos: [x, 0.7, z], scale: [0.92, 0.4, 0.92] })
+        }
+        // Light data cell — no pillar. The tattoo displacement plane
+        // shows through as the artistic background.
       } else if (theme === 'Tattoo Bloom') {
         // Tattoo Bloom — every module is a column whose height is chosen
         // from four tiers based on (dark? ink-mask?):
@@ -777,9 +978,20 @@ function buildSceneData(matrix, N, theme, season, maskGrid = null, externalPalet
   }
 
   // Ground plane — one big flat cube under everything so the tile grid
-  // reads as sitting on something. Contributes 1 instance.
-  push('ground', { color: palette.ground, roughness: 1 },
-    { pos: [0, -0.1, 0], scale: [N + 6, 0.2, N + 6] })
+  // reads as sitting on something. Contributes 1 instance. Ink Relief
+  // suppresses this (it has its own paper-toned quiet-zone plane so the
+  // subject textured plane sits on a clean surface).
+  if (theme !== 'Ink Relief') {
+    push('ground', { color: palette.ground, roughness: 1 },
+      { pos: [0, -0.1, 0], scale: [N + 6, 0.2, N + 6] })
+  } else {
+    // Ink Relief quiet-zone plane at y = -0.05 — pure paper (bright
+    // paperTone). MeshBasic so lighting doesn't affect its perceived
+    // luminance; jsQR reads it as the flat quiet zone during scan-snap.
+    push('inkReliefQuiet', {
+      color: palette.paperTone, basic: true,
+    }, { pos: [0, -0.05, 0], scale: [N + QUIET * 2, 0.02, N + QUIET * 2] })
+  }
 
   const counts = {}
   let total = 0
@@ -818,33 +1030,67 @@ function initRenderer(canvas, opts = {}) {
 // Called on every matrix/theme/season/mask/palette change. Old scene
 // children are disposed (geometries + materials release GPU memory) but
 // the RENDERER stays alive.
-function buildSceneGraph(sceneData, theme, season, N, matrix) {
+function buildSceneGraph(sceneData, theme, season, N, matrix, extras = {}) {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(sceneData.meta.palette.sky)
-  scene.fog = new THREE.Fog(sceneData.meta.palette.sky, N * 1.5, N * 4)
+  // Ink Relief has no fog — it kills the tattoo texture contrast.
+  scene.fog = theme === 'Ink Relief'
+    ? null
+    : new THREE.Fog(sceneData.meta.palette.sky, N * 1.5, N * 4)
 
   // Lights — kept as refs so the scan pass can temporarily neutralise
-  // them (we want unlit black/white for jsQR).
+  // them (we want unlit black/white for jsQR). Ink Relief uses a
+  // brighter ambient + amber/warm/cold directional key with shadows
+  // enabled, so the QR pillars cast onto the tattoo background.
+  const isInkRelief = theme === 'Ink Relief'
+  const ambientIntensity = isInkRelief
+    ? (sceneData.meta.palette.ambient ?? 0.35)
+    : Math.min(sceneData.meta.palette.ambient, 0.4)
   const ambient = new THREE.AmbientLight(
-    0xffffff, Math.min(sceneData.meta.palette.ambient, 0.4),
+    isInkRelief ? new THREE.Color(sceneData.meta.palette.ambientColor || '#ffffff') : 0xffffff,
+    ambientIntensity,
   )
   scene.add(ambient)
   const sun = new THREE.DirectionalLight(sceneData.meta.palette.sunColor, 0.9)
-  sun.position.set(N * 0.6, N * 1.2, N * 0.4)
+  sun.position.set(N * 0.6, N * 1.5, N * 0.4)
+  if (isInkRelief) {
+    sun.castShadow = true
+    sun.shadow.mapSize.set(1024, 1024)
+    sun.shadow.camera.left = -N
+    sun.shadow.camera.right = N
+    sun.shadow.camera.top = N
+    sun.shadow.camera.bottom = -N
+    sun.shadow.camera.near = 0.1
+    sun.shadow.camera.far = N * 6
+    sun.shadow.bias = -0.002
+    sun.shadow.radius = 3
+  }
   scene.add(sun)
   // HemisphereLight — sky/ground wrap-around. Reads as gentle bounce
-  // light and stops voxel faces from going flat black.
-  const hemi = new THREE.HemisphereLight(
-    sceneData.meta.palette.sky, sceneData.meta.palette.ground || '#333', 0.35,
+  // light and stops voxel faces from going flat black. Ink Relief skips
+  // hemisphere (it's an interior "gallery" lighting model, not sky/ground).
+  let hemi = null
+  if (!isInkRelief) {
+    hemi = new THREE.HemisphereLight(
+      sceneData.meta.palette.sky, sceneData.meta.palette.ground || '#333', 0.35,
+    )
+    scene.add(hemi)
+  }
+  const fill = new THREE.DirectionalLight(
+    isInkRelief ? new THREE.Color(sceneData.meta.palette.fillColor || '#ffffff') : '#ffffff',
+    isInkRelief ? 0.2 : 0.2,
   )
-  scene.add(hemi)
-  const fill = new THREE.DirectionalLight('#ffffff', 0.2)
-  fill.position.set(-N * 0.5, N * 0.4, -N * 0.5)
+  fill.position.set(-N * 0.4, N * 0.5, -N * 0.4)
   scene.add(fill)
 
-  // Cameras
+  // Cameras — Ink Relief uses a slightly higher iso camera to reveal the
+  // module depth without perspective distortion.
   const isoCam = new THREE.OrthographicCamera(-N, N, N, -N, 0.1, N * 6)
-  isoCam.position.set(N * 1.2, N * 1.3, N * 1.2)
+  if (isInkRelief) {
+    isoCam.position.set(N * 1.0, N * 1.5, N * 1.0)
+  } else {
+    isoCam.position.set(N * 1.2, N * 1.3, N * 1.2)
+  }
   isoCam.up.set(0, 1, 0)
   isoCam.lookAt(0, 0, 0)
 
@@ -877,7 +1123,11 @@ function buildSceneGraph(sceneData, theme, season, N, matrix) {
     const matProps = entry.material
     // Scan tiles are unlit — MeshBasic gives us pure #000/#fff regardless
     // of ambient / directional lights, which is exactly what jsQR wants.
-    const mat = SCAN_KEYS.has(key)
+    // Ink Relief's finder/timing/quiet/contrast tiles are ALSO MeshBasic
+    // (matProps.basic === true) so scanners see hard-edged flat surfaces
+    // regardless of the artistic lighting mood.
+    const useBasic = SCAN_KEYS.has(key) || matProps.basic === true
+    const mat = useBasic
       ? new THREE.MeshBasicMaterial({ color: matProps.color, toneMapped: false })
       : new THREE.MeshStandardMaterial({
           color: matProps.color,
@@ -916,6 +1166,8 @@ function buildSceneGraph(sceneData, theme, season, N, matrix) {
     }
     // Tile grid receives shadows so the tree's cast reads.
     if (key === 'tileDark' || key === 'tileLight') im.receiveShadow = true
+    // Ink Relief pillars cast onto the tattoo displacement plane.
+    if (key === 'inkReliefModule') im.castShadow = true
     // Scan meshes stay hidden by default — iso view never shows them.
     if (SCAN_KEYS.has(key)) im.visible = false
     scene.add(im)
@@ -936,11 +1188,75 @@ function buildSceneGraph(sceneData, theme, season, N, matrix) {
     scene.add(groundOverlay)
   }
 
+  // Ink Relief tattoo displacement plane — lives outside the instance
+  // graph so we can hide it wholesale during the top-down scan pass and
+  // fade it with the artistic geometry during camera transitions.
+  // Textured with the RGBA subject cutout, displaced by the distance-
+  // transform height map, tinted subtly by the inkTone palette entry.
+  let inkReliefBackground = null
+  if (theme === 'Ink Relief') {
+    inkReliefBackground = buildInkReliefBackground(
+      sceneData.meta.palette, N,
+      extras.subjectTexture || null,
+      extras.displacementTexture || null,
+    )
+    scene.add(inkReliefBackground)
+  }
+
   return {
     scene, isoCam, topCam, liveCam, meshes,
-    treeOverlay, groundOverlay,
+    treeOverlay, groundOverlay, inkReliefBackground,
     lights: { ambient, sun, fill, hemi },
   }
+}
+
+// ─── Ink Relief — tattoo displacement background plane ───────────────
+// PlaneGeometry with a high segment count textured with the subject
+// thumbnail (RGBA, transparent bg). Displacement comes from the mask
+// distance-transform passed in as a DataTexture. Sits at y = 0 (flat).
+// castShadow is off (it's the ground); receiveShadow is on so QR pillar
+// shadows land visibly on the tattoo.
+function buildInkReliefBackground(palette, N, subjectTexture, displacementTexture) {
+  const group = new THREE.Group()
+  group.name = 'inkReliefBackground'
+  // Plane fills the QR footprint. High seg count = smooth displacement.
+  const segs = 128
+  const size = N
+  const geom = new THREE.PlaneGeometry(size, size, segs, segs)
+  geom.rotateX(-Math.PI / 2)
+
+  // Paper-toned base — even when the texture is still loading (async),
+  // the plane reads as clean paper.
+  const mat = new THREE.MeshStandardMaterial({
+    color: palette.paperTone,
+    roughness: 0.88,
+    metalness: 0.02,
+    // Subject cutout painted onto the paper. Transparent pixels reveal
+    // the base colour underneath, so the subject reads as if inked on
+    // real paper. Tint slightly toward the ink tone for chromatic
+    // presence — small (0.15 mix) so paper still dominates.
+  })
+  if (subjectTexture) {
+    mat.map = subjectTexture
+    // Nudge the emissive toward the ink tone so the tattoo relief picks
+    // up a subtle chromatic glow without going flat black.
+    mat.emissive = new THREE.Color(palette.inkTone || '#5b21b6')
+    mat.emissiveIntensity = 0.08
+  }
+  if (displacementTexture) {
+    mat.displacementMap = displacementTexture
+    mat.displacementScale = 0.5
+    mat.displacementBias = 0
+  }
+  const mesh = new THREE.Mesh(geom, mat)
+  mesh.position.y = 0
+  mesh.receiveShadow = true
+  mesh.castShadow = false
+  // Stash the material so the transition-fade path can crossfade it
+  // via userData.fadeMaterials, matching the Tree Garden overlay pattern.
+  group.userData.fadeMaterials = [mat]
+  group.add(mesh)
+  return group
 }
 
 // Fully dispose a scene graph's GPU resources without touching the renderer.
@@ -1010,8 +1326,12 @@ function renderTopDownFrame(state, outCanvas) {
   // outside the instance graph — hide them for the snapshot too.
   const prevTreeVis = state.treeOverlay?.visible
   const prevGroundVis = state.groundOverlay?.visible
+  const prevInkBgVis = state.inkReliefBackground?.visible
   if (state.treeOverlay) state.treeOverlay.visible = false
   if (state.groundOverlay) state.groundOverlay.visible = false
+  // Ink Relief tattoo background — hide during snap so jsQR sees only
+  // the flat scan tiles + quiet zone.
+  if (state.inkReliefBackground) state.inkReliefBackground.visible = false
 
   // Stash + neutralise background/fog. Scan meshes are MeshBasic so
   // lights don't matter, but killing the fog also removes the sky-tinted
@@ -1036,6 +1356,7 @@ function renderTopDownFrame(state, outCanvas) {
   }
   if (state.treeOverlay) state.treeOverlay.visible = prevTreeVis
   if (state.groundOverlay) state.groundOverlay.visible = prevGroundVis
+  if (state.inkReliefBackground) state.inkReliefBackground.visible = prevInkBgVis
   state.scene.background = prevBg
   state.scene.fog = prevFog
 
@@ -1113,21 +1434,23 @@ function decodeWithRotations(img, expected) {
 }
 
 // ─── The React component ──────────────────────────────────────────────
-export default function QRScenes3D({ matrixData, ecc, payload, silhouetteMask = null, palette = null }) {
+export default function QRScenes3D({ matrixData, ecc, payload, silhouetteMask = null, subjectThumbnail = null, palette = null }) {
   const [theme, setTheme] = useState('Tree Garden')
 
   // When a silhouette mask arrives (user clicked "View as 3D scene" in
-  // Vision or Tattoo Studio), auto-flip to Tattoo Bloom so the tattoo is
-  // immediately visible as the topographical bloom. Users can switch back
-  // to any other theme after — this only fires on the mask flipping from
-  // null to a data URL, so it doesn't fight the user's manual choice.
+  // Vision or Tattoo Studio), auto-select the most-appropriate theme:
+  //   • subjectThumbnail present too → Ink Relief (layered composition
+  //     with real tattoo texture on the background plane)
+  //   • only silhouetteMask → Tattoo Bloom (mask-driven topographical bloom)
+  // Users can switch manually after; this only fires on the mask flipping
+  // from null to a data URL, so it doesn't fight the user's own choice.
   const prevMaskRef = useRef(null)
   useEffect(() => {
     if (silhouetteMask && silhouetteMask !== prevMaskRef.current) {
-      setTheme('Tattoo Bloom')
+      setTheme(subjectThumbnail ? 'Ink Relief' : 'Tattoo Bloom')
     }
     prevMaskRef.current = silhouetteMask
-  }, [silhouetteMask])
+  }, [silhouetteMask, subjectThumbnail])
 
   const [season, setSeason] = useState('Summer')
   const [view, setView] = useState('Iso')      // 'Iso' | 'Top'
@@ -1193,6 +1516,109 @@ export default function QRScenes3D({ matrixData, ecc, payload, silhouetteMask = 
     return () => { cancelled = true }
   }, [silhouetteMask, matrixData?.N])
 
+  // ─── Ink Relief — subject texture + displacement DataTexture ──────
+  // Load the RGBA subject thumbnail into a THREE.Texture and decode it
+  // to a Uint8ClampedArray so buildSceneData can sample local luminance
+  // for its contrast-protection decisions.
+  const [subjectTex, setSubjectTex] = useState(null)   // THREE.Texture
+  const [thumbData, setThumbData]   = useState(null)   // { rgba, w, h }
+  useEffect(() => {
+    if (!subjectThumbnail) {
+      // Dispose the previous texture to free GPU memory.
+      setSubjectTex((prev) => { prev?.dispose?.(); return null })
+      setThumbData(null)
+      return
+    }
+    let cancelled = false
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      if (cancelled) return
+      try {
+        // Downsample to 256×256 — plenty of texture detail for the plane
+        // and keeps the luminance sample loop fast.
+        const w = 256, h = 256
+        const off = document.createElement('canvas')
+        off.width = w; off.height = h
+        const ctx = off.getContext('2d')
+        ctx.clearRect(0, 0, w, h)
+        ctx.drawImage(img, 0, 0, w, h)
+        const rgba = ctx.getImageData(0, 0, w, h).data
+        // Build a CanvasTexture so three uses the resized canvas directly.
+        const tex = new THREE.CanvasTexture(off)
+        tex.colorSpace = THREE.SRGBColorSpace
+        tex.anisotropy = 4
+        tex.needsUpdate = true
+        setSubjectTex((prev) => { prev?.dispose?.(); return tex })
+        setThumbData({ rgba, w, h })
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn('[QRScenes3D] subject thumbnail decode failed', err)
+        setSubjectTex((prev) => { prev?.dispose?.(); return null })
+        setThumbData(null)
+      }
+    }
+    img.onerror = () => {
+      if (cancelled) return
+      // eslint-disable-next-line no-console
+      console.warn('[QRScenes3D] subject thumbnail load failed')
+      setSubjectTex((prev) => { prev?.dispose?.(); return null })
+      setThumbData(null)
+    }
+    img.src = subjectThumbnail
+    return () => { cancelled = true }
+  }, [subjectThumbnail])
+
+  // Displacement map — 256×256 grayscale DataTexture built from the mask
+  // distance transform. Rebuilds when the mask changes; disposed when
+  // the mask goes away.
+  const [displacementTex, setDisplacementTex] = useState(null)
+  useEffect(() => {
+    if (!silhouetteMask) {
+      setDisplacementTex((prev) => { prev?.dispose?.(); return null })
+      return
+    }
+    let cancelled = false
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      if (cancelled) return
+      try {
+        const w = 256, h = 256
+        const off = document.createElement('canvas')
+        off.width = w; off.height = h
+        const ctx = off.getContext('2d')
+        ctx.fillStyle = '#000000'
+        ctx.fillRect(0, 0, w, h)
+        ctx.drawImage(img, 0, 0, w, h)
+        const px = ctx.getImageData(0, 0, w, h).data
+        // Extract red channel as the mask (grayscale by convention).
+        const mask = new Uint8Array(w * h)
+        for (let i = 0; i < mask.length; i++) mask[i] = px[i * 4]
+        const height = distanceTransformHeightMap(mask, w, h)
+        // Wrap the grayscale bytes in a DataTexture. RedFormat is single-
+        // channel so three sees it as a scalar displacement map.
+        const tex = new THREE.DataTexture(height, w, h, THREE.RedFormat)
+        tex.minFilter = THREE.LinearFilter
+        tex.magFilter = THREE.LinearFilter
+        tex.wrapS = THREE.ClampToEdgeWrapping
+        tex.wrapT = THREE.ClampToEdgeWrapping
+        tex.needsUpdate = true
+        setDisplacementTex((prev) => { prev?.dispose?.(); return tex })
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn('[QRScenes3D] displacement map build failed', err)
+        setDisplacementTex((prev) => { prev?.dispose?.(); return null })
+      }
+    }
+    img.onerror = () => {
+      if (cancelled) return
+      setDisplacementTex((prev) => { prev?.dispose?.(); return null })
+    }
+    img.src = silhouetteMask
+    return () => { cancelled = true }
+  }, [silhouetteMask])
+
   // Keep season valid whenever theme changes.
   useEffect(() => {
     if (!SEASONS[theme].includes(season)) setSeason(SEASONS[theme][0])
@@ -1213,7 +1639,7 @@ export default function QRScenes3D({ matrixData, ecc, payload, silhouetteMask = 
   const stateRef = useRef({
     renderer: null, scene: null,
     isoCam: null, topCam: null, liveCam: null,
-    meshes: {}, treeOverlay: null, groundOverlay: null,
+    meshes: {}, treeOverlay: null, groundOverlay: null, inkReliefBackground: null,
     lights: null, raf: 0, angle: 0, lastTS: 0,
     view: 'Iso', autoRotate: true, N: 21,
     // Cached offscreen scan canvas — 720 px gives ~24 px/module on a
@@ -1275,11 +1701,12 @@ export default function QRScenes3D({ matrixData, ecc, payload, silhouetteMask = 
     }
     disposeSceneGraph({ scene: stateRef.current.scene })
     const sceneData = buildSceneData(
-      matrixData.matrix, matrixData.N, theme, season, maskGrid, palette,
+      matrixData.matrix, matrixData.N, theme, season, maskGrid, palette, thumbData,
     )
     setInstanceTotal(sceneData.meta.total)
     const built = buildSceneGraph(
       sceneData, theme, season, matrixData.N, matrixData.matrix,
+      { subjectTexture: subjectTex, displacementTexture: displacementTex },
     )
     stateRef.current.scene = built.scene
     stateRef.current.isoCam = built.isoCam
@@ -1288,6 +1715,7 @@ export default function QRScenes3D({ matrixData, ecc, payload, silhouetteMask = 
     stateRef.current.meshes = built.meshes
     stateRef.current.treeOverlay = built.treeOverlay
     stateRef.current.groundOverlay = built.groundOverlay
+    stateRef.current.inkReliefBackground = built.inkReliefBackground
     stateRef.current.lights = built.lights
     stateRef.current.N = matrixData.N
     // Cache the iso sky / fog on the scene itself so the animation tick
@@ -1307,7 +1735,7 @@ export default function QRScenes3D({ matrixData, ecc, payload, silhouetteMask = 
     stateRef.current.transition = null
     setTransitionPct(0)
     setScenePresent(true)
-  }, [matrixData, theme, season, maskGrid, palette])
+  }, [matrixData, theme, season, maskGrid, palette, subjectTex, displacementTex, thumbData])
 
   // Keep the refs' latest view/autoRotate in sync without recreating the RAF.
   useEffect(() => { stateRef.current.view = view }, [view])
@@ -1401,6 +1829,7 @@ export default function QRScenes3D({ matrixData, ecc, payload, silhouetteMask = 
       }
       if (s.treeOverlay) s.treeOverlay.visible = mode === 'iso'
       if (s.groundOverlay) s.groundOverlay.visible = mode === 'iso'
+      if (s.inkReliefBackground) s.inkReliefBackground.visible = mode === 'iso'
     }
 
     // During a transition we keep artistic geometry visible but crossfade
@@ -1417,7 +1846,7 @@ export default function QRScenes3D({ matrixData, ecc, payload, silhouetteMask = 
           mat.depthWrite = artisticOpacity > 0.98
         }
       }
-      for (const overlay of [s.treeOverlay, s.groundOverlay]) {
+      for (const overlay of [s.treeOverlay, s.groundOverlay, s.inkReliefBackground]) {
         if (!overlay) continue
         overlay.visible = true
         const mats = overlay.userData?.fadeMaterials || []
@@ -1444,7 +1873,7 @@ export default function QRScenes3D({ matrixData, ecc, payload, silhouetteMask = 
           mat.depthWrite = true
         }
       }
-      for (const overlay of [s.treeOverlay, s.groundOverlay]) {
+      for (const overlay of [s.treeOverlay, s.groundOverlay, s.inkReliefBackground]) {
         if (!overlay) continue
         for (const m of (overlay.userData?.fadeMaterials || [])) {
           m.opacity = 1
@@ -1664,12 +2093,19 @@ export default function QRScenes3D({ matrixData, ecc, payload, silhouetteMask = 
         </div>
         <Segmented block value={theme} onChange={setTheme} options={THEMES} />
         <p className='text-[11px] text-fg-muted mt-2 leading-snug'>
-          Tree Garden raises stone tiles from the QR grid; Voxel City builds towers from dark cells; Crystal Cave forests them with glowing columns; Fractal Forest sprouts low-poly trees; Tattoo Bloom extrudes a tattoo silhouette out of the QR floor, coloured by the tattoo&apos;s own palette.
+          Tree Garden raises stone tiles from the QR grid; Voxel City builds towers from dark cells; Crystal Cave forests them with glowing columns; Fractal Forest sprouts low-poly trees; Tattoo Bloom extrudes a tattoo silhouette out of the QR floor, coloured by the tattoo&apos;s own palette; Ink Relief lays the tattoo cutout as a displaced background plane with QR modules floating above as raised pillars casting soft shadows.
         </p>
         {theme === 'Tattoo Bloom' && !silhouetteMask && (
           <div className='mt-2 rounded-md border border-fuchsia-400/25 bg-fuchsia-400/[0.06] px-3 py-2'>
             <p className='text-[11px] leading-snug text-fuchsia-100'>
               <span className='font-bold'>No silhouette yet.</span> Upload a tattoo in Vision Studio and hit &ldquo;Use this style&rdquo; — the extracted mask will extrude here as a topographical bloom. Right now the scene renders as a plain QR floor.
+            </p>
+          </div>
+        )}
+        {theme === 'Ink Relief' && !subjectThumbnail && (
+          <div className='mt-2 rounded-md border border-amber-400/25 bg-amber-400/[0.06] px-3 py-2'>
+            <p className='text-[11px] leading-snug text-amber-100'>
+              <span className='font-bold'>No tattoo cutout yet.</span> Upload a tattoo in Vision or Tattoo Studio and push it to 3D — the extracted subject textures the background plane, the mask drives its displacement, and the QR sits above as raised pillars.
             </p>
           </div>
         )}
