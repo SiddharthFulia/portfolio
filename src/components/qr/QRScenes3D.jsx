@@ -1160,6 +1160,11 @@ export default function QRScenes3D({ matrixData, ecc, payload, silhouetteMask = 
   // Progress bar % during the iso↔top camera transition (0 when idle).
   const [transitionPct, setTransitionPct] = useState(0)
 
+  // WebGL failure state — surfaces a friendly panel instead of crashing
+  // the whole page when the browser can't allocate a WebGL context (mobile
+  // context limit, WebGL disabled, headless env, etc.).
+  const [webglError, setWebglError] = useState(null)
+
   // three.js refs — persist across renders without triggering React.
   const canvasRef = useRef(null)
   const stateRef = useRef({
@@ -1218,9 +1223,22 @@ export default function QRScenes3D({ matrixData, ecc, payload, silhouetteMask = 
       matrixData.matrix, matrixData.N, theme, season, maskGrid, palette,
     )
     setInstanceTotal(sceneData.meta.total)
-    const built = buildThreeScene(
-      canvas, sceneData, theme, season, matrixData.N, matrixData.matrix,
-    )
+    let built
+    try {
+      built = buildThreeScene(
+        canvas, sceneData, theme, season, matrixData.N, matrixData.matrix,
+      )
+      setWebglError(null)
+    } catch (err) {
+      // Most common: "Error creating WebGL context" when the browser hits
+      // its per-tab WebGL context limit or WebGL is disabled. Recover
+      // gracefully — the page stays usable, user can still hit the 2D
+      // editor from the tab switcher.
+      console.warn('QRScenes3D: WebGL init failed —', err?.message || err)
+      setWebglError(err?.message || 'WebGL is unavailable on this device')
+      setScenePresent(false)
+      return
+    }
     stateRef.current.renderer = built.renderer
     stateRef.current.scene = built.scene
     stateRef.current.isoCam = built.isoCam
@@ -1712,9 +1730,19 @@ export default function QRScenes3D({ matrixData, ecc, payload, silhouetteMask = 
             onClick={onCanvasClick}
             className='block w-full h-full cursor-pointer'
           />
-          {!scenePresent && (
+          {!scenePresent && !webglError && (
             <div className='absolute inset-0 flex items-center justify-center text-fg-muted text-sm'>
               Enter a payload in the 2D Editor tab to render the scene.
+            </div>
+          )}
+          {webglError && (
+            <div className='absolute inset-0 flex flex-col items-center justify-center gap-3 text-center px-6'>
+              <div className='text-4xl'>{'◇'}</div>
+              <div className='font-bold text-base'>3D isn't available on this device</div>
+              <div className='text-fg-muted text-xs max-w-sm leading-snug'>
+                Your browser couldn't allocate a WebGL context — this usually happens on older mobile browsers or when too many WebGL tabs are open. The 2D Editor still works fully; use it to design and download your QR.
+              </div>
+              <div className='text-[10px] text-fg-muted font-mono opacity-60'>{webglError}</div>
             </div>
           )}
           {transitionPct > 0 && (
